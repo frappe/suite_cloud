@@ -1,0 +1,244 @@
+{
+ "actions": [],
+ "creation": "2026-09-01 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "dns_tab",
+  "section_break_hrww",
+  "root_domain_name",
+  "column_break_4ccc",
+  "default_dns_ttl",
+  "dns_provider_section",
+  "dns_provider",
+  "column_break_pntn",
+  "dns_provider_zone_id",
+  "dns_provider_access_key",
+  "dns_provider_access_secret",
+  "dns_provider_key",
+  "dns_provider_secret",
+  "dns_provider_username",
+  "dns_provider_client_ip",
+  "dns_provider_token",
+  "dns_provider_private_zone",
+  "stalwart_tab",
+  "stalwart_version",
+  "column_break_stalwart",
+  "stalwart_cli_version",
+  "timeouts_tab",
+  "timeouts_seconds_section",
+  "ansible_play_timeout",
+  "column_break_timeouts_1",
+  "server_job_timeout",
+  "column_break_timeouts_2",
+  "server_deployment_timeout"
+ ],
+ "fields": [
+  {
+   "fieldname": "dns_tab",
+   "fieldtype": "Tab Break",
+   "label": "DNS"
+  },
+  {
+   "fieldname": "section_break_hrww",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "The domain name used to create DNS records.",
+   "fieldname": "root_domain_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Root Domain Name",
+   "mandatory_depends_on": "eval: doc.dns_provider",
+   "placeholder": "frappemail.com"
+  },
+  {
+   "fieldname": "column_break_4ccc",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "3600",
+   "fieldname": "default_dns_ttl",
+   "fieldtype": "Int",
+   "label": "Default DNS TTL",
+   "reqd": 1
+  },
+  {
+   "fieldname": "dns_provider_section",
+   "fieldtype": "Section Break",
+   "label": "DNS Provider"
+  },
+  {
+   "description": "The service provider managing your root domain's DNS records.",
+   "fieldname": "dns_provider",
+   "fieldtype": "Select",
+   "label": "DNS Provider",
+   "options": "\nAmazonRoute53\nDigitalOcean\nCloudflare\nHetzner\nLinode\nNamecheap\nGoDaddy"
+  },
+  {
+   "fieldname": "column_break_pntn",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\", \"Cloudflare\"].includes(doc.dns_provider)",
+   "description": "Unique identifier for your DNS zone.",
+   "fieldname": "dns_provider_zone_id",
+   "fieldtype": "Data",
+   "label": "Zone ID"
+  },
+  {
+   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
+   "description": "Public key used to authenticate API requests.",
+   "fieldname": "dns_provider_access_key",
+   "fieldtype": "Data",
+   "label": "Access Key",
+   "mandatory_depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)"
+  },
+  {
+   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
+   "description": "Secret key paired with the access key for authentication.",
+   "fieldname": "dns_provider_access_secret",
+   "fieldtype": "Password",
+   "label": "Access Secret",
+   "mandatory_depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)"
+  },
+  {
+   "depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)",
+   "description": "Key used for authorization with the DNS provider.",
+   "fieldname": "dns_provider_key",
+   "fieldtype": "Data",
+   "label": "Key",
+   "mandatory_depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)"
+  },
+  {
+   "depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)",
+   "description": "Secret used along with the auth key for secure access.",
+   "fieldname": "dns_provider_secret",
+   "fieldtype": "Password",
+   "label": "Secret",
+   "mandatory_depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)"
+  },
+  {
+   "depends_on": "eval: doc.dns_provider && [\"Cloudflare\", \"Namecheap\"].includes(doc.dns_provider)",
+   "description": "Account username for the DNS provider.",
+   "fieldname": "dns_provider_username",
+   "fieldtype": "Data",
+   "label": "Username",
+   "mandatory_depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)"
+  },
+  {
+   "depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)",
+   "description": "IP address whitelisted to make API calls.",
+   "fieldname": "dns_provider_client_ip",
+   "fieldtype": "Data",
+   "label": "Client IP",
+   "mandatory_depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)"
+  },
+  {
+   "depends_on": "eval: doc.dns_provider && [\"DigitalOcean\", \"Cloudflare\", \"Hetzner\", \"Linode\", \"Namecheap\"].includes(doc.dns_provider)",
+   "description": "The token used to authenticate with your DNS provider.",
+   "fieldname": "dns_provider_token",
+   "fieldtype": "Password",
+   "label": "Token",
+   "mandatory_depends_on": "eval: doc.dns_provider && [\"DigitalOcean\", \"Cloudflare\", \"Hetzner\", \"Linode\", \"Namecheap\"].includes(doc.dns_provider)"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
+   "description": "Indicates whether the DNS zone is private.",
+   "fieldname": "dns_provider_private_zone",
+   "fieldtype": "Check",
+   "label": "Private Zone",
+   "options": "0"
+  },
+  {
+   "fieldname": "stalwart_tab",
+   "fieldtype": "Tab Break",
+   "label": "Stalwart"
+  },
+  {
+   "default": "v0.16.16",
+   "fieldname": "stalwart_version",
+   "fieldtype": "Data",
+   "label": "Stalwart Version",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_stalwart",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "v1.0.12",
+   "fieldname": "stalwart_cli_version",
+   "fieldtype": "Data",
+   "label": "Stalwart CLI Version",
+   "reqd": 1
+  },
+  {
+   "fieldname": "timeouts_tab",
+   "fieldtype": "Tab Break",
+   "label": "Timeouts"
+  },
+  {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval: true",
+   "fieldname": "timeouts_seconds_section",
+   "fieldtype": "Section Break",
+   "label": "Timeouts (Seconds)"
+  },
+  {
+   "default": "1500",
+   "fieldname": "ansible_play_timeout",
+   "fieldtype": "Int",
+   "label": "Ansible Play Timeout",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_timeouts_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1500",
+   "fieldname": "server_job_timeout",
+   "fieldtype": "Int",
+   "label": "Server Job Timeout",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_timeouts_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1500",
+   "fieldname": "server_deployment_timeout",
+   "fieldtype": "Int",
+   "label": "Server Deployment Timeout",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-09-01 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Suite Infra",
+ "name": "Suite Infra Settings",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

@@ -8,7 +8,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
-        files: "mail_infra.*"
+        files: "suite_infra.*"
         exclude: ".*json$|.*txt$|.*csv|.*md|.*svg"
       - id: check-merge-conflict
       - id: check-ast
@@ -38,11 +38,11 @@ repos:
         # Ignore any files that might contain jinja / bundles
         exclude: |
             (?x)^(
-                mail_infra/public/dist/.*|
+                suite_infra/public/dist/.*|
                 .*node_modules.*|
                 .*boilerplate.*|
-                mail_infra/templates/includes/.*|
-                mail_infra/public/js/lib/.*
+                suite_infra/templates/includes/.*|
+                suite_infra/public/js/lib/.*
             )$
 
 
@@ -55,12 +55,12 @@ repos:
         # Ignore any files that might contain jinja / bundles
         exclude: |
             (?x)^(
-                mail_infra/public/dist/.*|
+                suite_infra/public/dist/.*|
                 cypress/.*|
                 .*node_modules.*|
                 .*boilerplate.*|
-                mail_infra/templates/includes/.*|
-                mail_infra/public/js/lib/.*
+                suite_infra/templates/includes/.*|
+                suite_infra/public/js/lib/.*
             )$
 
 ci:

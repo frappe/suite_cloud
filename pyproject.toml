@@ -1,27 +1,31 @@
 [project]
-name = "mail_infra"
+name = "suite_infra"
 authors = [
-    { name = "Frappe", email = "developers@frappe.io"}
+    { name = "Frappe Technologies Pvt Ltd", email = "developers@frappe.io" },
 ]
-description = "Deploys and manages Stalwart mail servers: clusters, servers, DNS records and Ansible-driven deployments"
-requires-python = ">=3.14"
+description = "Deploys and manages the infrastructure behind Frappe Suite: Stalwart mail servers today, with clusters, DNS records and Ansible-driven deployments."
 readme = "README.md"
+requires-python = ">=3.14,<3.15"
 dynamic = ["version"]
 dependencies = [
-    # "frappe~=16.0.0" # Installed and managed by bench.
+    "paramiko~=5.0.0",  # SSH: Server Job, Mail Server checks, cluster keypairs
+    "dnspython~=2.6.1",  # DNS Record verification, hostname lookups
+    "dns-lexicon~=3.20.1",  # DNS provider API (Route53, Cloudflare, ...)
+    "ansible-runner~=2.4.1",  # Server Ansible Play
 ]
 
 [build-system]
 requires = ["flit_core >=3.4,<4"]
 build-backend = "flit_core.buildapi"
 
-# These dependencies are only installed when developer mode is enabled
-[tool.bench.dev-dependencies]
-# package_name = "~=1.1.0"
+[tool.bench.frappe-dependencies]
+frappe = ">=16.0.0,<18.0.0"
 
-# These apt dependencies will be installed from Ubuntu repositories when you host your app on Frappe Cloud
+# Installed from Ubuntu repositories when the app is hosted on Frappe Cloud
 [deploy.dependencies.apt]
-packages = []
+packages = [
+    "ansible",  # ansible-runner drives it for server deployments
+]
 
 [tool.ruff]
 line-length = 110
@@ -54,12 +58,10 @@ ignore = [
     "UP030", # Use implicit references for positional format fields (translations)
     "UP031", # Use format specifiers instead of percent format
     "UP032", # Use f-string instead of `format` call (translations)
-    "UP037", # quoted annotations
-    "UP040", # Use type aliases instead of type annotations
 ]
 typing-modules = ["frappe.types.DF"]
 
 [tool.ruff.format]
 quote-style = "double"
-indent-style = "tab"
+indent-style = "space"
 docstring-code-format = true
