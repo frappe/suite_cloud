@@ -1,5 +1,5 @@
 [project]
-name = "suite_infra"
+name = "suite_cloud"
 authors = [
     { name = "Frappe Technologies Pvt Ltd", email = "developers@frappe.io" },
 ]

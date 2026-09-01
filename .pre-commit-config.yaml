@@ -8,7 +8,7 @@ repos:
     rev: v6.0.0
     hooks:
       - id: trailing-whitespace
-        files: "suite_infra.*"
+        files: "suite_cloud.*"
         exclude: ".*json$|.*txt$|.*csv|.*md|.*svg"
       - id: check-merge-conflict
       - id: check-ast
@@ -38,11 +38,11 @@ repos:
         # Ignore any files that might contain jinja / bundles
         exclude: |
             (?x)^(
-                suite_infra/public/dist/.*|
+                suite_cloud/public/dist/.*|
                 .*node_modules.*|
                 .*boilerplate.*|
-                suite_infra/templates/includes/.*|
-                suite_infra/public/js/lib/.*
+                suite_cloud/templates/includes/.*|
+                suite_cloud/public/js/lib/.*
             )$
 
 
@@ -55,12 +55,12 @@ repos:
         # Ignore any files that might contain jinja / bundles
         exclude: |
             (?x)^(
-                suite_infra/public/dist/.*|
+                suite_cloud/public/dist/.*|
                 cypress/.*|
                 .*node_modules.*|
                 .*boilerplate.*|
-                suite_infra/templates/includes/.*|
-                suite_infra/public/js/lib/.*
+                suite_cloud/templates/includes/.*|
+                suite_cloud/public/js/lib/.*
             )$
 
 ci:

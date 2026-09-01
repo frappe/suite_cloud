@@ -1,4 +1,4 @@
-# Suite Infra
+# Suite Cloud
 
 The infrastructure app for [Frappe Suite](https://github.com/frappe/suite): it deploys and manages
 the servers Suite's products run on, from a Frappe site. Today that is [Stalwart](https://stalw.art)
@@ -6,7 +6,7 @@ mail servers (clusters, servers, DNS records, Ansible-driven deployments), which
 Suite's Mail module. Other services Suite depends on, such as Meet's SFU server, are meant to land
 here too.
 
-Suite Infra and Frappe Suite are independent. Install either one alone, or both on the same site;
+Suite Cloud and Frappe Suite are independent. Install either one alone, or both on the same site;
 Suite talks to whichever servers you point it at.
 
 ## What it manages today
@@ -20,17 +20,17 @@ Suite talks to whichever servers you point it at.
 | Server Ansible Play, Server Ansible Play Task | Ansible playbook runs (install Docker, deploy Stalwart) tracked task by task |
 | Server Deployment | A Stalwart deployment: docker-compose services, env, bootstrap plan; runs the deploy playbook |
 | DNS Record | Records under the root domain, pushed to and verified against your DNS provider |
-| Suite Infra Settings | Root domain, DNS provider credentials, Stalwart versions, job timeouts |
+| Suite Cloud Settings | Root domain, DNS provider credentials, Stalwart versions, job timeouts |
 
-Playbooks live in `suite_infra/deploy/playbooks`, the Frappe Cloud helper scripts in `suite_infra/deploy/fc`.
+Playbooks live in `suite_cloud/deploy/playbooks`, the Frappe Cloud helper scripts in `suite_cloud/deploy/fc`.
 DNS records, server jobs, Ansible plays and the settings are service-agnostic; only the cluster, server and
 deployment DocTypes are Stalwart-specific.
 
 ## Install
 
 ```sh
-bench get-app https://github.com/frappe/suite_infra
-bench --site yoursite install-app suite_infra
+bench get-app https://github.com/frappe/suite_cloud
+bench --site yoursite install-app suite_cloud
 ```
 
 `ansible` must be available on the bench host (`apt install ansible`; Frappe Cloud installs it from
@@ -39,7 +39,7 @@ the app.
 
 ## Settings
 
-`Suite Infra Settings` (desk: `/app/suite-infra-settings`) holds:
+`Suite Cloud Settings` (desk: `/app/suite-cloud-settings`) holds:
 
 - **DNS**: root domain name, default TTL, and the DNS provider with its credentials
   (Route53, DigitalOcean, Cloudflare, Hetzner, Linode, Namecheap, GoDaddy). Saving with changed
@@ -47,12 +47,12 @@ the app.
 - **Stalwart**: the Stalwart and Stalwart CLI versions a deployment pins.
 - **Timeouts**: background job timeouts for Ansible plays, server jobs and deployments.
 
-Every value can also be set in `site_config.json` under a `suite_infra` key; settings win when both
+Every value can also be set in `site_config.json` under a `suite_cloud` key; settings win when both
 are set:
 
 ```json
 {
-  "suite_infra": {
+  "suite_cloud": {
     "root_domain_name": "example.com",
     "stalwart_version": "v0.16.16"
   }
@@ -67,22 +67,22 @@ Sites that deployed servers through Suite keep their data:
    deployment DocTypes: their tables and rows (clusters, SSH keys, servers, job history) stay in the
    database; only the DocType definitions are removed. On sites that never created a cluster or
    server the empty tables are dropped too.
-2. `bench --site yoursite install-app suite_infra`. Installing adopts the existing tables, copies
+2. `bench --site yoursite install-app suite_cloud`. Installing adopts the existing tables, copies
    the root domain, DNS provider credentials, Stalwart versions and timeouts that Suite's Mail
-   Settings used to hold into Suite Infra Settings, and completes clusters and servers that older
+   Settings used to hold into Suite Cloud Settings, and completes clusters and servers that older
    Suite versions (or a restored standalone mail backup) left without an SSH keypair, recovery
    admin, default domain, recovery port or bootstrap plan.
 
-Installing Suite Infra before Suite has migrated is refused, since both apps would then define the
+Installing Suite Cloud before Suite has migrated is refused, since both apps would then define the
 same DocTypes.
 
 ## Walkthrough
 
-![Cluster](suite_infra/docs/screenshots/cluster-details.png)
-![Server](suite_infra/docs/screenshots/server-details.png)
-![SSH](suite_infra/docs/screenshots/server-ssh.png)
-![Install Stalwart](suite_infra/docs/screenshots/server-install-stalwart.png)
-![Stalwart login](suite_infra/docs/screenshots/stalwart-login.png)
+![Cluster](suite_cloud/docs/screenshots/cluster-details.png)
+![Server](suite_cloud/docs/screenshots/server-details.png)
+![SSH](suite_cloud/docs/screenshots/server-ssh.png)
+![Install Stalwart](suite_cloud/docs/screenshots/server-install-stalwart.png)
+![Stalwart login](suite_cloud/docs/screenshots/stalwart-login.png)
 
 ## License
 
