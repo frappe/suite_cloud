@@ -1,6 +1,11 @@
+from collections.abc import Callable
+
 import frappe
 from frappe import _
+from frappe.model.document import Document
 from frappe.utils.password import get_decrypted_password
+
+from suite_infra.utils import log_error
 
 # Frappe Suite kept these in Mail Settings before the deployment DocTypes moved here. Suite
 # drops the fields on upgrade but leaves the stored values behind in tabSingles / __Auth.
@@ -49,6 +54,7 @@ def before_install() -> None:
 
 def after_install() -> None:
     import_legacy_settings()
+    complete_adopted_records()
 
 
 def import_legacy_settings() -> None:
@@ -88,3 +94,58 @@ def get_legacy_value(field: str, legacy: dict) -> str | None:
         )
 
     return legacy.get(field)
+
+
+def complete_adopted_records() -> None:
+    """Fills in what clusters and servers adopted from an older Suite may lack.
+
+    Suite's retired cluster/server patches used to do this on migrate. A site that skipped them,
+    or restored a standalone mail backup, arrives with clusters missing an SSH keypair, recovery
+    admin or default domain and servers missing a recovery port and bootstrap plan. Everything here
+    only fills blanks, so it is safe on every install; each record is handled on its own so one bad
+    row (a server whose cluster is disabled, say) does not block the rest.
+    """
+
+    for name in frappe.get_all("Mail Cluster", pluck="name"):
+        complete_record("Mail Cluster", name, complete_cluster)
+
+    for name in frappe.get_all("Mail Server", pluck="name"):
+        complete_record("Mail Server", name, complete_server)
+
+
+def complete_record(doctype: str, name: str, complete: Callable[[Document], None]) -> None:
+    try:
+        complete(frappe.get_doc(doctype, name))
+    except Exception:
+        log_error(
+            _("Could not complete adopted {0} {1}").format(doctype, name),
+            frappe.get_traceback(with_context=False),
+        )
+
+
+def complete_cluster(cluster: Document) -> None:
+    if not cluster.ssh_public_key:
+        cluster.generate_ssh_keypair()
+
+    # default_domain is set-once and save() refuses to change it even from blank, so the first
+    # value goes straight to the table; the save below then sees nothing to object to.
+    if not cluster.default_domain:
+        cluster.db_set("default_domain", cluster.hostname, update_modified=False)
+
+    # The standalone mail app kept the recovery admin in fallback_* columns; the columns outlive
+    # the fields, so the values are still there to move over.
+    if not cluster.recovery_admin_user and cluster.get("fallback_admin_user"):
+        cluster.recovery_admin_user = cluster.get("fallback_admin_user")
+
+    if not cluster.recovery_admin_password and cluster.get("fallback_admin_password"):
+        if password := cluster.get_password("fallback_admin_password", raise_exception=False):
+            cluster.recovery_admin_password = password
+
+    cluster._initialize_data_store()
+    cluster.save()
+
+
+def complete_server(server: Document) -> None:
+    server.recovery_http_port = server.recovery_http_port or 8080
+    server.bootstrap_ndjson = server.bootstrap_ndjson or server._generate_bootstrap_ndjson()
+    server.save()

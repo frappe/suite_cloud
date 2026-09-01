@@ -67,9 +67,11 @@ Sites that deployed servers through Suite keep their data:
    deployment DocTypes: their tables and rows (clusters, SSH keys, servers, job history) stay in the
    database; only the DocType definitions are removed. On sites that never created a cluster or
    server the empty tables are dropped too.
-2. `bench --site yoursite install-app suite_infra`. Installing adopts the existing tables and copies
+2. `bench --site yoursite install-app suite_infra`. Installing adopts the existing tables, copies
    the root domain, DNS provider credentials, Stalwart versions and timeouts that Suite's Mail
-   Settings used to hold into Suite Infra Settings.
+   Settings used to hold into Suite Infra Settings, and completes clusters and servers that older
+   Suite versions (or a restored standalone mail backup) left without an SSH keypair, recovery
+   admin, default domain, recovery port or bootstrap plan.
 
 Installing Suite Infra before Suite has migrated is refused, since both apps would then define the
 same DocTypes.
