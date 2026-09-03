@@ -8,7 +8,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now
 
-from suite_cloud.cluster import bootstrap, dns, plan, reconcile
+from suite_cloud.cluster import bootstrap, dns, egress, plan, reconcile
 from suite_cloud.provisioning.ssh import generate_keypair
 from suite_cloud.stalwart import forget_sessions, get_admin_client, get_client
 from suite_cloud.stalwart.credentials import Credential
@@ -45,6 +45,7 @@ class StalwartCluster(Document):
         config_version: DF.Int
         coordinator: DF.Literal["Disabled", "Default"]
         data_store: DF.Link
+        default_egress_pool: DF.Link | None
         default_domain: DF.Data | None
         drift_report: DF.JSON | None
         enabled: DF.Check
@@ -55,6 +56,8 @@ class StalwartCluster(Document):
         is_default: DF.Check
         last_config_sync_at: DF.Datetime | None
         region: DF.Data | None
+        relay_password: DF.Password | None
+        relay_username: DF.Data | None
         search_store: DF.Link | None
         ssh_port: DF.Int
         ssh_private_key: DF.Password | None
@@ -71,6 +74,9 @@ class StalwartCluster(Document):
         self.admin_username = self.admin_username or "admin"
         if not self.admin_password:
             self.admin_password = frappe.generate_hash(length=32)
+        self.relay_username = self.relay_username or "relay"
+        if not self.relay_password:
+            self.relay_password = frappe.generate_hash(length=32)
         if not self.ssh_public_key:
             self.ssh_private_key, self.ssh_public_key = generate_keypair(f"suite-cloud-{self.cluster_name}")
 
@@ -79,15 +85,28 @@ class StalwartCluster(Document):
         self.apply_defaults()
         self.validate_stores()
         self.validate_default()
+        self.validate_egress_pool()
+
+    def validate_egress_pool(self) -> None:
+        if (
+            self.default_egress_pool
+            and frappe.db.get_value("Egress IP Pool", self.default_egress_pool, "cluster") != self.name
+        ):
+            frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.default_egress_pool))
 
     def after_insert(self) -> None:
         dns.sync_spf_record(self)
 
     def on_update(self) -> None:
-        if self.has_value_changed("enabled") and not self.enabled and self.status == "Active":
+        before = self.get_doc_before_save()
+        if not before:
+            return
+        if before.enabled and not self.enabled and self.status == "Active":
             self.db_set("status", "Disabled")
-        elif self.has_value_changed("enabled") and self.enabled and self.status == "Disabled":
+        elif not before.enabled and self.enabled and self.status == "Disabled":
             self.db_set("status", "Active")
+        if before.default_egress_pool != self.default_egress_pool:
+            egress.resync_cluster(self)
 
     def on_trash(self) -> None:
         for doctype in ("Stalwart Node", "Suite Site", "Egress Gateway", "Egress IP Pool"):

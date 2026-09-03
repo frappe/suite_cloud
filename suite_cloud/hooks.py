@@ -23,6 +23,7 @@ scheduler_events = {
         "*/5 * * * *": [
             "suite_cloud.suite_cloud.doctype.server_job.server_job.retry_failed_jobs",
             "suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node.poll_pending_nodes",
+            "suite_cloud.suite_cloud.doctype.egress_gateway.egress_gateway.poll_pending_gateways",
         ],
     },
     "hourly": [

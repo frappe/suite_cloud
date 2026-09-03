@@ -7,6 +7,7 @@ from frappe.model.document import Document
 from frappe.utils import cint, now
 
 from suite_cloud.cluster import dns as cluster_dns
+from suite_cloud.cluster import egress
 from suite_cloud.cluster.zone import build_domain_records
 from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.stalwart.directory import Domain
@@ -36,6 +37,7 @@ class MailDomain(Document):
         dns_records: DF.Table[MailDomainDNSRecord]
         dns_zone_file: DF.Code | None
         domain_name: DF.Data
+        egress_pool: DF.Link | None
         enabled: DF.Check
         is_verified: DF.Check
         last_refreshed_at: DF.Datetime | None
@@ -62,6 +64,11 @@ class MailDomain(Document):
             self.validate_not_reserved()
         if self.catch_all_address:
             self.catch_all_address = self.catch_all_address.strip().lower()
+        if (
+            self.egress_pool
+            and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
+        ):
+            frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
 
     def validate_not_reserved(self) -> None:
         cluster = self.get_cluster()
@@ -79,12 +86,18 @@ class MailDomain(Document):
         before = self.get_doc_before_save()
         if before and any(before.get(f) != self.get(f) for f in PUSHED_FIELDS):
             sync.push_update(self, "domains", self.stalwart_patch())
+        if before and (before.egress_pool != self.egress_pool or before.enabled != self.enabled):
+            egress.resync_cluster(self.get_cluster())
 
     def on_trash(self) -> None:
         for doctype in ("Mail Account", "Mail Group", "Mailing List"):
             if frappe.db.exists(doctype, {"domain": self.name}):
                 frappe.throw(_("Delete every {0} of {1} first.").format(_(doctype), self.domain_name))
         sync.push_destroy(self, "domains")
+
+    def after_delete(self) -> None:
+        if self.egress_pool or frappe.db.get_value("Suite Site", self.site, "egress_pool"):
+            egress.resync_cluster(self.get_cluster())
 
     # --- Stalwart -----------------------------------------------------------------
 

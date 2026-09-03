@@ -42,6 +42,11 @@
   "column_break_ssh",
   "ssh_public_key",
   "ssh_private_key",
+  "egress_tab",
+  "default_egress_pool",
+  "column_break_egress",
+  "relay_username",
+  "relay_password",
   "enterprise_tab",
   "enterprise_license_key",
   "column_break_enterprise",
@@ -337,6 +342,36 @@
    "label": "Config Plan",
    "options": "JSON",
    "read_only": 1
+  },
+  {
+   "fieldname": "egress_tab",
+   "fieldtype": "Tab Break",
+   "label": "Egress"
+  },
+  {
+   "description": "Outbound mail of domains without a pool of their own leaves through this pool; empty means direct delivery from the nodes.",
+   "fieldname": "default_egress_pool",
+   "fieldtype": "Link",
+   "label": "Default Egress Pool",
+   "options": "Egress IP Pool"
+  },
+  {
+   "fieldname": "column_break_egress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "relay",
+   "description": "SMTP AUTH user the cluster presents to its egress gateways.",
+   "fieldname": "relay_username",
+   "fieldtype": "Data",
+   "label": "Relay Username",
+   "read_only": 1
+  },
+  {
+   "fieldname": "relay_password",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Relay Password"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -344,6 +379,16 @@
   {
    "group": "Cluster",
    "link_doctype": "Stalwart Node",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Cluster",
+   "link_doctype": "Egress Gateway",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Cluster",
+   "link_doctype": "Egress IP Pool",
    "link_fieldname": "cluster"
   },
   {

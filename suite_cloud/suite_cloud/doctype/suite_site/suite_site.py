@@ -25,6 +25,7 @@ class SuiteSite(Document):
         archived_at: DF.Datetime | None
         cluster: DF.Link
         default_disk_quota_gb: DF.Float
+        egress_pool: DF.Link | None
         enabled: DF.Check
         fc_reference: DF.Data | None
         max_accounts: DF.Int
@@ -59,6 +60,19 @@ class SuiteSite(Document):
             cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
             if not cluster.enabled or cluster.status != "Active":
                 frappe.throw(_("Cluster {0} is not active.").format(self.cluster))
+
+        if (
+            self.egress_pool
+            and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
+        ):
+            frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
+
+    def on_update(self) -> None:
+        before = self.get_doc_before_save()
+        if before and before.egress_pool != self.egress_pool:
+            from suite_cloud.cluster import egress
+
+            egress.resync_cluster(self.get_cluster())
 
     def on_trash(self) -> None:
         if self.status != "Archived":

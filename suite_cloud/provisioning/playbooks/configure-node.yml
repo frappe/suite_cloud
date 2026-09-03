@@ -28,14 +28,9 @@
         state: restarted
         enabled: true
 
-    - name: Wait for SMTP
+    - name: Wait for the listeners
       wait_for:
         host: 127.0.0.1
-        port: 25
+        port: "{{ item }}"
         timeout: 180
-
-    - name: Wait for HTTPS
-      wait_for:
-        host: 127.0.0.1
-        port: 443
-        timeout: 180
+      loop: "{{ wait_ports }}"

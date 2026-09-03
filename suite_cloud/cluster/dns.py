@@ -111,3 +111,36 @@ def sync_spf_record(cluster: Document) -> None:
 
 def delete_cluster_records(cluster: Document) -> None:
     delete_managed_records("Stalwart Cluster", cluster.name)
+
+
+# --- egress -----------------------------------------------------------------------------------
+
+
+def sync_gateway_records(gateway: Document) -> None:
+    records = address_records(relative_host(gateway.hostname), gateway.ipv4_address, None, "Egress")
+    reconcile_managed_records("Egress Gateway", gateway.name, records)
+
+
+def delete_gateway_records(gateway: Document) -> None:
+    delete_managed_records("Egress Gateway", gateway.name)
+
+
+def pool_records(pool: Document) -> list[dict]:
+    """``<pool>.out.<zone>`` -> every gateway hosting the pool, plus one A record per EHLO name."""
+
+    records = []
+    for gateway_name in pool.gateway_names():
+        ip = frappe.get_cached_value("Egress Gateway", gateway_name, "ipv4_address")
+        records += address_records(relative_host(pool.hostname), ip, None, "Egress")
+    for row in pool.addresses:
+        ipv4, ipv6 = (None, row.ip_address) if ":" in row.ip_address else (row.ip_address, None)
+        records += address_records(relative_host(row.ehlo_hostname), ipv4, ipv6, "Egress")
+    return records
+
+
+def sync_pool_records(pool: Document) -> None:
+    reconcile_managed_records("Egress IP Pool", pool.name, pool_records(pool))
+
+
+def delete_pool_records(pool: Document) -> None:
+    delete_managed_records("Egress IP Pool", pool.name)

@@ -1,0 +1,115 @@
+# Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+import re
+
+import frappe
+from frappe import _
+from frappe.model.document import Document
+
+from suite_cloud.cluster import dns, egress
+from suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node import validate_ip
+
+POOL_NAME = re.compile(r"^[a-z0-9]{1,8}$")
+FIRST_RELAY_PORT = 2525
+
+
+class EgressIPPool(Document):
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+
+        from suite_cloud.suite_cloud.doctype.egress_ip_pool_address.egress_ip_pool_address import (
+            EgressIPPoolAddress,
+        )
+
+        addresses: DF.Table[EgressIPPoolAddress]
+        cluster: DF.Link
+        description: DF.Data | None
+        hostname: DF.Data | None
+        is_default: DF.Check
+        pool_name: DF.Data
+        relay_port: DF.Int
+    # end: auto-generated types
+
+    def autoname(self) -> None:
+        self.pool_name = (self.pool_name or "").strip().lower()
+        self.name = f"{self.cluster}-{self.pool_name}"
+
+    def validate(self) -> None:
+        if not POOL_NAME.match(self.pool_name or ""):
+            frappe.throw(_("Pool Name must be 1-8 lowercase letters or digits."))
+
+        cluster = self.get_cluster()
+        self.hostname = f"{self.pool_name}.out.{cluster.default_domain}"
+        if not self.relay_port:
+            self.relay_port = self.next_relay_port()
+        self.validate_addresses(cluster)
+        if self.is_default:
+            frappe.db.set_value(
+                "Egress IP Pool", {"cluster": self.cluster, "name": ["!=", self.name]}, "is_default", 0
+            )
+
+    def validate_addresses(self, cluster: Document) -> None:
+        seen: set[str] = set()
+        for row in self.addresses:
+            row.ip_address = validate_ip(row.ip_address, 6 if ":" in (row.ip_address or "") else 4)
+            row.ehlo_hostname = (row.ehlo_hostname or "").strip().lower().rstrip(".")
+            if row.ip_address in seen:
+                frappe.throw(_("Address {0} is listed twice.").format(row.ip_address))
+            seen.add(row.ip_address)
+            if frappe.db.get_value("Egress Gateway", row.gateway, "cluster") != self.cluster:
+                frappe.throw(_("Gateway {0} belongs to another cluster.").format(row.gateway))
+            suffix = f".{cluster.default_domain}"
+            if not row.ehlo_hostname.endswith(suffix) or "." in row.ehlo_hostname[: -len(suffix)]:
+                frappe.throw(
+                    _("EHLO hostname {0} must be a single label under {1}.").format(
+                        row.ehlo_hostname, cluster.default_domain
+                    )
+                )
+            other = frappe.db.get_value(
+                "Egress IP Pool Address",
+                {"ip_address": row.ip_address, "parent": ["!=", self.name]},
+                "parent",
+            )
+            if other:
+                frappe.throw(_("Address {0} already belongs to pool {1}.").format(row.ip_address, other))
+
+    def next_relay_port(self) -> int:
+        ports = frappe.get_all("Egress IP Pool", {"cluster": self.cluster}, pluck="relay_port")
+        return max([FIRST_RELAY_PORT - 1, *[p for p in ports if p]]) + 1
+
+    def on_update(self) -> None:
+        dns.sync_pool_records(self)
+        dns.sync_spf_record(self.get_cluster())
+        egress.apply_pool_changes(self)
+
+    def on_trash(self) -> None:
+        for doctype, field in (
+            ("Stalwart Cluster", "default_egress_pool"),
+            ("Suite Site", "egress_pool"),
+            ("Mail Domain", "egress_pool"),
+        ):
+            if user := frappe.db.exists(doctype, {field: self.name}):
+                frappe.throw(_("Pool is still used by {0} {1}.").format(_(doctype), user))
+        dns.delete_pool_records(self)
+
+    def after_delete(self) -> None:
+        cluster = self.get_cluster()
+        dns.sync_spf_record(cluster)
+        egress.resync_cluster(cluster)
+
+    # --- helpers --------------------------------------------------------------
+
+    def get_cluster(self) -> Document:
+        return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+
+    def gateway_names(self) -> list[str]:
+        return sorted({row.gateway for row in self.addresses})
+
+    def addresses_on(self, gateway: str) -> list[Document]:
+        return [row for row in self.addresses if row.gateway == gateway]

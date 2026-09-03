@@ -62,7 +62,7 @@ class TestServerJob(IntegrationTestCase):
         self.assertEqual(names[0], "Ensure a Debian-family host")  # from install-stalwart.yml
         self.assertIn("Install the Stalwart binary", names)  # inside a block
         self.assertIn("Apply the cluster plan", names)
-        self.assertEqual(names[-1], "Wait for HTTPS")
+        self.assertEqual(names[-1], "Wait for the listeners")
 
     def test_unknown_playbook_is_rejected(self) -> None:
         self.assertRaisesRegex(

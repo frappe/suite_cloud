@@ -1,0 +1,40 @@
+{
+ "actions": [],
+ "autoname": "format:{cluster}-{pool_name}",
+ "creation": "2026-09-03 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": ["cluster", "pool_name", "description", "column_break_main", "is_default", "relay_port", "hostname", "addresses_section", "addresses"],
+ "fields": [
+  {"fieldname": "cluster", "fieldtype": "Link", "in_list_view": 1, "in_standard_filter": 1, "label": "Cluster", "options": "Stalwart Cluster", "reqd": 1, "set_only_once": 1},
+  {"description": "Up to 8 lowercase letters or digits; doubles as the relay listener and queue id.", "fieldname": "pool_name", "fieldtype": "Data", "in_list_view": 1, "label": "Pool Name", "reqd": 1, "set_only_once": 1},
+  {"fieldname": "description", "fieldtype": "Data", "in_list_view": 1, "label": "Description"},
+  {"fieldname": "column_break_main", "fieldtype": "Column Break"},
+  {"default": "0", "description": "Domains without a pool of their own leave the cluster through this pool.", "fieldname": "is_default", "fieldtype": "Check", "label": "Is Cluster Default"},
+  {"description": "Port the cluster relays to on the gateways hosting this pool.", "fieldname": "relay_port", "fieldtype": "Int", "label": "Relay Port", "read_only": 1},
+  {"description": "Resolves to every gateway hosting an address of the pool.", "fieldname": "hostname", "fieldtype": "Data", "label": "Hostname", "read_only": 1},
+  {"fieldname": "addresses_section", "fieldtype": "Section Break", "label": "Addresses"},
+  {"fieldname": "addresses", "fieldtype": "Table", "label": "Addresses", "options": "Egress IP Pool Address"}
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {"group": "Users", "link_doctype": "Suite Site", "link_fieldname": "egress_pool"},
+  {"group": "Users", "link_doctype": "Mail Domain", "link_fieldname": "egress_pool"},
+  {"group": "DNS", "link_doctype": "DNS Record", "link_fieldname": "managed_by"}
+ ],
+ "modified": "2026-09-03 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Suite Cloud",
+ "name": "Egress IP Pool",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1},
+  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Suite Cloud Manager", "share": 1, "write": 1}
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

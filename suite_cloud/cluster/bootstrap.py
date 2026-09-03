@@ -101,6 +101,7 @@ def build_node_variables(context: dict) -> dict:
         "stalwart_cli_url_template": get_config("stalwart_cli_download_url_template"),
         "systemd_unit": plan.systemd_unit(),
         "firewall_ports": list(plan.FIREWALL_PORTS),
+        "wait_ports": [25, 443],
         "recovery_port": plan.BOOTSTRAP_PORT,
         "admin_user": cluster.admin_username,
         "admin_password": cluster.get_password("admin_password"),
