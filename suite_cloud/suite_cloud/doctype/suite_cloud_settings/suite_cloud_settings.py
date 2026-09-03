@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from suite_cloud.suite_cloud.doctype.dns_record.dns_record import get_dns_provider
+from suite_cloud.dns import get_dns_provider
 
 # A change to any of these means the stored provider access may no longer work.
 DNS_PROVIDER_FIELDS = (
@@ -30,7 +30,8 @@ class SuiteCloudSettings(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
-        ansible_play_timeout: DF.Int
+        acme_contact_email: DF.Data | None
+        acme_directory_url: DF.Data
         default_dns_ttl: DF.Int
         dns_provider: DF.Literal[
             "", "AmazonRoute53", "DigitalOcean", "Cloudflare", "Hetzner", "Linode", "Namecheap", "GoDaddy"
@@ -44,10 +45,13 @@ class SuiteCloudSettings(Document):
         dns_provider_token: DF.Password | None
         dns_provider_username: DF.Data | None
         dns_provider_zone_id: DF.Data | None
+        public_url: DF.Data | None
         root_domain_name: DF.Data | None
-        server_deployment_timeout: DF.Int
         server_job_timeout: DF.Int
+        site_service_user: DF.Link | None
+        stalwart_cli_download_url_template: DF.Data
         stalwart_cli_version: DF.Data
+        stalwart_download_url_template: DF.Data
         stalwart_version: DF.Data
     # end: auto-generated types
 
@@ -55,6 +59,7 @@ class SuiteCloudSettings(Document):
         if not frappe.flags.in_migrate:
             self.validate_root_domain_name()
             self.validate_dns_provider()
+            self.validate_public_url()
 
     def on_update(self) -> None:
         if self.has_value_changed("root_domain_name"):
@@ -62,7 +67,11 @@ class SuiteCloudSettings(Document):
 
     def validate_root_domain_name(self) -> None:
         if self.root_domain_name:
-            self.root_domain_name = self.root_domain_name.lower()
+            self.root_domain_name = self.root_domain_name.strip().lower().rstrip(".")
+
+    def validate_public_url(self) -> None:
+        if self.public_url:
+            self.public_url = self.public_url.strip().rstrip("/")
 
     def validate_dns_provider(self) -> None:
         """Checks the provider credentials are complete and, when they changed, that they work."""
@@ -75,7 +84,6 @@ class SuiteCloudSettings(Document):
 
         self.validate_dns_provider_credentials()
 
-        # Set by the installer, which copies credentials over without a network round trip.
         if self.flags.skip_dns_provider_verification:
             return
 

@@ -10,11 +10,15 @@ from frappe.utils.caching import request_cache
 CONFIG_KEYS = (
     "root_domain_name",
     "default_dns_ttl",
+    "public_url",
+    "site_service_user",
     "stalwart_version",
     "stalwart_cli_version",
-    "ansible_play_timeout",
+    "stalwart_download_url_template",
+    "stalwart_cli_download_url_template",
+    "acme_directory_url",
+    "acme_contact_email",
     "server_job_timeout",
-    "server_deployment_timeout",
 )
 
 
@@ -28,7 +32,11 @@ def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tup
 
     site_conf = frappe.conf.suite_cloud or {}
     settings = frappe.get_cached_doc("Suite Cloud Settings")
-    config = {field: settings.get(field) or site_conf.get(field) for field in CONFIG_KEYS}
+    config = {}
+    for field in CONFIG_KEYS:
+        value = settings.get(field)
+        # Only an unset value falls through, so a deliberate 0 in settings still wins.
+        config[field] = site_conf.get(field) if value in (None, "") else value
 
     if not key:
         return config
@@ -39,6 +47,12 @@ def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tup
             frappe.throw(_("Suite Cloud config key '{0}' not found").format(k))
 
     return tuple(config[k] for k in keys) if len(keys) > 1 else config[keys[0]]
+
+
+def get_public_url() -> str:
+    """Returns the URL other systems use to reach this Suite Cloud site."""
+
+    return (get_config("public_url") or frappe.utils.get_url()).rstrip("/")
 
 
 def password_or_none(doc, field: str) -> str | None:

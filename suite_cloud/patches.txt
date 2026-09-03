@@ -1,6 +1,4 @@
 [pre_model_sync]
-# Patches added in this section will be executed before doctypes are migrated
-# Read docs to understand patches: https://docs.frappe.io/framework/user/en/database-migrations
+suite_cloud.patches.v1_0.drop_legacy_deployment_doctypes
 
 [post_model_sync]
-# Patches added in this section will be executed after doctypes are migrated

@@ -17,7 +17,11 @@
   "priority",
   "ttl",
   "column_break_hszw",
-  "value"
+  "value",
+  "managed_by_section",
+  "managed_by_doctype",
+  "column_break_managed",
+  "managed_by"
  ],
  "fields": [
   {
@@ -52,14 +56,16 @@
    "fieldtype": "Section Break"
   },
   {
+   "default": "Other",
    "fieldname": "category",
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Category",
-   "options": "\nSending Record\nReceiving Record\nTracking Record\nServer Record",
+   "options": "Node\nIngress\nEgress\nSPF\nOther",
    "reqd": 1
   },
   {
+   "description": "Relative to the root domain, e.g. n1.blr",
    "fieldname": "host",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -107,12 +113,44 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Value",
-   "reqd": 1
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval: doc.managed_by",
+   "fieldname": "managed_by_section",
+   "fieldtype": "Section Break",
+   "label": "Managed By"
+  },
+  {
+   "description": "Records owned by a cluster, node, gateway or pool are created and removed with it.",
+   "fieldname": "managed_by_doctype",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Managed By Type",
+   "options": "\nStalwart Cluster\nStalwart Node\nEgress Gateway\nEgress IP Pool",
+   "read_only": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "column_break_managed",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "managed_by",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Managed By",
+   "options": "managed_by_doctype",
+   "read_only": 1,
+   "set_only_once": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-01 12:00:00.000000",
+ "modified": "2026-09-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "DNS Record",
@@ -128,6 +166,18 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Suite Cloud Manager",
    "share": 1,
    "write": 1
   }

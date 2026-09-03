@@ -88,7 +88,7 @@ def make_dns_record():
     record.host = TEST_HOST
     record.type = "A"
     record.value = "203.0.113.10"
-    record.category = "Sending Record"
+    record.category = "Other"
     return record.insert()
 
 

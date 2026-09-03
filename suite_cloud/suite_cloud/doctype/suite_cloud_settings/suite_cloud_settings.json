@@ -22,16 +22,22 @@
   "dns_provider_token",
   "dns_provider_private_zone",
   "stalwart_tab",
+  "versions_section",
   "stalwart_version",
+  "stalwart_download_url_template",
   "column_break_stalwart",
   "stalwart_cli_version",
-  "timeouts_tab",
-  "timeouts_seconds_section",
-  "ansible_play_timeout",
-  "column_break_timeouts_1",
-  "server_job_timeout",
-  "column_break_timeouts_2",
-  "server_deployment_timeout"
+  "stalwart_cli_download_url_template",
+  "acme_section",
+  "acme_directory_url",
+  "column_break_acme",
+  "acme_contact_email",
+  "suite_cloud_tab",
+  "public_url",
+  "column_break_suite_cloud",
+  "site_service_user",
+  "timeouts_section",
+  "server_job_timeout"
  ],
  "fields": [
   {
@@ -44,7 +50,7 @@
    "fieldtype": "Section Break"
   },
   {
-   "description": "The domain name used to create DNS records.",
+   "description": "Clusters, nodes and egress gateways get their DNS records under this domain.",
    "fieldname": "root_domain_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -57,7 +63,8 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "3600",
+   "default": "300",
+   "description": "Used for records Suite Cloud writes and suggested to sites for theirs.",
    "fieldname": "default_dns_ttl",
    "fieldtype": "Int",
    "label": "Default DNS TTL",
@@ -69,7 +76,7 @@
    "label": "DNS Provider"
   },
   {
-   "description": "The service provider managing your root domain's DNS records.",
+   "description": "The service provider managing your root domain's DNS records. The same credentials are handed to Stalwart for ACME DNS-01 challenges.",
    "fieldname": "dns_provider",
    "fieldtype": "Select",
    "label": "DNS Provider",
@@ -148,8 +155,7 @@
    "description": "Indicates whether the DNS zone is private.",
    "fieldname": "dns_provider_private_zone",
    "fieldtype": "Check",
-   "label": "Private Zone",
-   "options": "0"
+   "label": "Private Zone"
   },
   {
    "fieldname": "stalwart_tab",
@@ -157,10 +163,25 @@
    "label": "Stalwart"
   },
   {
-   "default": "v0.16.16",
+   "fieldname": "versions_section",
+   "fieldtype": "Section Break",
+   "label": "Versions"
+  },
+  {
+   "default": "v0.16.20",
+   "description": "Default version new clusters pin. Upgrades are per cluster.",
    "fieldname": "stalwart_version",
    "fieldtype": "Data",
    "label": "Stalwart Version",
+   "reqd": 1
+  },
+  {
+   "default": "https://github.com/stalwartlabs/stalwart/releases/download/{version}/stalwart-{target}.tar.gz",
+   "description": "{version} and {target} (e.g. x86_64-unknown-linux-gnu) are substituted on the node.",
+   "fieldname": "stalwart_download_url_template",
+   "fieldtype": "Data",
+   "label": "Stalwart Download URL Template",
+   "length": 255,
    "reqd": 1
   },
   {
@@ -175,51 +196,79 @@
    "reqd": 1
   },
   {
-   "fieldname": "timeouts_tab",
-   "fieldtype": "Tab Break",
-   "label": "Timeouts"
+   "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
+   "fieldname": "stalwart_cli_download_url_template",
+   "fieldtype": "Data",
+   "label": "Stalwart CLI Download URL Template",
+   "length": 255,
+   "reqd": 1
   },
   {
-   "collapsible": 1,
-   "collapsible_depends_on": "eval: true",
-   "fieldname": "timeouts_seconds_section",
+   "fieldname": "acme_section",
+   "fieldtype": "Section Break",
+   "label": "TLS Certificates (ACME)"
+  },
+  {
+   "default": "https://acme-v02.api.letsencrypt.org/directory",
+   "description": "Use https://acme-staging-v02.api.letsencrypt.org/directory while testing.",
+   "fieldname": "acme_directory_url",
+   "fieldtype": "Data",
+   "label": "ACME Directory URL",
+   "length": 255,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_acme",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Certificate expiry notices from the CA go here.",
+   "fieldname": "acme_contact_email",
+   "fieldtype": "Data",
+   "label": "ACME Contact Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "suite_cloud_tab",
+   "fieldtype": "Tab Break",
+   "label": "Suite Cloud"
+  },
+  {
+   "description": "URL handed to Frappe Cloud for sites to reach this Suite Cloud. Defaults to this site's URL.",
+   "fieldname": "public_url",
+   "fieldtype": "Data",
+   "label": "Public URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_suite_cloud",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Every Suite Site API request runs as this user. Created on install.",
+   "fieldname": "site_service_user",
+   "fieldtype": "Link",
+   "label": "Site Service User",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "timeouts_section",
    "fieldtype": "Section Break",
    "label": "Timeouts (Seconds)"
   },
   {
-   "default": "1500",
-   "fieldname": "ansible_play_timeout",
-   "fieldtype": "Int",
-   "label": "Ansible Play Timeout",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_timeouts_1",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "1500",
+   "default": "1800",
    "fieldname": "server_job_timeout",
    "fieldtype": "Int",
    "label": "Server Job Timeout",
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_timeouts_2",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "1500",
-   "fieldname": "server_deployment_timeout",
-   "fieldtype": "Int",
-   "label": "Server Deployment Timeout",
    "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-01 12:00:00.000000",
+ "modified": "2026-09-03 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
@@ -232,6 +281,16 @@
    "print": 1,
    "read": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Suite Cloud Manager",
    "share": 1,
    "write": 1
   }

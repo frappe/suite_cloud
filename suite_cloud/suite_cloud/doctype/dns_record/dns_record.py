@@ -8,16 +8,36 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, now
 
-from suite_cloud.suite_cloud.doctype.dns_record.dns_provider import DNSProvider
-from suite_cloud.utils import enqueue_job, get_config, password_or_none, user_context
-from suite_cloud.utils.dns import verify_dns_record
+from suite_cloud.dns import get_dns_provider
+from suite_cloud.dns.resolver import verify_dns_record
+from suite_cloud.utils import enqueue_job, get_config, user_context
 
 
 class DNSRecord(Document):
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+
+        category: DF.Literal["Node", "Ingress", "Egress", "SPF", "Other"]
+        host: DF.Data
+        is_verified: DF.Check
+        last_checked_at: DF.Datetime | None
+        managed_by: DF.DynamicLink | None
+        managed_by_doctype: DF.Literal[
+            "", "Stalwart Cluster", "Stalwart Node", "Egress Gateway", "Egress IP Pool"
+        ]
+        priority: DF.Int
+        ttl: DF.Int
+        type: DF.Literal["", "A", "AAAA", "CNAME", "MX", "TXT"]
+        value: DF.Text
+    # end: auto-generated types
+
     @cached_property
     def fqdn(self) -> str:
-        """Returns the Fully Qualified Domain Name"""
-
         root_domain_name = get_config("root_domain_name")
         if not root_domain_name:
             frappe.throw(_("Please set the Root Domain Name in Suite Cloud Settings."))
@@ -25,87 +45,72 @@ class DNSRecord(Document):
         return f"{self.host}.{root_domain_name}"
 
     def validate(self) -> None:
+        self.host = (self.host or "").strip().lower()
+        self.value = (self.value or "").strip()
         if self.is_new():
             self.validate_duplicate_record()
 
-        self.validate_ttl()
+        self.ttl = self.ttl or cint(get_config("default_dns_ttl"))
 
     def on_update(self) -> None:
-        if self.has_value_changed("value") or self.has_value_changed("ttl"):
-            if frappe.flags.do_not_enqueue:
-                self.create_or_update_record_in_dns_provider()
-                self.reload()
-            else:
-                frappe.enqueue_doc(
-                    self.doctype,
-                    self.name,
-                    "create_or_update_record_in_dns_provider",
-                    queue="short",
-                    enqueue_after_commit=True,
-                    at_front=True,
-                )
+        if self.has_value_changed("value") or self.has_value_changed("ttl") or self.is_new():
+            self.push_to_provider()
 
     def on_trash(self) -> None:
-        self.delete_record_from_dns_provider()
+        self.delete_from_provider()
 
     def validate_duplicate_record(self) -> None:
-        """Validates if a duplicate DNS Record exists"""
+        """Several records may share host and type (round-robin), but not the value too."""
 
         if frappe.db.exists(
             "DNS Record",
-            {"host": self.host, "type": self.type, "name": ["!=", self.name]},
+            {"host": self.host, "type": self.type, "value": self.value, "name": ["!=", self.name]},
         ):
             frappe.throw(
-                _("DNS Record with the same host and type already exists."),
+                _("DNS Record {0} {1} {2} already exists.").format(self.host, self.type, self.value),
                 title=_("Duplicate Record"),
             )
 
-    def validate_ttl(self) -> None:
-        """Validates the TTL value"""
+    # --- provider sync ------------------------------------------------------
 
-        self.ttl = self.ttl or cint(get_config("default_dns_ttl"))
+    def push_to_provider(self) -> None:
+        if frappe.flags.do_not_enqueue or frappe.flags.in_test:
+            self.create_or_update_record_in_dns_provider()
+        else:
+            frappe.enqueue_doc(
+                self.doctype,
+                self.name,
+                "create_or_update_record_in_dns_provider",
+                queue="short",
+                enqueue_after_commit=True,
+                at_front=True,
+            )
 
     @frappe.whitelist()
     def sync_dns_record(self) -> None:
-        """Syncs the DNS Record"""
-
         self.create_or_update_record_in_dns_provider()
 
     def create_or_update_record_in_dns_provider(self) -> None:
-        """Creates or Updates the DNS Record in the DNS Provider"""
-
         result = False
-        dns_provider = get_dns_provider()
-
-        if dns_provider:
-            result = dns_provider.create_or_update_dns_record(
-                type=self.type,
-                host=self.host,
-                value=self.value,
-                ttl=self.ttl,
-                priority=self.priority,
+        if provider := get_dns_provider():
+            result = provider.ensure_dns_record(
+                type=self.type, host=self.host, value=self.value, ttl=self.ttl, priority=self.priority
             )
 
-        self._db_set(is_verified=cint(result), last_checked_at=now(), notify=True)
+        self.db_set({"is_verified": cint(result), "last_checked_at": now()}, notify=True)
 
-    def delete_record_from_dns_provider(self) -> None:
-        """Deletes the DNS Record from the DNS Provider"""
+    def delete_from_provider(self) -> None:
+        if provider := get_dns_provider():
+            provider.delete_dns_record(type=self.type, host=self.host, value=self.value)
 
-        dns_provider = get_dns_provider()
-
-        if not dns_provider:
-            return
-
-        dns_provider.delete_dns_record(type=self.type, host=self.host)
+    # --- verification -------------------------------------------------------
 
     @frappe.whitelist()
-    def verify_dns_record(self, save: bool = False) -> None:
-        """Verifies the DNS Record"""
-
-        self.is_verified = 0
+    def verify_dns_record(self, save: bool = False) -> bool:
+        self.is_verified = cint(verify_dns_record(self.fqdn, self.type, self.value))
         self.last_checked_at = now()
-        if verify_dns_record(self.fqdn, self.type, self.value):
-            self.is_verified = 1
+
+        if self.is_verified:
             frappe.msgprint(
                 _("Verified {0}:{1} record.").format(frappe.bold(self.fqdn), frappe.bold(self.type)),
                 indicator="green",
@@ -119,91 +124,53 @@ class DNSRecord(Document):
             )
 
         if save:
-            self.save()
+            self.db_set({"is_verified": self.is_verified, "last_checked_at": self.last_checked_at})
 
-    def _db_set(
-        self,
-        update_modified: bool = True,
-        commit: bool = False,
-        notify: bool = False,
-        **kwargs,
-    ) -> None:
-        """Updates the document with the given key-value pairs."""
-
-        self.db_set(kwargs, update_modified=update_modified, notify=notify, commit=commit)
+        return bool(self.is_verified)
 
 
-def create_or_update_dns_record(
-    host: str,
-    type: str,
-    value: str,
-    ttl: int | None = None,
-    priority: int | None = None,
-    category: str | None = None,
-    do_not_enqueue: bool = False,
-) -> DNSRecord:
-    """Creates or updates a DNS Record"""
+def reconcile_managed_records(owner_doctype: str, owner: str, desired: list[dict]) -> None:
+    """Makes the owner's DNS Records exactly ``desired``.
 
-    if do_not_enqueue:
-        frappe.flags.do_not_enqueue = True
+    ``desired`` rows are ``{"host", "type", "value", "category", "priority"?, "ttl"?}``. Rows
+    already present are left alone (their verification state survives); missing ones are
+    inserted and stale ones deleted, which removes them at the provider too.
+    """
 
-    if dns_record := frappe.db.exists("DNS Record", {"host": host, "type": type}):
-        dns_record = frappe.get_doc("DNS Record", dns_record)
-    else:
-        dns_record = frappe.new_doc("DNS Record")
-        dns_record.host = host
-        dns_record.type = type
+    wanted = {(row["host"].lower(), row["type"], row["value"].strip()): row for row in desired}
+    existing = frappe.get_all(
+        "DNS Record",
+        filters={"managed_by_doctype": owner_doctype, "managed_by": owner},
+        fields=["name", "host", "type", "value"],
+    )
 
-    dns_record.value = value
-    dns_record.ttl = ttl
-    dns_record.priority = priority
-    dns_record.category = category
-    dns_record.save(ignore_permissions=True)
+    for record in existing:
+        key = (record.host, record.type, (record.value or "").strip())
+        if key in wanted:
+            wanted.pop(key)
+        else:
+            frappe.delete_doc("DNS Record", record.name, ignore_permissions=True, force=True)
 
-    return dns_record
+    for row in wanted.values():
+        doc = frappe.new_doc("DNS Record")
+        doc.update(row)
+        doc.managed_by_doctype = owner_doctype
+        doc.managed_by = owner
+        doc.insert(ignore_permissions=True)
+
+
+def delete_managed_records(owner_doctype: str, owner: str) -> None:
+    reconcile_managed_records(owner_doctype, owner, [])
 
 
 def verify_all_dns_records() -> None:
-    """Verifies all DNS Records"""
-
-    dns_records = frappe.db.get_all("DNS Record", filters={}, pluck="name")
-    for dns_record in dns_records:
-        dns_record = frappe.get_doc("DNS Record", dns_record)
-        dns_record.verify_dns_record(save=True)
+    for name in frappe.get_all("DNS Record", pluck="name"):
+        frappe.get_doc("DNS Record", name).verify_dns_record(save=True)
 
 
 @frappe.whitelist()
 def enqueue_verify_all_dns_records() -> None:
-    "Called by the scheduler to enqueue the `verify_all_dns_records` job."
-
-    frappe.only_for("System Manager")
+    frappe.only_for(("System Manager", "Suite Cloud Manager"))
 
     with user_context("Administrator"):
         enqueue_job(verify_all_dns_records, queue="long", deduplicate=True)
-
-
-def get_dns_provider(settings: Document | None = None) -> DNSProvider | None:
-    """Returns the DNS Provider configured in Suite Cloud Settings, or None when there is none."""
-
-    settings = settings or frappe.get_single("Suite Cloud Settings")
-
-    if not settings.dns_provider:
-        return
-
-    return DNSProvider(
-        provider=settings.dns_provider,
-        domain=settings.root_domain_name,
-        access_key=settings.dns_provider_access_key,
-        access_secret=password_or_none(settings, "dns_provider_access_secret"),
-        auth_key=settings.dns_provider_key,
-        auth_secret=password_or_none(settings, "dns_provider_secret"),
-        username=settings.dns_provider_username,
-        token=password_or_none(settings, "dns_provider_token"),
-        client_ip=settings.dns_provider_client_ip,
-        zone_id=settings.dns_provider_zone_id,
-        private_zone=bool(settings.dns_provider_private_zone),
-    )
-
-
-def on_doctype_update() -> None:
-    frappe.db.add_unique("DNS Record", ["host", "type"])
