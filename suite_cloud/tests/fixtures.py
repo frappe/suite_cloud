@@ -100,3 +100,20 @@ def no_dns_provider():
     """DNS Record pushes go nowhere: the provider is unset, so records stay unverified."""
 
     return patch("suite_cloud.suite_cloud.doctype.dns_record.dns_record.get_dns_provider", return_value=None)
+
+
+def activate_cluster(cluster, token: str = "test-token"):
+    """Marks a cluster active with a known API key so a FakeStalwart can serve it."""
+
+    cluster.api_key = token
+    cluster.save()
+    cluster.db_set("status", "Active")
+    cluster.reload()
+    return cluster
+
+
+def make_site(cluster, name: str = "acme.frappe.test", **fields):
+    frappe.db.delete("Suite Site", {"name": name})
+    site = frappe.get_doc({"doctype": "Suite Site", "site_name": name, "cluster": cluster.name, **fields})
+    site.insert()
+    return site

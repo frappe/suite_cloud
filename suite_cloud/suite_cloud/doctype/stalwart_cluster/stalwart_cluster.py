@@ -8,7 +8,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now
 
-from suite_cloud.cluster import bootstrap, dns, plan
+from suite_cloud.cluster import bootstrap, dns, plan, reconcile
 from suite_cloud.provisioning.ssh import generate_keypair
 from suite_cloud.stalwart import forget_sessions, get_admin_client, get_client
 from suite_cloud.stalwart.credentials import Credential
@@ -218,6 +218,13 @@ class StalwartCluster(Document):
         report = plan.drift_report(self)
         self.db_set("drift_report", frappe.as_json(report), update_modified=False)
         return report
+
+    @frappe.whitelist()
+    def reconcile_directory(self) -> dict:
+        """Reports domains/accounts/lists that differ between Suite Cloud and the cluster; never mutates."""
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        return reconcile.directory_report(self)
 
     @frappe.whitelist()
     def finish_bootstrap(self) -> bool:

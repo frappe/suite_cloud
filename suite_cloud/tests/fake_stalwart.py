@@ -258,14 +258,15 @@ class FakeStalwart:
     def _create(self, type: str, payload: dict, collection: dict) -> dict:
         self._check_unique(type, payload)
         obj = {**payload, "id": self._new_id(type), "createdAt": "2026-01-01T00:00:00Z"}
-        self._server_set(type, obj)
-        collection[obj["id"]] = obj
         if type == "Domain":
+            # Automatic DKIM management: Stalwart generates one key per algorithm on creation.
             for algorithm in ("ed25519", "rsa"):
                 self._add(
                     "DkimSignature",
                     {"domainId": obj["id"], "selector": f"v1-{algorithm}-20260101", "stage": "active"},
                 )
+        self._server_set(type, obj)
+        collection[obj["id"]] = obj
         return json.loads(json.dumps(obj))
 
     def _check_unique(self, type: str, payload: dict) -> None:

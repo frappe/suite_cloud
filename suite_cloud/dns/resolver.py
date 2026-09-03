@@ -31,20 +31,29 @@ def get_dns_record(fqdn: str, type: str = "A", raise_exception: bool = False) ->
 def verify_dns_record(fqdn: str, type: str, expected_value: str, debug: bool = False) -> bool:
     """Verifies that the live DNS answer for fqdn/type contains the expected value."""
 
-    if result := get_dns_record(fqdn, type):
-        for data in result:
-            if data:
-                if type == "MX":
-                    data = data.exchange
-                data = data.to_text().replace('"', "")
-                if type == "TXT" and "._domainkey." in fqdn:
-                    data = data.replace(" ", "")
-                    expected_value = expected_value.replace(" ", "")
-                if data == expected_value:
-                    return True
-            if debug:
-                frappe.msgprint(f"Expected: {expected_value} Got: {data}")
+    answer = get_dns_record(fqdn, type)
+    if not answer:
+        return False
+
+    expected = normalize_record_value(type, expected_value, fqdn)
+    for data in answer:
+        actual = data.exchange.to_text() if type == "MX" else data.to_text()
+        if normalize_record_value(type, actual, fqdn) == expected:
+            return True
+        if debug:
+            frappe.msgprint(f"Expected: {expected_value} Got: {actual}")
     return False
+
+
+def normalize_record_value(type: str, value: str, fqdn: str) -> str:
+    """Makes provider and resolver renderings comparable (quotes, chunking, trailing dots)."""
+
+    value = (value or "").strip().replace('" "', "").replace('"', "")
+    if type in ("MX", "CNAME", "SRV", "A", "AAAA"):
+        value = value.rstrip(".").lower()
+    if type == "TXT" and "._domainkey." in fqdn:
+        value = value.replace(" ", "")
+    return value
 
 
 def verify_ptr_record(ip_address: str, expected_hostname: str) -> bool:

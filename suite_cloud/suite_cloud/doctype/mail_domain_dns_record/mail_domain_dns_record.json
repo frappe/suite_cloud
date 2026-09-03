@@ -1,0 +1,32 @@
+{
+ "actions": [],
+ "creation": "2026-09-03 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": ["category", "record_type", "host", "value", "priority", "ttl", "is_mandatory", "is_verified", "last_checked_at"],
+ "fields": [
+  {"columns": 1, "fieldname": "category", "fieldtype": "Select", "in_list_view": 1, "label": "Category", "options": "Receiving\nSending\nDKIM\nDMARC\nTLS Reporting\nMTA-STS\nAuto-config\nAuto-discover\nOther", "read_only": 1},
+  {"columns": 1, "fieldname": "record_type", "fieldtype": "Select", "in_list_view": 1, "label": "Type", "options": "MX\nTXT\nCNAME\nSRV\nCAA", "read_only": 1},
+  {"columns": 2, "description": "Relative to the domain; @ is the apex.", "fieldname": "host", "fieldtype": "Data", "in_list_view": 1, "label": "Host", "read_only": 1},
+  {"columns": 4, "fieldname": "value", "fieldtype": "Text", "in_list_view": 1, "label": "Value", "read_only": 1},
+  {"fieldname": "priority", "fieldtype": "Int", "label": "Priority", "read_only": 1},
+  {"fieldname": "ttl", "fieldtype": "Int", "label": "TTL", "read_only": 1},
+  {"columns": 1, "default": "0", "fieldname": "is_mandatory", "fieldtype": "Check", "in_list_view": 1, "label": "Mandatory", "read_only": 1},
+  {"columns": 1, "default": "0", "fieldname": "is_verified", "fieldtype": "Check", "in_list_view": 1, "label": "Verified", "read_only": 1},
+  {"fieldname": "last_checked_at", "fieldtype": "Datetime", "label": "Last Checked At", "read_only": 1}
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-03 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Suite Cloud",
+ "name": "Mail Domain DNS Record",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

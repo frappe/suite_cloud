@@ -1,0 +1,228 @@
+# Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe import _
+from frappe.model.document import Document
+from frappe.utils import cint, now
+
+from suite_cloud.cluster import dns as cluster_dns
+from suite_cloud.cluster.zone import build_domain_records
+from suite_cloud.dns.resolver import verify_dns_record
+from suite_cloud.stalwart.directory import Domain
+from suite_cloud.tenancy import sync
+from suite_cloud.tenancy.addresses import validate_domain_name
+from suite_cloud.utils import get_config
+
+PUSHED_FIELDS = ("description", "catch_all_address", "sub_addressing", "enabled")
+
+
+class MailDomain(Document):
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+
+        from suite_cloud.suite_cloud.doctype.mail_domain_dns_record.mail_domain_dns_record import (
+            MailDomainDNSRecord,
+        )
+
+        catch_all_address: DF.Data | None
+        cluster: DF.Link | None
+        description: DF.Data | None
+        dns_records: DF.Table[MailDomainDNSRecord]
+        dns_zone_file: DF.Code | None
+        domain_name: DF.Data
+        enabled: DF.Check
+        is_verified: DF.Check
+        last_refreshed_at: DF.Datetime | None
+        last_verified_at: DF.Datetime | None
+        publish_client_discovery_records: DF.Check
+        site: DF.Link
+        stalwart_id: DF.Data | None
+        sub_addressing: DF.Check
+    # end: auto-generated types
+
+    # --- lifecycle --------------------------------------------------------------
+
+    def autoname(self) -> None:
+        # Naming runs before validate, so the address is normalised here too.
+        self.domain_name = validate_domain_name(self.domain_name)
+        self.name = self.domain_name
+
+    def validate(self) -> None:
+        self.domain_name = validate_domain_name(self.domain_name)
+        site = self.get_site()
+        self.cluster = site.cluster
+        if self.is_new():
+            site.assert_can_add_domain()
+            self.validate_not_reserved()
+        if self.catch_all_address:
+            self.catch_all_address = self.catch_all_address.strip().lower()
+
+    def validate_not_reserved(self) -> None:
+        cluster = self.get_cluster()
+        reserved = {get_config("root_domain_name"), cluster.default_domain, cluster.hostname}
+        if self.domain_name in reserved or self.domain_name.endswith(f".{cluster.default_domain}"):
+            frappe.throw(_("{0} is reserved for the mail infrastructure.").format(self.domain_name))
+
+    def after_insert(self) -> None:
+        sync.push_create(self, "domains", self.stalwart_payload())
+        self.refresh_dns_records()
+
+    def on_update(self) -> None:
+        if self.is_new() or not self.stalwart_id or self.flags.skip_push:
+            return
+        before = self.get_doc_before_save()
+        if before and any(before.get(f) != self.get(f) for f in PUSHED_FIELDS):
+            sync.push_update(self, "domains", self.stalwart_patch())
+
+    def on_trash(self) -> None:
+        for doctype in ("Mail Account", "Mail Group", "Mailing List"):
+            if frappe.db.exists(doctype, {"domain": self.name}):
+                frappe.throw(_("Delete every {0} of {1} first.").format(_(doctype), self.domain_name))
+        sync.push_destroy(self, "domains")
+
+    # --- Stalwart -----------------------------------------------------------------
+
+    def stalwart_payload(self) -> Domain:
+        return Domain(
+            name=self.domain_name,
+            description=self.description or f"Suite site {self.site}",
+            is_enabled=bool(self.enabled),
+            catch_all_address=self.catch_all_address or None,
+            sub_addressing=bool(self.sub_addressing),
+            report_address_uri=f"mailto:postmaster@{self.domain_name}",
+        )
+
+    def stalwart_patch(self) -> dict:
+        return {
+            "description": self.description or f"Suite site {self.site}",
+            "isEnabled": bool(self.enabled),
+            "catchAllAddress": self.catch_all_address or None,
+            "subAddressing": {"@type": "Enabled" if self.sub_addressing else "Disabled"},
+        }
+
+    # --- DNS ------------------------------------------------------------------------
+
+    @frappe.whitelist()
+    def refresh_dns_records(self) -> None:
+        """Re-reads the zone Stalwart expects and rebuilds the record rows (verification kept)."""
+
+        zone_file = sync.client_for(self).domains.get_zone_file(self.stalwart_id)
+        cluster = self.get_cluster()
+        rows = build_domain_records(
+            self.domain_name,
+            zone_file,
+            spf_include=cluster_dns.spf_include(cluster),
+            include_client_discovery=bool(self.publish_client_discovery_records),
+            default_ttl=cint(get_config("default_dns_ttl")) or 300,
+        )
+        verified = {
+            (r.record_type, r.host, (r.value or "").strip()): r for r in self.dns_records if r.is_verified
+        }
+        self.set("dns_records", [])
+        for row in rows:
+            previous = verified.get((row["record_type"], row["host"], row["value"].strip()))
+            if previous:
+                row.update({"is_verified": 1, "last_checked_at": previous.last_checked_at})
+            self.append("dns_records", row)
+
+        self.dns_zone_file = zone_file
+        self.last_refreshed_at = now()
+        self.is_verified = int(
+            bool(self.dns_records) and all(r.is_verified for r in self.dns_records if r.is_mandatory)
+        )
+        self.save_records()
+
+    @frappe.whitelist()
+    def verify_dns_records(self) -> dict:
+        """Resolves every record on public resolvers; the domain is verified when all mandatory ones match."""
+
+        checked_at = now()
+        for row in self.dns_records:
+            row.is_verified = cint(verify_dns_record(row.fqdn, row.record_type, self.expected_value(row)))
+            row.last_checked_at = checked_at
+
+        self.is_verified = int(
+            bool(self.dns_records) and all(r.is_verified for r in self.dns_records if r.is_mandatory)
+        )
+        self.last_verified_at = checked_at
+        self.save_records()
+        return {
+            "is_verified": bool(self.is_verified),
+            "records": [r.to_api() for r in self.dns_records],
+        }
+
+    @staticmethod
+    def expected_value(row: Document) -> str:
+        return row.value
+
+    def save_records(self) -> None:
+        self.flags.skip_push = True
+        self.save(ignore_permissions=True)
+        self.flags.skip_push = False
+
+    # --- helpers -----------------------------------------------------------------------
+
+    def get_site(self) -> Document:
+        return frappe.get_cached_doc("Suite Site", self.site)
+
+    def get_cluster(self) -> Document:
+        return frappe.get_cached_doc("Stalwart Cluster", self.cluster or self.get_site().cluster)
+
+    def to_api(self, with_records: bool = True) -> dict:
+        payload = {
+            "domain": self.domain_name,
+            "enabled": bool(self.enabled),
+            "description": self.description,
+            "catch_all_address": self.catch_all_address,
+            "sub_addressing": bool(self.sub_addressing),
+            "publish_client_discovery_records": bool(self.publish_client_discovery_records),
+            "is_verified": bool(self.is_verified),
+            "last_verified_at": self.last_verified_at,
+            "created_at": self.creation,
+        }
+        if with_records:
+            payload["dns_records"] = [r.to_api() for r in self.dns_records]
+        return payload
+
+
+def refresh_all_domains() -> None:
+    """Daily: pick up rotated DKIM selectors and any zone changes."""
+
+    for name in frappe.get_all("Mail Domain", {"stalwart_id": ["is", "set"]}, pluck="name"):
+        _refresh(name)
+
+
+def refresh_rotating_domains() -> None:
+    """Hourly: domains whose keys are mid-rotation change selectors within days."""
+
+    for name in frappe.get_all("Mail Domain", {"stalwart_id": ["is", "set"], "is_verified": 1}, pluck="name"):
+        domain = frappe.get_doc("Mail Domain", name)
+        try:
+            signatures = sync.client_for(domain).dkim_signatures.get_all_by_domain(domain.stalwart_id)
+        except Exception:
+            continue
+        if any(s.get("stage") in ("pending", "retiring") for s in signatures):
+            _refresh(name)
+
+
+def verify_unverified_domains() -> None:
+    for name in frappe.get_all("Mail Domain", {"is_verified": 0, "stalwart_id": ["is", "set"]}, pluck="name"):
+        try:
+            frappe.get_doc("Mail Domain", name).verify_dns_records()
+        except Exception:
+            frappe.log_error(title=f"[Suite Cloud] DNS verification failed for {name}")
+        frappe.db.commit()
+
+
+def _refresh(name: str) -> None:
+    try:
+        frappe.get_doc("Mail Domain", name).refresh_dns_records()
+    except Exception:
+        frappe.log_error(title=f"[Suite Cloud] DNS refresh failed for {name}")
+    frappe.db.commit()

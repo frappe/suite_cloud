@@ -25,8 +25,13 @@ scheduler_events = {
             "suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node.poll_pending_nodes",
         ],
     },
+    "hourly": [
+        "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.refresh_rotating_domains",
+        "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.verify_unverified_domains",
+    ],
     "daily": [
         "suite_cloud.suite_cloud.doctype.dns_record.dns_record.verify_all_dns_records",
+        "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.refresh_all_domains",
         "suite_cloud.suite_cloud.doctype.stalwart_cluster.stalwart_cluster.check_all_clusters",
         "suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node.verify_all_ptr_records",
     ],

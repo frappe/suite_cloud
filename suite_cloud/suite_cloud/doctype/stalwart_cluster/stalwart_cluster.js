@@ -28,6 +28,7 @@ frappe.ui.form.on('Stalwart Cluster', {
 		if (frm.doc.status === 'Active') {
 			frm.add_custom_button(__('Sync Config'), () => frm.trigger('sync_config'), __('Configuration'))
 			frm.add_custom_button(__('Check Drift'), () => frm.trigger('check_drift'), __('Configuration'))
+			frm.add_custom_button(__('Reconcile Directory'), () => frm.trigger('reconcile_directory'), __('Configuration'))
 			frm.add_custom_button(__('Rotate API Key'), () => frm.trigger('rotate_api_key'), __('Access'))
 			frm.add_custom_button(__('Upgrade Nodes'), () => frm.trigger('upgrade_nodes'), __('Nodes'))
 		}
@@ -94,6 +95,12 @@ frappe.ui.form.on('Stalwart Cluster', {
 
 	check_drift(frm) {
 		frm.events.call(frm, 'check_drift', {}, __('Comparing with the cluster...'))
+	},
+
+	reconcile_directory(frm) {
+		frm.events.call(frm, 'reconcile_directory', {}, __('Comparing directories...'), (report) => {
+			frappe.msgprint({ title: __('Directory Report'), message: `<pre>${frappe.utils.escape_html(JSON.stringify(report, null, 2))}</pre>`, wide: true })
+		})
 	},
 
 	finish_bootstrap(frm) {
