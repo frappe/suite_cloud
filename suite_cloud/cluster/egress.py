@@ -140,12 +140,12 @@ def apply_pool_changes(pool: Document) -> None:
     for gateway_name in pool.gateway_names():
         gateway = frappe.get_doc("Egress Gateway", gateway_name)
         if gateway.status == "Active":
-            gateway.sync_config()
+            gateway.push_config()
 
 
 def resync_cluster(cluster: Document) -> None:
     if cluster.status == "Active" and cluster.get_password("api_key", raise_exception=False):
-        cluster.sync_config()
+        cluster.push_config()
 
 
 # --- gateway side --------------------------------------------------------------------------------

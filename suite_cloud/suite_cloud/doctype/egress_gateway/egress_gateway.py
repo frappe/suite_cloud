@@ -160,6 +160,9 @@ class EgressGateway(Document):
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status != "Active":
             frappe.throw(_("Only an active gateway can be synced."))
+        return self.push_config()
+
+    def push_config(self) -> dict:
         rendered = egress.gateway_plan(self)
         result = self.get_client().apply(rendered)
         self.get_client().reload_settings()

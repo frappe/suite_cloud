@@ -223,6 +223,10 @@ class StalwartCluster(Document):
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status != "Active":
             frappe.throw(_("Only an active cluster can be synced; provision the first node instead."))
+        return self.push_config()
+
+    def push_config(self) -> dict:
+        """The sync itself; also run on behalf of documents whose change alters the plan."""
 
         rendered = plan.cluster_plan(self)
         result = self.get_client().apply(rendered)
