@@ -1,0 +1,187 @@
+---
+- name: Install Stalwart
+  hosts: all
+  become: true
+  gather_facts: true
+  vars:
+    target_map:
+      x86_64: x86_64-unknown-linux-gnu
+      aarch64: aarch64-unknown-linux-gnu
+  tasks:
+    - name: Ensure a Debian-family host
+      fail:
+        msg: "Only Debian/Ubuntu nodes are supported (found {{ ansible_os_family }})."
+      when: ansible_os_family != "Debian"
+
+    - name: Install system packages
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gzip
+          - tar
+          - ufw
+          - xz-utils
+        state: present
+        update_cache: true
+
+    - name: Create the stalwart system user
+      user:
+        name: stalwart
+        system: true
+        shell: /usr/sbin/nologin
+        home: /var/lib/stalwart
+        create_home: false
+
+    - name: Create Stalwart directories
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: stalwart
+        group: stalwart
+        mode: "0750"
+      loop:
+        - /etc/stalwart
+        - /var/lib/stalwart
+        - /var/log/stalwart
+
+    - name: Determine the release target
+      set_fact:
+        stalwart_target: "{{ target_map[ansible_architecture] }}"
+
+    - name: Read the installed Stalwart version
+      command: /usr/local/bin/stalwart --version
+      register: installed_stalwart
+      changed_when: false
+      failed_when: false
+
+    - name: Install Stalwart {{ stalwart_version }}
+      when: (stalwart_version | regex_replace('^v', '')) not in (installed_stalwart.stdout | default(''))
+      block:
+        - name: Create a temporary directory for the Stalwart archive
+          tempfile:
+            state: directory
+            suffix: stalwart
+          register: stalwart_tmp
+
+        - name: Download the Stalwart release archive
+          get_url:
+            url: "{{ stalwart_url_template | replace('{version}', stalwart_version) | replace('{target}', stalwart_target) }}"
+            dest: "{{ stalwart_tmp.path }}/stalwart.tar.gz"
+            mode: "0644"
+
+        - name: Extract the Stalwart archive
+          unarchive:
+            src: "{{ stalwart_tmp.path }}/stalwart.tar.gz"
+            dest: "{{ stalwart_tmp.path }}"
+            remote_src: true
+
+        - name: Locate the Stalwart binary
+          find:
+            paths: "{{ stalwart_tmp.path }}"
+            patterns: stalwart
+            file_type: file
+            recurse: true
+          register: stalwart_binary
+
+        - name: Install the Stalwart binary
+          copy:
+            src: "{{ stalwart_binary.files[0].path }}"
+            dest: /usr/local/bin/stalwart
+            mode: "0755"
+            remote_src: true
+
+        - name: Remove the temporary Stalwart directory
+          file:
+            path: "{{ stalwart_tmp.path }}"
+            state: absent
+
+    - name: Read the installed Stalwart CLI version
+      command: /usr/local/bin/stalwart-cli --version
+      register: installed_cli
+      changed_when: false
+      failed_when: false
+
+    - name: Install Stalwart CLI {{ stalwart_cli_version }}
+      when: (stalwart_cli_version | regex_replace('^v', '')) not in (installed_cli.stdout | default(''))
+      block:
+        - name: Create a temporary directory for the CLI archive
+          tempfile:
+            state: directory
+            suffix: stalwart-cli
+          register: cli_tmp
+
+        - name: Download the Stalwart CLI archive
+          get_url:
+            url: "{{ stalwart_cli_url_template | replace('{version}', stalwart_cli_version) | replace('{target}', stalwart_target) }}"
+            dest: "{{ cli_tmp.path }}/stalwart-cli.tar.xz"
+            mode: "0644"
+
+        - name: Extract the CLI archive
+          unarchive:
+            src: "{{ cli_tmp.path }}/stalwart-cli.tar.xz"
+            dest: "{{ cli_tmp.path }}"
+            remote_src: true
+
+        - name: Locate the CLI binary
+          find:
+            paths: "{{ cli_tmp.path }}"
+            patterns: stalwart-cli
+            file_type: file
+            recurse: true
+          register: cli_binary
+
+        - name: Install the CLI binary
+          copy:
+            src: "{{ cli_binary.files[0].path }}"
+            dest: /usr/local/bin/stalwart-cli
+            mode: "0755"
+            remote_src: true
+
+        - name: Remove the temporary CLI directory
+          file:
+            path: "{{ cli_tmp.path }}"
+            state: absent
+
+    - name: Install the systemd unit
+      copy:
+        content: "{{ systemd_unit }}"
+        dest: /etc/systemd/system/stalwart.service
+        mode: "0644"
+      register: systemd_unit_file
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: true
+      when: systemd_unit_file.changed
+
+    - name: Enable the Stalwart service
+      systemd:
+        name: stalwart
+        enabled: true
+
+    - name: Allow SSH through the firewall
+      community.general.ufw:
+        rule: allow
+        port: "{{ ssh_port }}"
+        proto: tcp
+
+    - name: Allow mail and HTTPS ports
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: "{{ firewall_ports }}"
+
+    - name: Keep the bootstrap and recovery port local
+      community.general.ufw:
+        rule: allow
+        from_ip: 127.0.0.1
+        port: "{{ recovery_port }}"
+        proto: tcp
+
+    - name: Enable the firewall
+      community.general.ufw:
+        state: enabled
+        policy: deny
+        direction: incoming

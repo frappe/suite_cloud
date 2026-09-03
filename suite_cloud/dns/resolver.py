@@ -28,20 +28,6 @@ def get_dns_record(fqdn: str, type: str = "A", raise_exception: bool = False) ->
         frappe.throw(err_msg)
 
 
-def get_host_by_ip(ip_address: str, raise_exception: bool = False) -> str | None:
-    """Returns host for the given IP address."""
-
-    err_msg = None
-
-    try:
-        return socket.gethostbyaddr(ip_address)[0]
-    except Exception as e:
-        err_msg = _(str(e))
-
-    if raise_exception and err_msg:
-        frappe.throw(err_msg)
-
-
 def verify_dns_record(fqdn: str, type: str, expected_value: str, debug: bool = False) -> bool:
     """Verifies that the live DNS answer for fqdn/type contains the expected value."""
 
@@ -59,3 +45,19 @@ def verify_dns_record(fqdn: str, type: str, expected_value: str, debug: bool = F
             if debug:
                 frappe.msgprint(f"Expected: {expected_value} Got: {data}")
     return False
+
+
+def verify_ptr_record(ip_address: str, expected_hostname: str) -> bool:
+    """True when the reverse record of ``ip_address`` names ``expected_hostname``."""
+
+    try:
+        import dns.reversename
+
+        resolver = dns.resolver.Resolver(configure=False)
+        resolver.nameservers = NAMESERVERS
+        answer = resolver.resolve(dns.reversename.from_address(ip_address), "PTR")
+    except Exception:
+        return False
+
+    expected = expected_hostname.rstrip(".").lower()
+    return any(record.to_text().rstrip(".").lower() == expected for record in answer)

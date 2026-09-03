@@ -1,0 +1,150 @@
+---
+- import_playbook: install-stalwart.yml
+
+- name: Bootstrap the Stalwart cluster
+  hosts: all
+  become: true
+  gather_facts: false
+  vars:
+    cli_env:
+      STALWART_URL: "http://127.0.0.1:{{ recovery_port }}"
+      STALWART_USER: "{{ admin_user }}"
+      STALWART_PASSWORD: "{{ admin_password }}"
+  tasks:
+    - name: Check whether the server is already bootstrapped
+      stat:
+        path: /etc/stalwart/config.json
+      register: config_file
+
+    - name: Bootstrap the data store
+      when: not config_file.stat.exists
+      block:
+        - name: Write the bootstrap environment
+          copy:
+            content: "{{ env_bootstrap }}"
+            dest: /etc/stalwart/stalwart.env
+            owner: stalwart
+            group: stalwart
+            mode: "0600"
+
+        - name: Start Stalwart in bootstrap mode
+          systemd:
+            name: stalwart
+            state: restarted
+
+        - name: Wait for the bootstrap listener
+          wait_for:
+            host: 127.0.0.1
+            port: "{{ recovery_port }}"
+            timeout: 120
+
+        - name: Write the bootstrap plan
+          copy:
+            content: "{{ bootstrap_ndjson }}"
+            dest: /etc/stalwart/bootstrap.ndjson
+            owner: stalwart
+            group: stalwart
+            mode: "0600"
+
+        - name: Apply the bootstrap plan
+          command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/bootstrap.ndjson --json
+          environment: "{{ cli_env }}"
+          register: bootstrap_apply
+          failed_when: bootstrap_apply.rc != 0 and 'bootstrap mode' not in (bootstrap_apply.stdout + bootstrap_apply.stderr)
+
+        - name: Wait for config.json to be written
+          wait_for:
+            path: /etc/stalwart/config.json
+            timeout: 120
+
+        - name: Remove the bootstrap plan
+          file:
+            path: /etc/stalwart/bootstrap.ndjson
+            state: absent
+
+        - name: Stop Stalwart after bootstrap
+          systemd:
+            name: stalwart
+            state: stopped
+
+    - name: Check whether this cluster plan version was applied
+      stat:
+        path: "/etc/stalwart/{{ plan_marker }}"
+      register: plan_marker_file
+
+    - name: Apply the cluster plan in recovery mode
+      when: not plan_marker_file.stat.exists
+      block:
+        - name: Write the recovery environment
+          copy:
+            content: "{{ env_recovery }}"
+            dest: /etc/stalwart/stalwart.env
+            owner: stalwart
+            group: stalwart
+            mode: "0600"
+
+        - name: Start Stalwart in recovery mode
+          systemd:
+            name: stalwart
+            state: restarted
+
+        - name: Wait for the recovery listener
+          wait_for:
+            host: 127.0.0.1
+            port: "{{ recovery_port }}"
+            timeout: 120
+
+        - name: Write the cluster plan
+          copy:
+            content: "{{ cluster_ndjson }}"
+            dest: /etc/stalwart/cluster.ndjson
+            owner: stalwart
+            group: stalwart
+            mode: "0600"
+
+        - name: Apply the cluster plan
+          command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/cluster.ndjson --json
+          environment: "{{ cli_env }}"
+
+        - name: Remove the cluster plan
+          file:
+            path: /etc/stalwart/cluster.ndjson
+            state: absent
+
+        - name: Record the applied plan version
+          copy:
+            content: "{{ config_version }}\n"
+            dest: "/etc/stalwart/{{ plan_marker }}"
+            mode: "0644"
+
+    - name: Write the runtime environment
+      copy:
+        content: "{{ env_normal }}"
+        dest: /etc/stalwart/stalwart.env
+        owner: stalwart
+        group: stalwart
+        mode: "0600"
+
+    - name: Ensure no recovery credentials remain
+      command: grep -c STALWART_RECOVERY /etc/stalwart/stalwart.env
+      register: recovery_leftovers
+      changed_when: false
+      failed_when: recovery_leftovers.rc == 0
+
+    - name: Restart Stalwart normally
+      systemd:
+        name: stalwart
+        state: restarted
+        enabled: true
+
+    - name: Wait for SMTP
+      wait_for:
+        host: 127.0.0.1
+        port: 25
+        timeout: 180
+
+    - name: Wait for HTTPS
+      wait_for:
+        host: 127.0.0.1
+        port: 443
+        timeout: 180

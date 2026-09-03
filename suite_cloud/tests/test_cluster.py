@@ -1,0 +1,176 @@
+import json
+
+import frappe
+from frappe.tests import IntegrationTestCase
+
+from suite_cloud.cluster import dns, plan
+from suite_cloud.tests.fixtures import (
+    ROOT_DOMAIN,
+    configure_settings,
+    make_cluster,
+    make_node,
+    make_store,
+    no_dns_provider,
+)
+
+
+class TestStalwartCluster(IntegrationTestCase):
+    def setUp(self) -> None:
+        frappe.flags.do_not_enqueue = True
+        configure_settings()
+
+    def tearDown(self) -> None:
+        frappe.flags.do_not_enqueue = False
+
+    def test_cluster_derives_zone_url_and_coordinator(self) -> None:
+        cluster = make_cluster()
+
+        self.assertEqual(cluster.default_domain, f"blr.{ROOT_DOMAIN}")
+        self.assertEqual(cluster.base_url, f"https://mail.blr.{ROOT_DOMAIN}")
+        self.assertEqual(cluster.coordinator, "Default")
+        self.assertEqual(cluster.status, "Pending")
+        self.assertTrue(cluster.ssh_public_key.startswith("ssh-ed25519 "))
+        self.assertEqual(len(cluster.get_password("admin_password")), 32)
+        self.assertEqual(
+            cluster.stalwart_version, frappe.db.get_single_value("Suite Cloud Settings", "stalwart_version")
+        )
+
+    def test_hostname_must_be_two_labels_under_root(self) -> None:
+        store = make_store("Data", "PostgreSql", host="db", auth_secret="x")
+        cluster = frappe.get_doc(
+            {
+                "doctype": "Stalwart Cluster",
+                "cluster_name": "bad",
+                "hostname": f"mail.{ROOT_DOMAIN}",
+                "data_store": store.name,
+            }
+        )
+        self.assertRaisesRegex(frappe.ValidationError, "two labels", cluster.insert)
+
+    def test_store_kind_is_enforced(self) -> None:
+        blob = make_store("Blob", "S3", region="r", bucket="b", access_key="a", secret_key="s")
+        cluster = frappe.get_doc(
+            {
+                "doctype": "Stalwart Cluster",
+                "cluster_name": "kind",
+                "hostname": f"mail.kind.{ROOT_DOMAIN}",
+                "data_store": blob.name,
+            }
+        )
+        self.assertRaisesRegex(frappe.ValidationError, "Data store", cluster.insert)
+
+    def test_second_node_needs_shared_stores(self) -> None:
+        cluster = make_cluster(name="solo", hostname=f"mail.solo.{ROOT_DOMAIN}", multi_node=False)
+        make_node(cluster, "n1", "203.0.113.1")
+
+        self.assertRaisesRegex(frappe.ValidationError, "embedded", make_node, cluster, "n2", "203.0.113.2")
+
+    def test_node_hostname_must_sit_under_the_zone(self) -> None:
+        cluster = make_cluster()
+        node = frappe.get_doc(
+            {
+                "doctype": "Stalwart Node",
+                "cluster": cluster.name,
+                "hostname": f"n1.other.{ROOT_DOMAIN}",
+                "ipv4_address": "203.0.113.1",
+            }
+        )
+        self.assertRaisesRegex(frappe.ValidationError, "single label", node.insert)
+
+    def test_node_creates_its_dns_records_and_spf_tracks_ips(self) -> None:
+        cluster = make_cluster()
+        node = make_node(cluster, "n1", "203.0.113.10", ipv6_address="2001:db8::10")
+
+        records = frappe.get_all(
+            "DNS Record", {"managed_by": node.name}, ["host", "type", "value", "category"], order_by="type"
+        )
+        self.assertEqual(
+            [(r.host, r.type, r.value, r.category) for r in records],
+            [("n1.blr", "A", "203.0.113.10", "Node"), ("n1.blr", "AAAA", "2001:db8::10", "Node")],
+        )
+        # Not yet in ingress: the cluster hostname does not point at a pending node.
+        self.assertFalse(frappe.db.exists("DNS Record", {"host": "mail.blr", "managed_by": node.name}))
+
+        node.db_set("status", "Active")
+        dns.sync_node_records(node, include_ingress=True)
+        dns.sync_spf_record(cluster)
+        ingress = frappe.get_all("DNS Record", {"host": "mail.blr"}, pluck="value", order_by="type")
+        self.assertEqual(ingress, ["203.0.113.10", "2001:db8::10"])
+        spf = frappe.db.get_value("DNS Record", {"host": "spf.blr", "type": "TXT"}, "value")
+        self.assertEqual(spf, "v=spf1 ip4:203.0.113.10 ip6:2001:db8::10 -all")
+
+        dns.sync_node_records(node, include_ingress=False)
+        self.assertFalse(frappe.db.exists("DNS Record", {"host": "mail.blr"}))
+        self.assertEqual(frappe.db.get_value("Stalwart Node", node.name, "in_ingress_dns"), 0)
+
+    def test_bootstrap_and_cluster_plans(self) -> None:
+        cluster = make_cluster()
+
+        bootstrap = plan.bootstrap_plan(cluster)[0]
+        self.assertEqual(bootstrap["object"], "Bootstrap")
+        value = bootstrap["value"]
+        self.assertEqual(value["serverHostname"], f"mail.blr.{ROOT_DOMAIN}")
+        self.assertEqual(value["defaultDomain"], f"blr.{ROOT_DOMAIN}")
+        self.assertEqual(value["dataStore"]["@type"], "PostgreSql")
+        self.assertEqual(value["dataStore"]["authSecret"], {"@type": "Value", "secret": "pg-secret"})
+        self.assertEqual(value["blobStore"]["@type"], "S3")
+        self.assertEqual(value["inMemoryStore"]["@type"], "Redis")
+        self.assertEqual(value["searchStore"], {"@type": "Default"})
+        self.assertFalse(value["requestTlsCertificate"])
+
+        operations = {op["object"]: op for op in plan.cluster_plan(cluster)}
+        self.assertEqual(operations["Coordinator"]["value"], {"@type": "Default"})
+        self.assertEqual(set(operations["ClusterRole"]["value"]), {"full", "frontend", "outbound"})
+        self.assertNotIn("DnsServer", operations)  # no DNS provider configured in tests
+        domain = operations["Domain"]["value"]["default"]
+        self.assertEqual(
+            domain["certificateManagement"]["subjectAlternativeNames"],
+            [cluster.hostname, f"*.{cluster.default_domain}"],
+        )
+        self.assertEqual(domain["dnsManagement"], {"@type": "Manual"})
+        self.assertEqual(
+            operations["SystemSettings"]["value"]["mailExchangers"],
+            [{"hostname": cluster.hostname, "priority": 10}],
+        )
+        self.assertEqual(operations["AcmeProvider"]["value"]["acme"]["contact"], {"ops@example.test": True})
+        self.assertEqual(
+            operations["Role"]["value"]["disabled"]["enabledPermissions"], {"emailReceive": True}
+        )
+        self.assertNotIn("Enterprise", operations)
+
+        redacted = plan.redacted(plan.bootstrap_plan(cluster))
+        self.assertNotIn("pg-secret", redacted)
+        self.assertIn(plan.SECRET_MARKER, redacted)
+        self.assertEqual(
+            plan.to_ndjson(plan.cluster_plan(cluster)).count("\n"), len(plan.cluster_plan(cluster))
+        )
+
+    def test_node_env_and_config(self) -> None:
+        cluster = make_cluster()
+        node = make_node(cluster, "n1", role="frontend")
+
+        self.assertEqual(
+            plan.node_env(node),
+            {
+                "STALWART_HOSTNAME": node.hostname,
+                "STALWART_PUBLIC_URL": cluster.base_url,
+                "STALWART_ROLE": "frontend",
+            },
+        )
+        recovery = plan.node_env(node, "recovery")
+        self.assertEqual(recovery["STALWART_RECOVERY_MODE"], "1")
+        self.assertTrue(recovery["STALWART_RECOVERY_ADMIN"].startswith("admin:"))
+        self.assertNotIn("STALWART_RECOVERY_MODE", plan.node_env(node, "bootstrap"))
+        self.assertEqual(json.loads(frappe.as_json(plan.node_config(cluster)))["@type"], "PostgreSql")
+        self.assertIn("EnvironmentFile=/etc/stalwart/stalwart.env", plan.systemd_unit())
+
+    def test_dns_server_object_maps_the_settings_provider(self) -> None:
+        configure_settings(dns_provider="Cloudflare", dns_provider_token="cf-token")
+        self.assertEqual(plan.dns_server_object()["@type"], "Cloudflare")
+        self.assertEqual(plan.dns_server_object()["secret"], "cf-token")
+
+        with no_dns_provider():
+            cluster = make_cluster()
+        domain = {op["object"]: op for op in plan.cluster_plan(cluster)}["Domain"]["value"]["default"]
+        self.assertEqual(domain["dnsManagement"]["@type"], "Automatic")
+        self.assertEqual(domain["dnsManagement"]["origin"], ROOT_DOMAIN)

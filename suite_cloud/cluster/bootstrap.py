@@ -1,0 +1,277 @@
+"""Node lifecycle: provisioning, bootstrap completion, health, draining and upgrades."""
+
+from typing import TYPE_CHECKING
+
+import frappe
+from frappe import _
+from frappe.utils import add_to_date, get_datetime, now
+
+from suite_cloud.cluster import dns, plan
+from suite_cloud.stalwart.credentials import Credential
+from suite_cloud.stalwart.errors import StalwartError
+from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
+from suite_cloud.utils import get_config
+
+if TYPE_CHECKING:
+    from frappe.model.document import Document
+
+BOOTSTRAP_DEADLINE_MINUTES = 45
+NODE_VARIABLES_BUILDER = "suite_cloud.cluster.bootstrap.build_node_variables"
+SECRET_VARIABLES = (
+    "admin_password",
+    "env_bootstrap",
+    "env_recovery",
+    "config_json",
+    "bootstrap_ndjson",
+    "cluster_ndjson",
+)
+
+
+# --- provisioning ---------------------------------------------------------------------------
+
+
+def provision_node(node: Document) -> Document:
+    cluster = node.get_cluster()
+    if cluster.status in ("Pending", "Failed") and not _has_other_bootstrap_node(cluster, node):
+        playbook = "bootstrap-cluster.yml"
+        node.db_set("is_bootstrap_node", 1, update_modified=False)
+        cluster.db_set({"status": "Bootstrapping", "bootstrap_node": node.name}, update_modified=False)
+        cluster.bump_config_version(plan.cluster_plan(cluster))
+    elif cluster.status == "Bootstrapping" and node.is_bootstrap_node:
+        playbook = "bootstrap-cluster.yml"
+    elif cluster.status == "Active":
+        playbook = "configure-node.yml"
+    else:
+        frappe.throw(_("The cluster is still bootstrapping; provision more nodes once it is active."))
+
+    node.set_status("Provisioning")
+    return create_server_job(
+        node,
+        playbook,
+        title=f"Provision {node.hostname}",
+        context={"node": node.name},
+        variables_builder=NODE_VARIABLES_BUILDER,
+        callback="after_provision",
+    )
+
+
+def _has_other_bootstrap_node(cluster: Document, node: Document) -> bool:
+    return bool(cluster.bootstrap_node and cluster.bootstrap_node != node.name)
+
+
+def upgrade_node(node: Document) -> Document:
+    if node.status == "Active":
+        drain_node(node)
+    return create_server_job(
+        node,
+        "upgrade-stalwart.yml",
+        title=f"Upgrade {node.hostname} to {node.get_cluster().stalwart_version}",
+        context={"node": node.name},
+        variables_builder=NODE_VARIABLES_BUILDER,
+        callback="after_upgrade",
+    )
+
+
+def run_commands(server: Document, commands: list[str], title: str) -> Document:
+    return create_server_job(
+        server,
+        "run-commands.yml",
+        title=title,
+        context={"commands": commands},
+        variables_builder="suite_cloud.cluster.bootstrap.build_command_variables",
+    )
+
+
+def build_command_variables(context: dict) -> dict:
+    return {"commands": list(context.get("commands") or [])}
+
+
+def build_node_variables(context: dict) -> dict:
+    """Everything the node playbooks need; secrets are listed so the job snapshot redacts them."""
+
+    node = frappe.get_doc("Stalwart Node", context["node"])
+    cluster = node.get_cluster()
+    variables = {
+        "node_hostname": node.hostname,
+        "cluster_hostname": cluster.hostname,
+        "ssh_port": node.ssh_port or cluster.ssh_port,
+        "stalwart_version": cluster.stalwart_version or get_config("stalwart_version"),
+        "stalwart_url_template": get_config("stalwart_download_url_template"),
+        "stalwart_cli_version": get_config("stalwart_cli_version"),
+        "stalwart_cli_url_template": get_config("stalwart_cli_download_url_template"),
+        "systemd_unit": plan.systemd_unit(),
+        "firewall_ports": list(plan.FIREWALL_PORTS),
+        "recovery_port": plan.BOOTSTRAP_PORT,
+        "admin_user": cluster.admin_username,
+        "admin_password": cluster.get_password("admin_password"),
+        "config_version": cluster.config_version or 0,
+        "plan_marker": f".suite-cloud-plan-v{cluster.config_version or 0}",
+        "env_normal": plan.render_env(plan.node_env(node, "normal")),
+        "env_bootstrap": plan.render_env(plan.node_env(node, "bootstrap")),
+        "env_recovery": plan.render_env(plan.node_env(node, "recovery")),
+        "config_json": frappe.as_json(plan.node_config(cluster)),
+        "bootstrap_ndjson": plan.to_ndjson(plan.bootstrap_plan(cluster)),
+        "cluster_ndjson": plan.to_ndjson(plan.cluster_plan(cluster)),
+        "__secret_keys__": list(SECRET_VARIABLES),
+    }
+    return variables
+
+
+# --- callbacks --------------------------------------------------------------------------------
+
+
+def after_provision(node: Document, job: Document) -> None:
+    """The playbook finished: the node is installed and answering locally."""
+
+    node.db_set(
+        {
+            "status": "Provisioned",
+            "provisioned_at": now(),
+            "installed_version": node.get_cluster().stalwart_version,
+        },
+        update_modified=False,
+    )
+    if node.is_bootstrap_node:
+        # The certificate check goes through the cluster hostname, so it must resolve to us.
+        dns.sync_node_records(node, include_ingress=True)
+    dns.sync_spf_record(node.get_cluster())
+    check_node(node)
+
+
+def after_upgrade(node: Document, job: Document) -> None:
+    node.db_set({"installed_version": node.get_cluster().stalwart_version}, update_modified=False)
+    node.set_status("Provisioned")
+    check_node(node)
+
+
+# --- health ------------------------------------------------------------------------------------
+
+
+def check_node(node: Document) -> bool:
+    """Promotes a Provisioned node to Active once Stalwart confirms it; fails it after a deadline."""
+
+    cluster = node.get_cluster()
+    if cluster.status == "Bootstrapping" and node.is_bootstrap_node:
+        return finish_bootstrap(cluster)
+
+    if cluster.status != "Active":
+        return False
+
+    try:
+        registry = cluster.get_client().cluster_nodes.find_by_hostname(node.hostname)
+    except StalwartError as e:
+        return _not_ready(node, str(e))
+
+    if not registry or registry.get("status") != "active":
+        return _not_ready(node, f"Node registry status: {registry.get('status') if registry else 'absent'}")
+
+    node.db_set(
+        {"node_id": registry.get("nodeId"), "last_health_at": now(), "last_error": None},
+        update_modified=False,
+    )
+    if node.status in ("Provisioned", "Draining"):
+        activate_node(node)
+    return True
+
+
+def activate_node(node: Document) -> None:
+    node.set_status("Active")
+    dns.sync_node_records(node, include_ingress=True)
+    dns.sync_spf_record(node.get_cluster())
+
+
+def _not_ready(node: Document, detail: str) -> bool:
+    started = get_datetime(node.provisioned_at or now())
+    if get_datetime(now()) > add_to_date(started, minutes=BOOTSTRAP_DEADLINE_MINUTES):
+        node.set_status("Failed", f"Not healthy after {BOOTSTRAP_DEADLINE_MINUTES} minutes: {detail}")
+    else:
+        node.db_set("last_error", detail[:1000], update_modified=False)
+    return False
+
+
+def finish_bootstrap(cluster: Document) -> bool:
+    """Turns a bootstrapping cluster active once its first node serves a valid certificate.
+
+    Reached repeatedly (button or cron) until it succeeds: the ACME DNS-01 issuance runs on the
+    node after the playbook ends, so the HTTPS endpoint is not usable straight away.
+    """
+
+    node = frappe.get_doc("Stalwart Node", cluster.bootstrap_node) if cluster.bootstrap_node else None
+    if not node or node.status != "Provisioned":
+        return False
+
+    try:
+        admin = cluster.get_admin_client()
+        if not cluster.get_password("api_key", raise_exception=False):
+            _, secret = admin.api_keys.create_secret(
+                Credential(description=plan.API_KEY_DESCRIPTION, permissions=plan.api_key_permissions())
+            )
+            cluster.api_key = secret
+            cluster.save(ignore_permissions=True)
+        _set_default_certificate(cluster, admin)
+        registry = admin.cluster_nodes.find_by_hostname(node.hostname)
+    except StalwartError as e:
+        _not_ready(node, str(e))
+        if node.status == "Failed":
+            cluster.db_set("status", "Failed", update_modified=False)
+        return False
+
+    cluster.db_set({"status": "Active", "last_config_sync_at": now()}, update_modified=False)
+    node.db_set(
+        {
+            "node_id": registry.get("nodeId") if registry else None,
+            "last_health_at": now(),
+            "last_error": None,
+        },
+        update_modified=False,
+    )
+    activate_node(node)
+    return True
+
+
+def _set_default_certificate(cluster: Document, client) -> None:
+    """Non-SNI clients (SMTP) need a default certificate; pick the issued one for the hostname."""
+
+    try:
+        for certificate in client.objects("Certificate").get_all(
+            properties=["id", "subjectAlternativeNames"]
+        ):
+            names = certificate.get("subjectAlternativeNames") or []
+            names = list(names.keys()) if isinstance(names, dict) else list(names)
+            if cluster.hostname in names:
+                client.singleton("SystemSettings").write({"defaultCertificateId": certificate["id"]})
+                return
+    except StalwartError:
+        frappe.log_error(title=f"[Suite Cloud] Could not pick a default certificate for {cluster.name}")
+
+
+# --- draining / removal -----------------------------------------------------------------------
+
+
+def drain_node(node: Document) -> None:
+    """Takes the node out of the ingress round-robin; Stalwart keeps running on it."""
+
+    dns.sync_node_records(node, include_ingress=False)
+    node.set_status("Draining" if node.status == "Active" else "Disabled")
+    dns.sync_spf_record(node.get_cluster())
+
+
+def restore_node(node: Document) -> None:
+    if not node.enabled:
+        frappe.throw(_("Enable the node first."))
+    node.set_status("Provisioned")
+    check_node(node)
+
+
+def forget_node(node: Document) -> None:
+    """Removes the node's registry lease when the cluster is reachable (best effort)."""
+
+    cluster = node.get_cluster()
+    if cluster.status != "Active" or not cluster.get_password("api_key", raise_exception=False):
+        return
+    try:
+        client = cluster.get_client()
+        if registry := client.cluster_nodes.find_by_hostname(node.hostname):
+            client.cluster_nodes.delete(registry["id"])
+    except StalwartError:
+        frappe.log_error(title=f"[Suite Cloud] Could not remove {node.hostname} from the cluster registry")

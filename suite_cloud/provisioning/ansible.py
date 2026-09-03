@@ -1,7 +1,8 @@
+"""Runs Ansible playbooks for Server Jobs through ansible-runner, tracking progress per task."""
+
 import json
 import os
-import tempfile
-from collections.abc import Iterable
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
 import ansible_runner
@@ -10,347 +11,198 @@ import yaml
 from frappe import _
 from frappe.utils import now, time_diff_in_seconds
 
+from suite_cloud.provisioning.ssh import SSHTarget, inventory_line, private_key_file
 from suite_cloud.utils import reconnect_on_failure
 
 if TYPE_CHECKING:
-    from suite_cloud.suite_cloud.doctype.server_ansible_play.server_ansible_play import ServerAnsiblePlay
+    from suite_cloud.suite_cloud.doctype.server_job.server_job import ServerJob
+
+PLAYBOOKS_DIR = os.path.join(os.path.dirname(__file__), "playbooks")
+FINAL_TASK_STATUSES = ("Success", "Failed", "Unreachable", "Skipped")
+RUNNER_ENV = {"ANSIBLE_HOST_KEY_CHECKING": "False", "ANSIBLE_RETRY_FILES_ENABLED": "False"}
 
 
-class Ansible:
-    """Ansible class to run playbooks and track their progress."""
+def playbook_path(playbook: str) -> str:
+    path = os.path.join(PLAYBOOKS_DIR, playbook)
+    if not os.path.isfile(path) or os.path.dirname(os.path.abspath(path)) != os.path.abspath(PLAYBOOKS_DIR):
+        frappe.throw(_("Playbook {0} does not exist.").format(playbook))
+    return path
 
-    def __init__(
-        self,
-        server: str,
-        playbook: str,
-        variables: dict[str | Any] | None = None,
-    ) -> None:
-        self.server = server
-        self.playbook = playbook
-        self.variables = variables or {}
-        self._create_play_record()
 
-    @classmethod
-    def from_play(cls, play_name: str) -> Ansible:
-        """Create an Ansible instance from an existing Server Ansible Play record."""
+def playbook_task_names(playbook: str) -> list[str]:
+    """Task names in play order, following import_playbook and flattening blocks."""
 
-        pdoc = frappe.get_doc("Server Ansible Play", play_name)
+    with open(playbook_path(playbook)) as f:
+        plays = yaml.safe_load(f) or []
 
-        self = cls.__new__(cls)
-        self.play = pdoc.name
-        self.server = pdoc.server
-        self.playbook = pdoc.playbook
+    names: list[str] = []
+    for play in plays:
+        if "import_playbook" in play:
+            names.extend(playbook_task_names(play["import_playbook"]))
+            continue
+        names.extend(_task_names(play.get("tasks") or []))
+    return names
 
-        self.variables = {}
-        for variable in pdoc.variables:
-            try:
-                self.variables[variable.key_] = json.loads(variable.value)
-            except (TypeError, json.JSONDecodeError):
-                self.variables[variable.key_] = variable.value
 
-        self.tasks = {}
-        if tasks := frappe.db.get_all(
-            "Server Ansible Play Task",
-            filters={"play": self.play},
-            fields=["task", "name"],
-            order_by="creation asc",
-            as_list=True,
-        ):
-            self.tasks = frappe._dict(tasks)
-        return self
+def _task_names(tasks: list[dict]) -> list[str]:
+    names = []
+    for task in tasks:
+        if "block" in task:
+            names.extend(_task_names(task["block"]))
+            names.extend(_task_names(task.get("rescue") or []))
+            names.extend(_task_names(task.get("always") or []))
+        elif task.get("name"):
+            names.append(task["name"])
+    return names
 
-    @property
-    def playbook_path(self) -> str:
-        """Returns the absolute path to the playbook."""
 
-        return os.path.join(frappe.get_app_path("suite_cloud", "deploy", "playbooks"), self.playbook)
+@dataclass
+class RunOutcome:
+    status: str
+    stats: dict = field(default_factory=dict)
+    error_log: str | None = None
 
-    def _create_play_record(self) -> None:
-        """Creates a Server Ansible Play record and associated Server Ansible Play Task records."""
 
-        if hasattr(self, "play") and self.play:
-            return
+def ping(target: SSHTarget) -> tuple[bool, str]:
+    """Checks SSH access with Ansible's ping module (no playbook needed)."""
 
-        play = self._get_play()
-
-        pdoc = frappe.new_doc("Server Ansible Play")
-        pdoc.server = self.server
-        pdoc.play = play["name"]
-        pdoc.playbook = self.playbook
-
-        for key, value in self.variables.items():
-            if isinstance(value, int | bool):
-                value = str(value)
-            elif isinstance(value, list | dict):
-                value = json.dumps(value, indent=4)
-            elif not isinstance(value, str):
-                frappe.throw(_("Variable value cannot be of type {0}").format(type(value)))
-
-            pdoc.append("variables", {"key_": key, "value": value})
-
-        pdoc.insert(ignore_permissions=True)
-        self.play = pdoc.name
-
-        self._create_task_records(play=play)
-
-    def _create_task_records(self, play: dict | None = None) -> None:
-        """Creates Server Ansible Play Task records for each task in the play."""
-
-        if not hasattr(self, "play") or not self.play:
-            frappe.throw(_("Play record must be created before creating task records."))
-        elif hasattr(self, "tasks") and self.tasks:
-            return
-        play = play or self._get_play()
-
-        self.tasks = {}
-        for task in play["tasks"]:
-            tdoc = frappe.new_doc("Server Ansible Play Task")
-            tdoc.play = self.play
-            tdoc.task = task["name"]
-            tdoc.insert(ignore_permissions=True)
-            self.tasks[tdoc.task] = tdoc.name
-
-    def _get_play(self) -> dict:
-        """Returns the first play from the playbook."""
-
-        if not os.path.exists(self.playbook_path):
-            frappe.throw(_("Playbook {0} does not exist").format(self.playbook))
-
-        with open(self.playbook_path) as f:
-            try:
-                plays = yaml.safe_load(f)
-            except yaml.YAMLError as e:
-                frappe.throw(_("Error parsing playbook {0}: {1}").format(self.playbook, str(e)))
-
-        return plays[0]
-
-    def run(self, quiet: bool = True) -> "ServerAnsiblePlay":  # noqa: UP037
-        """Run the playbook using ansible-runner and track its progress."""
-
-        server = frappe.get_doc("Mail Server", self.server)
-        cluster = frappe.get_doc("Mail Cluster", server.cluster)
-
-        private_key_file = tempfile.NamedTemporaryFile(delete=False)
-        private_key_file.write(cluster.get_password("ssh_private_key").encode())
-        private_key_file.close()
-
-        inventory = (
-            f"{server.hostname} "
-            f"ansible_user={server.ssh_user} "
-            f"ansible_port={server.ssh_port} "
-            f"ansible_ssh_private_key_file={private_key_file.name}"
+    with private_key_file(target.private_key) as key_path:
+        runner = ansible_runner.run(
+            module="ping",
+            host_pattern="all",
+            inventory=inventory_line("target", target, key_path),
+            envvars=RUNNER_ENV,
+            quiet=True,
         )
+    ok = runner.rc == 0 and runner.status == "successful"
+    detail = "" if ok else _runner_detail(runner)
+    return ok, detail
 
-        runner = None
-        try:
+
+class PlaybookRun:
+    """One execution of a Server Job's playbook; events update the job's task rows."""
+
+    def __init__(self, job: ServerJob, variables: dict[str, Any]) -> None:
+        self.job = job
+        self.variables = variables
+        self.tasks = {row.task: row.name for row in job.tasks}
+        self.total = len(job.tasks)
+        self.done = 0
+
+    def run(self) -> RunOutcome:
+        server = self.job.get_server()
+        target = server.ssh_target()
+        alias = server.name
+        stats: dict = {}
+        with private_key_file(target.private_key) as key_path:
             runner = ansible_runner.run(
-                playbook=self.playbook_path,
-                inventory=inventory,
+                playbook=playbook_path(self.job.playbook),
+                inventory=inventory_line(alias, target, key_path),
                 extravars=self.variables,
-                event_handler=self.event_handler,
-                quiet=quiet,
+                envvars=RUNNER_ENV,
+                event_handler=self.handle_event,
+                quiet=True,
             )
-        finally:
-            if os.path.exists(private_key_file.name):
-                os.remove(private_key_file.name)
+            for event in getattr(runner, "events", []) or []:
+                if event.get("event") == "playbook_on_stats":
+                    stats = _host_stats(event.get("event_data") or {}, alias)
 
-        pdoc = frappe.get_doc("Server Ansible Play", self.play)
-        if pdoc.status in ("Pending", "Running"):
-            self._fail_play_and_pending_tasks(self._get_runner_error_log(runner))
-
-        return frappe.get_doc("Server Ansible Play", self.play)
-
-    def _get_runner_error_log(self, runner: Any | None) -> str:
-        """Builds a readable error log when ansible-runner exits before final task events."""
-
-        details: list[str] = [
-            "Ansible play ended before completing task execution.",
-            "No terminal play status event was received from ansible-runner.",
-        ]
-
-        if not runner:
-            return "\n".join(details)
-
-        status = getattr(runner, "status", None)
-        rc = getattr(runner, "rc", None)
-        if status is not None:
-            details.append(f"runner_status: {status}")
-        if rc is not None:
-            details.append(f"runner_rc: {rc}")
-
-        for attr, label in (("stderr", "stderr"), ("stdout", "stdout"), ("errored", "errored")):
-            value = getattr(runner, attr, None)
-            if value:
-                details.append(f"{label}: {self._stringify_runner_value(value)}")
-
-        return "\n".join(details)
-
-    def _stringify_runner_value(self, value: Any) -> str:
-        """Converts ansible-runner values to readable text for error logs."""
-
-        if isinstance(value, str):
-            return value.strip() or "<empty>"
-        if isinstance(value, bytes):
-            return value.decode(errors="replace").strip() or "<empty>"
-        if isinstance(value, Iterable) and not isinstance(value, dict):
-            return "\n".join(str(v) for v in value)
-        return str(value)
-
-    @reconnect_on_failure()
-    def _fail_play_and_pending_tasks(self, error_log: str) -> None:
-        """Marks the play and any non-finished tasks as failed with a common error log."""
-
-        ended_at = now()
-        pdoc = frappe.get_doc("Server Ansible Play", self.play)
-        started_at = pdoc.started_at or ended_at
-        started_after = pdoc.started_after
-        if not pdoc.started_at:
-            started_after = time_diff_in_seconds(started_at, pdoc.creation)
-
-        duration = time_diff_in_seconds(ended_at, started_at)
-        pdoc._db_set(
-            status="Failed",
-            started_at=started_at,
-            started_after=started_after,
-            ended_at=ended_at,
-            duration=duration,
-            error_log=error_log,
-            commit=True,
-            notify=True,
+        succeeded = runner.rc == 0 and not stats.get("failures") and not stats.get("unreachable")
+        if not succeeded:
+            self._fail_pending_tasks()
+        return RunOutcome(
+            status="Success" if succeeded else "Failed",
+            stats=stats,
+            error_log=None if succeeded else _runner_detail(runner),
         )
 
-        for task_name in self.tasks.values():
-            tdoc = frappe.get_doc("Server Ansible Play Task", task_name)
-            if tdoc.status in ("Success", "Failed", "Unreachable", "Skipped"):
-                continue
+    # --- events -----------------------------------------------------------------
 
-            task_started_at = tdoc.started_at or started_at
-            tdoc._db_set(
-                status="Failed",
-                started_at=task_started_at,
-                ended_at=ended_at,
-                duration=time_diff_in_seconds(ended_at, task_started_at),
-                exception=error_log,
-                commit=True,
-                notify=True,
-            )
-
-    def event_handler(self, event: dict) -> None:
-        """Handle events from ansible-runner and update the play and task records accordingly."""
-
-        if event_type := event.get("event"):
-            if hasattr(self, event_type):
-                method = getattr(self, event_type)
-                if callable(method):
-                    method(event.get("event_data"))
-
-    def playbook_on_start(self, event_data: dict) -> None:
-        """Called when the playbook starts."""
-
-        self.update_play(status="Running")
-
-    def playbook_on_task_start(self, event_data: dict) -> None:
-        """Called when a task starts."""
-
-        self.update_task(status="Running", task=event_data)
-
-    def runner_on_ok(self, event_data: dict) -> None:
-        """Called when a task completes successfully."""
-
-        self.update_task(status="Success", result=event_data)
-
-    def runner_on_failed(self, event_data: dict) -> None:
-        """Called when a task fails."""
-
-        self.update_task(status="Failed", result=event_data)
-
-    def runner_on_unreachable(self, event_data: dict) -> None:
-        """Called when a host is unreachable."""
-
-        self.update_task(status="Unreachable", result=event_data)
-
-    def runner_on_skipped(self, event_data: dict) -> None:
-        """Called when a task is skipped."""
-
-        self.update_task(status="Skipped", result=event_data)
-
-    def playbook_on_stats(self, event_data: dict) -> None:
-        """Called when the playbook finishes. Update the play record with final stats."""
-
-        stats = {}
-        for key in ["changed", "dark", "failures", "ignored", "ok", "processed", "rescued", "skipped"]:
-            stats[key] = event_data.get(key, {}).get(self.server, 0)
-        stats["unreachable"] = stats.pop("dark", 0)
-        self.update_play(stats=stats)
+    def handle_event(self, event: dict) -> bool:
+        kind = event.get("event")
+        data = event.get("event_data") or {}
+        if kind == "playbook_on_task_start":
+            self.update_task(data.get("task"), "Running")
+        elif kind == "runner_on_ok":
+            self.update_task(data.get("task"), "Success", data)
+        elif kind == "runner_on_failed":
+            self.update_task(data.get("task"), "Skipped" if data.get("ignore_errors") else "Failed", data)
+        elif kind == "runner_on_unreachable":
+            self.update_task(data.get("task"), "Unreachable", data)
+        elif kind == "runner_on_skipped":
+            self.update_task(data.get("task"), "Skipped", data)
+        return True
 
     @reconnect_on_failure()
-    def update_play(self, status: str | None = None, stats: dict | None = None) -> None:
-        """Updates the Server Ansible Play record with the given status and stats."""
-
-        if not status and not stats:
+    def update_task(self, task: str | None, status: str, data: dict | None = None) -> None:
+        row_name = self.tasks.get(task or "")
+        if not row_name:
             return
 
-        pdoc = frappe.get_doc("Server Ansible Play", self.play)
-
-        if stats:
-            ended_at = now()
-            duration = time_diff_in_seconds(ended_at, pdoc.started_at)
-            status = "Failed" if stats["failures"] or stats["unreachable"] else "Success"
-            kwargs = {**stats, "status": status, "ended_at": ended_at, "duration": duration}
-            pdoc._db_set(commit=True, notify=True, **kwargs)
-        else:
-            started_at = now()
-            started_after = time_diff_in_seconds(started_at, pdoc.creation)
-            pdoc._db_set(
-                status=status, started_at=started_at, started_after=started_after, commit=True, notify=True
-            )
-
-    @reconnect_on_failure()
-    def update_task(self, status: str, task: dict | None = None, result: dict | None = None) -> None:
-        """Updates the Server Ansible Play Task record with the given status, task, and result."""
-
-        if not any([task, result]):
-            return
-
-        if task:
-            name = task["task"]
-            parsed = frappe._dict()
-        else:
-            name = result["task"]
-            parsed = frappe._dict(result.get("res") or {})
-
-        task_name = self.tasks.get(name)
-        if not task_name:
-            return
-
-        tdoc = frappe.get_doc("Server Ansible Play Task", task_name)
-
-        kwargs = {"status": status}
-        if parsed:
-            kwargs.update({"stdout": parsed.stdout, "stderr": parsed.stderr, "exception": parsed.msg})
-            for key in ("stdout", "stdout_lines", "stderr", "stderr_lines", "msg"):
-                result["res"].pop(key, None)
-
-            kwargs["result"] = json.dumps(result, indent=4)
-
+        values: dict[str, Any] = {"status": status}
         if status == "Running":
-            kwargs.update({"started_at": now()})
-        elif status in ("Success", "Failed", "Unreachable", "Skipped"):
+            values["started_at"] = now()
+        else:
+            result = dict((data or {}).get("res") or {})
+            values.update(
+                {
+                    "stdout": _text(result.pop("stdout", None)),
+                    "stderr": _text(result.pop("stderr", None)),
+                    "exception": _text(result.pop("msg", None)),
+                }
+            )
+            for noisy in ("stdout_lines", "stderr_lines", "invocation"):
+                result.pop(noisy, None)
+            values["result"] = json.dumps(result, indent=2, default=str)[:20000]
+            started_at = frappe.db.get_value("Server Job Task", row_name, "started_at")
             ended_at = now()
-            duration = time_diff_in_seconds(ended_at, tdoc.started_at)
-            kwargs.update({"ended_at": ended_at, "duration": duration})
+            values["ended_at"] = ended_at
+            values["duration"] = time_diff_in_seconds(ended_at, started_at or ended_at)
+            self.done += 1
 
-        tdoc._db_set(commit=True, notify=True, **kwargs)
-        self._publish_play_progress(tdoc.name)
-
-    def _publish_play_progress(self, task: str) -> None:
-        """Publish the play progress to the user via real-time updates."""
-
-        task_list = list(self.tasks.values())
+        frappe.db.set_value("Server Job Task", row_name, values, update_modified=False)
+        if not frappe.in_test:
+            frappe.db.commit()
         frappe.publish_realtime(
-            "ansible_play_progress",
-            {"progress": task_list.index(task), "total": len(task_list), "play": self.play},
-            doctype="Server Ansible Play",
-            docname=self.play,
-            user=frappe.session.user,
+            "server_job_progress",
+            {"job": self.job.name, "task": task, "progress": self.done, "total": self.total},
+            doctype="Server Job",
+            docname=self.job.name,
         )
+
+    def _fail_pending_tasks(self) -> None:
+        frappe.db.set_value(
+            "Server Job Task",
+            {"parent": self.job.name, "status": ["in", ["Pending", "Running"]]},
+            "status",
+            "Failed",
+            update_modified=False,
+        )
+
+
+def _host_stats(event_data: dict, alias: str) -> dict:
+    stats = {}
+    for key in ("ok", "changed", "failures", "skipped", "processed", "rescued", "ignored"):
+        stats[key] = (event_data.get(key) or {}).get(alias, 0)
+    stats["unreachable"] = (event_data.get("dark") or {}).get(alias, 0)
+    return stats
+
+
+def _runner_detail(runner: Any) -> str:
+    parts = [f"status: {getattr(runner, 'status', None)}", f"rc: {getattr(runner, 'rc', None)}"]
+    for attr in ("stdout", "stderr"):
+        stream = getattr(runner, attr, None)
+        text = stream.read() if hasattr(stream, "read") else stream
+        if text:
+            parts.append(f"{attr}:\n{_text(text)[-4000:]}")
+    return "\n".join(parts)
+
+
+def _text(value: Any) -> str | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, bytes):
+        return value.decode(errors="replace")
+    if isinstance(value, list | tuple):
+        return "\n".join(str(v) for v in value)
+    return str(value)

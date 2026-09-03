@@ -1,0 +1,388 @@
+"""Generates the Stalwart configuration Suite Cloud owns for a cluster.
+
+Two plans exist. The bootstrap plan is applied once on the first node in bootstrap mode and
+only names the stores and hostnames (Stalwart provisions everything else with defaults).
+The cluster plan holds the objects Suite Cloud manages afterwards (roles, coordinator, ACME,
+DNS provider, default domain, system settings, licences) and is re-applied on every sync.
+"""
+
+import json
+from typing import TYPE_CHECKING
+
+import frappe
+
+from suite_cloud.utils import get_config
+
+if TYPE_CHECKING:
+    from frappe.model.document import Document
+
+BOOTSTRAP_PORT = 8080
+API_KEY_DESCRIPTION = "suite-cloud"
+DISABLED_ROLE_DESCRIPTION = "suite-disabled"
+FIREWALL_PORTS = (25, 465, 587, 143, 993, 110, 995, 443, 4190)
+SECRET_MARKER = "***"
+
+CLUSTER_ROLES = {
+    "full": {
+        "name": "full",
+        "description": "All tasks and listeners",
+        "tasks": {"@type": "EnableAll"},
+        "listeners": {"@type": "EnableAll"},
+    },
+    "frontend": {
+        "name": "frontend",
+        "description": "Serves clients, never delivers the outbound queue",
+        "tasks": {"@type": "DisableSome", "taskTypes": ["outboundMta"]},
+        "listeners": {"@type": "EnableAll"},
+    },
+    "outbound": {
+        "name": "outbound",
+        "description": "Delivers the outbound queue only",
+        "tasks": {"@type": "EnableSome", "taskTypes": ["outboundMta", "taskQueueProcessing"]},
+        "listeners": {"@type": "DisableAll"},
+    },
+}
+
+
+# --- bootstrap ------------------------------------------------------------------------
+
+
+def bootstrap_plan(cluster: Document) -> list[dict]:
+    """The single Bootstrap update applied while the first node runs in bootstrap mode."""
+
+    store = cluster.get_store
+    value = {
+        "serverHostname": cluster.hostname,
+        "defaultDomain": cluster.default_domain,
+        "requestTlsCertificate": False,
+        "generateDkimKeys": False,
+        "dataStore": store("data_store").config,
+        "blobStore": store("blob_store").config if cluster.blob_store else {"@type": "Default"},
+        "searchStore": store("search_store").config if cluster.search_store else {"@type": "Default"},
+        "inMemoryStore": store("in_memory_store").config if cluster.in_memory_store else {"@type": "Default"},
+        "directory": {"@type": "Internal"},
+        "tracer": {"@type": "Journal", "level": "info"},
+        "dnsServer": {"@type": "Manual"},
+    }
+    return [{"@type": "update", "object": "Bootstrap", "value": value}]
+
+
+# --- cluster --------------------------------------------------------------------------
+
+
+def cluster_plan(cluster: Document) -> list[dict]:
+    plan: list[dict] = [
+        {"@type": "update", "object": "Coordinator", "value": {"@type": cluster.coordinator or "Disabled"}},
+        {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
+    ]
+
+    dns_server = dns_server_object()
+    if dns_server:
+        plan.append(
+            {
+                "@type": "upsert",
+                "object": "DnsServer",
+                "matchOn": ["description"],
+                "value": {"dns": dns_server},
+            }
+        )
+
+    plan.append(
+        {
+            "@type": "upsert",
+            "object": "AcmeProvider",
+            "matchOn": ["description"],
+            "value": {"acme": acme_provider(cluster)},
+        }
+    )
+    plan.append(
+        {
+            "@type": "upsert",
+            "object": "Domain",
+            "matchOn": ["name"],
+            "value": {"default": default_domain(cluster, with_dns=bool(dns_server))},
+        }
+    )
+    plan.append(
+        {
+            "@type": "update",
+            "object": "SystemSettings",
+            "value": {
+                "defaultHostname": cluster.hostname,
+                "defaultDomainId": "#default",
+                "mailExchangers": [{"hostname": cluster.hostname, "priority": 10}],
+            },
+        }
+    )
+    plan.append(
+        {
+            "@type": "upsert",
+            "object": "Role",
+            "matchOn": ["description"],
+            "value": {
+                "disabled": {
+                    "description": DISABLED_ROLE_DESCRIPTION,
+                    "roleIds": {},
+                    "enabledPermissions": {"emailReceive": True},
+                    "disabledPermissions": {},
+                }
+            },
+        }
+    )
+
+    if cluster.enterprise_license_key and cluster.enterprise_api_key:
+        plan.append(
+            {
+                "@type": "update",
+                "object": "Enterprise",
+                "value": {
+                    "licenseKey": secret_value(cluster.get_password("enterprise_license_key")),
+                    "apiKey": secret_value(cluster.get_password("enterprise_api_key")),
+                },
+            }
+        )
+
+    plan.extend(egress_operations(cluster))
+    return plan
+
+
+def acme_provider(cluster: Document) -> dict:
+    contact = cluster.acme_contact_email or get_config("acme_contact_email")
+    provider = {
+        "description": "letsencrypt",
+        "directory": cluster.acme_directory_url or get_config("acme_directory_url"),
+        "challengeType": "Dns01",
+    }
+    if contact:
+        provider["contact"] = {contact: True}
+    return provider
+
+
+def default_domain(cluster: Document, with_dns: bool) -> dict:
+    """The cluster zone: carries the ACME certificate covering the ingress and node hostnames."""
+
+    domain = {
+        "name": cluster.default_domain,
+        "description": "Cluster default domain",
+        "isEnabled": True,
+        "certificateManagement": {
+            "@type": "Automatic",
+            "acmeProviderId": "#acme",
+            "subjectAlternativeNames": [cluster.hostname, f"*.{cluster.default_domain}"],
+        },
+        "dkimManagement": {"@type": "Manual"},
+        "subAddressing": {"@type": "Disabled"},
+    }
+    if with_dns:
+        # Automatic DNS management is what gives DNS-01 its provider; Suite Cloud publishes the
+        # zone's records itself, hence the empty record list.
+        domain["dnsManagement"] = {
+            "@type": "Automatic",
+            "dnsServerId": "#dns",
+            "origin": get_config("root_domain_name"),
+            "publishRecords": [],
+        }
+    else:
+        domain["dnsManagement"] = {"@type": "Manual"}
+    return domain
+
+
+def dns_server_object() -> dict | None:
+    """Maps the Suite Cloud DNS provider onto a Stalwart DnsServer variant.
+
+    Field names follow stalw.art/docs/ref/object/dns-server; confirm the less common providers
+    with ``stalwart-cli describe DnsServer`` before relying on them.
+    """
+
+    settings = frappe.get_cached_doc("Suite Cloud Settings")
+    if not settings.dns_provider:
+        return None
+
+    secret = lambda field: settings.get_password(field) if settings.get(field) else None  # noqa: E731
+    base = {"description": "suite-cloud", "ttl": 300000}
+    match settings.dns_provider:
+        case "Cloudflare":
+            return {**base, "@type": "Cloudflare", "secret": secret("dns_provider_token")}
+        case "AmazonRoute53":
+            return {
+                **base,
+                "@type": "Route53",
+                "accessKeyId": settings.dns_provider_access_key,
+                "secretAccessKey": secret("dns_provider_access_secret"),
+                "region": "us-east-1",
+            }
+        case "DigitalOcean":
+            return {**base, "@type": "DigitalOcean", "secret": secret("dns_provider_token")}
+        case "Hetzner":
+            return {**base, "@type": "Hetzner", "secret": secret("dns_provider_token")}
+        case "Linode":
+            return {**base, "@type": "Linode", "secret": secret("dns_provider_token")}
+        case "Namecheap":
+            return {
+                **base,
+                "@type": "Namecheap",
+                "username": settings.dns_provider_username,
+                "apiKey": secret("dns_provider_token"),
+                "clientIp": settings.dns_provider_client_ip,
+            }
+        case "GoDaddy":
+            return {
+                **base,
+                "@type": "GoDaddy",
+                "apiKey": settings.dns_provider_key,
+                "secret": secret("dns_provider_secret"),
+            }
+    return None
+
+
+def egress_operations(cluster: Document) -> list[dict]:
+    """Relay routes and routing rules for egress pools; filled in by suite_cloud.cluster.egress."""
+
+    try:
+        from suite_cloud.cluster.egress import cluster_operations
+    except ImportError:
+        return []
+    return cluster_operations(cluster)
+
+
+def api_key_permissions() -> dict:
+    """Permissions of Suite Cloud's own management key.
+
+    Inherit (the admin account's full set) for now; a Replace list scoped to the object types
+    Suite Cloud manages is the follow-up once the identifiers are confirmed on a live server.
+    """
+
+    return {"@type": "Inherit"}
+
+
+# --- per node -----------------------------------------------------------------------------
+
+
+def node_config(cluster: Document) -> dict:
+    """``/etc/stalwart/config.json``: only the data store; everything else lives in it."""
+
+    return cluster.get_store("data_store").config
+
+
+def node_env(node: Document, mode: str = "normal") -> dict[str, str]:
+    """``stalwart.env`` for a node in ``normal``, ``bootstrap`` or ``recovery`` mode."""
+
+    cluster = node.get_cluster()
+    env = {
+        "STALWART_HOSTNAME": node.hostname,
+        "STALWART_PUBLIC_URL": cluster.base_url,
+    }
+    if mode == "normal":
+        env["STALWART_ROLE"] = node.role or "full"
+        return env
+
+    env["STALWART_RECOVERY_ADMIN"] = f"{cluster.admin_username}:{cluster.get_password('admin_password')}"
+    env["STALWART_RECOVERY_MODE_PORT"] = str(BOOTSTRAP_PORT)
+    if mode == "recovery":
+        env["STALWART_RECOVERY_MODE"] = "1"
+    return env
+
+
+def systemd_unit() -> str:
+    return """[Unit]
+Description=Stalwart Mail and Collaboration Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=stalwart
+Group=stalwart
+EnvironmentFile=/etc/stalwart/stalwart.env
+ExecStart=/usr/local/bin/stalwart --config /etc/stalwart/config.json
+Restart=on-failure
+RestartSec=5
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+LimitNOFILE=65536
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target
+"""
+
+
+# --- rendering ------------------------------------------------------------------------------
+
+
+def render_env(env: dict[str, str]) -> str:
+    return "".join(f"{key}={value}\n" for key, value in env.items())
+
+
+def to_ndjson(plan: list[dict]) -> str:
+    return "".join(json.dumps(operation, separators=(",", ":")) + "\n" for operation in plan)
+
+
+def secret_value(secret: str | None) -> dict | None:
+    return {"@type": "Value", "secret": secret} if secret else None
+
+
+def redacted(plan: list[dict]) -> str:
+    """The plan for display: every secret-carrying value replaced by a marker."""
+
+    return json.dumps([_redact(op) for op in plan], indent=2)
+
+
+SECRET_KEYS = {
+    "secret",
+    "secretKey",
+    "secretAccessKey",
+    "apiKey",
+    "authSecret",
+    "sentinelSecret",
+    "bearerToken",
+}
+
+
+def _redact(value):
+    if isinstance(value, dict):
+        if value.get("@type") == "Value" and "secret" in value:
+            return {"@type": "Value", "secret": SECRET_MARKER}
+        return {
+            k: (SECRET_MARKER if k in SECRET_KEYS and isinstance(v, str) else _redact(v))
+            for k, v in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact(v) for v in value]
+    return value
+
+
+# --- drift ------------------------------------------------------------------------------------
+
+
+def drift_report(cluster: Document) -> dict:
+    """Compares the generated plan with what the cluster currently holds (never mutates)."""
+
+    client = cluster.get_client()
+    differences: list[dict] = []
+    for operation in cluster_plan(cluster):
+        object_type = operation["object"]
+        if operation["@type"] == "upsert":
+            match_on = operation.get("matchOn") or ["name"]
+            existing = client.objects(object_type).get_all()
+            for ref, value in operation["value"].items():
+                live = next((o for o in existing if all(o.get(k) == value.get(k) for k in match_on)), None)
+                if live is None:
+                    differences.append({"object": object_type, "ref": ref, "missing": True})
+                    continue
+                for key, wanted in value.items():
+                    if isinstance(wanted, str) and wanted.startswith("#"):
+                        continue
+                    if live.get(key) != wanted:
+                        differences.append({"object": object_type, "ref": ref, "property": key})
+        elif operation["@type"] == "update" and not operation.get("id"):
+            live = client.singleton(object_type).read()
+            for key, wanted in operation["value"].items():
+                if isinstance(wanted, str) and wanted.startswith("#"):
+                    continue
+                if isinstance(wanted, dict) and wanted.get("@type") == "Value":
+                    continue
+                if live.get(key) != wanted:
+                    differences.append({"object": object_type, "property": key})
+
+    return {"checked_at": frappe.utils.now(), "differences": differences}

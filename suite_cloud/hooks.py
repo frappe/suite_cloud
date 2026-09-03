@@ -19,10 +19,21 @@ after_migrate = "suite_cloud.install.after_migrate"
 # Scheduled tasks
 # ============================================================================
 scheduler_events = {
+    "cron": {
+        "*/5 * * * *": [
+            "suite_cloud.suite_cloud.doctype.server_job.server_job.retry_failed_jobs",
+            "suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node.poll_pending_nodes",
+        ],
+    },
     "daily": [
         "suite_cloud.suite_cloud.doctype.dns_record.dns_record.verify_all_dns_records",
+        "suite_cloud.suite_cloud.doctype.stalwart_cluster.stalwart_cluster.check_all_clusters",
+        "suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node.verify_all_ptr_records",
     ],
 }
+
+# Execution history points back at its server; it must not block deleting the server.
+ignore_links_on_delete = ["Server Job"]
 
 export_python_type_annotations = True
 require_type_annotated_api_methods = True

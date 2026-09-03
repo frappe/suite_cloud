@@ -1,0 +1,9 @@
+---
+- name: Run commands
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Run command
+      shell: "{{ item }}"
+      loop: "{{ commands }}"

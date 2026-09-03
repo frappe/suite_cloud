@@ -1,0 +1,29 @@
+---
+- import_playbook: install-stalwart.yml
+
+- name: Restart Stalwart on the new version
+  hosts: all
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Restart Stalwart
+      systemd:
+        name: stalwart
+        state: restarted
+        enabled: true
+
+    - name: Wait for SMTP
+      wait_for:
+        host: 127.0.0.1
+        port: 25
+        timeout: 180
+
+    - name: Wait for HTTPS
+      wait_for:
+        host: 127.0.0.1
+        port: 443
+        timeout: 180
+
+    - name: Report the running version
+      command: /usr/local/bin/stalwart --version
+      changed_when: false
