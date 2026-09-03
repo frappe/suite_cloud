@@ -131,7 +131,10 @@ class ServerJob(Document):
         try:
             getattr(server, method)(self)
         except Exception:
-            frappe.db.rollback(save_point="server_job_callback")
+            try:
+                frappe.db.rollback(save_point="server_job_callback")
+            except Exception:
+                frappe.db.rollback()  # the callback committed and released the savepoint
             self.log_error(f"Server Job callback {method} failed")
             if success:
                 self.mark_finished("Failed", error_log=frappe.get_traceback(with_context=True))
@@ -164,6 +167,22 @@ class ServerJob(Document):
             values["retries"] = cint(self.retries) + 1
         self.db_set(values, update_modified=False, commit=should_commit(), notify=True)
         self.reload()
+
+    def is_superseded(self) -> bool:
+        """A newer job for the same server, or a deleted server, makes an automatic retry harmful."""
+
+        if not frappe.db.exists(self.server_doctype, self.server):
+            return True
+        return bool(
+            frappe.db.exists(
+                "Server Job",
+                {
+                    "server_doctype": self.server_doctype,
+                    "server": self.server,
+                    "creation": [">", self.creation],
+                },
+            )
+        )
 
     def is_stale(self) -> bool:
         """A job still marked Running after the worker timeout lost its worker (kill, deploy, OOM)."""
@@ -236,6 +255,8 @@ def retry_failed_jobs() -> None:
     timeout = cint(get_config("server_job_timeout")) or 1800
     for row in jobs:
         job = frappe.get_doc("Server Job", row.name)
+        if job.is_superseded():
+            continue
         if job.status == "Failed" and job.retries <= job.max_retries:
             job.retry()
         elif job.status == "Running" and job.is_stale():

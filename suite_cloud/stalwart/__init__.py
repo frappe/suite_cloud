@@ -9,7 +9,6 @@ import hashlib
 from typing import TYPE_CHECKING
 
 import frappe
-from frappe.utils.caching import request_cache
 
 from suite_cloud.stalwart.client import StalwartClient
 from suite_cloud.stalwart.connection import ConnectionInfo, JMAPConnection, SessionStore
@@ -21,7 +20,6 @@ SESSION_CACHE_KEY = "suite_cloud:stalwart:sessions"
 DEFAULT_TIMEOUT = (15.0, 60.0)
 
 
-@request_cache
 def get_client(target: Document, timeout: tuple[float, float] = DEFAULT_TIMEOUT) -> StalwartClient:
     """Returns the management client for a Stalwart Cluster or Egress Gateway document."""
 

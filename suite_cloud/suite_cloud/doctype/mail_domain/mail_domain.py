@@ -266,10 +266,22 @@ def refresh_rotating_domains() -> None:
 
 
 def verify_unverified_domains() -> None:
-    for name in frappe.get_all("Mail Domain", {"is_verified": 0, "stalwart_id": ["is", "set"]}, pluck="name"):
-        _run_isolated(
-            name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
+    """Hourly: unverified domains, plus verified ones with a mandatory row still unverified (rotations)."""
+
+    names = set(frappe.get_all("Mail Domain", {"is_verified": 0, "stalwart_id": ["is", "set"]}, pluck="name"))
+    names.update(
+        frappe.get_all(
+            "Mail Domain DNS Record",
+            {"is_mandatory": 1, "is_verified": 0, "parenttype": "Mail Domain"},
+            pluck="parent",
+            distinct=True,
         )
+    )
+    for name in sorted(names):
+        if frappe.db.get_value("Mail Domain", name, "stalwart_id"):
+            _run_isolated(
+                name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
+            )
 
 
 def _refresh(name: str) -> None:

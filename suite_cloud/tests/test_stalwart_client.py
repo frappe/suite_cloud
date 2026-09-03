@@ -75,11 +75,13 @@ class TestStalwartClient(UnitTestCase):
 
         self.client.accounts.set_password(account["id"], "new-pw")
         self.client.accounts.set_member_group_ids(account["id"], [])
-        self.client.accounts.set_roles(account["id"], ["role-x"])
+        role_id = self.fake._add("Role", {"description": "suite-disabled"})
+        self.client.accounts.set_roles(account["id"], [role_id])
         stored = self.fake.get("Account", account["id"])
         self.assertEqual(stored["credentials"]["0"]["secret"], "new-pw")
         self.assertEqual(stored["memberGroupIds"], {})
-        self.assertEqual(stored["roles"], {"@type": "Custom", "roleIds": {"role-x": True}})
+        self.assertEqual(stored["roles"], {"@type": "Custom", "roleIds": {role_id: True}})
+        self.assertRaises(StalwartRejectedError, self.client.accounts.set_roles, account["id"], ["role-x"])
 
     def test_group_delete_clears_membership(self) -> None:
         domain_id = self.client.domains.create_id(Domain(name="example.com"))
@@ -170,6 +172,17 @@ class TestStalwartClient(UnitTestCase):
         result = self.client.apply(plan)
         self.assertEqual(result.updated, [])
         self.assertEqual(len(result.unchanged), 1)
+
+    def test_unsupported_query_filters_are_refused_by_the_fake(self) -> None:
+        self.assertRaises(StalwartRejectedError, self.client.roles.find, {"description": "x"})
+        self.assertIsNone(self.client.roles.find_by_description("missing"))
+
+    def test_patches_need_existing_parents(self) -> None:
+        domain_id = self.client.domains.create_id(Domain(name="example.com"))
+        account_id = self.client.accounts.create_id(Account(name="nopw", domain_id=domain_id))
+        self.fake.get("Account", account_id)["credentials"] = {}
+        self.client.accounts.set_password(account_id, "fresh-pw")  # falls back to replacing the map
+        self.assertEqual(self.fake.get("Account", account_id)["credentials"]["0"]["secret"], "fresh-pw")
 
     def test_reload_settings_runs_an_action(self) -> None:
         self.client.reload_settings()

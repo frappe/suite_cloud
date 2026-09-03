@@ -73,8 +73,8 @@ class DNSRecord(Document):
                 "type": self.type,
                 "value": self.value,
                 "name": ["!=", self.name],
-                "managed_by_doctype": self.managed_by_doctype or "",
-                "managed_by": self.managed_by or "",
+                "managed_by_doctype": self.managed_by_doctype or ["is", "not set"],
+                "managed_by": self.managed_by or ["is", "not set"],
             },
         ):
             frappe.throw(

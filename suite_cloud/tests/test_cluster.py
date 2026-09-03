@@ -158,6 +158,79 @@ class TestStalwartCluster(IntegrationTestCase):
             frappe.get_doc("Stalwart Node", node.name).delete()  # Pending nodes delete normally
         self.assertFalse(frappe.db.exists("DNS Record", {"host": "n1.blr"}))
 
+    def test_finish_bootstrap_and_key_rotation_through_the_fake(self) -> None:
+        from suite_cloud.cluster import bootstrap
+        from suite_cloud.stalwart import forget_sessions
+        from suite_cloud.tests.fake_stalwart import FakeStalwart
+        from suite_cloud.tests.fixtures import clear_request_cache
+
+        cluster = make_cluster()
+        node = make_node(cluster, "n1", "203.0.113.10")
+        fake = FakeStalwart(base_url=cluster.base_url, admin_password=cluster.get_password("admin_password"))
+        fake.objects["Certificate"]["cert1"] = {"id": "cert1", "subjectAlternativeNames": [cluster.hostname]}
+        with fake.install():
+            forget_sessions(cluster)
+            clear_request_cache()
+            job = frappe.get_doc(
+                {
+                    "doctype": "Server Job",
+                    "title": "x",
+                    "server_doctype": "Stalwart Node",
+                    "server": node.name,
+                    "playbook": "run-commands.yml",
+                }
+            )
+            with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.enqueue"):
+                job.insert()
+            bootstrap.provision_node(node)
+            node.reload()
+
+            # No registry lease yet: a Redis-coordinated cluster keeps waiting (nothing fails).
+            bootstrap.after_provision(node, job)
+            self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Bootstrapping")
+
+            fake.add_cluster_node(node.hostname, node_id=7)
+            self.assertTrue(bootstrap.finish_bootstrap(frappe.get_doc("Stalwart Cluster", cluster.name)))
+
+            cluster.reload()
+            node.reload()
+            self.assertEqual((cluster.status, node.status, node.node_id), ("Active", "Active", 7))
+            self.assertTrue(frappe.db.exists("DNS Record", {"host": "mail.blr", "managed_by": node.name}))
+            self.assertIn(cluster.get_password("api_key"), fake.tokens)
+            self.assertEqual(fake.singletons["SystemSettings"]["defaultCertificateId"], "cert1")
+            self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
+
+            # The minted key works for management calls and rotation revokes the old one.
+            old_key = cluster.get_password("api_key")
+            clear_request_cache()
+            self.assertEqual(cluster.get_client().cluster_nodes.find_by_hostname(node.hostname)["nodeId"], 7)
+            cluster.rotate_api_key()
+            self.assertNotEqual(cluster.get_password("api_key"), old_key)
+            self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
+
+    def test_retried_bootstrap_recovers_a_failed_cluster(self) -> None:
+        from suite_cloud.cluster import bootstrap
+
+        cluster = make_cluster()
+        node = make_node(cluster, "n1", "203.0.113.10")
+        node.db_set({"is_bootstrap_node": 1, "status": "Provisioning"})
+        cluster.db_set({"status": "Failed", "bootstrap_node": node.name})
+        job = frappe._dict(retries=1, max_retries=1, error_log="boom")
+
+        node.after_provision_failed(job)  # first failure keeps the cluster retryable
+        self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Failed")
+
+        with (
+            patch("suite_cloud.cluster.bootstrap.check_node", return_value=False),
+            patch("suite_cloud.cluster.dns.sync_node_records"),
+            patch("suite_cloud.cluster.dns.sync_spf_record"),
+        ):
+            bootstrap.after_provision(node, job)
+        self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Bootstrapping")
+
+        node.after_provision_failed(frappe._dict(retries=2, max_retries=1, error_log="boom"))
+        self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Failed")
+
     def test_outbound_nodes_stay_out_of_ingress(self) -> None:
         from suite_cloud.cluster import bootstrap
 

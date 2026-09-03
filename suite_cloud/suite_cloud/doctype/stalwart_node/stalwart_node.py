@@ -174,7 +174,8 @@ class StalwartNode(Document):
     def after_provision_failed(self, job: Document) -> None:
         self.set_status("Failed", job.error_log)
         cluster = self.get_cluster()
-        if self.is_bootstrap_node and cluster.status == "Bootstrapping":
+        exhausted = (job.retries or 0) > (job.max_retries or 0)
+        if self.is_bootstrap_node and cluster.status == "Bootstrapping" and exhausted:
             cluster.db_set("status", "Failed", update_modified=False)
 
     def after_upgrade(self, job: Document) -> None:

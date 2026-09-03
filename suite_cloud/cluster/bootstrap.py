@@ -136,6 +136,9 @@ def build_node_variables(context: dict) -> dict:
 def after_provision(node: Document, job: Document) -> None:
     """The playbook finished: the node is installed and answering locally."""
 
+    cluster = node.get_cluster()
+    if node.is_bootstrap_node and cluster.status == "Failed" and cluster.bootstrap_node == node.name:
+        cluster.db_set("status", "Bootstrapping", update_modified=False)  # a retried bootstrap succeeded
     node.db_set(
         {
             "status": "Provisioned",
@@ -180,15 +183,12 @@ def check_node(node: Document) -> bool:
     except StalwartError as e:
         return _not_ready(node, str(e))
 
-    # A single node without a coordinator may not hold a lease; the cluster answering is enough.
-    if registry is None and cluster.coordinator != "Disabled":
-        return _not_ready(node, "Node registry entry absent")
-    if registry and registry.get("status") != "active":
-        return _not_ready(node, f"Node registry status: {registry.get('status')}")
+    if problem := _registry_problem(cluster, registry):
+        return _not_ready(node, problem)
 
     node.db_set(
         {
-            "node_id": registry.get("nodeId") if registry else None,
+            "node_id": (registry or {}).get("nodeId") or 0,
             "last_health_at": now(),
             "last_error": None,
         },
@@ -205,6 +205,16 @@ def activate_node(node: Document) -> None:
     node.set_status("Active")
     dns.sync_node_records(node, include_ingress=serves_clients(node))
     dns.sync_spf_record(node.get_cluster())
+
+
+def _registry_problem(cluster: Document, registry: dict | None) -> str | None:
+    """A single node without a coordinator may not hold a lease; the cluster answering is enough."""
+
+    if registry is None and cluster.coordinator != "Disabled":
+        return "Node registry entry absent"
+    if registry and registry.get("status") != "active":
+        return f"Node registry status: {registry.get('status')}"
+    return None
 
 
 def _not_ready(node: Document, detail: str) -> bool:
@@ -233,17 +243,23 @@ def finish_bootstrap(cluster: Document) -> bool:
     try:
         admin = cluster.get_admin_client()
         if not cluster.get_password("api_key", raise_exception=False):
+            # Earlier attempts may have minted keys that were then rolled back; keep only one.
+            for stale in admin.api_keys.get_all():
+                if stale.get("description") == plan.API_KEY_DESCRIPTION:
+                    admin.api_keys.delete(stale["id"])
             _, secret = admin.api_keys.create_secret(
                 Credential(description=plan.API_KEY_DESCRIPTION, permissions=plan.api_key_permissions())
             )
             cluster.api_key = secret
             cluster.save(ignore_permissions=True)
-            if not frappe.in_test:
-                frappe.db.commit()  # a later failure must not lose (and re-mint) the key
         _set_default_certificate(cluster, admin)
         registry = admin.cluster_nodes.find_by_hostname(node.hostname)
+        problem = _registry_problem(cluster, registry)
     except StalwartError as e:
-        _not_ready(node, str(e))
+        problem = str(e)
+
+    if problem:
+        _not_ready(node, problem)
         if node.status == "Failed":
             cluster.db_set("status", "Failed", update_modified=False)
         return False
@@ -251,7 +267,7 @@ def finish_bootstrap(cluster: Document) -> bool:
     cluster.db_set({"status": "Active", "last_config_sync_at": now()}, update_modified=False)
     node.db_set(
         {
-            "node_id": registry.get("nodeId") if registry else None,
+            "node_id": (registry or {}).get("nodeId") or 0,
             "last_health_at": now(),
             "last_error": None,
         },

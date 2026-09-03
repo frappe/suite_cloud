@@ -203,8 +203,12 @@ class AccountService(ManagementService):
         credentials = (self.get(account_id, properties=["credentials"]) or {}).get("credentials") or {}
         row = next((idx for idx, c in credentials.items() if c.get("@type") == "Password"), None)
         if row is None:
-            row = str(len(credentials))
-            self.update(account_id, {f"credentials/{row}": {"@type": "Password", "secret": new_password}})
+            # No password row to patch into: replace the whole map (patch paths need existing parents).
+            credentials = {
+                **credentials,
+                str(len(credentials)): {"@type": "Password", "secret": new_password},
+            }
+            self.update(account_id, {"credentials": credentials})
         else:
             self.update(account_id, {f"credentials/{row}/secret": new_password})
 
@@ -282,8 +286,9 @@ class MailingListService(ManagementService):
         "aliases",
     ]
 
-    def find_by_name(self, name: str, domain_id: str, properties: list[str] | None = None) -> dict | None:
-        return self.find({"name": name, "domainId": domain_id}, properties=properties or ["id"])
+    def find_by_name(self, name: str, domain_id: str) -> dict | None:
+        # MailingList/query only documents text and tenant filters; match locally instead.
+        return self.find_local(name=name, domainId=domain_id)
 
     def set_recipients(self, list_id: str, recipients: list[str]) -> None:
         self.update(list_id, {"recipients": id_set(recipients)})
@@ -303,4 +308,5 @@ class RoleService(ManagementService):
     ]
 
     def find_by_description(self, description: str) -> dict | None:
-        return self.find({"description": description}, properties=["id", "description"])
+        # Role/query only documents a text filter; roles are few, so match locally.
+        return self.find_local(description=description)

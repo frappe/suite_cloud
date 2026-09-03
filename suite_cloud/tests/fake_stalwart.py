@@ -37,6 +37,17 @@ SINGLETONS = {
 ACCOUNT_SCOPED = {"AppPassword", "ApiKey"}
 ADDRESS_TYPES = ("Account", "MailingList")
 
+# Query filters each type documents (stalw.art/docs/ref/object/<type>); anything else is refused.
+QUERY_FILTERS = {
+    "Account": {"text", "name", "domainId", "memberTenantId", "memberGroupIds"},
+    "Domain": {"text", "name", "memberTenantId"},
+    "MailingList": {"text", "memberTenantId"},
+    "DkimSignature": {"domainId", "memberTenantId"},
+    "Role": {"text"},
+    "Tenant": {"text"},
+}
+REFERENCES = {"domainId": "Domain", "memberGroupIds": "Account", "roleIds": "Role"}
+
 SCHEMA = {
     "enums": {
         "Locale": [{"id": "en_US", "description": "English (US)"}, {"id": "de_DE", "description": "German"}],
@@ -86,6 +97,17 @@ class FakeStalwart:
             yield self
 
     # --- helpers for tests --------------------------------------------------------
+
+    def add_cluster_node(self, hostname: str, node_id: int = 1, status: str = "active") -> str:
+        return self._add(
+            "ClusterNode",
+            {
+                "nodeId": node_id,
+                "hostname": hostname,
+                "lastRenewal": "2026-01-01T00:00:00Z",
+                "status": status,
+            },
+        )
 
     def add_token(self, secret: str, account_id: str | None = None) -> None:
         self.tokens[secret] = account_id or self.admin_id
@@ -204,9 +226,11 @@ class FakeStalwart:
         return {"accountId": account_id, "state": "1", "list": objects, "notFound": []}
 
     def _query(self, type: str, args: dict, account_id: str, refs: dict) -> dict:
-        objects = [
-            o for o in self._collection(type, account_id).values() if matches(o, args.get("filter") or {})
-        ]
+        filter = args.get("filter") or {}
+        unsupported = set(filter) - QUERY_FILTERS.get(type, set())
+        if unsupported:
+            raise FakeError("unsupportedFilter", f"{type} cannot filter on {sorted(unsupported)}")
+        objects = [o for o in self._collection(type, account_id).values() if matches(o, filter)]
         if limit := args.get("limit"):
             objects = objects[:limit]
         return {"accountId": account_id, "ids": [o["id"] for o in objects], "total": len(objects)}
@@ -215,7 +239,11 @@ class FakeStalwart:
         result: dict = {"accountId": account_id, "created": {}, "updated": {}, "destroyed": []}
         if type in SINGLETONS:
             for id, patch_ in (args.get("update") or {}).items():
-                self.singletons[type] = apply_patch(self.singletons.get(type, {}), patch_)
+                try:
+                    self.singletons[type] = apply_patch(self.singletons.get(type, {}), patch_)
+                except FakeError as e:
+                    result.setdefault("notUpdated", {})[id] = {"type": e.type, "description": e.description}
+                    continue
                 result["updated"][id] = None
                 if type == "Bootstrap":
                     self.bootstrapped = True
@@ -225,7 +253,8 @@ class FakeStalwart:
         for ref, payload in (args.get("create") or {}).items():
             payload = resolve_creation_refs(payload, refs)
             try:
-                created = self._create(type, payload, collection)
+                self._check_references(payload)
+                created = self._create(type, payload, collection, account_id)
             except FakeError as e:
                 result.setdefault("notCreated", {})[ref] = {"type": e.type, "description": e.description}
                 continue
@@ -236,7 +265,13 @@ class FakeStalwart:
             if id not in collection:
                 result.setdefault("notUpdated", {})[id] = {"type": "notFound"}
                 continue
-            collection[id] = apply_patch(collection[id], resolve_creation_refs(patch_, refs))
+            try:
+                patch_ = resolve_creation_refs(patch_, refs)
+                self._check_references(patch_)
+                collection[id] = apply_patch(collection[id], patch_)
+            except FakeError as e:
+                result.setdefault("notUpdated", {})[id] = {"type": e.type, "description": e.description}
+                continue
             self._server_set(type, collection[id])
             result["updated"][id] = None
 
@@ -255,7 +290,22 @@ class FakeStalwart:
 
     # --- object rules --------------------------------------------------------------------
 
-    def _create(self, type: str, payload: dict, collection: dict) -> dict:
+    def _check_references(self, payload: dict) -> None:
+        """Ids must point at existing objects, like the real server's invalidProperties checks."""
+
+        for key, target in REFERENCES.items():
+            value = payload.get(key)
+            ids = list(value) if isinstance(value, dict) else ([value] if isinstance(value, str) else [])
+            for ref in ids:
+                if ref not in self.objects[target]:
+                    raise FakeError("invalidProperties", f"{key} references unknown {target} {ref}")
+        roles = payload.get("roles")
+        if isinstance(roles, dict) and roles.get("@type") == "Custom":
+            for ref in roles.get("roleIds") or {}:
+                if ref not in self.objects["Role"]:
+                    raise FakeError("invalidProperties", f"roleIds references unknown Role {ref}")
+
+    def _create(self, type: str, payload: dict, collection: dict, account_id: str | None = None) -> dict:
         self._check_unique(type, payload)
         obj = {**payload, "id": self._new_id(type), "createdAt": "2026-01-01T00:00:00Z"}
         if type == "Domain":
@@ -267,6 +317,8 @@ class FakeStalwart:
                 )
         self._server_set(type, obj)
         collection[obj["id"]] = obj
+        if type == "ApiKey" and account_id:
+            self.tokens[obj["secret"]] = account_id  # a minted key authenticates like any token
         return json.loads(json.dumps(obj))
 
     def _check_unique(self, type: str, payload: dict) -> None:
@@ -387,7 +439,9 @@ def apply_patch(obj: dict, patch_: dict) -> dict:
         *path, leaf = key.split("/")
         target = obj
         for part in path:
-            target = target.setdefault(part, {})
+            if not isinstance(target, dict) or part not in target:
+                raise FakeError("invalidPatch", f"{key}: parent does not exist")  # RFC 8620 5.3
+            target = target[part]
         if value is None:
             target.pop(leaf, None)
         else:
