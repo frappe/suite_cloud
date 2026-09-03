@@ -23,6 +23,7 @@ def create_group(
     aliases: list[str] | str | None = None,
     members: list[str] | str | None = None,
 ) -> dict:
+    member_names = [owned("Mail Account", m).name for m in as_list(members)]
     doc = frappe.get_doc(
         {
             "doctype": "Mail Group",
@@ -33,8 +34,8 @@ def create_group(
         }
     )
     doc.insert(ignore_permissions=True)
-    if members:
-        _set_members(doc, as_list(members))
+    if member_names:
+        _set_members(doc, member_names)
     frappe.local.response["http_status_code"] = 201
     return doc.to_api()
 

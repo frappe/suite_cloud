@@ -54,6 +54,9 @@ def create_account(
         frappe.throw(_("Password must be at least 8 characters."))
 
     site = current_site()
+    # Everything the account depends on is resolved first: a refusal after the insert would leave
+    # the Stalwart account behind while the database change rolls back.
+    lists = [owned("Mailing List", email_) for email_ in as_list(mailing_lists)]
     doc = frappe.get_doc(
         {
             "doctype": "Mail Account",
@@ -71,8 +74,7 @@ def create_account(
     doc.flags.password = password
     doc.insert(ignore_permissions=True)
 
-    for list_email in as_list(mailing_lists):
-        mailing_list = owned("Mailing List", list_email)
+    for mailing_list in lists:
         if doc.email not in [r.email for r in mailing_list.recipients]:
             mailing_list.append("recipients", {"email": doc.email})
             mailing_list.save(ignore_permissions=True)

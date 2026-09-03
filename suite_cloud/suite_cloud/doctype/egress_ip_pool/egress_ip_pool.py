@@ -84,9 +84,17 @@ class EgressIPPool(Document):
         return max([FIRST_RELAY_PORT - 1, *[p for p in ports if p]]) + 1
 
     def on_update(self) -> None:
+        before = self.get_doc_before_save()
+        if before and self.snapshot(before) == self.snapshot(self):
+            return
         dns.sync_pool_records(self)
         dns.sync_spf_record(self.get_cluster())
         egress.apply_pool_changes(self)
+
+    @staticmethod
+    def snapshot(doc: Document) -> tuple:
+        addresses = sorted((r.gateway, r.ip_address, r.ehlo_hostname) for r in doc.addresses)
+        return (doc.relay_port, doc.hostname, bool(doc.is_default), tuple(addresses))
 
     def on_trash(self) -> None:
         for doctype, field in (

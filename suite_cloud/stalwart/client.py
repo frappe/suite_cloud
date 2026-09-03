@@ -88,6 +88,18 @@ class StalwartClient:
         return PlanApplier(self).apply(plan)
 
 
+# Stalwart never echoes secrets back, so they would look changed on every apply.
+WRITE_ONLY_KEYS = frozenset(
+    {"credentials", "secret", "authSecret", "secretKey", "secretAccessKey", "apiKey", "licenseKey"}
+)
+
+
+def is_write_only(key: str, value: Any) -> bool:
+    if key in WRITE_ONLY_KEYS:
+        return True
+    return isinstance(value, dict) and value.get("@type") == "Value" and "secret" in value
+
+
 @dataclass
 class ApplyResult:
     created: dict[str, str] = field(default_factory=dict)
@@ -147,7 +159,11 @@ class PlanApplier:
                 continue
 
             self.ids[ref] = match["id"]
-            patch = {k: v for k, v in value.items() if k not in match_on and match.get(k) != v}
+            patch = {
+                k: v
+                for k, v in value.items()
+                if k not in match_on and not is_write_only(k, v) and match.get(k) != v
+            }
             if patch:
                 service.update(match["id"], patch)
                 match.update(patch)

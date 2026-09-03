@@ -120,6 +120,17 @@ class TestServerJob(IntegrationTestCase):
         callback.assert_not_called()
         self.assertEqual(frappe.db.get_value("Stalwart Node", self.node.name, "status"), "Failed")
 
+    def test_stale_running_job_can_be_retried(self) -> None:
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+            job = create_server_job(self.node, "run-commands.yml", title="Stuck")
+        job.db_set({"status": "Running", "started_at": frappe.utils.add_to_date(None, hours=-2)})
+        job.reload()
+        self.assertTrue(job.is_stale())
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.enqueue") as enqueue:
+            job.retry()
+        enqueue.assert_called_once()
+        self.assertEqual(frappe.db.get_value("Server Job", job.name, "status"), "Pending")
+
     def test_variables_snapshot_redacts_secrets(self) -> None:
         variables = bootstrap.build_node_variables({"node": self.node.name})
         self.assertIn("admin_password", variables["__secret_keys__"])

@@ -103,6 +103,40 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertFalse(frappe.db.exists("DNS Record", {"host": "mail.blr"}))
         self.assertEqual(frappe.db.get_value("Stalwart Node", node.name, "in_ingress_dns"), 0)
 
+    def test_removing_a_node_updates_spf_and_frees_a_failed_bootstrap(self) -> None:
+        from suite_cloud.cluster import bootstrap
+
+        cluster = make_cluster()
+        node = make_node(cluster, "n1", "203.0.113.10")
+        node.db_set({"status": "Active", "is_bootstrap_node": 1})
+        dns.sync_spf_record(cluster)
+        self.assertIn("ip4:203.0.113.10", frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"))
+
+        bootstrap.drain_node(node)  # Draining nodes still send
+        self.assertIn("ip4:203.0.113.10", frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"))
+        node.db_set("status", "Failed")
+        cluster.db_set({"status": "Failed", "bootstrap_node": node.name})
+
+        frappe.get_doc("Stalwart Node", node.name).delete()
+
+        self.assertEqual(frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"), "v=spf1 -all")
+        self.assertEqual(
+            frappe.db.get_value("Stalwart Cluster", cluster.name, ["status", "bootstrap_node"]),
+            ("Pending", None),
+        )
+
+    def test_outbound_nodes_stay_out_of_ingress(self) -> None:
+        from suite_cloud.cluster import bootstrap
+
+        cluster = make_cluster()
+        node = make_node(cluster, "mta1", "203.0.113.20", role="outbound")
+        self.assertFalse(bootstrap.serves_clients(node))
+        self.assertEqual(bootstrap.build_node_variables({"node": node.name})["wait_ports"], [])
+        bootstrap.activate_node(node)
+        self.assertFalse(frappe.db.exists("DNS Record", {"host": "mail.blr", "managed_by": node.name}))
+        self.assertIn("ip4:203.0.113.20", frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"))
+        self.assertRaisesRegex(frappe.ValidationError, "must serve clients", bootstrap.provision_node, node)
+
     def test_bootstrap_and_cluster_plans(self) -> None:
         cluster = make_cluster()
 

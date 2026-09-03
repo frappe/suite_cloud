@@ -20,6 +20,7 @@
       when: not config_file.stat.exists
       block:
         - name: Write the bootstrap environment
+          no_log: true
           copy:
             content: "{{ env_bootstrap }}"
             dest: /etc/stalwart/stalwart.env
@@ -39,6 +40,7 @@
             timeout: 120
 
         - name: Write the bootstrap plan
+          no_log: true
           copy:
             content: "{{ bootstrap_ndjson }}"
             dest: /etc/stalwart/bootstrap.ndjson
@@ -47,6 +49,7 @@
             mode: "0600"
 
         - name: Apply the bootstrap plan
+          no_log: true
           command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/bootstrap.ndjson --json
           environment: "{{ cli_env }}"
           register: bootstrap_apply
@@ -76,6 +79,7 @@
       when: not plan_marker_file.stat.exists
       block:
         - name: Write the recovery environment
+          no_log: true
           copy:
             content: "{{ env_recovery }}"
             dest: /etc/stalwart/stalwart.env
@@ -95,6 +99,7 @@
             timeout: 120
 
         - name: Write the cluster plan
+          no_log: true
           copy:
             content: "{{ cluster_ndjson }}"
             dest: /etc/stalwart/cluster.ndjson
@@ -103,6 +108,7 @@
             mode: "0600"
 
         - name: Apply the cluster plan
+          no_log: true
           command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/cluster.ndjson --json
           environment: "{{ cli_env }}"
 
@@ -118,6 +124,7 @@
             mode: "0644"
 
     - name: Write the runtime environment
+      no_log: true
       copy:
         content: "{{ env_normal }}"
         dest: /etc/stalwart/stalwart.env

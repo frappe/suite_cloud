@@ -107,7 +107,9 @@ server's error type, and each site gets 300 requests per minute.
 
 `get_dns_records` returns the records a domain owner has to publish: MX to the cluster hostname,
 SPF as `v=spf1 include:spf.<zone> -all`, the DKIM selectors Stalwart rotates, DMARC and TLS
-reporting. SRV, autoconfig and MTA-STS records are listed only when
+reporting. A domain is created on the cluster disabled and only starts receiving and sending
+mail once `verify_dns_records` finds the mandatory records published: publishing them is the
+proof that the site controls the domain. Verification is retried hourly. SRV, autoconfig and MTA-STS records are listed only when
 `publish_client_discovery_records` is set, because the cluster holds no certificate for customer
 hostnames.
 

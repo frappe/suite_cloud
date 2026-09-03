@@ -150,6 +150,27 @@ class TestStalwartClient(UnitTestCase):
         self.assertEqual(third.updated, [first.ids["full"], "SystemSettings/singleton"])
         self.assertEqual(self.fake.get("ClusterRole", first.ids["full"])["description"], "changed")
 
+    def test_plan_apply_does_not_resend_secrets(self) -> None:
+        plan = [
+            {
+                "@type": "upsert",
+                "object": "MtaRoute",
+                "matchOn": ["name"],
+                "value": {
+                    "r": {
+                        "@type": "Relay",
+                        "name": "egress-x",
+                        "port": 2525,
+                        "authSecret": {"@type": "Value", "secret": "pw"},
+                    }
+                },
+            }
+        ]
+        self.client.apply(plan)
+        result = self.client.apply(plan)
+        self.assertEqual(result.updated, [])
+        self.assertEqual(len(result.unchanged), 1)
+
     def test_reload_settings_runs_an_action(self) -> None:
         self.client.reload_settings()
         self.assertEqual(self.fake.all("Action")[0]["@type"], "ReloadSettings")

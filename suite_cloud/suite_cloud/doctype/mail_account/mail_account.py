@@ -84,7 +84,11 @@ class MailAccount(Document):
     def after_insert(self) -> None:
         sync.push_create(self, "accounts", self.stalwart_payload(self.flags.password))
         if not self.enabled:
-            self.push_enabled()
+            try:
+                self.push_enabled()
+            except Exception:
+                sync.push_destroy(self, "accounts")  # the insert rolls back; the account must not survive
+                raise
 
     def on_update(self) -> None:
         if self.is_new() or not self.stalwart_id or self.flags.skip_push:

@@ -143,6 +143,26 @@ def apply_pool_changes(pool: Document) -> None:
             gateway.push_config()
 
 
+def resync_cluster_after_commit(cluster_name: str) -> None:
+    """Deferred variant for deletes: a remote failure must not roll the delete back."""
+
+    if frappe.flags.do_not_enqueue:
+        resync_cluster(frappe.get_doc("Stalwart Cluster", cluster_name))
+        return
+    frappe.enqueue(
+        resync_cluster_job,
+        cluster=cluster_name,
+        queue="short",
+        job_id=f"resync-cluster:{cluster_name}",
+        deduplicate=True,
+        enqueue_after_commit=True,
+    )
+
+
+def resync_cluster_job(cluster: str) -> None:
+    resync_cluster(frappe.get_doc("Stalwart Cluster", cluster))
+
+
 def resync_cluster(cluster: Document) -> None:
     if cluster.status == "Active" and cluster.get_password("api_key", raise_exception=False):
         cluster.push_config()

@@ -84,11 +84,18 @@ class StalwartNode(Document):
     def on_trash(self) -> None:
         if self.status not in REMOVABLE_STATUSES:
             frappe.throw(_("Drain and disable the node before deleting it."))
-        if self.is_bootstrap_node and self.get_cluster().status == "Active":
+        cluster = self.get_cluster()
+        if self.is_bootstrap_node and cluster.status == "Active":
             frappe.throw(_("The bootstrap node of an active cluster cannot be deleted."))
+        if cluster.bootstrap_node == self.name:
+            # A failed first attempt: let another node bootstrap the cluster.
+            cluster.db_set({"bootstrap_node": None, "status": "Pending"}, update_modified=False)
 
         bootstrap.forget_node(self)
         dns.delete_node_records(self)
+
+    def after_delete(self) -> None:
+        dns.sync_spf_record(self.get_cluster())
 
     # --- helpers --------------------------------------------------------------
 

@@ -7,6 +7,7 @@
   gather_facts: false
   tasks:
     - name: Write config.json
+      no_log: true
       copy:
         content: "{{ config_json }}"
         dest: /etc/stalwart/config.json
@@ -15,6 +16,7 @@
         mode: "0600"
 
     - name: Write the runtime environment
+      no_log: true
       copy:
         content: "{{ env_normal }}"
         dest: /etc/stalwart/stalwart.env

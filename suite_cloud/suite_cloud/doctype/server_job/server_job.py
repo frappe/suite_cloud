@@ -81,7 +81,7 @@ class ServerJob(Document):
     def execute(self) -> None:
         """Runs the playbook (blocking; meant for the long queue) and fires the callback."""
 
-        if self.status == "Running":
+        if self.status == "Running" and not self.is_stale():
             return
 
         self.mark_running()
@@ -157,11 +157,19 @@ class ServerJob(Document):
         self.db_set(values, update_modified=False, commit=should_commit(), notify=True)
         self.reload()
 
+    def is_stale(self) -> bool:
+        """A job still marked Running after the worker timeout lost its worker (kill, deploy, OOM)."""
+
+        if self.status != "Running" or not self.started_at:
+            return False
+        timeout = cint(get_config("server_job_timeout")) or 1800
+        return time_diff_in_seconds(now(), self.started_at) > timeout
+
     @frappe.whitelist()
     def retry(self) -> None:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        if self.status != "Failed":
-            frappe.throw(_("Only failed jobs can be retried."))
+        if self.status != "Failed" and not self.is_stale():
+            frappe.throw(_("Only failed (or stale running) jobs can be retried."))
 
         for task in self.tasks:
             task.db_set(

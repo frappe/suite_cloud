@@ -115,11 +115,19 @@ class SuiteSite(Document):
         """Locks the site out; with ``delete_data`` every directory object is removed from Stalwart too."""
 
         frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
-        if delete_data:
-            for doctype in DIRECTORY_DOCTYPES:
-                for name in frappe.get_all(doctype, {"site": self.name}, pluck="name"):
-                    frappe.delete_doc(doctype, name, ignore_permissions=True)
         self.db_set({"enabled": 0, "status": "Archived", "archived_at": now()})
+        if delete_data:
+            if frappe.flags.do_not_enqueue:
+                purge_directory(self.name)
+            else:
+                frappe.enqueue(
+                    purge_directory,
+                    site=self.name,
+                    queue="long",
+                    job_id=f"purge-site:{self.name}",
+                    deduplicate=True,
+                    enqueue_after_commit=True,
+                )
 
     # --- limits -----------------------------------------------------------------
 
@@ -162,3 +170,17 @@ class SuiteSite(Document):
             },
             "usage": {"domains": self.domain_count(), "accounts": self.account_count()},
         }
+
+
+def purge_directory(site: str) -> None:
+    """Deletes an archived site's directory one document at a time.
+
+    Each delete is its own transaction: every document destroys its Stalwart object inside its
+    delete, so a failure half-way must not resurrect rows whose objects are already gone.
+    """
+
+    for doctype in DIRECTORY_DOCTYPES:
+        for name in frappe.get_all(doctype, {"site": site}, pluck="name"):
+            frappe.delete_doc(doctype, name, ignore_permissions=True)
+            if not frappe.in_test:
+                frappe.db.commit()

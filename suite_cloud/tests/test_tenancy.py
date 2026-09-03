@@ -155,6 +155,40 @@ class TestMailDomain(TenancyTestCase):
         other = make_site(self.cluster, "other.frappe.test")
         self.assertRaises(frappe.DoesNotExistError, get_site_domain, other.name, "acme.com")
 
+    def test_domain_goes_live_only_once_verified(self) -> None:
+        domain = self.make_domain()
+        self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
+        for row in domain.dns_records:
+            row.is_verified = 1
+        domain.save_records()
+        # Simulate a verification pass where every record already resolves.
+        from unittest.mock import patch
+
+        with patch(
+            "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.verify_dns_record", return_value=True
+        ):
+            result = domain.verify_dns_records()
+
+        self.assertTrue(result["is_verified"])
+        self.assertTrue(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
+        domain.enabled = 0
+        domain.save()
+        self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
+    def test_domain_name_collision_is_neutral(self) -> None:
+        self.make_domain()
+        other = make_site(self.cluster, "other.frappe.test")
+        doc = frappe.get_doc({"doctype": "Mail Domain", "domain_name": "acme.com", "site": other.name})
+        self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", doc.insert)
+
+    def test_domain_delete_blocked_by_aliases_on_it(self) -> None:
+        self.make_domain()
+        second = self.make_domain("acme.net")
+        self.make_account("a@acme.com", aliases=[{"alias_email": "a@acme.net"}])
+        self.assertRaisesRegex(frappe.ValidationError, "aliases on acme.net", second.delete)
+
     def test_domain_delete_requires_empty_directory_and_removes_dkim(self) -> None:
         domain = self.make_domain()
         self.make_account("a@acme.com")

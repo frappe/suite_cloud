@@ -60,6 +60,11 @@ class MailDomain(Document):
         site = self.get_site()
         self.cluster = site.cluster
         if self.is_new():
+            if frappe.db.exists("Mail Domain", self.domain_name):
+                # Neutral on purpose: another site holding the name is not this site's business.
+                frappe.throw(
+                    _("Domain {0} is not available.").format(self.domain_name), frappe.DuplicateEntryError
+                )
             site.assert_can_add_domain()
             self.validate_not_reserved()
         if self.catch_all_address:
@@ -87,25 +92,33 @@ class MailDomain(Document):
         if before and any(before.get(f) != self.get(f) for f in PUSHED_FIELDS):
             sync.push_update(self, "domains", self.stalwart_patch())
         if before and (before.egress_pool != self.egress_pool or before.enabled != self.enabled):
-            egress.resync_cluster(self.get_cluster())
+            egress.resync_cluster_after_commit(self.cluster)
 
     def on_trash(self) -> None:
         for doctype in ("Mail Account", "Mail Group", "Mailing List"):
             if frappe.db.exists(doctype, {"domain": self.name}):
                 frappe.throw(_("Delete every {0} of {1} first.").format(_(doctype), self.domain_name))
+        alias_filters = {"alias_email": ["like", f"%@{self.domain_name}"]}
+        if alias := frappe.db.get_value("Mail Address Alias", alias_filters, "parent"):
+            frappe.throw(_("Remove the aliases on {0} first (e.g. on {1}).").format(self.domain_name, alias))
         sync.push_destroy(self, "domains")
 
     def after_delete(self) -> None:
         if self.egress_pool or frappe.db.get_value("Suite Site", self.site, "egress_pool"):
-            egress.resync_cluster(self.get_cluster())
+            egress.resync_cluster_after_commit(self.cluster)
 
     # --- Stalwart -----------------------------------------------------------------
+
+    def is_live(self) -> bool:
+        """Mail flows only for verified domains: proof of control comes from the published records."""
+
+        return bool(self.enabled and self.is_verified)
 
     def stalwart_payload(self) -> Domain:
         return Domain(
             name=self.domain_name,
             description=self.description or f"Suite site {self.site}",
-            is_enabled=bool(self.enabled),
+            is_enabled=self.is_live(),
             catch_all_address=self.catch_all_address or None,
             sub_addressing=bool(self.sub_addressing),
             report_address_uri=f"mailto:postmaster@{self.domain_name}",
@@ -114,7 +127,7 @@ class MailDomain(Document):
     def stalwart_patch(self) -> dict:
         return {
             "description": self.description or f"Suite site {self.site}",
-            "isEnabled": bool(self.enabled),
+            "isEnabled": self.is_live(),
             "catchAllAddress": self.catch_all_address or None,
             "subAddressing": {"@type": "Enabled" if self.sub_addressing else "Disabled"},
         }
@@ -160,11 +173,14 @@ class MailDomain(Document):
             row.is_verified = cint(verify_dns_record(row.fqdn, row.record_type, self.expected_value(row)))
             row.last_checked_at = checked_at
 
+        was_live = self.is_live()
         self.is_verified = int(
             bool(self.dns_records) and all(r.is_verified for r in self.dns_records if r.is_mandatory)
         )
         self.last_verified_at = checked_at
         self.save_records()
+        if self.stalwart_id and was_live != self.is_live():
+            sync.push_update(self, "domains", {"isEnabled": self.is_live()})
         return {
             "is_verified": bool(self.is_verified),
             "records": [r.to_api() for r in self.dns_records],

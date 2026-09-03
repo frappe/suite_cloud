@@ -30,9 +30,19 @@ SECRET_VARIABLES = (
 # --- provisioning ---------------------------------------------------------------------------
 
 
+def serves_clients(node: Document) -> bool:
+    """Outbound-only nodes run no listeners: nothing to wait for, nothing to put in ingress DNS."""
+
+    return (node.role or "full") != "outbound"
+
+
 def provision_node(node: Document) -> Document:
     cluster = node.get_cluster()
-    if cluster.status in ("Pending", "Failed") and not _has_other_bootstrap_node(cluster, node):
+    if cluster.status == "Failed" or (
+        cluster.status == "Pending" and not _has_other_bootstrap_node(cluster, node)
+    ):
+        if not serves_clients(node):
+            frappe.throw(_("The first node must serve clients; pick the full or frontend role."))
         playbook = "bootstrap-cluster.yml"
         node.db_set("is_bootstrap_node", 1, update_modified=False)
         cluster.db_set({"status": "Bootstrapping", "bootstrap_node": node.name}, update_modified=False)
@@ -101,7 +111,7 @@ def build_node_variables(context: dict) -> dict:
         "stalwart_cli_url_template": get_config("stalwart_cli_download_url_template"),
         "systemd_unit": plan.systemd_unit(),
         "firewall_ports": list(plan.FIREWALL_PORTS),
-        "wait_ports": [25, 443],
+        "wait_ports": [25, 443] if serves_clients(node) else [],
         "recovery_port": plan.BOOTSTRAP_PORT,
         "admin_user": cluster.admin_username,
         "admin_password": cluster.get_password("admin_password"),
@@ -135,12 +145,17 @@ def after_provision(node: Document, job: Document) -> None:
     if node.is_bootstrap_node:
         # The certificate check goes through the cluster hostname, so it must resolve to us.
         dns.sync_node_records(node, include_ingress=True)
+    else:
+        dns.sync_node_records(node, include_ingress=False)
     dns.sync_spf_record(node.get_cluster())
     check_node(node)
 
 
 def after_upgrade(node: Document, job: Document) -> None:
-    node.db_set({"installed_version": node.get_cluster().stalwart_version}, update_modified=False)
+    node.db_set(
+        {"installed_version": node.get_cluster().stalwart_version, "provisioned_at": now()},
+        update_modified=False,
+    )
     node.set_status("Provisioned")
     check_node(node)
 
@@ -177,7 +192,7 @@ def check_node(node: Document) -> bool:
 
 def activate_node(node: Document) -> None:
     node.set_status("Active")
-    dns.sync_node_records(node, include_ingress=True)
+    dns.sync_node_records(node, include_ingress=serves_clients(node))
     dns.sync_spf_record(node.get_cluster())
 
 
@@ -260,6 +275,7 @@ def drain_node(node: Document) -> None:
 def restore_node(node: Document) -> None:
     if not node.enabled:
         frappe.throw(_("Enable the node first."))
+    node.db_set("provisioned_at", now(), update_modified=False)  # the health deadline starts afresh
     node.set_status("Provisioned")
     check_node(node)
 

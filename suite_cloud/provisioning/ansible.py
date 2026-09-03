@@ -2,6 +2,10 @@
 
 import json
 import os
+import shutil
+import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 
@@ -63,11 +67,23 @@ class RunOutcome:
     error_log: str | None = None
 
 
+@contextmanager
+def private_data_dir() -> Iterator[str]:
+    """ansible-runner writes extravars (our secrets) into its data dir; it must not outlive the run."""
+
+    path = tempfile.mkdtemp(prefix="suite-cloud-run-")
+    try:
+        yield path
+    finally:
+        shutil.rmtree(path, ignore_errors=True)
+
+
 def ping(target: SSHTarget) -> tuple[bool, str]:
     """Checks SSH access with Ansible's ping module (no playbook needed)."""
 
-    with private_key_file(target.private_key) as key_path:
+    with private_key_file(target.private_key) as key_path, private_data_dir() as data_dir:
         runner = ansible_runner.run(
+            private_data_dir=data_dir,
             module="ping",
             host_pattern="all",
             inventory=inventory_line("target", target, key_path),
@@ -94,8 +110,9 @@ class PlaybookRun:
         target = server.ssh_target()
         alias = server.name
         stats: dict = {}
-        with private_key_file(target.private_key) as key_path:
+        with private_key_file(target.private_key) as key_path, private_data_dir() as data_dir:
             runner = ansible_runner.run(
+                private_data_dir=data_dir,
                 playbook=playbook_path(self.job.playbook),
                 inventory=inventory_line(alias, target, key_path),
                 extravars=self.variables,
