@@ -74,7 +74,8 @@ class EgressGateway(Document):
         dns.sync_gateway_records(self)
 
     def on_update(self) -> None:
-        if self.has_value_changed("ipv4_address") and not self.is_new():
+        before = self.get_doc_before_save()
+        if before and before.ipv4_address != self.ipv4_address:
             dns.sync_gateway_records(self)
             for pool in self.pools():
                 dns.sync_pool_records(pool)

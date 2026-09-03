@@ -71,16 +71,14 @@ class StalwartNode(Document):
         self.get_cluster().save(ignore_permissions=True)  # re-validates stores for the new node count
 
     def on_update(self) -> None:
-        addresses_changed = self.has_value_changed("ipv4_address") or self.has_value_changed("ipv6_address")
-        if addresses_changed and not self.is_new():
+        before = self.get_doc_before_save()
+        if not before:
+            return
+        if (before.ipv4_address, before.ipv6_address) != (self.ipv4_address, self.ipv6_address):
             dns.sync_node_records(self)
             dns.sync_spf_record(self.get_cluster())
 
-        if (
-            self.has_value_changed("enabled")
-            and not self.enabled
-            and self.status in ("Active", "Provisioned")
-        ):
+        if before.enabled and not self.enabled and self.status in ("Active", "Provisioned"):
             bootstrap.drain_node(self)
 
     def on_trash(self) -> None:
