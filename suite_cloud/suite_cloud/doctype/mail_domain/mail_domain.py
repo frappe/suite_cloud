@@ -76,14 +76,17 @@ class MailDomain(Document):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
 
     def validate_not_reserved(self) -> None:
-        cluster = self.get_cluster()
-        reserved = {get_config("root_domain_name"), cluster.default_domain, cluster.hostname}
-        if self.domain_name in reserved or self.domain_name.endswith(f".{cluster.default_domain}"):
+        root = get_config("root_domain_name")
+        if self.domain_name == root or self.domain_name.endswith(f".{root}"):
             frappe.throw(_("{0} is reserved for the mail infrastructure.").format(self.domain_name))
 
     def after_insert(self) -> None:
         sync.push_create(self, "domains", self.stalwart_payload())
-        self.refresh_dns_records()
+        try:
+            self.refresh_dns_records()
+        except Exception:
+            sync.push_destroy(self, "domains")  # the insert rolls back; the domain must not survive
+            raise
 
     def on_update(self) -> None:
         if self.is_new() or not self.stalwart_id or self.flags.skip_push:
@@ -159,9 +162,8 @@ class MailDomain(Document):
 
         self.dns_zone_file = zone_file
         self.last_refreshed_at = now()
-        self.is_verified = int(
-            bool(self.dns_records) and all(r.is_verified for r in self.dns_records if r.is_mandatory)
-        )
+        # Liveness is only ever changed by a verification run: a rotated DKIM selector must not
+        # take a working domain offline before its owner had a chance to publish it.
         self.save_records()
 
     @frappe.whitelist()
@@ -169,22 +171,45 @@ class MailDomain(Document):
         """Resolves every record on public resolvers; the domain is verified when all mandatory ones match."""
 
         checked_at = now()
+        inconclusive = 0
         for row in self.dns_records:
-            row.is_verified = cint(verify_dns_record(row.fqdn, row.record_type, self.expected_value(row)))
+            verified = verify_dns_record(row.fqdn, row.record_type, self.expected_value(row))
+            if verified is None:
+                inconclusive += 1  # resolver trouble says nothing about the record: keep its state
+                continue
+            row.is_verified = cint(verified)
             row.last_checked_at = checked_at
 
         was_live = self.is_live()
-        self.is_verified = int(
-            bool(self.dns_records) and all(r.is_verified for r in self.dns_records if r.is_mandatory)
-        )
+        self.is_verified = int(self.compute_is_verified())
         self.last_verified_at = checked_at
-        self.save_records()
         if self.stalwart_id and was_live != self.is_live():
+            # Cluster first: a failed push must not leave the local flag ahead of Stalwart.
             sync.push_update(self, "domains", {"isEnabled": self.is_live()})
+        self.save_records()
         return {
+            "inconclusive": inconclusive,
             "is_verified": bool(self.is_verified),
             "records": [r.to_api() for r in self.dns_records],
         }
+
+    def compute_is_verified(self) -> bool:
+        """MX, SPF and DMARC must all verify, plus at least one DKIM selector.
+
+        Stalwart rotates DKIM keys; the retiring selector keeps signatures valid while the owner
+        publishes the new one, so a single verified selector is enough to stay live.
+        """
+
+        rows = self.dns_records
+        if not rows:
+            return False
+        by_category: dict[str, list] = {}
+        for row in rows:
+            by_category.setdefault(row.category, []).append(row)
+        for category in ("Receiving", "Sending", "DMARC"):
+            if not by_category.get(category) or not all(r.is_verified for r in by_category[category]):
+                return False
+        return any(r.is_verified for r in by_category.get("DKIM", []))
 
     @staticmethod
     def expected_value(row: Document) -> str:
@@ -242,16 +267,23 @@ def refresh_rotating_domains() -> None:
 
 def verify_unverified_domains() -> None:
     for name in frappe.get_all("Mail Domain", {"is_verified": 0, "stalwart_id": ["is", "set"]}, pluck="name"):
-        try:
-            frappe.get_doc("Mail Domain", name).verify_dns_records()
-        except Exception:
-            frappe.log_error(title=f"[Suite Cloud] DNS verification failed for {name}")
-        frappe.db.commit()
+        _run_isolated(
+            name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
+        )
 
 
 def _refresh(name: str) -> None:
+    _run_isolated(name, lambda: frappe.get_doc("Mail Domain", name).refresh_dns_records(), "DNS refresh")
+
+
+def _run_isolated(name: str, action, label: str) -> None:
+    """One domain per transaction; a failure rolls its partial work back instead of committing it."""
+
     try:
-        frappe.get_doc("Mail Domain", name).refresh_dns_records()
+        action()
     except Exception:
-        frappe.log_error(title=f"[Suite Cloud] DNS refresh failed for {name}")
-    frappe.db.commit()
+        frappe.db.rollback()
+        frappe.log_error(title=f"[Suite Cloud] {label} failed for {name}")
+        return
+    if not frappe.in_test:
+        frappe.db.commit()

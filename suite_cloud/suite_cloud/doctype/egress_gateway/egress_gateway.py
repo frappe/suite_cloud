@@ -79,8 +79,12 @@ class EgressGateway(Document):
             dns.sync_gateway_records(self)
             for pool in self.pools():
                 dns.sync_pool_records(pool)
+        if before and before.enabled and not self.enabled and self.status in ("Provisioned", "Active"):
+            self.set_status("Disabled")
 
     def on_trash(self) -> None:
+        if self.status in ("Provisioning", "Provisioned", "Active"):
+            frappe.throw(_("Disable the gateway before deleting it."))
         if frappe.db.exists("Egress IP Pool Address", {"gateway": self.name}):
             frappe.throw(_("Remove this gateway's addresses from every pool first."))
         dns.delete_gateway_records(self)
@@ -208,5 +212,8 @@ def poll_pending_gateways() -> None:
         try:
             egress.check_gateway(gateway)
         except Exception:
+            frappe.db.rollback()
             gateway.log_error(f"Health check failed for {name}")
-        frappe.db.commit()
+            continue
+        if not frappe.in_test:
+            frappe.db.commit()

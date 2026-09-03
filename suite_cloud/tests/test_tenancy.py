@@ -86,7 +86,7 @@ class TestSuiteSite(TenancyTestCase):
 
         self.site.suspend()
         self.assertEqual(
-            frappe.db.get_value("Suite Site", self.site.name, ["enabled", "status"]), (0, "Suspended")
+            frappe.db.get_value("Suite Site", self.site.name, ["enabled", "status"]), (1, "Suspended")
         )
         self.site.resume()
         self.assertEqual(frappe.db.get_value("Suite Site", self.site.name, "status"), "Active")
@@ -176,6 +176,46 @@ class TestMailDomain(TenancyTestCase):
         domain.enabled = 0
         domain.save()
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
+    def test_verification_rule_and_inconclusive_lookups(self) -> None:
+        from unittest.mock import patch
+
+        domain = self.make_domain()
+        for row in domain.dns_records:
+            row.is_verified = 1
+        domain.save_records()
+
+        def resolve(fqdn, type, value):
+            return None if "_domainkey" in fqdn else True  # DKIM lookups time out
+
+        with patch(
+            "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.verify_dns_record", side_effect=resolve
+        ):
+            result = domain.verify_dns_records()
+        self.assertTrue(result["is_verified"])  # DKIM rows kept their verified state
+        self.assertEqual(result["inconclusive"], 2)
+
+        # One verified DKIM selector is enough after a rotation adds an unpublished one.
+        domain.append(
+            "dns_records",
+            {
+                "category": "DKIM",
+                "record_type": "TXT",
+                "host": "v2._domainkey",
+                "value": "v=DKIM1",
+                "is_mandatory": 1,
+            },
+        )
+        self.assertTrue(domain.compute_is_verified())
+        for row in domain.dns_records:
+            if row.category == "DKIM":
+                row.is_verified = 0
+        self.assertFalse(domain.compute_is_verified())
+
+    def test_reserved_names_cover_every_cluster_zone(self) -> None:
+        self.assertRaisesRegex(
+            frappe.ValidationError, "reserved", self.make_domain, "mail.other.example.test"
+        )
 
     def test_domain_name_collision_is_neutral(self) -> None:
         self.make_domain()

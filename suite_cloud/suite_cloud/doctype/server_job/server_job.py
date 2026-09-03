@@ -7,6 +7,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, now, time_diff_in_seconds
+from frappe.utils.background_jobs import is_job_enqueued
 
 from suite_cloud.provisioning.ansible import PlaybookRun, playbook_path, playbook_task_names
 from suite_cloud.utils import get_config
@@ -118,16 +119,23 @@ class ServerJob(Document):
             return
 
         method = self.callback if success else f"{self.callback}_failed"
-        server = self.get_server()
+        try:
+            server = self.get_server()
+        except frappe.DoesNotExistError:
+            return  # the server was deleted while the job ran; nothing left to update
         if not hasattr(server, method):
             return
 
+        # The callback's partial work is discarded on failure so the job's Failed state is consistent.
+        frappe.db.savepoint("server_job_callback")
         try:
             getattr(server, method)(self)
         except Exception:
+            frappe.db.rollback(save_point="server_job_callback")
             self.log_error(f"Server Job callback {method} failed")
             if success:
                 self.mark_finished("Failed", error_log=frappe.get_traceback(with_context=True))
+                self.fire_callback(success=False)
 
     # --- state -----------------------------------------------------------------
 
@@ -218,13 +226,20 @@ def create_server_job(
 
 
 def retry_failed_jobs() -> None:
-    """Cron: retries failed jobs that still have attempts left."""
+    """Cron: retries failed jobs with attempts left, and jobs whose worker vanished."""
 
     jobs = frappe.get_all(
         "Server Job",
-        filters={"status": "Failed", "retries": [">", 0]},
-        fields=["name", "retries", "max_retries"],
+        filters={"status": ["in", ["Failed", "Running", "Pending"]]},
+        fields=["name", "status", "retries", "max_retries", "started_at", "creation"],
     )
-    for job in jobs:
-        if job.retries < job.max_retries:
-            frappe.get_doc("Server Job", job.name).retry()
+    timeout = cint(get_config("server_job_timeout")) or 1800
+    for row in jobs:
+        job = frappe.get_doc("Server Job", row.name)
+        if job.status == "Failed" and job.retries <= job.max_retries:
+            job.retry()
+        elif job.status == "Running" and job.is_stale():
+            job.retry()
+        elif job.status == "Pending" and time_diff_in_seconds(now(), job.creation) > 2 * timeout:
+            if not is_job_enqueued(f"server-job:{job.name}"):
+                job.enqueue()

@@ -1,4 +1,5 @@
 import json
+from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -124,6 +125,38 @@ class TestStalwartCluster(IntegrationTestCase):
             frappe.db.get_value("Stalwart Cluster", cluster.name, ["status", "bootstrap_node"]),
             ("Pending", None),
         )
+
+    def test_active_nodes_are_not_failed_by_transient_checks(self) -> None:
+        from suite_cloud.cluster import bootstrap
+
+        cluster = make_cluster()
+        node = make_node(cluster, "n1", "203.0.113.10")
+        node.db_set({"status": "Active", "provisioned_at": frappe.utils.add_to_date(None, hours=-5)})
+        self.assertFalse(bootstrap._not_ready(node, "registry hiccup"))
+        self.assertEqual(
+            frappe.db.get_value("Stalwart Node", node.name, ["status", "last_error"]),
+            ("Active", "registry hiccup"),
+        )
+
+        node.db_set("status", "Provisioned")
+        self.assertFalse(bootstrap._not_ready(node, "still down"))
+        self.assertEqual(frappe.db.get_value("Stalwart Node", node.name, "status"), "Failed")
+
+    def test_dns_records_may_be_wanted_by_two_owners(self) -> None:
+        from suite_cloud.suite_cloud.doctype.dns_record.dns_record import reconcile_managed_records
+
+        cluster = make_cluster()
+        node = make_node(cluster, "n1", "203.0.113.10")
+        wanted = [{"host": "n1.blr", "type": "A", "value": "203.0.113.10", "category": "Egress"}]
+        reconcile_managed_records("Stalwart Cluster", cluster.name, wanted)
+        self.assertEqual(frappe.db.count("DNS Record", {"host": "n1.blr", "type": "A"}), 2)
+
+        with patch("suite_cloud.suite_cloud.doctype.dns_record.dns_record.get_dns_provider") as provider:
+            provider.return_value.delete_dns_record.return_value = True
+            reconcile_managed_records("Stalwart Cluster", cluster.name, [])
+            provider.return_value.delete_dns_record.assert_not_called()  # the node still wants it
+            frappe.get_doc("Stalwart Node", node.name).delete()  # Pending nodes delete normally
+        self.assertFalse(frappe.db.exists("DNS Record", {"host": "n1.blr"}))
 
     def test_outbound_nodes_stay_out_of_ingress(self) -> None:
         from suite_cloud.cluster import bootstrap

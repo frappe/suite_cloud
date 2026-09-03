@@ -60,11 +60,22 @@ class DNSRecord(Document):
         self.delete_from_provider()
 
     def validate_duplicate_record(self) -> None:
-        """Several records may share host and type (round-robin), but not the value too."""
+        """Several records may share host and type (round-robin), but not the value too.
+
+        Different owners may want the same record (a pool address that reuses its gateway's
+        hostname); each keeps its own row and the provider record lives as long as one remains.
+        """
 
         if frappe.db.exists(
             "DNS Record",
-            {"host": self.host, "type": self.type, "value": self.value, "name": ["!=", self.name]},
+            {
+                "host": self.host,
+                "type": self.type,
+                "value": self.value,
+                "name": ["!=", self.name],
+                "managed_by_doctype": self.managed_by_doctype or "",
+                "managed_by": self.managed_by or "",
+            },
         ):
             frappe.throw(
                 _("DNS Record {0} {1} {2} already exists.").format(self.host, self.type, self.value),
@@ -100,6 +111,12 @@ class DNSRecord(Document):
         self.db_set({"is_verified": cint(result), "last_checked_at": now()}, notify=True)
 
     def delete_from_provider(self) -> None:
+        still_wanted = frappe.db.exists(
+            "DNS Record",
+            {"host": self.host, "type": self.type, "value": self.value, "name": ["!=", self.name]},
+        )
+        if still_wanted:
+            return
         if provider := get_dns_provider():
             provider.delete_dns_record(type=self.type, host=self.host, value=self.value)
 
@@ -107,7 +124,13 @@ class DNSRecord(Document):
 
     @frappe.whitelist()
     def verify_dns_record(self, save: bool = False) -> bool:
-        self.is_verified = cint(verify_dns_record(self.fqdn, self.type, self.value))
+        verified = verify_dns_record(self.fqdn, self.type, self.value)
+        if verified is None:
+            frappe.msgprint(
+                _("Could not resolve {0} right now.").format(frappe.bold(self.fqdn)), indicator="orange"
+            )
+            return bool(self.is_verified)
+        self.is_verified = cint(verified)
         self.last_checked_at = now()
 
         if self.is_verified:

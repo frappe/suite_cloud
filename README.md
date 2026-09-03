@@ -99,7 +99,7 @@ server's error type, and each site gets 300 requests per minute.
 | Module | Methods |
 | --- | --- |
 | `site` | `ping` |
-| `site.domains` | `list_domains`, `get_domain`, `create_domain`, `update_domain`, `delete_domain`, `get_dns_records(domain, refresh)`, `verify_dns_records` |
+| `site.domains` | `list_domains`, `get_domain`, `create_domain`, `update_domain`, `delete_domain`, `get_dns_records`, `refresh_dns_records`, `verify_dns_records` |
 | `site.accounts` | `list_accounts(domain, search, start, limit)`, `get_account`, `create_account(email, password, aliases, groups, mailing_lists, disk_quota_gb, ...)`, `update_account`, `set_account_enabled`, `set_password`, `create_app_password`, `set_aliases`, `set_groups`, `delete_account` |
 | `site.groups` | `list_groups`, `get_group`, `create_group`, `update_group`, `set_group_aliases`, `set_group_members`, `delete_group` |
 | `site.mailing_lists` | `list_mailing_lists`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `set_recipients`, `delete_mailing_list` |
@@ -109,7 +109,8 @@ server's error type, and each site gets 300 requests per minute.
 SPF as `v=spf1 include:spf.<zone> -all`, the DKIM selectors Stalwart rotates, DMARC and TLS
 reporting. A domain is created on the cluster disabled and only starts receiving and sending
 mail once `verify_dns_records` finds the mandatory records published: publishing them is the
-proof that the site controls the domain. Verification is retried hourly. SRV, autoconfig and MTA-STS records are listed only when
+proof that the site controls the domain (MX, SPF, DMARC and at least one DKIM selector).
+Verification is retried hourly; resolver failures never change a domain's state. SRV, autoconfig and MTA-STS records are listed only when
 `publish_client_discovery_records` is set, because the cluster holds no certificate for customer
 hostnames.
 

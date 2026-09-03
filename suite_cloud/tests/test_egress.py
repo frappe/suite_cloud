@@ -178,7 +178,7 @@ class TestEgress(IntegrationTestCase):
             {"match": [{"if": "listener == 'relay-ded'", "then": "'ded'"}], "else": "'default'"},
         )
         role = operations["ClusterRole"]["value"]["egress"]
-        self.assertEqual(role["listeners"], {"@type": "EnableSome", "listenerIds": ["#relay-ded"]})
+        self.assertEqual(role["listeners"], {"@type": "EnableAll"})  # the firewall limits exposure
         domain = operations["Domain"]["value"]["egress"]
         self.assertEqual(
             domain["certificateManagement"]["subjectAlternativeNames"],

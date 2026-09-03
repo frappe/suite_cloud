@@ -70,6 +70,8 @@ def _has_other_bootstrap_node(cluster: Document, node: Document) -> bool:
 
 
 def upgrade_node(node: Document) -> Document:
+    if not node.enabled:
+        frappe.throw(_("Enable the node first."))
     if node.status == "Active":
         drain_node(node)
     return create_server_job(
@@ -178,27 +180,39 @@ def check_node(node: Document) -> bool:
     except StalwartError as e:
         return _not_ready(node, str(e))
 
-    if not registry or registry.get("status") != "active":
-        return _not_ready(node, f"Node registry status: {registry.get('status') if registry else 'absent'}")
+    # A single node without a coordinator may not hold a lease; the cluster answering is enough.
+    if registry is None and cluster.coordinator != "Disabled":
+        return _not_ready(node, "Node registry entry absent")
+    if registry and registry.get("status") != "active":
+        return _not_ready(node, f"Node registry status: {registry.get('status')}")
 
     node.db_set(
-        {"node_id": registry.get("nodeId"), "last_health_at": now(), "last_error": None},
+        {
+            "node_id": registry.get("nodeId") if registry else None,
+            "last_health_at": now(),
+            "last_error": None,
+        },
         update_modified=False,
     )
-    if node.status in ("Provisioned", "Draining"):
+    if node.status == "Provisioned":  # Draining stays put until an operator restores the node
         activate_node(node)
     return True
 
 
 def activate_node(node: Document) -> None:
+    if not node.enabled:
+        frappe.throw(_("Enable the node first."))
     node.set_status("Active")
     dns.sync_node_records(node, include_ingress=serves_clients(node))
     dns.sync_spf_record(node.get_cluster())
 
 
 def _not_ready(node: Document, detail: str) -> bool:
+    """Records the problem; only a node still waiting to come up is failed after the deadline."""
+
     started = get_datetime(node.provisioned_at or now())
-    if get_datetime(now()) > add_to_date(started, minutes=BOOTSTRAP_DEADLINE_MINUTES):
+    expired = get_datetime(now()) > add_to_date(started, minutes=BOOTSTRAP_DEADLINE_MINUTES)
+    if expired and node.status == "Provisioned":
         node.set_status("Failed", f"Not healthy after {BOOTSTRAP_DEADLINE_MINUTES} minutes: {detail}")
     else:
         node.db_set("last_error", detail[:1000], update_modified=False)
@@ -224,6 +238,8 @@ def finish_bootstrap(cluster: Document) -> bool:
             )
             cluster.api_key = secret
             cluster.save(ignore_permissions=True)
+            if not frappe.in_test:
+                frappe.db.commit()  # a later failure must not lose (and re-mint) the key
         _set_default_certificate(cluster, admin)
         registry = admin.cluster_nodes.find_by_hostname(node.hostname)
     except StalwartError as e:

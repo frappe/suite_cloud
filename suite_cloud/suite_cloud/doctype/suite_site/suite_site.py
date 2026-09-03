@@ -100,8 +100,9 @@ class SuiteSite(Document):
 
     @frappe.whitelist()
     def suspend(self) -> None:
+        # The key keeps authenticating so the site gets a 403 naming the suspension, not a bare 401.
         frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
-        self.db_set({"enabled": 0, "status": "Suspended"})
+        self.db_set({"status": "Suspended"})
 
     @frappe.whitelist()
     def resume(self) -> None:

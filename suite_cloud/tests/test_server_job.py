@@ -120,6 +120,20 @@ class TestServerJob(IntegrationTestCase):
         callback.assert_not_called()
         self.assertEqual(frappe.db.get_value("Stalwart Node", self.node.name, "status"), "Failed")
 
+    def test_failed_job_is_retried_max_retries_times(self) -> None:
+        from suite_cloud.suite_cloud.doctype.server_job.server_job import retry_failed_jobs
+
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+            job = create_server_job(self.node, "run-commands.yml", title="Flaky", max_retries=1)
+        job.db_set({"status": "Failed", "retries": 1})
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.enqueue") as enqueue:
+            retry_failed_jobs()
+        enqueue.assert_called_once()  # first failure -> one retry
+        job.db_set({"status": "Failed", "retries": 2})
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.enqueue") as enqueue:
+            retry_failed_jobs()
+        enqueue.assert_not_called()
+
     def test_stale_running_job_can_be_retried(self) -> None:
         with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
             job = create_server_job(self.node, "run-commands.yml", title="Stuck")

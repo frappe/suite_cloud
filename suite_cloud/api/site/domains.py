@@ -79,10 +79,21 @@ def delete_domain(domain: str) -> None:
 
 @frappe.whitelist(methods=["GET", "POST"])
 @site_api
-def get_dns_records(domain: str, refresh: bool = False) -> dict:
+def get_dns_records(domain: str) -> dict:
+    return _records(owned("Mail Domain", domain))
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def refresh_dns_records(domain: str) -> dict:
+    """Re-reads the records Stalwart expects (new DKIM selectors after a rotation, for instance)."""
+
     doc = owned("Mail Domain", domain)
-    if refresh:
-        doc.refresh_dns_records()
+    doc.refresh_dns_records()
+    return _records(doc)
+
+
+def _records(doc) -> dict:
     return {
         "domain": doc.domain_name,
         "is_verified": bool(doc.is_verified),

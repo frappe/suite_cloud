@@ -55,7 +55,7 @@
       changed_when: false
       failed_when: false
 
-    - name: Install Stalwart {{ stalwart_version }}
+    - name: Install Stalwart
       when: (stalwart_version | regex_replace('^v', '')) not in (installed_stalwart.stdout | default(''))
       block:
         - name: Create a temporary directory for the Stalwart archive
@@ -102,7 +102,7 @@
       changed_when: false
       failed_when: false
 
-    - name: Install Stalwart CLI {{ stalwart_cli_version }}
+    - name: Install Stalwart CLI
       when: (stalwart_cli_version | regex_replace('^v', '')) not in (installed_cli.stdout | default(''))
       block:
         - name: Create a temporary directory for the CLI archive

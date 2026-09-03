@@ -202,8 +202,11 @@ def poll_pending_nodes() -> None:
         try:
             bootstrap.check_node(node)
         except Exception:
+            frappe.db.rollback()
             node.log_error(f"Health check failed for {name}")
-        frappe.db.commit()
+            continue
+        if not frappe.in_test:
+            frappe.db.commit()
 
 
 def verify_all_ptr_records() -> None:

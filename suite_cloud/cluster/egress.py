@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 import frappe
 from frappe import _
-from frappe.utils import now
+from frappe.utils import add_to_date, get_datetime, now
 
 from suite_cloud.cluster import dns, plan
 from suite_cloud.stalwart.credentials import Credential
@@ -20,6 +20,7 @@ if TYPE_CHECKING:
     from frappe.model.document import Document
 
 GATEWAY_ROLE = "egress"
+GATEWAY_DEADLINE_MINUTES = 45
 GATEWAY_VARIABLES_BUILDER = "suite_cloud.cluster.egress.build_gateway_variables"
 SUITE_RULE_PREFIX = "'egress-"
 
@@ -298,7 +299,9 @@ def gateway_plan(gateway: Document) -> list[dict]:
                         "@type": "EnableSome",
                         "taskTypes": ["outboundMta", "taskQueueProcessing", "taskScheduler"],
                     },
-                    "listeners": {"@type": "EnableSome", "listenerIds": [f"#{name}" for name in listeners]},
+                    # Every listener stays on so management HTTPS keeps working; the firewall only
+                    # opens 443 and the relay ports.
+                    "listeners": {"@type": "EnableAll"},
                 }
             },
         }
@@ -428,7 +431,12 @@ def check_gateway(gateway: Document) -> bool:
             gateway.api_key = secret
             gateway.save(ignore_permissions=True)
     except StalwartError as e:
-        gateway.db_set("last_error", str(e)[:1000], update_modified=False)
+        started = get_datetime(gateway.provisioned_at or now())
+        expired = get_datetime(now()) > add_to_date(started, minutes=GATEWAY_DEADLINE_MINUTES)
+        if expired and gateway.status == "Provisioned":
+            gateway.set_status("Failed", f"Not reachable after {GATEWAY_DEADLINE_MINUTES} minutes: {e}")
+        else:
+            gateway.db_set("last_error", str(e)[:1000], update_modified=False)
         return False
 
     if gateway.status != "Active":

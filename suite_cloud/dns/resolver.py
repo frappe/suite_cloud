@@ -8,30 +8,35 @@ from frappe import _
 NAMESERVERS = ["1.1.1.1", "8.8.4.4", "8.8.8.8", "9.9.9.9"]
 
 
-def get_dns_record(fqdn: str, type: str = "A", raise_exception: bool = False) -> dns.resolver.Answer | None:
-    """Returns DNS record for the given FQDN and type."""
+class LookupInconclusive(Exception):
+    """The resolver could not answer (timeout, SERVFAIL): says nothing about the record."""
 
-    err_msg = None
+
+def get_dns_record(fqdn: str, type: str = "A", raise_exception: bool = False) -> dns.resolver.Answer | None:
+    """Returns the answer, None when the name/record does not exist, LookupInconclusive on failures."""
 
     try:
         resolver = dns.resolver.Resolver(configure=False)
         resolver.nameservers = NAMESERVERS
+        resolver.lifetime = 8
         return resolver.resolve(fqdn, type)
-    except dns.resolver.NXDOMAIN:
-        err_msg = _("{0} does not exist.").format(frappe.bold(fqdn))
-    except dns.resolver.NoAnswer:
-        err_msg = _("No answer for {0}.").format(frappe.bold(fqdn))
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer) as e:
+        if raise_exception:
+            frappe.throw(_("No {0} record found for {1}: {2}").format(type, frappe.bold(fqdn), e))
+        return None
     except dns.exception.DNSException as e:
-        err_msg = _(str(e))
+        if raise_exception:
+            frappe.throw(_("Could not resolve {0}: {1}").format(frappe.bold(fqdn), e))
+        raise LookupInconclusive(str(e)) from e
 
-    if raise_exception and err_msg:
-        frappe.throw(err_msg)
 
+def verify_dns_record(fqdn: str, type: str, expected_value: str, debug: bool = False) -> bool | None:
+    """True/False when the answer is conclusive; None when the resolver could not answer."""
 
-def verify_dns_record(fqdn: str, type: str, expected_value: str, debug: bool = False) -> bool:
-    """Verifies that the live DNS answer for fqdn/type contains the expected value."""
-
-    answer = get_dns_record(fqdn, type)
+    try:
+        answer = get_dns_record(fqdn, type)
+    except LookupInconclusive:
+        return None
     if not answer:
         return False
 

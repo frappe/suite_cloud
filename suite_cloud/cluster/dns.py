@@ -82,7 +82,7 @@ def sending_ips(cluster: Document) -> list[str]:
     ips: list[str] = []
     nodes = frappe.get_all(
         "Stalwart Node",
-        {"cluster": cluster.name, "enabled": 1, "status": ["in", ["Provisioned", "Active", "Draining"]]},
+        {"cluster": cluster.name, "status": ["in", ["Provisioned", "Active", "Draining"]]},
         ["ipv4_address", "ipv6_address"],
     )
     for node in nodes:

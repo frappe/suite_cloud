@@ -28,6 +28,8 @@ def validate_email_address(value: str | None) -> str:
     if not frappe_validate_email(email) or email.count("@") != 1:
         frappe.throw(_("{0} is not a valid email address.").format(value))
     local, domain = email.split("@", 1)
+    if "%" in local or "/" in local:  # '%' is Stalwart's master-user separator
+        frappe.throw(_("{0} is not a valid email address.").format(value))
     return f"{local}@{validate_domain_name(domain)}"
 
 
