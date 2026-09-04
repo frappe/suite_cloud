@@ -46,8 +46,8 @@ class StalwartCluster(Document):
         config_version: DF.Int
         coordinator: DF.Literal["Disabled", "Default"]
         data_store: DF.Link
-        default_egress_pool: DF.Link | None
         default_domain: DF.Data | None
+        default_egress_pool: DF.Link | None
         dns_zone: DF.Link
         drift_report: DF.JSON | None
         enabled: DF.Check

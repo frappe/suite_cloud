@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "field:cluster_name",
- "creation": "2026-09-03 12:00:00.000000",
+ "creation": "2026-09-03 12:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -56,6 +56,7 @@
   "last_config_sync_at",
   "column_break_config",
   "drift_report",
+  "section_break_wysw",
   "config_plan"
  ],
  "fields": [
@@ -84,10 +85,10 @@
   },
   {
    "default": "0",
+   "description": "Cluster Frappe Cloud uses when it names neither a cluster nor a region. Only one cluster can be default.",
    "fieldname": "is_default",
    "fieldtype": "Check",
-   "label": "Is Default",
-   "description": "Cluster Frappe Cloud uses when it names neither a cluster nor a region. Only one cluster can be default."
+   "label": "Is Default"
   },
   {
    "fieldname": "column_break_details",
@@ -95,21 +96,21 @@
   },
   {
    "default": "1",
+   "description": "Untick to stop placing new sites here and mark the cluster Disabled. Existing sites keep working.",
    "fieldname": "enabled",
    "fieldtype": "Check",
-   "label": "Enabled",
-   "description": "Untick to stop placing new sites here and mark the cluster Disabled. Existing sites keep working."
+   "label": "Enabled"
   },
   {
    "default": "Pending",
+   "description": "Pending: no node yet. Bootstrapping: first node provisioned, waiting for the certificate. Active: ready for sites. Failed: the first node did not come up; provision it again.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Pending\nBootstrapping\nActive\nFailed\nDisabled",
-   "read_only": 1,
-   "description": "Pending: no node yet. Bootstrapping: first node provisioned, waiting for the certificate. Active: ready for sites. Failed: the first node did not come up; provision it again."
+   "read_only": 1
   },
   {
    "description": "Stalwart release the nodes run, e.g. v0.16.20. Defaults to the version in Suite Cloud Settings. Change it and run Upgrade Nodes.",
@@ -161,12 +162,12 @@
    "read_only": 1
   },
   {
+   "description": "The node that ran the first-time setup of the cluster. Set automatically.",
    "fieldname": "bootstrap_node",
    "fieldtype": "Link",
    "label": "Bootstrap Node",
    "options": "Stalwart Node",
-   "read_only": 1,
-   "description": "The node that ran the first-time setup of the cluster. Set automatically."
+   "read_only": 1
   },
   {
    "fieldname": "stores_tab",
@@ -174,37 +175,37 @@
    "label": "Stores"
   },
   {
+   "description": "Where settings, the directory and message metadata live. PostgreSQL or MySQL for a real cluster; RocksDB only for a single test node.",
    "fieldname": "data_store",
    "fieldtype": "Link",
    "label": "Data Store",
    "options": "Stalwart Store",
-   "reqd": 1,
-   "description": "Where settings, the directory and message metadata live. PostgreSQL or MySQL for a real cluster; RocksDB only for a single test node."
+   "reqd": 1
   },
   {
+   "description": "Where message bodies and attachments live. Leave blank to keep them in the data store; S3 is the usual choice for a cluster.",
    "fieldname": "blob_store",
    "fieldtype": "Link",
    "label": "Blob Store",
-   "options": "Stalwart Store",
-   "description": "Where message bodies and attachments live. Leave blank to keep them in the data store; S3 is the usual choice for a cluster."
+   "options": "Stalwart Store"
   },
   {
    "fieldname": "column_break_stores",
    "fieldtype": "Column Break"
   },
   {
+   "description": "Where the full-text index lives. Leave blank to keep it in the data store.",
    "fieldname": "search_store",
    "fieldtype": "Link",
    "label": "Search Store",
-   "options": "Stalwart Store",
-   "description": "Where the full-text index lives. Leave blank to keep it in the data store."
+   "options": "Stalwart Store"
   },
   {
+   "description": "Caches, rate limits and cluster coordination. Leave blank to keep them in the data store; Redis is required for more than one node.",
    "fieldname": "in_memory_store",
    "fieldtype": "Link",
    "label": "In-Memory Store",
-   "options": "Stalwart Store",
-   "description": "Caches, rate limits and cluster coordination. Leave blank to keep them in the data store; Redis is required for more than one node."
+   "options": "Stalwart Store"
   },
   {
    "fieldname": "derived_section",
@@ -236,22 +237,22 @@
    "label": "TLS"
   },
   {
+   "description": "Certificate authority the cluster requests its certificates from. Defaults to Suite Cloud Settings. Use the Let's Encrypt staging directory while testing.",
    "fieldname": "acme_directory_url",
    "fieldtype": "Data",
    "label": "ACME Directory URL",
-   "length": 255,
-   "description": "Certificate authority the cluster requests its certificates from. Defaults to Suite Cloud Settings. Use the Let's Encrypt staging directory while testing."
+   "length": 255
   },
   {
    "fieldname": "column_break_tls",
    "fieldtype": "Column Break"
   },
   {
+   "description": "Address the certificate authority writes to about expiring certificates. Defaults to Suite Cloud Settings.",
    "fieldname": "acme_contact_email",
    "fieldtype": "Data",
    "label": "ACME Contact Email",
-   "options": "Email",
-   "description": "Address the certificate authority writes to about expiring certificates. Defaults to Suite Cloud Settings."
+   "options": "Email"
   },
   {
    "fieldname": "access_tab",
@@ -265,18 +266,18 @@
   },
   {
    "default": "admin",
+   "description": "Stalwart's built-in administrator account, created during bootstrap.",
    "fieldname": "admin_username",
    "fieldtype": "Data",
    "label": "Admin Username",
-   "read_only": 1,
-   "description": "Stalwart's built-in administrator account, created during bootstrap."
+   "read_only": 1
   },
   {
+   "description": "Generated on save. Only used to mint the API key and for app-password creation; Show Admin Password reveals it to the Administrator.",
    "fieldname": "admin_password",
    "fieldtype": "Password",
    "hidden": 1,
-   "label": "Admin Password",
-   "description": "Generated on save. Only used to mint the API key and for app-password creation; Show Admin Password reveals it to the Administrator."
+   "label": "Admin Password"
   },
   {
    "fieldname": "column_break_admin",
@@ -296,19 +297,19 @@
   },
   {
    "default": "root",
+   "description": "User Ansible logs in as on the nodes. Needs root or passwordless sudo.",
    "fieldname": "ssh_user",
    "fieldtype": "Data",
    "label": "SSH User",
-   "reqd": 1,
-   "description": "User Ansible logs in as on the nodes. Needs root or passwordless sudo."
+   "reqd": 1
   },
   {
    "default": "22",
+   "description": "SSH port on the nodes. Individual nodes can override user and port.",
    "fieldname": "ssh_port",
    "fieldtype": "Int",
    "label": "SSH Port",
-   "reqd": 1,
-   "description": "SSH port on the nodes. Individual nodes can override user and port."
+   "reqd": 1
   },
   {
    "fieldname": "column_break_ssh",
@@ -322,11 +323,11 @@
    "read_only": 1
   },
   {
+   "description": "Generated on save; written to a temporary file only while a job runs.",
    "fieldname": "ssh_private_key",
    "fieldtype": "Password",
    "hidden": 1,
-   "label": "SSH Private Key",
-   "description": "Generated on save; written to a temporary file only while a job runs."
+   "label": "SSH Private Key"
   },
   {
    "fieldname": "egress_tab",
@@ -353,11 +354,11 @@
    "read_only": 1
   },
   {
+   "description": "Generated on save; pushed to the gateways with their configuration.",
    "fieldname": "relay_password",
    "fieldtype": "Password",
    "hidden": 1,
-   "label": "Relay Password",
-   "description": "Generated on save; pushed to the gateways with their configuration."
+   "label": "Relay Password"
   },
   {
    "fieldname": "config_tab",
@@ -366,29 +367,29 @@
   },
   {
    "default": "0",
+   "description": "Increases every time the generated configuration is pushed to the cluster.",
    "fieldname": "config_version",
    "fieldtype": "Int",
    "label": "Config Version",
-   "read_only": 1,
-   "description": "Increases every time the generated configuration is pushed to the cluster."
+   "read_only": 1
   },
   {
+   "description": "When the configuration was last pushed.",
    "fieldname": "last_config_sync_at",
    "fieldtype": "Datetime",
    "label": "Last Config Sync At",
-   "read_only": 1,
-   "description": "When the configuration was last pushed."
+   "read_only": 1
   },
   {
    "fieldname": "column_break_config",
    "fieldtype": "Column Break"
   },
   {
+   "description": "Result of the last Check Drift: settings on the cluster that differ from the generated plan. Cleared by Sync Config.",
    "fieldname": "drift_report",
    "fieldtype": "JSON",
    "label": "Drift Report",
-   "read_only": 1,
-   "description": "Result of the last Check Drift: settings on the cluster that differ from the generated plan. Cleared by Sync Config."
+   "read_only": 1
   },
   {
    "description": "Last generated plan, secrets redacted.",
@@ -397,6 +398,10 @@
    "label": "Config Plan",
    "options": "JSON",
    "read_only": 1
+  },
+  {
+   "fieldname": "section_break_wysw",
+   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -432,7 +437,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-04 15:00:00.000000",
+ "modified": "2026-09-04 17:58:05.893602",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Stalwart Cluster",
