@@ -161,7 +161,7 @@ class TestServerJob(IntegrationTestCase):
         recovery_ops = [json.loads(line) for line in variables["cluster_ndjson"].splitlines()]
         account_op = next(op for op in recovery_ops if op["object"] == "Account")
         self.assertEqual(account_op["value"]["admin"]["credentials"]["0"]["secret"], admin_password)
-        self.assertEqual(account_op["value"]["admin"]["roles"], {"@type": "Admin"})
+        self.assertNotIn("domainId", account_op["value"]["admin"])  # never move the account
         self.assertNotIn("Account", [op["object"] for op in plan.cluster_plan(self.node.get_cluster())])
         # No Role may exist before the first normal start, or Stalwart skips its built-in roles.
         self.assertNotIn("Role", [op["object"] for op in recovery_ops])

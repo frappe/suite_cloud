@@ -328,7 +328,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
 
 
 def gateway_recovery_plan(gateway: Document) -> list[dict]:
-    return [*gateway_plan(gateway), plan.admin_account_operation(gateway, "#egress")]
+    return [*gateway_plan(gateway), plan.admin_account_operation(gateway)]
 
 
 def gateway_bootstrap_plan(gateway: Document) -> list[dict]:

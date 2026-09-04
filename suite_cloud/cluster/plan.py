@@ -205,13 +205,15 @@ def dns_server_object(cluster: Document) -> dict | None:
     return frappe.get_cached_doc("DNS Zone", cluster.dns_zone).stalwart_dns_server()
 
 
-def admin_account_operation(server: Document, domain_ref: str) -> dict:
+def admin_account_operation(server: Document) -> dict:
     """Pins the permanent administrator's password.
 
     Bootstrap creates the account with a password nobody is told (the recovery credential is a
     virtual login that bypasses the directory), so the recovery-stage plan sets it. Only that
     plan may carry it: credentials are a whole list, and once the management API key exists it
-    lives in the same list and would be wiped by a later push.
+    lives in the same list and would be wiped by a later push. The account always exists, so
+    the operation only ever updates it and names nothing else: sending a domain id would try to
+    move the account when bootstrap's default domain differs from the plan's.
     """
 
     username = server.admin_username or "admin"
@@ -223,11 +225,7 @@ def admin_account_operation(server: Document, domain_ref: str) -> dict:
             "admin": {
                 "@type": "User",
                 "name": username,
-                "domainId": domain_ref,
-                "description": "Administrator",
                 "credentials": {"0": {"@type": "Password", "secret": server.get_password("admin_password")}},
-                "roles": {"@type": "Admin"},
-                "permissions": {"@type": "Inherit"},
             }
         },
     }
@@ -242,7 +240,7 @@ def recovery_plan(cluster: Document) -> list[dict]:
     """
 
     operations = [op for op in cluster_plan(cluster) if op["object"] != "Role"]
-    operations.append(admin_account_operation(cluster, "#default"))
+    operations.append(admin_account_operation(cluster))
     return operations
 
 
