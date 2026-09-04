@@ -34,48 +34,235 @@
   "config_plan"
  ],
  "fields": [
-  {"fieldname": "cluster", "fieldtype": "Link", "in_list_view": 1, "in_standard_filter": 1, "label": "Cluster", "options": "Stalwart Cluster", "reqd": 1, "set_only_once": 1},
-  {"description": "A single label under the cluster zone, e.g. out1.blr.frappemail.com", "fieldname": "hostname", "fieldtype": "Data", "in_list_view": 1, "label": "Hostname", "reqd": 1, "set_only_once": 1, "unique": 1},
-  {"fieldname": "base_url", "fieldtype": "Data", "label": "Base URL", "read_only": 1},
-  {"fieldname": "column_break_main", "fieldtype": "Column Break"},
-  {"default": "1", "fieldname": "enabled", "fieldtype": "Check", "label": "Enabled"},
-  {"default": "Pending", "fieldname": "status", "fieldtype": "Select", "in_list_view": 1, "in_standard_filter": 1, "label": "Status", "options": "Pending\nProvisioning\nProvisioned\nActive\nFailed\nDisabled", "read_only": 1},
-  {"fieldname": "stalwart_version", "fieldtype": "Data", "label": "Stalwart Version"},
-  {"fieldname": "network_section", "fieldtype": "Section Break", "label": "Network"},
-  {"description": "Management address (SSH and HTTPS). Pool addresses are configured on the pools.", "fieldname": "ipv4_address", "fieldtype": "Data", "in_list_view": 1, "label": "IPv4 Address", "reqd": 1},
-  {"fieldname": "column_break_network", "fieldtype": "Column Break"},
-  {"fieldname": "ssh_user", "fieldtype": "Data", "label": "SSH User"},
-  {"fieldname": "ssh_port", "fieldtype": "Int", "label": "SSH Port"},
-  {"default": "0", "fieldname": "ssh_verified", "fieldtype": "Check", "label": "SSH Verified", "read_only": 1},
-  {"fieldname": "stalwart_section", "fieldtype": "Section Break", "label": "Stalwart"},
-  {"description": "A local RocksDb store is created when left empty; gateways keep no mail.", "fieldname": "data_store", "fieldtype": "Link", "label": "Data Store", "options": "Stalwart Store"},
-  {"default": "admin", "fieldname": "admin_username", "fieldtype": "Data", "label": "Admin Username", "read_only": 1},
-  {"fieldname": "admin_password", "fieldtype": "Password", "hidden": 1, "label": "Admin Password"},
-  {"fieldname": "column_break_stalwart", "fieldtype": "Column Break"},
-  {"fieldname": "api_key", "fieldtype": "Password", "hidden": 1, "label": "API Key"},
-  {"fieldname": "installed_version", "fieldtype": "Data", "label": "Installed Version", "read_only": 1},
-  {"default": "0", "fieldname": "config_version", "fieldtype": "Int", "label": "Config Version", "read_only": 1},
-  {"fieldname": "state_section", "fieldtype": "Section Break", "label": "State"},
-  {"fieldname": "provisioned_at", "fieldtype": "Datetime", "label": "Provisioned At", "read_only": 1},
-  {"fieldname": "last_config_sync_at", "fieldtype": "Datetime", "label": "Last Config Sync At", "read_only": 1},
-  {"fieldname": "column_break_state", "fieldtype": "Column Break"},
-  {"fieldname": "last_error", "fieldtype": "Small Text", "label": "Last Error", "read_only": 1},
-  {"fieldname": "config_plan", "fieldtype": "Code", "label": "Config Plan", "options": "JSON", "read_only": 1}
+  {
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "reqd": 1,
+   "set_only_once": 1,
+   "description": "Cluster whose mail this gateway sends. It provides the SSH key, the relay login and the Stalwart version."
+  },
+  {
+   "description": "Name of this server: one label under the cluster's default domain, e.g. out1.blr.frappemail.com. It gets an A record in the zone and is what the reverse DNS of the IP must point to.",
+   "fieldname": "hostname",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Hostname",
+   "reqd": 1,
+   "set_only_once": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "Base URL",
+   "read_only": 1,
+   "description": "Management URL of the gateway's own Stalwart: https:// plus the hostname."
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "description": "Untick to take the gateway out of service. Pools that list its addresses stop working until another gateway hosts them."
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nProvisioning\nProvisioned\nActive\nFailed\nDisabled",
+   "read_only": 1,
+   "description": "Pending: created, not provisioned. Provisioning: a job is running. Provisioned: installed, waiting for its certificate and API key. Active: relaying. Failed: the job or health check failed, see Last Error. Disabled: stopped by an operator."
+  },
+  {
+   "fieldname": "stalwart_version",
+   "fieldtype": "Data",
+   "label": "Stalwart Version",
+   "description": "Stalwart release the gateway runs. Defaults to the cluster's version. Change it and run Upgrade."
+  },
+  {
+   "fieldname": "network_section",
+   "fieldtype": "Section Break",
+   "label": "Network"
+  },
+  {
+   "description": "Public IPv4 of the VPS, used for SSH, the gateway's A record and management. The addresses mail leaves from are listed on the pools; this one can be among them.",
+   "fieldname": "ipv4_address",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "IPv4 Address",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_network",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ssh_user",
+   "fieldtype": "Data",
+   "label": "SSH User",
+   "description": "User Ansible logs in as. Leave blank to use the cluster's SSH user."
+  },
+  {
+   "fieldname": "ssh_port",
+   "fieldtype": "Int",
+   "label": "SSH Port",
+   "description": "Leave blank to use the cluster's SSH port."
+  },
+  {
+   "default": "0",
+   "fieldname": "ssh_verified",
+   "fieldtype": "Check",
+   "label": "SSH Verified",
+   "read_only": 1,
+   "description": "Verify SSH reached the server with the cluster's key. Required before Provision; reset when the IP changes."
+  },
+  {
+   "fieldname": "stalwart_section",
+   "fieldtype": "Section Break",
+   "label": "Stalwart"
+  },
+  {
+   "description": "Where this gateway's own Stalwart keeps its queue and settings. A gateway shares nothing with the cluster, so a local RocksDB store is created when left blank.",
+   "fieldname": "data_store",
+   "fieldtype": "Link",
+   "label": "Data Store",
+   "options": "Stalwart Store"
+  },
+  {
+   "default": "admin",
+   "fieldname": "admin_username",
+   "fieldtype": "Data",
+   "label": "Admin Username",
+   "read_only": 1,
+   "description": "Administrator account of the gateway's Stalwart, created during bootstrap."
+  },
+  {
+   "fieldname": "admin_password",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Admin Password",
+   "description": "Generated on save. Used once to mint the API key; Show Admin Password is not offered for gateways, read it from the database if ever needed."
+  },
+  {
+   "fieldname": "column_break_stalwart",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "API Key",
+   "description": "Bearer token Suite Cloud uses to push listeners and connection strategies to the gateway. Minted when provisioning finishes."
+  },
+  {
+   "fieldname": "installed_version",
+   "fieldtype": "Data",
+   "label": "Installed Version",
+   "read_only": 1,
+   "description": "Stalwart release the last job installed on this gateway."
+  },
+  {
+   "default": "0",
+   "fieldname": "config_version",
+   "fieldtype": "Int",
+   "label": "Config Version",
+   "read_only": 1,
+   "description": "Increases every time the gateway plan is pushed."
+  },
+  {
+   "fieldname": "state_section",
+   "fieldtype": "Section Break",
+   "label": "State"
+  },
+  {
+   "fieldname": "provisioned_at",
+   "fieldtype": "Datetime",
+   "label": "Provisioned At",
+   "read_only": 1,
+   "description": "When the last provisioning or upgrade job finished successfully."
+  },
+  {
+   "fieldname": "last_config_sync_at",
+   "fieldtype": "Datetime",
+   "label": "Last Config Sync At",
+   "read_only": 1,
+   "description": "When the gateway plan was last pushed, either by a job or after a pool changed."
+  },
+  {
+   "fieldname": "column_break_state",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "last_error",
+   "fieldtype": "Small Text",
+   "label": "Last Error",
+   "read_only": 1,
+   "description": "Why the last job, health check or configuration push failed. Cleared by the next success."
+  },
+  {
+   "fieldname": "config_plan",
+   "fieldtype": "Code",
+   "label": "Config Plan",
+   "options": "JSON",
+   "read_only": 1,
+   "description": "Last generated gateway plan, secrets redacted: certificate domain, relay account, one listener and connection strategy per pool."
+  }
  ],
  "index_web_pages_for_search": 1,
  "links": [
-  {"group": "Jobs", "link_doctype": "Server Job", "link_fieldname": "server"},
-  {"group": "DNS", "link_doctype": "DNS Record", "link_fieldname": "managed_by"}
+  {
+   "group": "Jobs",
+   "link_doctype": "Server Job",
+   "link_fieldname": "server"
+  },
+  {
+   "group": "DNS",
+   "link_doctype": "DNS Record",
+   "link_fieldname": "managed_by"
+  }
  ],
- "modified": "2026-09-03 12:00:00.000000",
+ "modified": "2026-09-04 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Egress Gateway",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
-  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1},
-  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Suite Cloud Manager", "share": 1, "write": 1}
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Suite Cloud Manager",
+   "share": 1,
+   "write": 1
+  }
  ],
  "row_format": "Dynamic",
  "sort_field": "creation",
