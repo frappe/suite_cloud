@@ -7,6 +7,7 @@
  "field_order": [
   "gateway",
   "ip_address",
+  "column_break_address",
   "ehlo_hostname",
   "ptr_verified"
  ],
@@ -22,7 +23,7 @@
    "description": "Gateway the address is configured on."
   },
   {
-   "columns": 3,
+   "columns": 2,
    "description": "Public IPv4 or IPv6 that outbound connections use. It must already be configured on the gateway's network interface; the gateway's own address is allowed.",
    "fieldname": "ip_address",
    "fieldtype": "Data",
@@ -31,7 +32,11 @@
    "reqd": 1
   },
   {
-   "columns": 3,
+   "fieldname": "column_break_address",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 4,
    "description": "Name the gateway announces when sending from this address: one label under the cluster's default domain, e.g. ded1.blr.frappemail.com. It gets an A record pointing at the address, and the address's reverse DNS must point back at it.",
    "fieldname": "ehlo_hostname",
    "fieldtype": "Data",
@@ -53,7 +58,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-04 20:00:00.000000",
+ "modified": "2026-09-04 20:10:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Egress IP Pool Address",
