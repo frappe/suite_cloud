@@ -50,7 +50,7 @@ REFERENCES = {"domainId": "Domain", "memberGroupIds": "Account", "roleIds": "Rol
 
 SCHEMA = {
     "enums": {
-        "Locale": [{"id": "en_US", "description": "English (US)"}, {"id": "de_DE", "description": "German"}],
+        "Locale": [{"id": "en-US", "description": "English (US)"}, {"id": "de-DE", "description": "German"}],
         "TimeZone": [{"id": "UTC"}, {"id": "Asia/Kolkata"}],
         "Permission": [{"id": "authenticate"}, {"id": "emailReceive"}, {"id": "sysAccountGet"}],
     }

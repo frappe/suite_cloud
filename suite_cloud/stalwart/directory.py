@@ -5,7 +5,8 @@ from typing import ClassVar
 
 from suite_cloud.stalwart.service import ManagementService, id_set, indexed
 
-DEFAULT_LOCALE = "en_US"
+# Stalwart locales are BCP 47 tags (en-US), not POSIX names (en_US).
+DEFAULT_LOCALE = "en-US"
 DKIM_ALGORITHMS = ("Dkim1Ed25519Sha256", "Dkim1RsaSha256")
 DKIM_SELECTOR_TEMPLATE = "v{version}-{algorithm}-{date-%Y%m%d}"
 DAY_MS = 24 * 60 * 60 * 1000

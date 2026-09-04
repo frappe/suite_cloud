@@ -284,7 +284,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
                     "quotas": {},
                     "aliases": {},
                     "memberGroupIds": {},
-                    "locale": "en_US",
+                    "locale": "en-US",
                     "encryptionAtRest": {"@type": "Disabled"},
                 }
             },

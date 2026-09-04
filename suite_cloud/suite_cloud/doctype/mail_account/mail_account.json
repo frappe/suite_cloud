@@ -37,7 +37,7 @@
   {"fieldname": "stalwart_id", "fieldtype": "Data", "label": "Stalwart ID", "no_copy": 1, "read_only": 1},
   {"fieldname": "settings_section", "fieldtype": "Section Break", "label": "Settings"},
   {"description": "0 means unlimited.", "fieldname": "disk_quota_gb", "fieldtype": "Float", "label": "Disk Quota (GB)"},
-  {"default": "en_US", "fieldname": "locale", "fieldtype": "Data", "label": "Locale"},
+  {"default": "en-US", "fieldname": "locale", "fieldtype": "Data", "label": "Locale"},
   {"fieldname": "column_break_settings", "fieldtype": "Column Break"},
   {"fieldname": "time_zone", "fieldtype": "Data", "label": "Time Zone"},
   {"fieldname": "used_disk_bytes", "fieldtype": "Int", "label": "Used Disk (bytes)", "read_only": 1},

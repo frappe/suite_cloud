@@ -61,7 +61,8 @@ class MailAccount(Document):
         self.domain = domain.name
         self.site = domain.site
         self.cluster = domain.cluster
-        self.locale = self.locale or "en_US"
+        # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
+        self.locale = (self.locale or "en-US").replace("_", "-")
 
         site = frappe.get_cached_doc("Suite Site", self.site)
         if self.is_new():
@@ -128,7 +129,7 @@ class MailAccount(Document):
             member_group_ids=sync.group_ids(self),
             aliases=sync.aliases(self),
             description=self.stalwart_description(),
-            locale=self.locale or "en_US",
+            locale=self.locale or "en-US",
             time_zone=self.time_zone or None,
             disk_quota_bytes=self.disk_quota_bytes(),
         )

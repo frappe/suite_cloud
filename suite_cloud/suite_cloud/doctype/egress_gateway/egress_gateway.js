@@ -11,6 +11,16 @@ frappe.ui.form.on('Egress Gateway', {
 		if (['Pending', 'Failed'].includes(frm.doc.status)) {
 			frm.add_custom_button(__('Provision'), () => frm.events.call(frm, 'provision', __('Queueing...')), __('Actions'))
 		}
+		if (['Provisioned', 'Active'].includes(frm.doc.status)) {
+			frm.add_custom_button(
+				__('Re-provision'),
+				() =>
+					frappe.confirm(__('Run the provisioning playbook again? Stalwart restarts on the gateway.'), () =>
+						frm.events.call(frm, 'provision', __('Queueing...')),
+					),
+				__('Actions'),
+			)
+		}
 		if (frm.doc.status === 'Provisioned') {
 			frm.add_custom_button(__('Check Health'), () => frm.events.call(frm, 'check_health', __('Checking...')), __('Actions'))
 		}

@@ -65,7 +65,7 @@ def create_account(
             "display_name": display_name,
             "description": description,
             "disk_quota_gb": disk_quota_gb,
-            "locale": locale or "en_US",
+            "locale": locale or "en-US",
             "time_zone": time_zone,
             "aliases": [{"alias_email": a} for a in as_list(aliases)],
             "groups": [{"group": owned("Mail Group", g).name} for g in as_list(groups)],
