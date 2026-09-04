@@ -103,18 +103,26 @@ class TestStalwartCluster(IntegrationTestCase):
             [("n1.blr", "A", "203.0.113.10", "Node"), ("n1.blr", "AAAA", "2001:db8::10", "Node")],
         )
         # Not yet in ingress: the cluster hostname does not point at a pending node.
-        self.assertFalse(frappe.db.exists("DNS Record", {"host": "mail.blr", "managed_by": node.name}))
+        self.assertFalse(
+            frappe.db.exists(
+                "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "mail.blr", "managed_by": node.name}
+            )
+        )
 
         node.db_set("status", "Active")
         dns.sync_node_records(node, include_ingress=True)
         dns.sync_spf_record(cluster)
-        ingress = frappe.get_all("DNS Record", {"host": "mail.blr"}, pluck="value", order_by="type")
+        ingress = frappe.get_all(
+            "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "mail.blr"}, pluck="value", order_by="type"
+        )
         self.assertEqual(ingress, ["203.0.113.10", "2001:db8::10"])
-        spf = frappe.db.get_value("DNS Record", {"host": "spf.blr", "type": "TXT"}, "value")
+        spf = frappe.db.get_value(
+            "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "spf.blr", "type": "TXT"}, "value"
+        )
         self.assertEqual(spf, "v=spf1 ip4:203.0.113.10 ip6:2001:db8::10 -all")
 
         dns.sync_node_records(node, include_ingress=False)
-        self.assertFalse(frappe.db.exists("DNS Record", {"host": "mail.blr"}))
+        self.assertFalse(frappe.db.exists("DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "mail.blr"}))
         self.assertEqual(frappe.db.get_value("Stalwart Node", node.name, "in_ingress_dns"), 0)
 
     def test_removing_a_node_updates_spf_and_frees_a_failed_bootstrap(self) -> None:
@@ -124,16 +132,25 @@ class TestStalwartCluster(IntegrationTestCase):
         node = make_node(cluster, "n1", "203.0.113.10")
         node.db_set({"status": "Active", "is_bootstrap_node": 1})
         dns.sync_spf_record(cluster)
-        self.assertIn("ip4:203.0.113.10", frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"))
+        self.assertIn(
+            "ip4:203.0.113.10",
+            frappe.db.get_value("DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "spf.blr"}, "value"),
+        )
 
         bootstrap.drain_node(node)  # Draining nodes still send
-        self.assertIn("ip4:203.0.113.10", frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"))
+        self.assertIn(
+            "ip4:203.0.113.10",
+            frappe.db.get_value("DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "spf.blr"}, "value"),
+        )
         node.db_set("status", "Failed")
         cluster.db_set({"status": "Failed", "bootstrap_node": node.name})
 
         frappe.get_doc("Stalwart Node", node.name).delete()
 
-        self.assertEqual(frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"), "v=spf1 -all")
+        self.assertEqual(
+            frappe.db.get_value("DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "spf.blr"}, "value"),
+            "v=spf1 -all",
+        )
         self.assertEqual(
             frappe.db.get_value("Stalwart Cluster", cluster.name, ["status", "bootstrap_node"]),
             ("Pending", None),
@@ -220,7 +237,11 @@ class TestStalwartCluster(IntegrationTestCase):
             cluster.reload()
             node.reload()
             self.assertEqual((cluster.status, node.status, node.node_id), ("Active", "Active", 7))
-            self.assertTrue(frappe.db.exists("DNS Record", {"host": "mail.blr", "managed_by": node.name}))
+            self.assertTrue(
+                frappe.db.exists(
+                    "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "mail.blr", "managed_by": node.name}
+                )
+            )
             self.assertIn(cluster.get_password("api_key"), fake.tokens)
             self.assertEqual(fake.singletons["SystemSettings"]["defaultCertificateId"], "cert1")
             self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
@@ -264,8 +285,15 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertFalse(bootstrap.serves_clients(node))
         self.assertEqual(bootstrap.build_node_variables({"node": node.name})["wait_ports"], [])
         bootstrap.activate_node(node)
-        self.assertFalse(frappe.db.exists("DNS Record", {"host": "mail.blr", "managed_by": node.name}))
-        self.assertIn("ip4:203.0.113.20", frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"))
+        self.assertFalse(
+            frappe.db.exists(
+                "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "mail.blr", "managed_by": node.name}
+            )
+        )
+        self.assertIn(
+            "ip4:203.0.113.20",
+            frappe.db.get_value("DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "spf.blr"}, "value"),
+        )
         self.assertRaisesRegex(frappe.ValidationError, "must serve clients", bootstrap.provision_node, node)
 
     def test_bootstrap_and_cluster_plans(self) -> None:
