@@ -111,7 +111,7 @@ def route_expression(cluster: Document, grouped: dict[str, list[str]]) -> dict:
     current = current_route_expression(cluster)
     kept = [
         rule
-        for rule in (current.get("match") or [])
+        for rule in expression_rules(current)
         if not str(rule.get("then", "")).startswith(SUITE_RULE_PREFIX)
     ]
     rules = []
@@ -119,7 +119,16 @@ def route_expression(cluster: Document, grouped: dict[str, list[str]]) -> dict:
         pool_short = frappe.get_cached_value("Egress IP Pool", pool_name, "pool_name")
         condition = " || ".join(f"sender_domain == '{d}'" for d in domain_names)
         rules.append({"if": condition, "then": f"'egress-{pool_short}'"})
-    return {"match": rules + kept, "else": current.get("else") or "'mx'"}
+    return {"match": plan.as_list(rules + kept), "else": current.get("else") or "'mx'"}
+
+
+def expression_rules(expression: dict) -> list[dict]:
+    """The match rules of an expression in order; Stalwart sends List<T> as an index-keyed object."""
+
+    match = expression.get("match") or {}
+    if isinstance(match, dict):
+        return [match[key] for key in sorted(match, key=int)]
+    return list(match)
 
 
 def current_route_expression(cluster: Document) -> dict:
@@ -312,7 +321,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
         {
             "@type": "update",
             "object": "MtaOutboundStrategy",
-            "value": {"connection": {"match": rules, "else": "'default'"}},
+            "value": {"connection": {"match": plan.as_list(rules), "else": "'default'"}},
         }
     )
     return operations

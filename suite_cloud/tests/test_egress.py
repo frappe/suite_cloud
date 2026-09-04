@@ -27,7 +27,10 @@ class TestEgress(IntegrationTestCase):
             "mailExchangers": {"0": {"hostname": self.cluster.hostname, "priority": 10}}
         }
         self.fake.singletons["MtaOutboundStrategy"] = {
-            "route": {"match": [{"if": "is_local_domain(rcpt_domain)", "then": "'local'"}], "else": "'mx'"}
+            "route": {
+                "match": {"0": {"if": "is_local_domain(rcpt_domain)", "then": "'local'"}},
+                "else": "'mx'",
+            }
         }
         self._install = self.fake.install()
         self._install.__enter__()
@@ -127,7 +130,10 @@ class TestEgress(IntegrationTestCase):
         # No assignment yet: only the pre-existing rule survives and no relay route exists.
         operations = egress.cluster_operations(self.cluster)
         self.assertEqual([op["object"] for op in operations], ["MtaOutboundStrategy"])
-        self.assertEqual(operations[0]["value"]["route"]["match"][0]["then"], "'local'")
+        self.assertEqual(
+            operations[0]["value"]["route"]["match"],
+            {"0": {"if": "is_local_domain(rcpt_domain)", "then": "'local'"}},
+        )
 
         domain.egress_pool = pool.name
         domain.save()
@@ -137,12 +143,12 @@ class TestEgress(IntegrationTestCase):
             (route["address"], route["port"], route["authUsername"]), (pool.hostname, 2525, "relay")
         )
         self.assertEqual(route["authSecret"]["secret"], self.cluster.get_password("relay_password"))
-        rules = operations["MtaOutboundStrategy"]["value"]["route"]["match"]
+        rules = egress.expression_rules(operations["MtaOutboundStrategy"]["value"]["route"])
         self.assertEqual(rules[0], {"if": "sender_domain == 'acme.com'", "then": "'egress-ded'"})
         self.assertEqual(rules[1]["then"], "'local'")  # existing rule kept after ours
         # The save synced the running cluster: the fake now carries the relay route and rules.
         self.assertEqual(self.fake.find("MtaRoute", name="egress-ded")["port"], 2525)
-        live_rules = self.fake.singletons["MtaOutboundStrategy"]["route"]["match"]
+        live_rules = egress.expression_rules(self.fake.singletons["MtaOutboundStrategy"]["route"])
         self.assertEqual([r["then"] for r in live_rules], ["'egress-ded'", "'local'"])
 
         # Cluster default pool pulls every unassigned domain in; site and domain overrides win.
@@ -153,7 +159,7 @@ class TestEgress(IntegrationTestCase):
 
         # Re-applying is idempotent: our rules are replaced, not stacked.
         egress.resync_cluster(frappe.get_doc("Stalwart Cluster", self.cluster.name))
-        live_rules = self.fake.singletons["MtaOutboundStrategy"]["route"]["match"]
+        live_rules = egress.expression_rules(self.fake.singletons["MtaOutboundStrategy"]["route"])
         self.assertEqual(len([r for r in live_rules if r["then"].startswith("'egress-")]), 1)
 
     def test_gateway_plan(self) -> None:
@@ -175,7 +181,7 @@ class TestEgress(IntegrationTestCase):
         )
         self.assertEqual(
             operations["MtaOutboundStrategy"]["value"]["connection"],
-            {"match": [{"if": "listener == 'relay-ded'", "then": "'ded'"}], "else": "'default'"},
+            {"match": {"0": {"if": "listener == 'relay-ded'", "then": "'ded'"}}, "else": "'default'"},
         )
         role = operations["ClusterRole"]["value"]["egress"]
         self.assertEqual(role["listeners"], {"@type": "EnableAll"})  # the firewall limits exposure
