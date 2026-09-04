@@ -52,7 +52,23 @@
           command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/bootstrap.ndjson --json
           environment: "{{ cli_env }}"
           register: bootstrap_apply
-          failed_when: bootstrap_apply.rc != 0 and 'bootstrap mode' not in (bootstrap_apply.stdout + bootstrap_apply.stderr)
+          failed_when: >-
+            bootstrap_apply.rc != 0
+            and 'bootstrap mode' not in (bootstrap_apply.stdout + bootstrap_apply.stderr)
+            and 'already been initialized' not in (bootstrap_apply.stdout + bootstrap_apply.stderr)
+
+        # config.json only names the data store. When the store was initialised by an earlier
+        # run but the file is gone, Stalwart refuses to bootstrap again; writing the file back is
+        # all that is needed (it is the same file every other node receives).
+        - name: Restore config.json for an initialised data store
+          no_log: true
+          when: "'already been initialized' in (bootstrap_apply.stdout + bootstrap_apply.stderr)"
+          copy:
+            content: "{{ config_json }}"
+            dest: /etc/stalwart/config.json
+            owner: stalwart
+            group: stalwart
+            mode: "0600"
 
         - name: Wait for config.json to be written
           wait_for:
