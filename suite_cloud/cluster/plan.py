@@ -76,7 +76,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
         {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
     ]
 
-    dns_server = dns_server_object()
+    dns_server = dns_server_object(cluster)
     if dns_server:
         plan.append(
             {
@@ -179,7 +179,7 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
         domain["dnsManagement"] = {
             "@type": "Automatic",
             "dnsServerId": "#dns",
-            "origin": get_config("root_domain_name"),
+            "origin": cluster.dns_zone,
             "publishRecords": [],
         }
     else:
@@ -187,52 +187,10 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
     return domain
 
 
-def dns_server_object() -> dict | None:
-    """Maps the Suite Cloud DNS provider onto a Stalwart DnsServer variant.
+def dns_server_object(cluster: Document) -> dict | None:
+    """The cluster zone's provider as a Stalwart DnsServer, or None when records are published by hand."""
 
-    Field names follow stalw.art/docs/ref/object/dns-server; confirm the less common providers
-    with ``stalwart-cli describe DnsServer`` before relying on them.
-    """
-
-    settings = frappe.get_cached_doc("Suite Cloud Settings")
-    if not settings.dns_provider:
-        return None
-
-    secret = lambda field: settings.get_password(field) if settings.get(field) else None  # noqa: E731
-    base = {"description": "suite-cloud", "ttl": 300000}
-    match settings.dns_provider:
-        case "Cloudflare":
-            return {**base, "@type": "Cloudflare", "secret": secret("dns_provider_token")}
-        case "AmazonRoute53":
-            return {
-                **base,
-                "@type": "Route53",
-                "accessKeyId": settings.dns_provider_access_key,
-                "secretAccessKey": secret("dns_provider_access_secret"),
-                "region": "us-east-1",
-            }
-        case "DigitalOcean":
-            return {**base, "@type": "DigitalOcean", "secret": secret("dns_provider_token")}
-        case "Hetzner":
-            return {**base, "@type": "Hetzner", "secret": secret("dns_provider_token")}
-        case "Linode":
-            return {**base, "@type": "Linode", "secret": secret("dns_provider_token")}
-        case "Namecheap":
-            return {
-                **base,
-                "@type": "Namecheap",
-                "username": settings.dns_provider_username,
-                "apiKey": secret("dns_provider_token"),
-                "clientIp": settings.dns_provider_client_ip,
-            }
-        case "GoDaddy":
-            return {
-                **base,
-                "@type": "GoDaddy",
-                "apiKey": settings.dns_provider_key,
-                "secret": secret("dns_provider_secret"),
-            }
-    return None
+    return frappe.get_cached_doc("DNS Zone", cluster.dns_zone).stalwart_dns_server()
 
 
 def egress_operations(cluster: Document) -> list[dict]:

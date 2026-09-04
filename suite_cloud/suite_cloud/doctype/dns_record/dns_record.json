@@ -11,6 +11,7 @@
   "column_break_ihb5",
   "last_checked_at",
   "section_break_gd3y",
+  "dns_zone",
   "category",
   "host",
   "type",
@@ -56,6 +57,17 @@
    "fieldtype": "Section Break"
   },
   {
+   "description": "Records are relative to this zone. Defaults to the default zone.",
+   "fieldname": "dns_zone",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "DNS Zone",
+   "options": "DNS Zone",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
    "default": "Other",
    "fieldname": "category",
    "fieldtype": "Select",
@@ -65,7 +77,7 @@
    "reqd": 1
   },
   {
-   "description": "Relative to the root domain, e.g. n1.blr",
+   "description": "Relative to the zone, e.g. n1.blr",
    "fieldname": "host",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -150,7 +162,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-03 12:00:00.000000",
+ "modified": "2026-09-04 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "DNS Record",

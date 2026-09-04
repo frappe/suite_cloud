@@ -8,7 +8,6 @@ from frappe import _
 from frappe.utils.caching import request_cache
 
 CONFIG_KEYS = (
-    "root_domain_name",
     "default_dns_ttl",
     "public_url",
     "site_service_user",

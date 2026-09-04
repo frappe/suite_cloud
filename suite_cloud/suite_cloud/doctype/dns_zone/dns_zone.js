@@ -1,9 +1,9 @@
 // Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on('Suite Cloud Settings', {
+frappe.ui.form.on('DNS Zone', {
 	dns_provider(frm) {
-		if (frm.doc.dns_provider && frm.doc.dns_provider === 'GoDaddy') {
+		if (frm.doc.dns_provider === 'GoDaddy') {
 			frappe.msgprint({
 				title: __('Limited Access to GoDaddy DNS APIs'),
 				indicator: 'yellow',

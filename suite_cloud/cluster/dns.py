@@ -1,4 +1,4 @@
-"""DNS records Suite Cloud keeps under its root domain for clusters, nodes and pools.
+"""DNS records Suite Cloud keeps in a cluster's DNS Zone for the cluster, its nodes and pools.
 
 Every record is a DNS Record owned (``managed_by``) by the document that needs it, so
 reconciling an owner's desired set adds, keeps and removes rows (and provider records) exactly.
@@ -7,36 +7,28 @@ reconciling an owner's desired set adds, keeps and removes rows (and provider re
 from typing import TYPE_CHECKING
 
 import frappe
-from frappe import _
 
 from suite_cloud.suite_cloud.doctype.dns_record.dns_record import (
     delete_managed_records,
     reconcile_managed_records,
 )
-from suite_cloud.utils import get_config
+from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import relative_host
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
 
 
-def relative_host(fqdn: str) -> str:
-    """``n1.blr.frappemail.com`` -> ``n1.blr`` (records are relative to the root domain)."""
-
-    root = get_config("root_domain_name")
-    if not root:
-        frappe.throw(_("Set the Root Domain Name in Suite Cloud Settings."))
-    suffix = f".{root}"
-    if not fqdn.endswith(suffix):
-        frappe.throw(_("{0} is not under the root domain {1}.").format(fqdn, root))
-    return fqdn[: -len(suffix)]
+def cluster_zone(cluster_name: str) -> str:
+    return frappe.get_cached_value("Stalwart Cluster", cluster_name, "dns_zone")
 
 
-def address_records(host: str, ipv4: str | None, ipv6: str | None, category: str) -> list[dict]:
+def address_records(zone: str, fqdn: str, ipv4: str | None, ipv6: str | None, category: str) -> list[dict]:
+    host = relative_host(fqdn, zone)
     records = []
     if ipv4:
-        records.append({"host": host, "type": "A", "value": ipv4, "category": category})
+        records.append({"dns_zone": zone, "host": host, "type": "A", "value": ipv4, "category": category})
     if ipv6:
-        records.append({"host": host, "type": "AAAA", "value": ipv6, "category": category})
+        records.append({"dns_zone": zone, "host": host, "type": "AAAA", "value": ipv6, "category": category})
     return records
 
 
@@ -44,10 +36,10 @@ def address_records(host: str, ipv4: str | None, ipv6: str | None, category: str
 
 
 def node_records(node: Document, include_ingress: bool) -> list[dict]:
-    records = address_records(relative_host(node.hostname), node.ipv4_address, node.ipv6_address, "Node")
+    zone, ingress = frappe.get_cached_value("Stalwart Cluster", node.cluster, ["dns_zone", "hostname"])
+    records = address_records(zone, node.hostname, node.ipv4_address, node.ipv6_address, "Node")
     if include_ingress:
-        cluster_host = relative_host(frappe.get_cached_value("Stalwart Cluster", node.cluster, "hostname"))
-        records += address_records(cluster_host, node.ipv4_address, node.ipv6_address, "Ingress")
+        records += address_records(zone, ingress, node.ipv4_address, node.ipv6_address, "Ingress")
     return records
 
 
@@ -67,9 +59,9 @@ def delete_node_records(node: Document) -> None:
 
 
 def spf_host(cluster: Document) -> str:
-    """The include target sites use: ``spf.<zone>`` relative to the root domain."""
+    """The include target sites use: ``spf.<cluster zone>`` relative to the DNS Zone."""
 
-    return relative_host(f"spf.{cluster.default_domain}")
+    return relative_host(spf_include(cluster), cluster.dns_zone)
 
 
 def spf_include(cluster: Document) -> str:
@@ -102,7 +94,15 @@ def sending_ips(cluster: Document) -> list[str]:
 def spf_records(cluster: Document) -> list[dict]:
     mechanisms = [f"ip6:{ip}" if ":" in ip else f"ip4:{ip}" for ip in sending_ips(cluster)]
     value = " ".join(["v=spf1", *mechanisms, "-all"])
-    return [{"host": spf_host(cluster), "type": "TXT", "value": value, "category": "SPF"}]
+    return [
+        {
+            "dns_zone": cluster.dns_zone,
+            "host": spf_host(cluster),
+            "type": "TXT",
+            "value": value,
+            "category": "SPF",
+        }
+    ]
 
 
 def sync_spf_record(cluster: Document) -> None:
@@ -117,7 +117,8 @@ def delete_cluster_records(cluster: Document) -> None:
 
 
 def sync_gateway_records(gateway: Document) -> None:
-    records = address_records(relative_host(gateway.hostname), gateway.ipv4_address, None, "Egress")
+    zone = cluster_zone(gateway.cluster)
+    records = address_records(zone, gateway.hostname, gateway.ipv4_address, None, "Egress")
     reconcile_managed_records("Egress Gateway", gateway.name, records)
 
 
@@ -128,13 +129,14 @@ def delete_gateway_records(gateway: Document) -> None:
 def pool_records(pool: Document) -> list[dict]:
     """``<pool>.out.<zone>`` -> every gateway hosting the pool, plus one A record per EHLO name."""
 
+    zone = cluster_zone(pool.cluster)
     records = []
     for gateway_name in pool.gateway_names():
         ip = frappe.get_cached_value("Egress Gateway", gateway_name, "ipv4_address")
-        records += address_records(relative_host(pool.hostname), ip, None, "Egress")
+        records += address_records(zone, pool.hostname, ip, None, "Egress")
     for row in pool.addresses:
         ipv4, ipv6 = (None, row.ip_address) if ":" in row.ip_address else (row.ip_address, None)
-        records += address_records(relative_host(row.ehlo_hostname), ipv4, ipv6, "Egress")
+        records += address_records(zone, row.ehlo_hostname, ipv4, ipv6, "Egress")
     return records
 
 

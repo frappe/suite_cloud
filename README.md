@@ -14,7 +14,7 @@ Suite site   ──(site key, Frappe-Authorization-Source: Suite Site)──▶ 
                                           Stalwart Cluster ◀── JMAP (Bearer API key) ── Suite Cloud
 Suite site users ──(JMAP, app passwords)──────────────────────────────▲
 Suite Cloud ──(Ansible over SSH)──▶ node and gateway VPSes
-Suite Cloud ──(dns-lexicon)──▶ DNS provider of the root domain
+Suite Cloud ──(dns-lexicon)──▶ DNS provider of each DNS Zone
 ```
 
 ## What it manages
@@ -25,11 +25,12 @@ Suite Cloud ──(dns-lexicon)──▶ DNS provider of the root domain
 | Stalwart Cluster | A cluster: ingress hostname (`mail.blr.example.com`), its zone, stores, ACME settings, admin credentials, SSH keypair, generated configuration plan |
 | Stalwart Node | One VPS running the Stalwart binary; provisioning, health, ingress DNS membership, upgrades |
 | Egress Gateway, Egress IP Pool | Outbound-only Stalwart instances and the IP pools they host; domains, sites or the cluster route outbound mail through a pool |
-| DNS Record | Records under the root domain (node, ingress round-robin, SPF include, egress), owned by the document that needs them |
+| DNS Zone | A domain Suite Cloud publishes records into (`frappemail.com`) and the provider credentials for it; clusters pick one |
+| DNS Record | Records in a DNS Zone (node, ingress round-robin, SPF include, egress), owned by the document that needs them |
 | Server Job | An Ansible playbook run against a node or gateway, tracked task by task; variables are built at run time so no secret is stored |
 | Suite Site | A Frappe Suite site bound to one cluster, with its API key/secret and limits |
 | Mail Domain, Mail Account, Mail Group, Mailing List | The site's directory; each document pushes itself to the cluster inside its own save |
-| Suite Cloud Settings | Root domain and DNS provider, Stalwart versions and download URLs, ACME defaults, public URL, job timeout |
+| Suite Cloud Settings | Default DNS TTL, Stalwart versions and download URLs, ACME defaults, public URL, job timeout |
 
 ## Install
 
@@ -45,8 +46,10 @@ and the service user every site request runs as.
 
 ## Setting up a cluster
 
-1. **Settings**: set the root domain (`example.com`), the DNS provider with its credentials, the
-   ACME contact email and, for staging, the Let's Encrypt staging directory.
+1. **Settings and zone**: set the ACME contact email and, for staging, the Let's Encrypt staging
+   directory. Create a DNS Zone for the domain the infrastructure lives under (`example.com`) with
+   the provider credentials that manage it; mark it default. Further zones can be added later and
+   each cluster picks the zone its hostnames live under.
 2. **Stores**: create a PostgreSQL (or MySQL) data store, an S3 blob store and a Redis in-memory
    store. RocksDB/FileSystem only work for single-node clusters. The Redis store doubles as the
    cluster coordinator.
@@ -120,7 +123,7 @@ Every settings value can also be set in `site_config.json` under a `suite_cloud`
 when both are set:
 
 ```json
-{ "suite_cloud": { "root_domain_name": "example.com", "stalwart_version": "v0.16.20" } }
+{ "suite_cloud": { "acme_contact_email": "ops@example.com", "stalwart_version": "v0.16.20" } }
 ```
 
 `suite_cloud.verify_stalwart_tls` may be set to `false` on a development site talking to a cluster

@@ -202,7 +202,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
     operations: list[dict] = [
         {"@type": "update", "object": "Coordinator", "value": {"@type": "Disabled"}},
     ]
-    dns_server = plan.dns_server_object()
+    dns_server = plan.dns_server_object(cluster)
     if dns_server:
         operations.append(
             {
@@ -233,7 +233,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
         "dnsManagement": {
             "@type": "Automatic",
             "dnsServerId": "#dns",
-            "origin": frappe.db.get_single_value("Suite Cloud Settings", "root_domain_name"),
+            "origin": cluster.dns_zone,
             "publishRecords": [],
         }
         if dns_server

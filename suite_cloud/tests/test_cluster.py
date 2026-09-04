@@ -11,6 +11,7 @@ from suite_cloud.tests.fixtures import (
     make_cluster,
     make_node,
     make_store,
+    make_zone,
     no_dns_provider,
 )
 
@@ -147,7 +148,15 @@ class TestStalwartCluster(IntegrationTestCase):
 
         cluster = make_cluster()
         node = make_node(cluster, "n1", "203.0.113.10")
-        wanted = [{"host": "n1.blr", "type": "A", "value": "203.0.113.10", "category": "Egress"}]
+        wanted = [
+            {
+                "dns_zone": ROOT_DOMAIN,
+                "host": "n1.blr",
+                "type": "A",
+                "value": "203.0.113.10",
+                "category": "Egress",
+            }
+        ]
         reconcile_managed_records("Stalwart Cluster", cluster.name, wanted)
         self.assertEqual(frappe.db.count("DNS Record", {"host": "n1.blr", "type": "A"}), 2)
 
@@ -304,13 +313,14 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(json.loads(frappe.as_json(plan.node_config(cluster)))["@type"], "PostgreSql")
         self.assertIn("EnvironmentFile=/etc/stalwart/stalwart.env", plan.systemd_unit())
 
-    def test_dns_server_object_maps_the_settings_provider(self) -> None:
-        configure_settings(dns_provider="Cloudflare", dns_provider_token="cf-token")
-        self.assertEqual(plan.dns_server_object()["@type"], "Cloudflare")
-        self.assertEqual(plan.dns_server_object()["secret"], "cf-token")
-
+    def test_dns_server_object_maps_the_zone_provider(self) -> None:
+        make_zone(dns_provider="Cloudflare", dns_provider_token="cf-token")
         with no_dns_provider():
             cluster = make_cluster()
+        self.assertEqual(cluster.dns_zone, ROOT_DOMAIN)
+        self.assertEqual(plan.dns_server_object(cluster)["@type"], "Cloudflare")
+        self.assertEqual(plan.dns_server_object(cluster)["secret"], "cf-token")
+
         domain = {op["object"]: op for op in plan.cluster_plan(cluster)}["Domain"]["value"]["default"]
         self.assertEqual(domain["dnsManagement"]["@type"], "Automatic")
         self.assertEqual(domain["dnsManagement"]["origin"], ROOT_DOMAIN)

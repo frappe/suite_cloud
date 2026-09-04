@@ -12,6 +12,7 @@ from suite_cloud.cluster import bootstrap, dns, egress, plan, reconcile
 from suite_cloud.provisioning.ssh import generate_keypair
 from suite_cloud.stalwart import forget_sessions, get_admin_client, get_client
 from suite_cloud.stalwart.credentials import Credential
+from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
 from suite_cloud.utils import get_config
 
 SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
@@ -47,6 +48,7 @@ class StalwartCluster(Document):
         data_store: DF.Link
         default_egress_pool: DF.Link | None
         default_domain: DF.Data | None
+        dns_zone: DF.Link
         drift_report: DF.JSON | None
         enabled: DF.Check
         enterprise_api_key: DF.Password | None
@@ -122,14 +124,13 @@ class StalwartCluster(Document):
             frappe.throw(_("Cluster Name must be a slug: lowercase letters, digits and dashes."))
 
         self.hostname = (self.hostname or "").strip().lower().rstrip(".")
-        root = get_config("root_domain_name")
-        if not root:
-            frappe.throw(_("Set the Root Domain Name in Suite Cloud Settings before creating clusters."))
-        if not self.hostname.endswith(f".{root}") or self.hostname.count(".") < root.count(".") + 2:
+        self.dns_zone = self.dns_zone or get_default_zone()
+        if not self.dns_zone:
+            frappe.throw(_("Create a DNS Zone before creating clusters."))
+        zone = self.dns_zone
+        if not self.hostname.endswith(f".{zone}") or self.hostname.count(".") < zone.count(".") + 2:
             frappe.throw(
-                _("Hostname must be at least two labels under the root domain, e.g. mail.blr.{0}").format(
-                    root
-                )
+                _("Hostname must be at least two labels under the DNS zone, e.g. mail.blr.{0}").format(zone)
             )
 
         self.default_domain = self.hostname.split(".", 1)[1]

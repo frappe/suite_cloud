@@ -10,6 +10,7 @@ from frappe.utils import cint, now
 
 from suite_cloud.dns import get_dns_provider
 from suite_cloud.dns.resolver import verify_dns_record
+from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
 from suite_cloud.utils import enqueue_job, get_config, user_context
 
 
@@ -23,6 +24,7 @@ class DNSRecord(Document):
         from frappe.types import DF
 
         category: DF.Literal["Node", "Ingress", "Egress", "SPF", "Other"]
+        dns_zone: DF.Link
         host: DF.Data
         is_verified: DF.Check
         last_checked_at: DF.Datetime | None
@@ -38,19 +40,23 @@ class DNSRecord(Document):
 
     @cached_property
     def fqdn(self) -> str:
-        root_domain_name = get_config("root_domain_name")
-        if not root_domain_name:
-            frappe.throw(_("Please set the Root Domain Name in Suite Cloud Settings."))
-
-        return f"{self.host}.{root_domain_name}"
+        return f"{self.host}.{self.dns_zone}"
 
     def validate(self) -> None:
         self.host = (self.host or "").strip().lower()
         self.value = (self.value or "").strip()
+        self.dns_zone = self.dns_zone or get_default_zone()
+        if not self.dns_zone:
+            frappe.throw(_("Create a DNS Zone before adding DNS Records."))
         if self.is_new():
             self.validate_duplicate_record()
 
-        self.ttl = self.ttl or cint(get_config("default_dns_ttl"))
+        self.ttl = self.ttl or self.default_ttl()
+
+    def default_ttl(self) -> int:
+        return cint(frappe.get_cached_value("DNS Zone", self.dns_zone, "default_ttl")) or cint(
+            get_config("default_dns_ttl")
+        )
 
     def on_update(self) -> None:
         if self.has_value_changed("value") or self.has_value_changed("ttl") or self.is_new():
@@ -69,6 +75,7 @@ class DNSRecord(Document):
         if frappe.db.exists(
             "DNS Record",
             {
+                "dns_zone": self.dns_zone,
                 "host": self.host,
                 "type": self.type,
                 "value": self.value,
@@ -103,7 +110,7 @@ class DNSRecord(Document):
 
     def create_or_update_record_in_dns_provider(self) -> None:
         result = False
-        if provider := get_dns_provider():
+        if provider := get_dns_provider(self.dns_zone):
             result = provider.ensure_dns_record(
                 type=self.type, host=self.host, value=self.value, ttl=self.ttl, priority=self.priority
             )
@@ -113,11 +120,17 @@ class DNSRecord(Document):
     def delete_from_provider(self) -> None:
         still_wanted = frappe.db.exists(
             "DNS Record",
-            {"host": self.host, "type": self.type, "value": self.value, "name": ["!=", self.name]},
+            {
+                "dns_zone": self.dns_zone,
+                "host": self.host,
+                "type": self.type,
+                "value": self.value,
+                "name": ["!=", self.name],
+            },
         )
         if still_wanted:
             return
-        if provider := get_dns_provider():
+        if provider := get_dns_provider(self.dns_zone):
             provider.delete_dns_record(type=self.type, host=self.host, value=self.value)
 
     # --- verification -------------------------------------------------------
@@ -155,20 +168,22 @@ class DNSRecord(Document):
 def reconcile_managed_records(owner_doctype: str, owner: str, desired: list[dict]) -> None:
     """Makes the owner's DNS Records exactly ``desired``.
 
-    ``desired`` rows are ``{"host", "type", "value", "category", "priority"?, "ttl"?}``. Rows
-    already present are left alone (their verification state survives); missing ones are
+    ``desired`` rows are ``{"dns_zone", "host", "type", "value", "category", "priority"?, "ttl"?}``.
+    Rows already present are left alone (their verification state survives); missing ones are
     inserted and stale ones deleted, which removes them at the provider too.
     """
 
-    wanted = {(row["host"].lower(), row["type"], row["value"].strip()): row for row in desired}
+    wanted = {
+        (row["dns_zone"], row["host"].lower(), row["type"], row["value"].strip()): row for row in desired
+    }
     existing = frappe.get_all(
         "DNS Record",
         filters={"managed_by_doctype": owner_doctype, "managed_by": owner},
-        fields=["name", "host", "type", "value"],
+        fields=["name", "dns_zone", "host", "type", "value"],
     )
 
     for record in existing:
-        key = (record.host, record.type, (record.value or "").strip())
+        key = (record.dns_zone, record.host, record.type, (record.value or "").strip())
         if key in wanted:
             wanted.pop(key)
         else:

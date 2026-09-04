@@ -150,6 +150,18 @@
   {
    "child": 0,
    "collapsible": 1,
+   "icon": "globe",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "DNS Zones",
+   "link_to": "DNS Zone",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
+   "collapsible": 1,
    "icon": "square-play",
    "indent": 0,
    "keep_closed": 0,
@@ -181,7 +193,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-03 12:00:01.000000",
+ "modified": "2026-09-04 12:00:01.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud",

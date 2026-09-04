@@ -9,15 +9,28 @@ ROOT_DOMAIN = "example.test"
 
 def configure_settings(**overrides) -> None:
     settings = frappe.get_single("Suite Cloud Settings")
-    settings.root_domain_name = ROOT_DOMAIN
-    settings.dns_provider = ""
     settings.acme_contact_email = "ops@example.test"
     for key, value in overrides.items():
         settings.set(key, value)
-    settings.flags.skip_dns_provider_verification = True
     settings.save()
     frappe.clear_document_cache("Suite Cloud Settings", "Suite Cloud Settings")
     clear_request_cache()
+    make_zone()
+
+
+def make_zone(domain_name: str = ROOT_DOMAIN, **fields):
+    """The default zone every fixture cluster lives under; provider fields default to "by hand"."""
+
+    if frappe.db.exists("DNS Zone", domain_name):
+        zone = frappe.get_doc("DNS Zone", domain_name)
+    else:
+        zone = frappe.new_doc("DNS Zone")
+        zone.domain_name = domain_name
+    zone.update({"enabled": 1, "is_default": 1, "dns_provider": "", **fields})
+    zone.flags.skip_dns_provider_verification = True
+    zone.save()
+    frappe.clear_document_cache("DNS Zone", domain_name)
+    return zone
 
 
 def clear_request_cache() -> None:

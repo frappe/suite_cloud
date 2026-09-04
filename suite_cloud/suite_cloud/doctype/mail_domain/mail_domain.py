@@ -76,9 +76,9 @@ class MailDomain(Document):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
 
     def validate_not_reserved(self) -> None:
-        root = get_config("root_domain_name")
-        if self.domain_name == root or self.domain_name.endswith(f".{root}"):
-            frappe.throw(_("{0} is reserved for the mail infrastructure.").format(self.domain_name))
+        for zone in frappe.get_all("DNS Zone", pluck="name"):
+            if self.domain_name == zone or self.domain_name.endswith(f".{zone}"):
+                frappe.throw(_("{0} is reserved for the mail infrastructure.").format(self.domain_name))
 
     def after_insert(self) -> None:
         sync.push_create(self, "domains", self.stalwart_payload())

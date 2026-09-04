@@ -5,22 +5,7 @@
  "engine": "InnoDB",
  "field_order": [
   "dns_tab",
-  "section_break_hrww",
-  "root_domain_name",
-  "column_break_4ccc",
   "default_dns_ttl",
-  "dns_provider_section",
-  "dns_provider",
-  "column_break_pntn",
-  "dns_provider_zone_id",
-  "dns_provider_access_key",
-  "dns_provider_access_secret",
-  "dns_provider_key",
-  "dns_provider_secret",
-  "dns_provider_username",
-  "dns_provider_client_ip",
-  "dns_provider_token",
-  "dns_provider_private_zone",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -46,116 +31,12 @@
    "label": "DNS"
   },
   {
-   "fieldname": "section_break_hrww",
-   "fieldtype": "Section Break"
-  },
-  {
-   "description": "Clusters, nodes and egress gateways get their DNS records under this domain.",
-   "fieldname": "root_domain_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Root Domain Name",
-   "mandatory_depends_on": "eval: doc.dns_provider",
-   "placeholder": "frappemail.com"
-  },
-  {
-   "fieldname": "column_break_4ccc",
-   "fieldtype": "Column Break"
-  },
-  {
    "default": "300",
-   "description": "Used for records Suite Cloud writes and suggested to sites for theirs.",
+   "description": "Used for records of zones without their own TTL and suggested to sites for theirs.",
    "fieldname": "default_dns_ttl",
    "fieldtype": "Int",
    "label": "Default DNS TTL",
    "reqd": 1
-  },
-  {
-   "fieldname": "dns_provider_section",
-   "fieldtype": "Section Break",
-   "label": "DNS Provider"
-  },
-  {
-   "description": "The service provider managing your root domain's DNS records. The same credentials are handed to Stalwart for ACME DNS-01 challenges.",
-   "fieldname": "dns_provider",
-   "fieldtype": "Select",
-   "label": "DNS Provider",
-   "options": "\nAmazonRoute53\nDigitalOcean\nCloudflare\nHetzner\nLinode\nNamecheap\nGoDaddy"
-  },
-  {
-   "fieldname": "column_break_pntn",
-   "fieldtype": "Column Break"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\", \"Cloudflare\"].includes(doc.dns_provider)",
-   "description": "Unique identifier for your DNS zone.",
-   "fieldname": "dns_provider_zone_id",
-   "fieldtype": "Data",
-   "label": "Zone ID"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
-   "description": "Public key used to authenticate API requests.",
-   "fieldname": "dns_provider_access_key",
-   "fieldtype": "Data",
-   "label": "Access Key",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
-   "description": "Secret key paired with the access key for authentication.",
-   "fieldname": "dns_provider_access_secret",
-   "fieldtype": "Password",
-   "label": "Access Secret",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)",
-   "description": "Key used for authorization with the DNS provider.",
-   "fieldname": "dns_provider_key",
-   "fieldtype": "Data",
-   "label": "Key",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)",
-   "description": "Secret used along with the auth key for secure access.",
-   "fieldname": "dns_provider_secret",
-   "fieldtype": "Password",
-   "label": "Secret",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"Cloudflare\", \"Namecheap\"].includes(doc.dns_provider)",
-   "description": "Account username for the DNS provider.",
-   "fieldname": "dns_provider_username",
-   "fieldtype": "Data",
-   "label": "Username",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)",
-   "description": "IP address whitelisted to make API calls.",
-   "fieldname": "dns_provider_client_ip",
-   "fieldtype": "Data",
-   "label": "Client IP",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"DigitalOcean\", \"Cloudflare\", \"Hetzner\", \"Linode\", \"Namecheap\"].includes(doc.dns_provider)",
-   "description": "The token used to authenticate with your DNS provider.",
-   "fieldname": "dns_provider_token",
-   "fieldtype": "Password",
-   "label": "Token",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"DigitalOcean\", \"Cloudflare\", \"Hetzner\", \"Linode\", \"Namecheap\"].includes(doc.dns_provider)"
-  },
-  {
-   "default": "0",
-   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
-   "description": "Indicates whether the DNS zone is private.",
-   "fieldname": "dns_provider_private_zone",
-   "fieldtype": "Check",
-   "label": "Private Zone"
   },
   {
    "fieldname": "stalwart_tab",
@@ -268,7 +149,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-03 12:00:00.000000",
+ "modified": "2026-09-04 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

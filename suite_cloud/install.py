@@ -82,6 +82,5 @@ def ensure_setting_defaults() -> None:
 
     if changed:
         settings.flags.ignore_mandatory = True
-        settings.flags.skip_dns_provider_verification = True
         settings.save(ignore_permissions=True)
         frappe.clear_document_cache("Suite Cloud Settings", "Suite Cloud Settings")

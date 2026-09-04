@@ -30,10 +30,10 @@ frappe.ui.form.on('DNS Record', {
 
 	add_comments(frm) {
 		if (!frm.doc.__islocal && !frm.doc.is_verified) {
-			const settings_link = `<a href="/app/suite-cloud-settings">${__('Suite Cloud Settings')}</a>`
+			const zone_link = `<a href="/app/dns-zone/${encodeURIComponent(frm.doc.dns_zone)}">${frm.doc.dns_zone}</a>`
 			const msg = __(
-				'It seems that the DNS provider or token is not configured in the {0}. Please manually add this DNS record to your provider for the root domain.',
-				[settings_link],
+				'This record is not verified. If the DNS Zone {0} has no provider configured, add the record at the provider by hand.',
+				[zone_link],
 			)
 			frm.dashboard.add_comment(msg, 'yellow', true)
 		}
