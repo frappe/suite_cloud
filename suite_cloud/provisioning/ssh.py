@@ -2,7 +2,7 @@ import os
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519
@@ -13,7 +13,7 @@ class SSHTarget:
     host: str
     user: str
     port: int
-    private_key: str
+    private_key: str = field(repr=False)
 
 
 def generate_keypair(comment: str) -> tuple[str, str]:

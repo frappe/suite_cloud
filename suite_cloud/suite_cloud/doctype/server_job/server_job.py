@@ -86,12 +86,15 @@ class ServerJob(Document):
             return
 
         self.mark_running()
+        run = None
         try:
             variables = self.build_variables()
             run = PlaybookRun(self, variables)
             outcome = run.run()
         except Exception:
-            self.mark_finished("Failed", error_log=frappe.get_traceback(with_context=True))
+            # Never with_context: the locals hold the private key, passwords and provider tokens.
+            traceback = frappe.get_traceback()
+            self.mark_finished("Failed", error_log=run.mask(traceback) if run else traceback)
             self.fire_callback(success=False)
             return
 
@@ -139,7 +142,7 @@ class ServerJob(Document):
                 frappe.db.rollback()  # the callback committed and released the savepoint
             self.log_error(f"Server Job callback {method} failed")
             if success:
-                self.mark_finished("Failed", error_log=frappe.get_traceback(with_context=True))
+                self.mark_finished("Failed", error_log=frappe.get_traceback())
                 self.fire_callback(success=False)
 
     # --- state -----------------------------------------------------------------

@@ -166,6 +166,22 @@ class TestServerJob(IntegrationTestCase):
         self.assertNotIn("__secret_values__", variables)
         self.assertEqual(run.mask(f"authSecret {admin_password} pg-secret"), "authSecret *** ***")
 
+    def test_large_task_results_stay_valid_json(self) -> None:
+        import json
+
+        from suite_cloud.provisioning.ansible import _result_json
+
+        result = {
+            "msg": "All items completed",
+            "changed": True,
+            "results": [{"item": i, "x": "y" * 100} for i in range(400)],
+        }
+        text = _result_json(result)
+        self.assertLessEqual(len(text), 20000)
+        self.assertEqual(json.loads(text)["truncated"], True)
+        self.assertNotIn("results", json.loads(text))
+        self.assertEqual(json.loads(_result_json({"msg": "small"})), {"msg": "small"})
+
     def test_provision_first_node_uses_bootstrap_playbook(self) -> None:
         with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
             job = bootstrap.provision_node(self.node)

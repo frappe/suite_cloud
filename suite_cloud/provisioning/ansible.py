@@ -177,7 +177,7 @@ class PlaybookRun:
             )
             for noisy in ("stdout_lines", "stderr_lines", "invocation"):
                 result.pop(noisy, None)
-            values["result"] = self.mask(json.dumps(result, indent=2, default=str))[:20000]
+            values["result"] = self.mask(_result_json(result))
             started_at = frappe.db.get_value("Server Job Task", row_name, "started_at")
             ended_at = now()
             values["ended_at"] = ended_at
@@ -223,6 +223,21 @@ def _runner_detail(runner: Any) -> str:
         if text:
             parts.append(f"{attr}:\n{_text(text)[-4000:]}")
     return "\n".join(parts)
+
+
+def _result_json(result: dict, limit: int = 20000) -> str:
+    """The task result as JSON that fits the column; cutting the string would corrupt it."""
+
+    text = json.dumps(result, indent=2, default=str)
+    if len(text) <= limit:
+        return text
+    # Loops are the usual culprit: keep the summary, drop the per-item detail.
+    slim = {k: v for k, v in result.items() if k != "results"}
+    slim["truncated"] = True
+    text = json.dumps(slim, indent=2, default=str)
+    if len(text) <= limit:
+        return text
+    return json.dumps({"truncated": True, "msg": str(result.get("msg", ""))[:2000]}, indent=2)
 
 
 def _text(value: Any) -> str | None:
