@@ -10,7 +10,7 @@ from suite_cloud.cluster import dns, plan
 from suite_cloud.stalwart.credentials import Credential
 from suite_cloud.stalwart.errors import StalwartError
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
-from suite_cloud.utils import get_config
+from suite_cloud.utils import get_config, log_error
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -212,6 +212,16 @@ def activate_node(node: Document) -> None:
     dns.sync_spf_record(node.get_cluster())
 
 
+def _push_initial_config(cluster: Document) -> None:
+    """Objects the recovery stage cannot create (the disabled-accounts role) land here."""
+
+    try:
+        cluster.push_config()
+    except StalwartError as e:
+        cluster.db_set("drift_report", frappe.as_json({"error": str(e)}), update_modified=False)
+        log_error(f"Initial config push failed for {cluster.name}", message=str(e))
+
+
 def _registry_problem(cluster: Document, registry: dict | None) -> str | None:
     """A single node without a coordinator may not hold a lease; the cluster answering is enough."""
 
@@ -270,6 +280,7 @@ def finish_bootstrap(cluster: Document) -> bool:
         return False
 
     cluster.db_set({"status": "Active", "last_config_sync_at": now()}, update_modified=False)
+    _push_initial_config(cluster)
     node.db_set(
         {
             "node_id": (registry or {}).get("nodeId") or 0,

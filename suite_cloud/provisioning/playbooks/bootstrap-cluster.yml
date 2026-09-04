@@ -64,6 +64,29 @@
             path: /etc/stalwart/bootstrap.ndjson
             state: absent
 
+        # Stalwart provisions its built-in roles, the default role lists and other defaults only
+        # on a normal start; bootstrap and recovery mode skip that step. Without this start the
+        # administrator (and every account) would resolve to no permissions at all.
+        - name: Write the runtime environment for the first normal start
+          no_log: true
+          copy:
+            content: "{{ env_normal }}"
+            dest: /etc/stalwart/stalwart.env
+            owner: stalwart
+            group: stalwart
+            mode: "0600"
+
+        - name: Start Stalwart normally so it provisions its defaults
+          systemd:
+            name: stalwart
+            state: restarted
+
+        - name: Wait for the normal listener
+          wait_for:
+            host: 127.0.0.1
+            port: 443
+            timeout: 120
+
         - name: Stop Stalwart after bootstrap
           systemd:
             name: stalwart

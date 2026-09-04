@@ -228,9 +228,18 @@ def admin_account_operation(server: Document, domain_ref: str) -> dict:
 
 
 def recovery_plan(cluster: Document) -> list[dict]:
-    """The cluster plan as the first node applies it in recovery mode, admin password included."""
+    """The cluster plan as the first node applies it in recovery mode.
 
-    return [*cluster_plan(cluster), admin_account_operation(cluster, "#default")]
+    Stalwart provisions its built-in roles only on a normal start that finds no Role objects,
+    so the plan must not create any: the disabled-accounts role is pushed once the cluster is
+    active, and one created by an earlier version of this plan is removed so the next normal
+    start can provision. The admin password is pinned here and only here (see the helper).
+    """
+
+    operations = [op for op in cluster_plan(cluster) if op["object"] != "Role"]
+    operations.append({"@type": "destroy", "object": "Role", "value": {"text": DISABLED_ROLE_DESCRIPTION}})
+    operations.append(admin_account_operation(cluster, "#default"))
+    return operations
 
 
 def egress_operations(cluster: Document) -> list[dict]:

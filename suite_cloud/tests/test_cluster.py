@@ -237,6 +237,8 @@ class TestStalwartCluster(IntegrationTestCase):
             cluster.reload()
             node.reload()
             self.assertEqual((cluster.status, node.status, node.node_id), ("Active", "Active", 7))
+            # Activation pushes the full plan: the disabled-accounts role appears only now.
+            self.assertTrue(fake.find("Role", description="suite-disabled"))
             self.assertTrue(
                 frappe.db.exists(
                     "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "mail.blr", "managed_by": node.name}
