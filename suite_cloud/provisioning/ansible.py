@@ -90,8 +90,8 @@ def ping(target: SSHTarget) -> tuple[bool, str]:
             envvars=RUNNER_ENV,
             quiet=True,
         )
-    ok = runner.rc == 0 and runner.status == "successful"
-    detail = "" if ok else _runner_detail(runner)
+        ok = runner.rc == 0 and runner.status == "successful"
+        detail = "" if ok else _runner_detail(runner)  # the artifacts vanish with the directory
     return ok, detail
 
 
@@ -100,6 +100,9 @@ class PlaybookRun:
 
     def __init__(self, job: ServerJob, variables: dict[str, Any]) -> None:
         self.job = job
+        # Literal secrets the playbook may echo (a CLI error quoting the plan, say); masked
+        # before anything is stored. Longest first so a secret containing another is caught whole.
+        self.secrets = sorted({s for s in variables.pop("__secret_values__", []) if s}, key=len, reverse=True)
         self.variables = variables
         self.tasks = {row.task: row.name for row in job.tasks}
         self.total = len(job.tasks)
@@ -123,15 +126,19 @@ class PlaybookRun:
             for event in getattr(runner, "events", []) or []:
                 if event.get("event") == "playbook_on_stats":
                     stats = _host_stats(event.get("event_data") or {}, alias)
+            succeeded = runner.rc == 0 and not stats.get("failures") and not stats.get("unreachable")
+            detail = None if succeeded else self.mask(_runner_detail(runner))
 
-        succeeded = runner.rc == 0 and not stats.get("failures") and not stats.get("unreachable")
         if not succeeded:
             self._fail_pending_tasks()
-        return RunOutcome(
-            status="Success" if succeeded else "Failed",
-            stats=stats,
-            error_log=None if succeeded else _runner_detail(runner),
-        )
+        return RunOutcome(status="Success" if succeeded else "Failed", stats=stats, error_log=detail)
+
+    def mask(self, text: str | None) -> str | None:
+        if not text:
+            return text
+        for secret in self.secrets:
+            text = text.replace(secret, "***")
+        return text
 
     # --- events -----------------------------------------------------------------
 
@@ -163,14 +170,14 @@ class PlaybookRun:
             result = dict((data or {}).get("res") or {})
             values.update(
                 {
-                    "stdout": _text(result.pop("stdout", None)),
-                    "stderr": _text(result.pop("stderr", None)),
-                    "exception": _text(result.pop("msg", None)),
+                    "stdout": self.mask(_text(result.pop("stdout", None))),
+                    "stderr": self.mask(_text(result.pop("stderr", None))),
+                    "exception": self.mask(_text(result.pop("msg", None))),
                 }
             )
             for noisy in ("stdout_lines", "stderr_lines", "invocation"):
                 result.pop(noisy, None)
-            values["result"] = json.dumps(result, indent=2, default=str)[:20000]
+            values["result"] = self.mask(json.dumps(result, indent=2, default=str))[:20000]
             started_at = frappe.db.get_value("Server Job Task", row_name, "started_at")
             ended_at = now()
             values["ended_at"] = ended_at
@@ -208,8 +215,11 @@ def _host_stats(event_data: dict, alias: str) -> dict:
 def _runner_detail(runner: Any) -> str:
     parts = [f"status: {getattr(runner, 'status', None)}", f"rc: {getattr(runner, 'rc', None)}"]
     for attr in ("stdout", "stderr"):
-        stream = getattr(runner, attr, None)
-        text = stream.read() if hasattr(stream, "read") else stream
+        try:
+            stream = getattr(runner, attr, None)
+            text = stream.read() if hasattr(stream, "read") else stream
+        except Exception as e:  # ansible-runner raises when the artifact file is gone
+            text = f"({attr} unavailable: {e})"
         if text:
             parts.append(f"{attr}:\n{_text(text)[-4000:]}")
     return "\n".join(parts)

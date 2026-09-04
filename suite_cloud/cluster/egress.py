@@ -403,9 +403,14 @@ def build_gateway_variables(context: dict) -> dict:
         "env_bootstrap": plan.render_env(gateway_env(gateway, "bootstrap")),
         "env_recovery": plan.render_env(gateway_env(gateway, "recovery")),
         "config_json": frappe.as_json(gateway.get_store("data_store").config),
-        "bootstrap_ndjson": plan.to_ndjson(gateway_bootstrap_plan(gateway)),
-        "cluster_ndjson": plan.to_ndjson(gateway_plan(gateway)),
+        "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := gateway_bootstrap_plan(gateway)),
+        "cluster_ndjson": plan.to_ndjson(cluster_plan := gateway_plan(gateway)),
         "__secret_keys__": list(SECRET_VARIABLES),
+        "__secret_values__": [
+            gateway.get_password("admin_password"),
+            *plan.secret_strings(bootstrap_plan),
+            *plan.secret_strings(cluster_plan),
+        ],
     }
 
 

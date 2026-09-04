@@ -170,14 +170,15 @@ class TestStalwartCluster(IntegrationTestCase):
             }
         ]
         reconcile_managed_records("Stalwart Cluster", cluster.name, wanted)
-        self.assertEqual(frappe.db.count("DNS Record", {"host": "n1.blr", "type": "A"}), 2)
+        wanted_filters = {"dns_zone": ROOT_DOMAIN, "host": "n1.blr", "type": "A"}
+        self.assertEqual(frappe.db.count("DNS Record", wanted_filters), 2)
 
         with patch("suite_cloud.suite_cloud.doctype.dns_record.dns_record.get_dns_provider") as provider:
             provider.return_value.delete_dns_record.return_value = True
             reconcile_managed_records("Stalwart Cluster", cluster.name, [])
             provider.return_value.delete_dns_record.assert_not_called()  # the node still wants it
             frappe.get_doc("Stalwart Node", node.name).delete()  # Pending nodes delete normally
-        self.assertFalse(frappe.db.exists("DNS Record", {"host": "n1.blr"}))
+        self.assertFalse(frappe.db.exists("DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "n1.blr"}))
 
     def test_finish_bootstrap_and_key_rotation_through_the_fake(self) -> None:
         from suite_cloud.cluster import bootstrap

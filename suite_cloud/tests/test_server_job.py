@@ -125,14 +125,15 @@ class TestServerJob(IntegrationTestCase):
 
         with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
             job = create_server_job(self.node, "run-commands.yml", title="Flaky", max_retries=1)
+        # The site may hold other failed jobs, so only this job's state is asserted.
         job.db_set({"status": "Failed", "retries": 1})
-        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.enqueue") as enqueue:
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.enqueue"):
             retry_failed_jobs()
-        enqueue.assert_called_once()  # first failure -> one retry
+        self.assertEqual(frappe.db.get_value("Server Job", job.name, "status"), "Pending")  # one retry
         job.db_set({"status": "Failed", "retries": 2})
-        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.enqueue") as enqueue:
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.enqueue"):
             retry_failed_jobs()
-        enqueue.assert_not_called()
+        self.assertEqual(frappe.db.get_value("Server Job", job.name, "status"), "Failed")
 
     def test_stale_running_job_can_be_retried(self) -> None:
         with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
@@ -152,6 +153,18 @@ class TestServerJob(IntegrationTestCase):
         self.assertNotIn("STALWART_RECOVERY", variables["env_normal"])
         self.assertIn('"@type": "PostgreSql"', variables["config_json"])
         self.assertEqual(variables["plan_marker"], ".suite-cloud-plan-v0")
+
+        admin_password = self.node.get_cluster().get_password("admin_password")
+        self.assertIn(admin_password, variables["__secret_values__"])
+        self.assertIn("pg-secret", variables["__secret_values__"])
+
+        from types import SimpleNamespace
+
+        from suite_cloud.provisioning.ansible import PlaybookRun
+
+        run = PlaybookRun(SimpleNamespace(tasks=[]), variables)
+        self.assertNotIn("__secret_values__", variables)
+        self.assertEqual(run.mask(f"authSecret {admin_password} pg-secret"), "authSecret *** ***")
 
     def test_provision_first_node_uses_bootstrap_playbook(self) -> None:
         with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):

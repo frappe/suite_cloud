@@ -123,9 +123,14 @@ def build_node_variables(context: dict) -> dict:
         "env_bootstrap": plan.render_env(plan.node_env(node, "bootstrap")),
         "env_recovery": plan.render_env(plan.node_env(node, "recovery")),
         "config_json": frappe.as_json(plan.node_config(cluster)),
-        "bootstrap_ndjson": plan.to_ndjson(plan.bootstrap_plan(cluster)),
-        "cluster_ndjson": plan.to_ndjson(plan.cluster_plan(cluster)),
+        "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := plan.bootstrap_plan(cluster)),
+        "cluster_ndjson": plan.to_ndjson(cluster_plan := plan.cluster_plan(cluster)),
         "__secret_keys__": list(SECRET_VARIABLES),
+        "__secret_values__": [
+            cluster.get_password("admin_password"),
+            *plan.secret_strings(bootstrap_plan),
+            *plan.secret_strings(cluster_plan),
+        ],
     }
     return variables
 

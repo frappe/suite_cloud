@@ -268,6 +268,26 @@ def secret_value(secret: str | None) -> dict | None:
     return {"@type": "Value", "secret": secret} if secret else None
 
 
+def secret_strings(plan: list[dict]) -> list[str]:
+    """Every literal secret in a plan, so job output that echoes the plan can be masked."""
+
+    found: list[str] = []
+    _collect_secrets(plan, found)
+    return list(dict.fromkeys(found))
+
+
+def _collect_secrets(value, found: list[str]) -> None:
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if key in SECRET_KEYS and isinstance(item, str) and item:
+                found.append(item)
+            else:
+                _collect_secrets(item, found)
+    elif isinstance(value, list):
+        for item in value:
+            _collect_secrets(item, found)
+
+
 def redacted(plan: list[dict]) -> str:
     """The plan for display: every secret-carrying value replaced by a marker."""
 

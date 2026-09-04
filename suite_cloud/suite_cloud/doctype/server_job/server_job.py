@@ -107,7 +107,9 @@ class ServerJob(Document):
         context = json.loads(self.context) if isinstance(self.context, str) else (self.context or {})
         variables = frappe.get_attr(self.variables_builder)(context)
         secret_keys = set(variables.pop("__secret_keys__", ()))
-        snapshot = {k: (REDACTED if k in secret_keys else v) for k, v in variables.items()}
+        snapshot = {
+            k: (REDACTED if k in secret_keys else v) for k, v in variables.items() if k != "__secret_values__"
+        }
         self.db_set("variables", json.dumps(snapshot, indent=2), update_modified=False)
         return variables
 
