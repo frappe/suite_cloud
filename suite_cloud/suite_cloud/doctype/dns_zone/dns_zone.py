@@ -32,9 +32,7 @@ class DNSZone(Document):
         from frappe.types import DF
 
         default_ttl: DF.Int
-        dns_provider: DF.Literal[
-            "", "AmazonRoute53", "DigitalOcean", "Cloudflare", "Hetzner", "Linode", "Namecheap", "GoDaddy"
-        ]
+        dns_provider: DF.Literal["", "AmazonRoute53", "DigitalOcean", "Cloudflare", "Hetzner", "Linode", "Namecheap", "GoDaddy"]
         dns_provider_access_key: DF.Data | None
         dns_provider_access_secret: DF.Password | None
         dns_provider_client_ip: DF.Data | None
