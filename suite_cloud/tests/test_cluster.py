@@ -189,7 +189,10 @@ class TestStalwartCluster(IntegrationTestCase):
         cluster = make_cluster()
         node = make_node(cluster, "n1", "203.0.113.10")
         fake = FakeStalwart(base_url=cluster.base_url, admin_password=cluster.get_password("admin_password"))
-        fake.objects["Certificate"]["cert1"] = {"id": "cert1", "subjectAlternativeNames": [cluster.hostname]}
+        fake.objects["Certificate"]["cert1"] = {
+            "id": "cert1",
+            "subjectAlternativeNames": {cluster.hostname: True},
+        }
         with fake.install():
             forget_sessions(cluster)
             clear_request_cache()
@@ -284,15 +287,20 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(operations["Coordinator"]["value"], {"@type": "Default"})
         self.assertEqual(set(operations["ClusterRole"]["value"]), {"full", "frontend", "outbound"})
         self.assertNotIn("DnsServer", operations)  # no DNS provider configured in tests
+        self.assertEqual(
+            operations["ClusterRole"]["value"]["frontend"]["tasks"]["taskTypes"], {"outboundMta": True}
+        )
+        self.assertEqual(operations["AcmeProvider"]["matchOn"], ["directory"])
+        self.assertNotIn("description", operations["AcmeProvider"]["value"]["acme"])
         domain = operations["Domain"]["value"]["default"]
         self.assertEqual(
             domain["certificateManagement"]["subjectAlternativeNames"],
-            [cluster.hostname, f"*.{cluster.default_domain}"],
+            {cluster.hostname: True, f"*.{cluster.default_domain}": True},
         )
         self.assertEqual(domain["dnsManagement"], {"@type": "Manual"})
         self.assertEqual(
             operations["SystemSettings"]["value"]["mailExchangers"],
-            [{"hostname": cluster.hostname, "priority": 10}],
+            {"0": {"hostname": cluster.hostname, "priority": 10}},
         )
         self.assertEqual(operations["AcmeProvider"]["value"]["acme"]["contact"], {"ops@example.test": True})
         self.assertEqual(

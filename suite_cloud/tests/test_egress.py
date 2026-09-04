@@ -24,7 +24,7 @@ class TestEgress(IntegrationTestCase):
         )
         self.fake.add_token("test-token")
         self.fake.singletons["SystemSettings"] = {
-            "mailExchangers": [{"hostname": self.cluster.hostname, "priority": 10}]
+            "mailExchangers": {"0": {"hostname": self.cluster.hostname, "priority": 10}}
         }
         self.fake.singletons["MtaOutboundStrategy"] = {
             "route": {"match": [{"if": "is_local_domain(rcpt_domain)", "then": "'local'"}], "else": "'mx'"}
@@ -171,7 +171,7 @@ class TestEgress(IntegrationTestCase):
         strategy = operations["MtaConnectionStrategy"]["value"]["ded"]
         self.assertEqual(
             strategy["sourceIps"],
-            [{"sourceIp": "203.0.113.51", "ehloHostname": f"ded1.{self.cluster.default_domain}"}],
+            {"0": {"sourceIp": "203.0.113.51", "ehloHostname": f"ded1.{self.cluster.default_domain}"}},
         )
         self.assertEqual(
             operations["MtaOutboundStrategy"]["value"]["connection"],
@@ -182,7 +182,7 @@ class TestEgress(IntegrationTestCase):
         domain = operations["Domain"]["value"]["egress"]
         self.assertEqual(
             domain["certificateManagement"]["subjectAlternativeNames"],
-            [self.gateway.hostname, f"*.out.{self.cluster.default_domain}"],
+            {self.gateway.hostname: True, f"*.out.{self.cluster.default_domain}": True},
         )
         relay = operations["Account"]["value"]["relay"]
         self.assertEqual(relay["credentials"]["0"]["secret"], self.cluster.get_password("relay_password"))

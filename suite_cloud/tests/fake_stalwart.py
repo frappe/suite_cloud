@@ -342,10 +342,11 @@ class FakeStalwart:
     def _zone_file(self, domain: dict) -> str:
         name = domain["name"]
         settings = self.singletons.get("SystemSettings", {})
-        exchangers = settings.get("mailExchangers") or [
-            {"hostname": settings.get("defaultHostname") or "mail.test"}
-        ]
-        mx = exchangers[0]["hostname"].rstrip(".")
+        exchangers = settings.get("mailExchangers") or {
+            "0": {"hostname": settings.get("defaultHostname") or "mail.test"}
+        }
+        first = exchangers[sorted(exchangers, key=int)[0]] if isinstance(exchangers, dict) else exchangers[0]
+        mx = first["hostname"].rstrip(".")
         lines = [f"{name}. 3600 IN MX 10 {mx}."]
         lines.append(f'{name}. 3600 IN TXT "v=spf1 mx ra=postmaster -all"')
         for signature in self.all("DkimSignature"):

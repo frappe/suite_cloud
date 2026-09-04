@@ -22,6 +22,19 @@ DISABLED_ROLE_DESCRIPTION = "suite-disabled"
 FIREWALL_PORTS = (25, 465, 587, 143, 993, 110, 995, 443, 4190)
 SECRET_MARKER = "***"
 
+
+def as_set(values) -> dict:
+    """Stalwart encodes Set<T> as ``{value: true}``; an empty set is ``{}``."""
+
+    return {value: True for value in values}
+
+
+def as_list(items) -> dict:
+    """Stalwart encodes List<T> as an index-keyed object, ``{"0": item, "1": item}``."""
+
+    return {str(index): item for index, item in enumerate(items)}
+
+
 CLUSTER_ROLES = {
     "full": {
         "name": "full",
@@ -32,13 +45,13 @@ CLUSTER_ROLES = {
     "frontend": {
         "name": "frontend",
         "description": "Serves clients, never delivers the outbound queue",
-        "tasks": {"@type": "DisableSome", "taskTypes": ["outboundMta"]},
+        "tasks": {"@type": "DisableSome", "taskTypes": as_set(["outboundMta"])},
         "listeners": {"@type": "EnableAll"},
     },
     "outbound": {
         "name": "outbound",
         "description": "Delivers the outbound queue only",
-        "tasks": {"@type": "EnableSome", "taskTypes": ["outboundMta", "taskQueueProcessing"]},
+        "tasks": {"@type": "EnableSome", "taskTypes": as_set(["outboundMta", "taskQueueProcessing"])},
         "listeners": {"@type": "DisableAll"},
     },
 }
@@ -91,7 +104,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
         {
             "@type": "upsert",
             "object": "AcmeProvider",
-            "matchOn": ["description"],
+            "matchOn": ["directory"],
             "value": {"acme": acme_provider(cluster)},
         }
     )
@@ -110,7 +123,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
             "value": {
                 "defaultHostname": cluster.hostname,
                 "defaultDomainId": "#default",
-                "mailExchangers": [{"hostname": cluster.hostname, "priority": 10}],
+                "mailExchangers": as_list([{"hostname": cluster.hostname, "priority": 10}]),
             },
         }
     )
@@ -137,7 +150,6 @@ def cluster_plan(cluster: Document) -> list[dict]:
 def acme_provider(cluster: Document) -> dict:
     contact = cluster.acme_contact_email or get_config("acme_contact_email")
     provider = {
-        "description": "letsencrypt",
         "directory": cluster.acme_directory_url or get_config("acme_directory_url"),
         "challengeType": "Dns01",
     }
@@ -156,7 +168,7 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
         "certificateManagement": {
             "@type": "Automatic",
             "acmeProviderId": "#acme",
-            "subjectAlternativeNames": [cluster.hostname, f"*.{cluster.default_domain}"],
+            "subjectAlternativeNames": as_set([cluster.hostname, f"*.{cluster.default_domain}"]),
         },
         "dkimManagement": {"@type": "Manual"},
         "subAddressing": {"@type": "Disabled"},
@@ -168,7 +180,7 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
             "@type": "Automatic",
             "dnsServerId": "#dns",
             "origin": cluster.dns_zone,
-            "publishRecords": [],
+            "publishRecords": {},
         }
     else:
         domain["dnsManagement"] = {"@type": "Manual"}

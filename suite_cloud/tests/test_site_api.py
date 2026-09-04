@@ -36,7 +36,7 @@ class SiteApiTestCase(IntegrationTestCase):
         self.fake.add_token("test-token")
         self.fake._add("Role", {"description": DISABLED_ROLE_DESCRIPTION})
         self.fake.singletons["SystemSettings"] = {
-            "mailExchangers": [{"hostname": self.cluster.hostname, "priority": 10}]
+            "mailExchangers": {"0": {"hostname": self.cluster.hostname, "priority": 10}}
         }
         self._install = self.fake.install()
         self._install.__enter__()

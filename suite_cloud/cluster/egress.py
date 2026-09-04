@@ -195,7 +195,9 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "name": pool.pool_name,
             "description": f"Egress pool {pool.pool_name}",
             "ehloHostname": gateway.hostname,
-            "sourceIps": [{"sourceIp": a.ip_address, "ehloHostname": a.ehlo_hostname} for a in addresses],
+            "sourceIps": plan.as_list(
+                [{"sourceIp": a.ip_address, "ehloHostname": a.ehlo_hostname} for a in addresses]
+            ),
         }
         rules.append({"if": f"listener == '{listener}'", "then": f"'{pool.pool_name}'"})
 
@@ -216,7 +218,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
         {
             "@type": "upsert",
             "object": "AcmeProvider",
-            "matchOn": ["description"],
+            "matchOn": ["directory"],
             "value": {"acme": plan.acme_provider(cluster)},
         }
     )
@@ -227,14 +229,14 @@ def gateway_plan(gateway: Document) -> list[dict]:
         "certificateManagement": {
             "@type": "Automatic",
             "acmeProviderId": "#acme",
-            "subjectAlternativeNames": [gateway.hostname, f"*.{zone}"],
+            "subjectAlternativeNames": plan.as_set([gateway.hostname, f"*.{zone}"]),
         },
         "dkimManagement": {"@type": "Manual"},
         "dnsManagement": {
             "@type": "Automatic",
             "dnsServerId": "#dns",
             "origin": cluster.dns_zone,
-            "publishRecords": [],
+            "publishRecords": {},
         }
         if dns_server
         else {"@type": "Manual"},
@@ -250,7 +252,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "value": {
                 "defaultHostname": gateway.hostname,
                 "defaultDomainId": "#egress",
-                "mailExchangers": [],
+                "mailExchangers": {},
             },
         }
     )
@@ -297,7 +299,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
                     "description": "Outbound relay only",
                     "tasks": {
                         "@type": "EnableSome",
-                        "taskTypes": ["outboundMta", "taskQueueProcessing", "taskScheduler"],
+                        "taskTypes": plan.as_set(["outboundMta", "taskQueueProcessing", "taskScheduler"]),
                     },
                     # Every listener stays on so management HTTPS keeps working; the firewall only
                     # opens 443 and the relay ports.

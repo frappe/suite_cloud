@@ -27,7 +27,7 @@ class TenancyTestCase(IntegrationTestCase):
         self.fake.add_token("test-token")
         # What the cluster plan sets at bootstrap: MX records point at the ingress hostname.
         self.fake.singletons["SystemSettings"] = {
-            "mailExchangers": [{"hostname": self.cluster.hostname, "priority": 10}]
+            "mailExchangers": {"0": {"hostname": self.cluster.hostname, "priority": 10}}
         }
         self.fake._add(
             "Role", {"description": DISABLED_ROLE_DESCRIPTION, "enabledPermissions": {"emailReceive": True}}
