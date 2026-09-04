@@ -236,7 +236,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "@type": "Automatic",
             "dnsServerId": "#dns",
             "origin": cluster.dns_zone,
-            "publishRecords": {},
+            "publishRecords": plan.PUBLISHED_RECORD_TYPES,
         }
         if dns_server
         else {"@type": "Manual"},

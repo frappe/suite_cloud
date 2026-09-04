@@ -35,6 +35,8 @@ def as_list(items) -> dict:
     return {str(index): item for index, item in enumerate(items)}
 
 
+PUBLISHED_RECORD_TYPES = {"mx": True}
+
 CLUSTER_ROLES = {
     "full": {
         "name": "full",
@@ -174,13 +176,14 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
         "subAddressing": {"@type": "Disabled"},
     }
     if with_dns:
-        # Automatic DNS management is what gives DNS-01 its provider; Suite Cloud publishes the
-        # zone's records itself, hence the empty record list.
+        # Automatic DNS management is what gives DNS-01 its provider. Suite Cloud publishes the
+        # zone's records itself, but Stalwart insists on publishing at least one type: the MX of
+        # the cluster zone points at the cluster anyway, so it is the harmless choice.
         domain["dnsManagement"] = {
             "@type": "Automatic",
             "dnsServerId": "#dns",
             "origin": cluster.dns_zone,
-            "publishRecords": {},
+            "publishRecords": PUBLISHED_RECORD_TYPES,
         }
     else:
         domain["dnsManagement"] = {"@type": "Manual"}
