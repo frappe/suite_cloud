@@ -164,9 +164,7 @@ class TestServerJob(IntegrationTestCase):
         self.assertEqual(account_op["value"]["admin"]["roles"], {"@type": "Admin"})
         self.assertNotIn("Account", [op["object"] for op in plan.cluster_plan(self.node.get_cluster())])
         # No Role may exist before the first normal start, or Stalwart skips its built-in roles.
-        self.assertNotIn("Role", [op["object"] for op in recovery_ops if op["@type"] != "destroy"])
-        destroy = next(op for op in recovery_ops if op["@type"] == "destroy")
-        self.assertEqual((destroy["object"], destroy["value"]), ("Role", {"text": "suite-disabled"}))
+        self.assertNotIn("Role", [op["object"] for op in recovery_ops])
         self.assertIn("pg-secret", variables["__secret_values__"])
 
         from types import SimpleNamespace
