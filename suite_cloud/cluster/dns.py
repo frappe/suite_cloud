@@ -92,17 +92,26 @@ def sending_ips(cluster: Document) -> list[str]:
 
 
 def spf_records(cluster: Document) -> list[dict]:
+    """The include target listing every sending address, and the cluster zone's own SPF."""
+
     mechanisms = [f"ip6:{ip}" if ":" in ip else f"ip4:{ip}" for ip in sending_ips(cluster)]
-    value = " ".join(["v=spf1", *mechanisms, "-all"])
-    return [
-        {
-            "dns_zone": cluster.dns_zone,
-            "host": spf_host(cluster),
-            "type": "TXT",
-            "value": value,
-            "category": "SPF",
-        }
-    ]
+    include_target = {
+        "dns_zone": cluster.dns_zone,
+        "host": spf_host(cluster),
+        "type": "TXT",
+        "value": " ".join(["v=spf1", *mechanisms, "-all"]),
+        "category": "SPF",
+    }
+    # Reports and notifications leave from the cluster zone itself, so it needs SPF like any
+    # customer domain; it references the include target the same way customers do.
+    zone_spf = {
+        "dns_zone": cluster.dns_zone,
+        "host": relative_host(cluster.default_domain, cluster.dns_zone),
+        "type": "TXT",
+        "value": f"v=spf1 include:{spf_include(cluster)} -all",
+        "category": "SPF",
+    }
+    return [include_target, zone_spf]
 
 
 def sync_spf_record(cluster: Document) -> None:

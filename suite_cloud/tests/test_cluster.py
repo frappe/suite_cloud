@@ -120,6 +120,10 @@ class TestStalwartCluster(IntegrationTestCase):
             "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "spf.blr", "type": "TXT"}, "value"
         )
         self.assertEqual(spf, "v=spf1 ip4:203.0.113.10 ip6:2001:db8::10 -all")
+        zone_spf = frappe.db.get_value(
+            "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "blr", "type": "TXT"}, "value"
+        )
+        self.assertEqual(zone_spf, f"v=spf1 include:spf.blr.{ROOT_DOMAIN} -all")
 
         dns.sync_node_records(node, include_ingress=False)
         self.assertFalse(frappe.db.exists("DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "mail.blr"}))
@@ -338,6 +342,7 @@ class TestStalwartCluster(IntegrationTestCase):
             {f"*.{cluster.default_domain}": True},
         )
         self.assertEqual(domain["dnsManagement"], {"@type": "Manual"})
+        self.assertEqual(domain["dkimManagement"], {"@type": "Automatic"})
         self.assertEqual(
             operations["SystemSettings"]["value"]["mailExchangers"],
             {"0": {"hostname": cluster.hostname, "priority": 10}},
@@ -384,3 +389,4 @@ class TestStalwartCluster(IntegrationTestCase):
         domain = {op["object"]: op for op in plan.cluster_plan(cluster)}["Domain"]["value"]["default"]
         self.assertEqual(domain["dnsManagement"]["@type"], "Automatic")
         self.assertEqual(domain["dnsManagement"]["origin"], ROOT_DOMAIN)
+        self.assertEqual(domain["dnsManagement"]["publishRecords"], {"mx": True, "dkim": True, "dmarc": True})

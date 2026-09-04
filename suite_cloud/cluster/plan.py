@@ -37,7 +37,9 @@ def as_list(items) -> dict:
     return {str(index): item for index, item in enumerate(items)}
 
 
-PUBLISHED_RECORD_TYPES = {"mx": True}
+# What Stalwart publishes for the cluster zone itself: its MX, the DKIM keys it rotates and a
+# DMARC policy. The zone's SPF is a DNS Record of the cluster (it references the include target).
+PUBLISHED_RECORD_TYPES = {"mx": True, "dkim": True, "dmarc": True}
 
 CLUSTER_ROLES = {
     "full": {
@@ -163,7 +165,11 @@ def acme_provider(cluster: Document) -> dict:
 
 
 def default_domain(cluster: Document, with_dns: bool) -> dict:
-    """The cluster zone: carries the ACME certificate covering the ingress and node hostnames."""
+    """The cluster zone: carries the wildcard certificate and signs the cluster's own mail.
+
+    Reports, alarms and notifications leave from this domain, so it gets DKIM keys like any
+    customer domain.
+    """
 
     domain = {
         "name": cluster.default_domain,
@@ -176,13 +182,12 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
             # order that lists a name its wildcard already covers.
             "subjectAlternativeNames": as_set([f"*.{cluster.default_domain}"]),
         },
-        "dkimManagement": {"@type": "Manual"},
+        "dkimManagement": {"@type": "Automatic"},
         "subAddressing": {"@type": "Disabled"},
     }
     if with_dns:
-        # Automatic DNS management is what gives DNS-01 its provider. Suite Cloud publishes the
-        # zone's records itself, but Stalwart insists on publishing at least one type: the MX of
-        # the cluster zone points at the cluster anyway, so it is the harmless choice.
+        # Automatic DNS management is what gives DNS-01 its provider; it also publishes the
+        # zone's MX, DKIM and DMARC records. Node, ingress and SPF records stay with Suite Cloud.
         domain["dnsManagement"] = {
             "@type": "Automatic",
             "dnsServerId": "#dns",
