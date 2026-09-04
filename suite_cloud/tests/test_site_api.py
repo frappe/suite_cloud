@@ -174,6 +174,9 @@ class TestFrappeCloudApi(SiteApiTestCase):
         super().setUp()
         frappe.set_user("Administrator")
         frappe.local.suite_site = None
+        # The site may hold a real default cluster; selection must land on the fixture cluster.
+        frappe.db.set_value("Stalwart Cluster", {"name": ["!=", self.cluster.name]}, "is_default", 0)
+        self.cluster.db_set("is_default", 1)
 
     def test_create_site_returns_credentials_once(self) -> None:
         with patch("suite_cloud.api.fc.get_public_url", return_value="https://cloud.suite.test"):

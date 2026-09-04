@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import frappe
 
+from suite_cloud.stalwart.client import is_write_only
 from suite_cloud.utils import get_config
 
 if TYPE_CHECKING:
@@ -402,19 +403,39 @@ def drift_report(cluster: Document) -> dict:
                 if live is None:
                     differences.append({"object": object_type, "ref": ref, "missing": True})
                     continue
-                for key, wanted in value.items():
-                    if isinstance(wanted, str) and wanted.startswith("#"):
-                        continue
-                    if live.get(key) != wanted:
-                        differences.append({"object": object_type, "ref": ref, "property": key})
+                differences += _drifted(object_type, live, value, ref)
         elif operation["@type"] == "update" and not operation.get("id"):
             live = client.singleton(object_type).read()
-            for key, wanted in operation["value"].items():
-                if isinstance(wanted, str) and wanted.startswith("#"):
-                    continue
-                if isinstance(wanted, dict) and wanted.get("@type") == "Value":
-                    continue
-                if live.get(key) != wanted:
-                    differences.append({"object": object_type, "property": key})
+            differences += _drifted(object_type, live, operation["value"])
 
     return {"checked_at": frappe.utils.now(), "differences": differences}
+
+
+def _drifted(object_type: str, live: dict, wanted: dict, ref: str | None = None) -> list[dict]:
+    found = []
+    for key, value in wanted.items():
+        if key == "@type" or is_write_only(key, value):
+            continue  # secrets are never echoed back
+        if not same_value(live.get(key), value):
+            entry = {"object": object_type, "property": key}
+            if ref:
+                entry["ref"] = ref
+            found.append(entry)
+    return found
+
+
+def same_value(live, wanted) -> bool:
+    """Deep equality where a ``#ref`` in the plan stands for whatever id the server assigned."""
+
+    if isinstance(wanted, str) and wanted.startswith("#"):
+        return isinstance(live, str) and bool(live)
+    if isinstance(wanted, dict):
+        if not isinstance(live, dict):
+            return False
+        return all(
+            (not is_write_only(k, v) and same_value(live.get(k), v)) or is_write_only(k, v)
+            for k, v in wanted.items()
+        )
+    if isinstance(wanted, list):
+        return isinstance(live, list) and len(live) == len(wanted) and all(map(same_value, live, wanted))
+    return live == wanted

@@ -239,6 +239,16 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertEqual((cluster.status, node.status, node.node_id), ("Active", "Active", 7))
             # Activation pushes the full plan: the disabled-accounts role appears only now.
             self.assertTrue(fake.find("Role", description="suite-disabled"))
+            # Refs resolve to ids and secrets are never echoed: neither may count as drift.
+            self.assertEqual(
+                frappe.get_doc("Stalwart Cluster", cluster.name).check_drift()["differences"], []
+            )
+            self.assertTrue(
+                plan.same_value(
+                    {"acmeProviderId": "x", "secret": "hidden"}, {"acmeProviderId": "#acme", "secret": "s"}
+                )
+            )
+            self.assertFalse(plan.same_value({"a": {"0": {"x": 1}}}, {"a": {"0": {"x": 2}}}))
             self.assertTrue(
                 frappe.db.exists(
                     "DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "mail.blr", "managed_by": node.name}

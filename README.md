@@ -169,11 +169,17 @@ bench --site yoursite run-tests --app suite_cloud --test-category all
 The tests run against a fake Stalwart that lives inside the test process
 (`suite_cloud/tests/fake_stalwart.py`). Nothing reaches a real server or a real DNS provider.
 
-A few details have not yet been checked against a live Stalwart 0.16 cluster and are listed in the
-plan. Run `stalwart-cli describe <Object>` on a node to confirm the exact field names for: DNS
-provider types other than Cloudflare and Route53, the format of `NetworkListener.bind`, the
-`listener` variable in connection strategies, whether `Domain.dnsManagement.publishRecords` accepts
-an empty list, and the file names in the download URL templates.
+The bootstrap path has been run end to end against a real single-node cluster on Stalwart
+v0.16.20 (DigitalOcean DNS, Let's Encrypt wildcard certificate through DNS-01). Lessons that
+are now built in: Stalwart encodes every `Set` as `{"value": true}` and every `List` as an
+index-keyed object; secrets are `{"@type": "Value", "secret": ...}` unions; Let's Encrypt
+rejects a wildcard order that also names a host it covers; the built-in roles are provisioned
+only on a normal start that finds no Role objects, so the recovery-stage plan creates none;
+and bootstrap's admin password is never disclosed, so the recovery-stage plan sets it.
+
+Still unverified on a live server: the egress gateway (relay listeners, connection strategy,
+the `listener` variable), multi-node registry leases with a Redis coordinator, and node
+upgrades.
 
 ## License
 
