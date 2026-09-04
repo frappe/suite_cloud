@@ -339,7 +339,7 @@ class TestStalwartCluster(IntegrationTestCase):
             cluster = make_cluster()
         self.assertEqual(cluster.dns_zone, ROOT_DOMAIN)
         self.assertEqual(plan.dns_server_object(cluster)["@type"], "Cloudflare")
-        self.assertEqual(plan.dns_server_object(cluster)["secret"], "cf-token")
+        self.assertEqual(plan.dns_server_object(cluster)["secret"], {"@type": "Value", "secret": "cf-token"})
 
         domain = {op["object"]: op for op in plan.cluster_plan(cluster)}["Domain"]["value"]["default"]
         self.assertEqual(domain["dnsManagement"]["@type"], "Automatic")

@@ -136,7 +136,11 @@ class DNSZone(Document):
         if not self.dns_provider:
             return None
 
-        secret = lambda field: password_or_none(self, field)  # noqa: E731
+        def secret(field: str) -> dict | None:
+            # SecretKey fields are a union; a literal value is the "Value" variant.
+            value = password_or_none(self, field)
+            return {"@type": "Value", "secret": value} if value else None
+
         base = {"description": f"suite-cloud-{self.domain_name}", "ttl": 300000}
         match self.dns_provider:
             case "Cloudflare":
