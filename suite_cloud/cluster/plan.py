@@ -324,7 +324,23 @@ def render_env(env: dict[str, str]) -> str:
 
 
 def to_ndjson(plan: list[dict]) -> str:
+    assert_unique_labels(plan)
     return "".join(json.dumps(operation, separators=(",", ":")) + "\n" for operation in plan)
+
+
+def assert_unique_labels(plan: list[dict]) -> None:
+    """``#label`` references share one namespace across the whole plan, whatever the object type.
+
+    A later operation reusing a label silently rebinds every reference to it (the CLI resolved
+    ``#egress`` to a ClusterRole once), so duplicates are a programming error.
+    """
+
+    seen: dict[str, str] = {}
+    for operation in plan:
+        for label in (operation.get("value") or {}) if operation["@type"] in ("upsert", "create") else ():
+            if label in seen:
+                raise ValueError(f"Plan label #{label} used for {seen[label]} and {operation['object']}")
+            seen[label] = operation["object"]
 
 
 def secret_value(secret: str | None) -> dict | None:

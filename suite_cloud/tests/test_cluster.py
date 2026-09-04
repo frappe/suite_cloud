@@ -352,6 +352,15 @@ class TestStalwartCluster(IntegrationTestCase):
             operations["Role"]["value"]["disabled"]["enabledPermissions"], {"emailReceive": True}
         )
 
+        self.assertRaisesRegex(
+            ValueError,
+            "label #x",
+            plan.to_ndjson,
+            [
+                {"@type": "upsert", "object": "Domain", "value": {"x": {}}},
+                {"@type": "upsert", "object": "Role", "value": {"x": {}}},
+            ],
+        )
         redacted = plan.redacted(plan.bootstrap_plan(cluster))
         self.assertNotIn("pg-secret", redacted)
         self.assertIn(plan.SECRET_MARKER, redacted)

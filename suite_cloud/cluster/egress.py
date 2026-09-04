@@ -303,7 +303,8 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "object": "ClusterRole",
             "matchOn": ["name"],
             "value": {
-                GATEWAY_ROLE: {
+                # Plan labels are one namespace: "egress" already names the domain.
+                "gateway-role": {
                     "name": GATEWAY_ROLE,
                     "description": "Outbound relay only",
                     "tasks": {
