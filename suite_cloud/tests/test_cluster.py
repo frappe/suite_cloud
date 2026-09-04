@@ -295,7 +295,7 @@ class TestStalwartCluster(IntegrationTestCase):
         domain = operations["Domain"]["value"]["default"]
         self.assertEqual(
             domain["certificateManagement"]["subjectAlternativeNames"],
-            {cluster.hostname: True, f"*.{cluster.default_domain}": True},
+            {f"*.{cluster.default_domain}": True},
         )
         self.assertEqual(domain["dnsManagement"], {"@type": "Manual"})
         self.assertEqual(

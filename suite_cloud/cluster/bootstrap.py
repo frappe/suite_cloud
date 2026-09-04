@@ -118,7 +118,7 @@ def build_node_variables(context: dict) -> dict:
         "admin_user": cluster.admin_username,
         "admin_password": cluster.get_password("admin_password"),
         "config_version": cluster.config_version or 0,
-        "plan_marker": f".suite-cloud-plan-v{cluster.config_version or 0}",
+        "plan_marker": plan.marker(plan.cluster_plan(cluster)),
         "env_normal": plan.render_env(plan.node_env(node, "normal")),
         "env_bootstrap": plan.render_env(plan.node_env(node, "bootstrap")),
         "env_recovery": plan.render_env(plan.node_env(node, "recovery")),

@@ -409,7 +409,7 @@ def build_gateway_variables(context: dict) -> dict:
         "admin_user": gateway.admin_username,
         "admin_password": gateway.get_password("admin_password"),
         "config_version": gateway.config_version or 0,
-        "plan_marker": f".suite-cloud-plan-v{gateway.config_version or 0}",
+        "plan_marker": plan.marker(gateway_plan(gateway)),
         "env_normal": plan.render_env(gateway_env(gateway, "normal")),
         "env_bootstrap": plan.render_env(gateway_env(gateway, "bootstrap")),
         "env_recovery": plan.render_env(gateway_env(gateway, "recovery")),

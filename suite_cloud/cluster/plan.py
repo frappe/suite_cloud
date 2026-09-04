@@ -6,6 +6,7 @@ The cluster plan holds the objects Suite Cloud manages afterwards (roles, coordi
 DNS provider, default domain, system settings, licences) and is re-applied on every sync.
 """
 
+import hashlib
 import json
 from typing import TYPE_CHECKING
 
@@ -170,7 +171,9 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
         "certificateManagement": {
             "@type": "Automatic",
             "acmeProviderId": "#acme",
-            "subjectAlternativeNames": as_set([cluster.hostname, f"*.{cluster.default_domain}"]),
+            # The wildcard covers the ingress hostname and every node; Let's Encrypt rejects an
+            # order that lists a name its wildcard already covers.
+            "subjectAlternativeNames": as_set([f"*.{cluster.default_domain}"]),
         },
         "dkimManagement": {"@type": "Manual"},
         "subAddressing": {"@type": "Disabled"},
@@ -301,6 +304,13 @@ def _collect_secrets(value, found: list[str]) -> None:
     elif isinstance(value, list):
         for item in value:
             _collect_secrets(item, found)
+
+
+def marker(plan: list[dict]) -> str:
+    """Name of the file a node keeps once it applied this exact plan (secrets excluded)."""
+
+    digest = hashlib.sha1(redacted(plan).encode()).hexdigest()[:12]
+    return f".suite-cloud-plan-{digest}"
 
 
 def redacted(plan: list[dict]) -> str:

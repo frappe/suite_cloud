@@ -152,7 +152,7 @@ class TestServerJob(IntegrationTestCase):
         self.assertIn("STALWART_RECOVERY_ADMIN=admin:", variables["env_recovery"])
         self.assertNotIn("STALWART_RECOVERY", variables["env_normal"])
         self.assertIn('"@type": "PostgreSql"', variables["config_json"])
-        self.assertEqual(variables["plan_marker"], ".suite-cloud-plan-v0")
+        self.assertRegex(variables["plan_marker"], r"^\.suite-cloud-plan-[0-9a-f]{12}$")
 
         admin_password = self.node.get_cluster().get_password("admin_password")
         self.assertIn(admin_password, variables["__secret_values__"])
