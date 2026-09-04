@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -200,6 +202,25 @@ class TestEgress(IntegrationTestCase):
         self.assertIn("STALWART_ROLE=egress", variables["env_normal"])
         self.assertIn('"@type":"RocksDb"', variables["bootstrap_ndjson"])
         self.assertIn(pool.pool_name, variables["cluster_ndjson"])
+
+    def test_verify_ptr_marks_rows_one_or_all(self) -> None:
+        pool = self.make_pool("ded", ("203.0.113.51", "203.0.113.52"))
+        first, second = pool.addresses
+        target = "suite_cloud.suite_cloud.doctype.egress_ip_pool.egress_ip_pool.verify_ptr_record"
+
+        with patch(target, side_effect=lambda ip, host: ip == "203.0.113.51") as check:
+            self.assertEqual(pool.verify_ptr(first.name), {"203.0.113.51": True})
+            check.assert_called_once_with("203.0.113.51", first.ehlo_hostname)
+            self.assertEqual(pool.verify_ptr(), {"203.0.113.51": True, "203.0.113.52": False})
+        self.assertRaisesRegex(frappe.ValidationError, "not found", pool.verify_ptr, "missing")
+
+        rows = frappe.get_all(
+            "Egress IP Pool Address", {"parent": pool.name}, ["ip_address", "ptr_verified"], order_by="idx"
+        )
+        self.assertEqual(
+            [(r.ip_address, r.ptr_verified) for r in rows], [("203.0.113.51", 1), ("203.0.113.52", 0)]
+        )
+        self.assertEqual(second.ptr_verified, 0)
 
     def test_pool_deletion_is_blocked_while_used(self) -> None:
         pool = self.make_pool("ded")

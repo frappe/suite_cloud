@@ -6,8 +6,10 @@ import re
 import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import cint
 
 from suite_cloud.cluster import dns, egress
+from suite_cloud.dns.resolver import verify_ptr_record
 from suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node import validate_ip
 
 POOL_NAME = re.compile(r"^[a-z0-9]{1,8}$")
@@ -106,6 +108,18 @@ class EgressIPPool(Document):
         dns.sync_spf_record(cluster)
         egress.resync_cluster(cluster)
 
+    # --- actions ----------------------------------------------------------------
+
+    @frappe.whitelist()
+    def verify_ptr(self, address: str | None = None) -> dict[str, bool]:
+        """Check the reverse DNS of one address row (by row name) or of every address."""
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        rows = [row for row in self.addresses if not address or row.name == address]
+        if address and not rows:
+            frappe.throw(_("Address row {0} not found.").format(address))
+        return {row.ip_address: verify_address_ptr(row) for row in rows}
+
     # --- helpers --------------------------------------------------------------
 
     def get_cluster(self) -> Document:
@@ -116,3 +130,15 @@ class EgressIPPool(Document):
 
     def addresses_on(self, gateway: str) -> list[Document]:
         return [row for row in self.addresses if row.gateway == gateway]
+
+
+def verify_address_ptr(row: Document) -> bool:
+    ok = verify_ptr_record(row.ip_address, row.ehlo_hostname)
+    row.db_set("ptr_verified", cint(ok), update_modified=False)
+    return ok
+
+
+def verify_all_ptr_records() -> None:
+    for name in frappe.get_all("Egress IP Pool", pluck="name"):
+        for row in frappe.get_doc("Egress IP Pool", name).addresses:
+            verify_address_ptr(row)

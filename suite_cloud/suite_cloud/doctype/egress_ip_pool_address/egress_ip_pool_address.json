@@ -9,7 +9,8 @@
   "ip_address",
   "column_break_address",
   "ehlo_hostname",
-  "ptr_verified"
+  "ptr_verified",
+  "verify_ptr"
  ],
  "fields": [
   {
@@ -36,7 +37,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "columns": 4,
+   "columns": 3,
    "description": "Name the gateway announces when sending from this address: one label under the cluster's default domain, e.g. ded1.blr.frappemail.com. It gets an A record pointing at the address, and the address's reverse DNS must point back at it.",
    "fieldname": "ehlo_hostname",
    "fieldtype": "Data",
@@ -53,6 +54,13 @@
    "label": "PTR Verified",
    "read_only": 1,
    "description": "Reverse DNS of the address points at the EHLO hostname. Checked daily; receivers reject mail from addresses without it."
+  },
+  {
+   "columns": 1,
+   "fieldname": "verify_ptr",
+   "fieldtype": "Button",
+   "in_list_view": 1,
+   "label": "Verify PTR"
   }
  ],
  "index_web_pages_for_search": 1,

@@ -35,6 +35,7 @@ scheduler_events = {
         "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.refresh_all_domains",
         "suite_cloud.suite_cloud.doctype.stalwart_cluster.stalwart_cluster.check_all_clusters",
         "suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node.verify_all_ptr_records",
+        "suite_cloud.suite_cloud.doctype.egress_ip_pool.egress_ip_pool.verify_all_ptr_records",
     ],
 }
 
