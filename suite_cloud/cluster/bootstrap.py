@@ -118,18 +118,18 @@ def build_node_variables(context: dict) -> dict:
         "admin_user": cluster.admin_username,
         "admin_password": cluster.get_password("admin_password"),
         "config_version": cluster.config_version or 0,
-        "plan_marker": plan.marker(plan.cluster_plan(cluster)),
+        "plan_marker": plan.marker(recovery_plan := plan.recovery_plan(cluster)),
         "env_normal": plan.render_env(plan.node_env(node, "normal")),
         "env_bootstrap": plan.render_env(plan.node_env(node, "bootstrap")),
         "env_recovery": plan.render_env(plan.node_env(node, "recovery")),
         "config_json": frappe.as_json(plan.node_config(cluster)),
         "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := plan.bootstrap_plan(cluster)),
-        "cluster_ndjson": plan.to_ndjson(cluster_plan := plan.cluster_plan(cluster)),
+        "cluster_ndjson": plan.to_ndjson(recovery_plan),
         "__secret_keys__": list(SECRET_VARIABLES),
         "__secret_values__": [
             cluster.get_password("admin_password"),
             *plan.secret_strings(bootstrap_plan),
-            *plan.secret_strings(cluster_plan),
+            *plan.secret_strings(recovery_plan),
         ],
     }
     return variables

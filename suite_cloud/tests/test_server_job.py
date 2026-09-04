@@ -1,10 +1,11 @@
+import json
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.cluster import bootstrap
+from suite_cloud.cluster import bootstrap, plan
 from suite_cloud.provisioning.ansible import playbook_task_names
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 from suite_cloud.tests.fixtures import configure_settings, make_cluster, make_node
@@ -156,6 +157,12 @@ class TestServerJob(IntegrationTestCase):
 
         admin_password = self.node.get_cluster().get_password("admin_password")
         self.assertIn(admin_password, variables["__secret_values__"])
+        # The recovery-stage plan pins the admin password; the plan pushed later never does.
+        recovery_ops = [json.loads(line) for line in variables["cluster_ndjson"].splitlines()]
+        account_op = next(op for op in recovery_ops if op["object"] == "Account")
+        self.assertEqual(account_op["value"]["admin"]["credentials"]["0"]["secret"], admin_password)
+        self.assertEqual(account_op["value"]["admin"]["roles"], {"@type": "Admin"})
+        self.assertNotIn("Account", [op["object"] for op in plan.cluster_plan(self.node.get_cluster())])
         self.assertIn("pg-secret", variables["__secret_values__"])
 
         from types import SimpleNamespace

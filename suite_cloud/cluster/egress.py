@@ -327,6 +327,10 @@ def gateway_plan(gateway: Document) -> list[dict]:
     return operations
 
 
+def gateway_recovery_plan(gateway: Document) -> list[dict]:
+    return [*gateway_plan(gateway), plan.admin_account_operation(gateway, "#egress")]
+
+
 def gateway_bootstrap_plan(gateway: Document) -> list[dict]:
     cluster = gateway.get_cluster()
     value = {
@@ -409,18 +413,18 @@ def build_gateway_variables(context: dict) -> dict:
         "admin_user": gateway.admin_username,
         "admin_password": gateway.get_password("admin_password"),
         "config_version": gateway.config_version or 0,
-        "plan_marker": plan.marker(gateway_plan(gateway)),
+        "plan_marker": plan.marker(recovery_plan := gateway_recovery_plan(gateway)),
         "env_normal": plan.render_env(gateway_env(gateway, "normal")),
         "env_bootstrap": plan.render_env(gateway_env(gateway, "bootstrap")),
         "env_recovery": plan.render_env(gateway_env(gateway, "recovery")),
         "config_json": frappe.as_json(gateway.get_store("data_store").config),
         "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := gateway_bootstrap_plan(gateway)),
-        "cluster_ndjson": plan.to_ndjson(cluster_plan := gateway_plan(gateway)),
+        "cluster_ndjson": plan.to_ndjson(recovery_plan),
         "__secret_keys__": list(SECRET_VARIABLES),
         "__secret_values__": [
             gateway.get_password("admin_password"),
             *plan.secret_strings(bootstrap_plan),
-            *plan.secret_strings(cluster_plan),
+            *plan.secret_strings(recovery_plan),
         ],
     }
 

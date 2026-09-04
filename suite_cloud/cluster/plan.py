@@ -199,6 +199,40 @@ def dns_server_object(cluster: Document) -> dict | None:
     return frappe.get_cached_doc("DNS Zone", cluster.dns_zone).stalwart_dns_server()
 
 
+def admin_account_operation(server: Document, domain_ref: str) -> dict:
+    """Pins the permanent administrator's password.
+
+    Bootstrap creates the account with a password nobody is told (the recovery credential is a
+    virtual login that bypasses the directory), so the recovery-stage plan sets it. Only that
+    plan may carry it: credentials are a whole list, and once the management API key exists it
+    lives in the same list and would be wiped by a later push.
+    """
+
+    username = server.admin_username or "admin"
+    return {
+        "@type": "upsert",
+        "object": "Account",
+        "matchOn": ["name"],
+        "value": {
+            "admin": {
+                "@type": "User",
+                "name": username,
+                "domainId": domain_ref,
+                "description": "Administrator",
+                "credentials": {"0": {"@type": "Password", "secret": server.get_password("admin_password")}},
+                "roles": {"@type": "Admin"},
+                "permissions": {"@type": "Inherit"},
+            }
+        },
+    }
+
+
+def recovery_plan(cluster: Document) -> list[dict]:
+    """The cluster plan as the first node applies it in recovery mode, admin password included."""
+
+    return [*cluster_plan(cluster), admin_account_operation(cluster, "#default")]
+
+
 def egress_operations(cluster: Document) -> list[dict]:
     """Relay routes and routing rules for egress pools; filled in by suite_cloud.cluster.egress."""
 
