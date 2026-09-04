@@ -65,7 +65,7 @@
    "label": "Details"
   },
   {
-   "description": "Internal label: lowercase letters, digits and dashes, e.g. hel-1. The public name is the hostname below.",
+   "description": "Internal label: lowercase letters, digits and dashes, e.g. blr-1. The public name is the hostname below.",
    "fieldname": "cluster_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -75,7 +75,7 @@
    "unique": 1
   },
   {
-   "description": "Short region code, e.g. hel. Frappe Cloud asks for a cluster by region when it does not name one. Defaults to the first label of the default domain.",
+   "description": "Short region code, e.g. blr. Frappe Cloud asks for a cluster by region when it does not name one. Defaults to the first label of the default domain.",
    "fieldname": "region",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -133,7 +133,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Public address of the cluster, e.g. mail.hel.frappe.email. Mail clients, MX records and sites all use it. It needs at least two labels under the zone; the part after the first label becomes the default domain.",
+   "description": "Public address of the cluster, e.g. mail.blr.frappemail.com. Mail clients, MX records and sites all use it. It needs at least two labels under the zone; the part after the first label becomes the default domain.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -143,7 +143,7 @@
    "unique": 1
   },
   {
-   "description": "Sub-zone the cluster owns, derived from the hostname (mail.hel.frappe.email owns hel.frappe.email). Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
+   "description": "Sub-zone the cluster owns, derived from the hostname (mail.blr.frappemail.com owns blr.frappemail.com). Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
    "fieldname": "default_domain",
    "fieldtype": "Data",
    "label": "Default Domain",
