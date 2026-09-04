@@ -4,8 +4,13 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "dns_tab",
-  "default_dns_ttl",
+  "general_tab",
+  "suite_cloud_section",
+  "public_url",
+  "column_break_general",
+  "site_service_user",
+  "jobs_section",
+  "server_job_timeout",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -13,30 +18,57 @@
   "column_break_stalwart",
   "stalwart_cli_version",
   "stalwart_cli_download_url_template",
+  "certificates_tab",
   "acme_section",
   "acme_directory_url",
   "column_break_acme",
   "acme_contact_email",
-  "suite_cloud_tab",
-  "public_url",
-  "column_break_suite_cloud",
-  "site_service_user",
-  "timeouts_section",
-  "server_job_timeout"
+  "dns_tab",
+  "dns_section",
+  "default_dns_ttl"
  ],
  "fields": [
   {
-   "fieldname": "dns_tab",
+   "fieldname": "general_tab",
    "fieldtype": "Tab Break",
-   "label": "DNS"
+   "label": "General"
   },
   {
-   "default": "300",
-   "description": "Used for records of zones without their own TTL and suggested to sites for theirs.",
-   "fieldname": "default_dns_ttl",
+   "fieldname": "suite_cloud_section",
+   "fieldtype": "Section Break",
+   "label": "Suite Cloud"
+  },
+  {
+   "description": "Address Frappe Cloud hands to Suite sites so they can reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL.",
+   "fieldname": "public_url",
+   "fieldtype": "Data",
+   "label": "Public URL",
+   "options": "URL"
+  },
+  {
+   "fieldname": "column_break_general",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Every request from a Suite site runs as this user. It is created on install and needs no changes.",
+   "fieldname": "site_service_user",
+   "fieldtype": "Link",
+   "label": "Site Service User",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "jobs_section",
+   "fieldtype": "Section Break",
+   "label": "Server Jobs"
+  },
+  {
+   "default": "1800",
+   "fieldname": "server_job_timeout",
    "fieldtype": "Int",
-   "label": "Default DNS TTL",
-   "reqd": 1
+   "label": "Server Job Timeout (Seconds)",
+   "reqd": 1,
+   "description": "How long an install, bootstrap or upgrade job may run before it is marked failed. Bootstrapping the first node includes waiting for a certificate, so keep this generous. 1800 = 30 minutes."
   },
   {
    "fieldname": "stalwart_tab",
@@ -50,7 +82,7 @@
   },
   {
    "default": "v0.16.20",
-   "description": "Default version new clusters pin. Upgrades are per cluster.",
+   "description": "Stalwart release that new clusters install, e.g. v0.16.20. Existing clusters keep their own version until you run Upgrade Nodes on them.",
    "fieldname": "stalwart_version",
    "fieldtype": "Data",
    "label": "Stalwart Version",
@@ -58,7 +90,7 @@
   },
   {
    "default": "https://github.com/stalwartlabs/stalwart/releases/download/{version}/stalwart-{target}.tar.gz",
-   "description": "{version} and {target} (e.g. x86_64-unknown-linux-gnu) are substituted on the node.",
+   "description": "Where the node downloads the Stalwart archive from. {version} is replaced with the release and {target} with the platform, e.g. x86_64-unknown-linux-gnu.",
    "fieldname": "stalwart_download_url_template",
    "fieldtype": "Data",
    "label": "Stalwart Download URL Template",
@@ -74,7 +106,8 @@
    "fieldname": "stalwart_cli_version",
    "fieldtype": "Data",
    "label": "Stalwart CLI Version",
-   "reqd": 1
+   "reqd": 1,
+   "description": "Release of stalwart-cli installed next to the server, e.g. v1.0.12. Only used on a node while it bootstraps a cluster."
   },
   {
    "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
@@ -82,16 +115,22 @@
    "fieldtype": "Data",
    "label": "Stalwart CLI Download URL Template",
    "length": 255,
-   "reqd": 1
+   "reqd": 1,
+   "description": "Where the node downloads the stalwart-cli archive from. Same placeholders as the server URL."
+  },
+  {
+   "fieldname": "certificates_tab",
+   "fieldtype": "Tab Break",
+   "label": "Certificates"
   },
   {
    "fieldname": "acme_section",
    "fieldtype": "Section Break",
-   "label": "TLS Certificates (ACME)"
+   "label": "Let's Encrypt (ACME)"
   },
   {
    "default": "https://acme-v02.api.letsencrypt.org/directory",
-   "description": "Use https://acme-staging-v02.api.letsencrypt.org/directory while testing.",
+   "description": "Certificate authority clusters request their TLS certificates from. While testing use https://acme-staging-v02.api.letsencrypt.org/directory to avoid rate limits; staging certificates are not trusted by mail clients.",
    "fieldname": "acme_directory_url",
    "fieldtype": "Data",
    "label": "ACME Directory URL",
@@ -103,53 +142,35 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Certificate expiry notices from the CA go here.",
+   "description": "Address the certificate authority writes to about expiring certificates. Used by clusters that do not set their own contact.",
    "fieldname": "acme_contact_email",
    "fieldtype": "Data",
    "label": "ACME Contact Email",
    "options": "Email"
   },
   {
-   "fieldname": "suite_cloud_tab",
+   "fieldname": "dns_tab",
    "fieldtype": "Tab Break",
-   "label": "Suite Cloud"
+   "label": "DNS"
   },
   {
-   "description": "URL handed to Frappe Cloud for sites to reach this Suite Cloud. Defaults to this site's URL.",
-   "fieldname": "public_url",
-   "fieldtype": "Data",
-   "label": "Public URL",
-   "options": "URL"
-  },
-  {
-   "fieldname": "column_break_suite_cloud",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Every Suite Site API request runs as this user. Created on install.",
-   "fieldname": "site_service_user",
-   "fieldtype": "Link",
-   "label": "Site Service User",
-   "options": "User",
-   "read_only": 1
-  },
-  {
-   "fieldname": "timeouts_section",
+   "fieldname": "dns_section",
    "fieldtype": "Section Break",
-   "label": "Timeouts (Seconds)"
+   "label": "Defaults"
   },
   {
-   "default": "1800",
-   "fieldname": "server_job_timeout",
+   "default": "300",
+   "description": "How long resolvers may cache the records Suite Cloud publishes, used when a DNS Zone sets no TTL of its own. Also suggested to sites for their domain records. 300 keeps node changes quick to roll out.",
+   "fieldname": "default_dns_ttl",
    "fieldtype": "Int",
-   "label": "Server Job Timeout",
+   "label": "Default DNS TTL (Seconds)",
    "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-04 12:00:00.000000",
+ "modified": "2026-09-04 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
