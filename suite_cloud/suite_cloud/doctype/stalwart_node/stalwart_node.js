@@ -10,6 +10,17 @@ frappe.ui.form.on('Stalwart Node', {
 		if (['Pending', 'Failed'].includes(frm.doc.status)) {
 			frm.add_custom_button(__('Provision'), () => frm.events.call(frm, 'provision', __('Queueing provisioning...')), __('Actions'))
 		}
+		if (['Provisioned', 'Active', 'Draining'].includes(frm.doc.status)) {
+			// Idempotent: re-applies a changed plan or environment and restarts Stalwart.
+			frm.add_custom_button(
+				__('Re-provision'),
+				() =>
+					frappe.confirm(__('Run the provisioning playbook again? Stalwart restarts on the node.'), () =>
+						frm.events.call(frm, 'provision', __('Queueing provisioning...')),
+					),
+				__('Actions'),
+			)
+		}
 		if (frm.doc.status === 'Provisioned') {
 			frm.add_custom_button(__('Check Health'), () => frm.events.call(frm, 'check_health', __('Checking...')), __('Actions'))
 		}
