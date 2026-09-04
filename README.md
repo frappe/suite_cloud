@@ -178,7 +178,7 @@ only on a normal start that finds no Role objects, so the recovery-stage plan cr
 and bootstrap's admin password is never disclosed, so the recovery-stage plan sets it.
 
 Still unverified on a live server: the egress gateway (relay listeners, connection strategy,
-the `listener` variable), multi-node registry leases with a Redis coordinator, and node
+multi-node registry leases with a Redis coordinator, and node
 upgrades.
 
 ## License

@@ -181,7 +181,7 @@ class TestEgress(IntegrationTestCase):
         )
         self.assertEqual(
             operations["MtaOutboundStrategy"]["value"]["connection"],
-            {"match": {"0": {"if": "listener == 'relay-ded'", "then": "'ded'"}}, "else": "'default'"},
+            {"match": {"0": {"if": "received_via_port == 2525", "then": "'ded'"}}, "else": "'default'"},
         )
         role = operations["ClusterRole"]["value"]["gateway-role"]
         self.assertEqual(role["name"], "egress")

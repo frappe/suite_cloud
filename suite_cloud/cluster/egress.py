@@ -208,7 +208,9 @@ def gateway_plan(gateway: Document) -> list[dict]:
                 [{"sourceIp": a.ip_address, "ehloHostname": a.ehlo_hostname} for a in addresses]
             ),
         }
-        rules.append({"if": f"listener == '{listener}'", "then": f"'{pool.pool_name}'"})
+        # The connection strategy is chosen at delivery time, where the listener is no longer
+        # known but the port the message arrived on is.
+        rules.append({"if": f"received_via_port == {pool.relay_port}", "then": f"'{pool.pool_name}'"})
 
     operations: list[dict] = [
         {"@type": "update", "object": "Coordinator", "value": {"@type": "Disabled"}},
