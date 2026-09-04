@@ -22,8 +22,7 @@
   "api_key",
   "api_secret",
   "column_break_access",
-  "user",
-  "tenant_id"
+  "user"
  ],
  "fields": [
   {
@@ -138,14 +137,6 @@
    "read_only": 1
   },
   {
-   "description": "Reserved for Stalwart Enterprise tenants.",
-   "fieldname": "tenant_id",
-   "fieldtype": "Data",
-   "hidden": 1,
-   "label": "Stalwart Tenant ID",
-   "read_only": 1
-  },
-  {
    "description": "Outbound mail of this site's domains leaves through this pool (overrides the cluster default).",
    "fieldname": "egress_pool",
    "fieldtype": "Link",
@@ -176,7 +167,7 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-09-03 12:00:00.000000",
+ "modified": "2026-09-04 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Site",

@@ -56,6 +56,7 @@ class StalwartNode(Document):
         if not self.hostname.endswith(suffix) or "." in self.hostname[: -len(suffix)]:
             frappe.throw(_("Hostname must be a single label under {0}.").format(cluster.default_domain))
 
+        self.validate_single_node(cluster)
         self.ipv4_address = validate_ip(self.ipv4_address, 4)
         self.ipv6_address = validate_ip(self.ipv6_address, 6) if self.ipv6_address else None
         self.ssh_user = self.ssh_user or cluster.ssh_user
@@ -65,6 +66,21 @@ class StalwartNode(Document):
 
         if self.has_value_changed("ipv4_address") or self.has_value_changed("ipv6_address"):
             self.ssh_verified = 0
+
+    def validate_single_node(self, cluster: Document) -> None:
+        """Embedded stores live on one VPS: no second node, and roles that split work make no sense."""
+
+        if not cluster.single_node:
+            return
+        other = frappe.db.get_value("Stalwart Node", {"cluster": cluster.name, "name": ["!=", self.name]})
+        if other:
+            frappe.throw(
+                _("Cluster {0} uses an embedded store and can only have one node ({1}).").format(
+                    cluster.name, other
+                )
+            )
+        if self.role != "full":
+            frappe.throw(_("The only node of a cluster must have the full role."))
 
     def after_insert(self) -> None:
         dns.sync_node_records(self)

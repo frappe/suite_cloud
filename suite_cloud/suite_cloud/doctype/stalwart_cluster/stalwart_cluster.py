@@ -51,8 +51,6 @@ class StalwartCluster(Document):
         dns_zone: DF.Link
         drift_report: DF.JSON | None
         enabled: DF.Check
-        enterprise_api_key: DF.Password | None
-        enterprise_license_key: DF.Password | None
         hostname: DF.Data
         in_memory_store: DF.Link | None
         is_default: DF.Check
@@ -61,6 +59,7 @@ class StalwartCluster(Document):
         relay_password: DF.Password | None
         relay_username: DF.Data | None
         search_store: DF.Link | None
+        single_node: DF.Check
         ssh_port: DF.Int
         ssh_private_key: DF.Password | None
         ssh_public_key: DF.Code | None
@@ -149,23 +148,17 @@ class StalwartCluster(Document):
                 if store.kind != kind:
                     frappe.throw(_("{0} must be a {1} store.").format(self.meta.get_label(field), kind))
 
-        in_memory = (
-            frappe.get_cached_doc("Stalwart Store", self.in_memory_store) if self.in_memory_store else None
-        )
-        self.coordinator = "Default" if in_memory and in_memory.type.startswith("Redis") else "Disabled"
+        # Embedded stores keep their data on one VPS, so such a cluster can never grow.
+        self.single_node = int(any(store.is_embedded for store in self.stores()))
+        if self.single_node and self.node_count() > 1:
+            frappe.throw(
+                _("An embedded store cannot be shared by the cluster's {0} nodes.").format(self.node_count())
+            )
 
-        if self.node_count() > 1:
-            self.validate_multi_node_stores()
-
-    def validate_multi_node_stores(self) -> None:
-        """Every node reads the same stores, so embedded backends cannot be shared."""
-
-        for field in STORE_KINDS:
-            if store_name := self.get(field):
-                if frappe.get_cached_value("Stalwart Store", store_name, "type") in ("RocksDb", "FileSystem"):
-                    frappe.throw(_("{0} is embedded and cannot back a multi-node cluster.").format(field))
-
-        if self.coordinator == "Disabled":
+        in_memory = self.get_store("in_memory_store")
+        has_redis = bool(in_memory and in_memory.type.startswith("Redis"))
+        self.coordinator = "Default" if has_redis and not self.single_node else "Disabled"
+        if self.node_count() > 1 and self.coordinator == "Disabled":
             frappe.throw(_("A multi-node cluster needs a Redis in-memory store to coordinate nodes."))
 
     def validate_default(self) -> None:
@@ -194,6 +187,9 @@ class StalwartCluster(Document):
 
     def get_store(self, field: str) -> Document | None:
         return frappe.get_cached_doc("Stalwart Store", self.get(field)) if self.get(field) else None
+
+    def stores(self) -> list[Document]:
+        return [store for field in STORE_KINDS if (store := self.get_store(field))]
 
     def get_client(self):
         return get_client(self)

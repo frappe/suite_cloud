@@ -26,7 +26,10 @@
   "column_break_stores",
   "search_store",
   "in_memory_store",
+  "derived_section",
   "coordinator",
+  "column_break_derived",
+  "single_node",
   "tls_tab",
   "acme_directory_url",
   "column_break_tls",
@@ -48,10 +51,6 @@
   "column_break_egress",
   "relay_username",
   "relay_password",
-  "enterprise_tab",
-  "enterprise_license_key",
-  "column_break_enterprise",
-  "enterprise_api_key",
   "config_tab",
   "config_version",
   "last_config_sync_at",
@@ -66,7 +65,7 @@
    "label": "Details"
   },
   {
-   "description": "Short slug, e.g. blr-1",
+   "description": "Internal label: lowercase letters, digits and dashes, e.g. hel-1. The public name is the hostname below.",
    "fieldname": "cluster_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -76,7 +75,7 @@
    "unique": 1
   },
   {
-   "description": "Frappe Cloud picks a cluster by region when it does not name one.",
+   "description": "Short region code, e.g. hel. Frappe Cloud asks for a cluster by region when it does not name one. Defaults to the first label of the default domain.",
    "fieldname": "region",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -87,7 +86,8 @@
    "default": "0",
    "fieldname": "is_default",
    "fieldtype": "Check",
-   "label": "Is Default"
+   "label": "Is Default",
+   "description": "Cluster Frappe Cloud uses when it names neither a cluster nor a region. Only one cluster can be default."
   },
   {
    "fieldname": "column_break_details",
@@ -97,7 +97,8 @@
    "default": "1",
    "fieldname": "enabled",
    "fieldtype": "Check",
-   "label": "Enabled"
+   "label": "Enabled",
+   "description": "Untick to stop placing new sites here and mark the cluster Disabled. Existing sites keep working."
   },
   {
    "default": "Pending",
@@ -107,10 +108,11 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Pending\nBootstrapping\nActive\nFailed\nDisabled",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Pending: no node yet. Bootstrapping: first node provisioned, waiting for the certificate. Active: ready for sites. Failed: the first node did not come up; provision it again."
   },
   {
-   "description": "Defaults to the version in Suite Cloud Settings. Change it and run Upgrade Nodes.",
+   "description": "Stalwart release the nodes run, e.g. v0.16.20. Defaults to the version in Suite Cloud Settings. Change it and run Upgrade Nodes.",
    "fieldname": "stalwart_version",
    "fieldtype": "Data",
    "label": "Stalwart Version"
@@ -121,7 +123,7 @@
    "label": "Naming"
   },
   {
-   "description": "Zone the ingress, node, gateway and pool hostnames live under. Defaults to the default zone.",
+   "description": "Zone the cluster's records are published in. Every hostname below must sit under it. Defaults to the default zone.",
    "fieldname": "dns_zone",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -131,7 +133,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Ingress hostname under the DNS zone, e.g. mail.blr.frappemail.com",
+   "description": "Public address of the cluster, e.g. mail.hel.frappe.email. Mail clients, MX records and sites all use it. It needs at least two labels under the zone; the part after the first label becomes the default domain.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -141,7 +143,7 @@
    "unique": 1
   },
   {
-   "description": "Zone the cluster owns: node and pool hostnames live under it.",
+   "description": "Sub-zone the cluster owns, derived from the hostname (mail.hel.frappe.email owns hel.frappe.email). Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
    "fieldname": "default_domain",
    "fieldtype": "Data",
    "label": "Default Domain",
@@ -152,7 +154,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "JMAP URL handed to sites.",
+   "description": "JMAP URL handed to sites: https:// plus the hostname.",
    "fieldname": "base_url",
    "fieldtype": "Data",
    "label": "Base URL",
@@ -163,7 +165,8 @@
    "fieldtype": "Link",
    "label": "Bootstrap Node",
    "options": "Stalwart Node",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The node that ran the first-time setup of the cluster. Set automatically."
   },
   {
    "fieldname": "stores_tab",
@@ -175,13 +178,15 @@
    "fieldtype": "Link",
    "label": "Data Store",
    "options": "Stalwart Store",
-   "reqd": 1
+   "reqd": 1,
+   "description": "Where settings, the directory and message metadata live. PostgreSQL or MySQL for a real cluster; RocksDB only for a single test node."
   },
   {
    "fieldname": "blob_store",
    "fieldtype": "Link",
    "label": "Blob Store",
-   "options": "Stalwart Store"
+   "options": "Stalwart Store",
+   "description": "Where message bodies and attachments live. Leave blank to keep them in the data store; S3 is the usual choice for a cluster."
   },
   {
    "fieldname": "column_break_stores",
@@ -191,20 +196,38 @@
    "fieldname": "search_store",
    "fieldtype": "Link",
    "label": "Search Store",
-   "options": "Stalwart Store"
+   "options": "Stalwart Store",
+   "description": "Where the full-text index lives. Leave blank to keep it in the data store."
   },
   {
    "fieldname": "in_memory_store",
    "fieldtype": "Link",
    "label": "In-Memory Store",
-   "options": "Stalwart Store"
+   "options": "Stalwart Store",
+   "description": "Caches, rate limits and cluster coordination. Leave blank to keep them in the data store; Redis is required for more than one node."
   },
   {
-   "description": "Derived: Redis in-memory stores double as the cluster coordinator.",
+   "fieldname": "derived_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Derived. Default when a Redis in-memory store is set on a multi-node cluster, so nodes can coordinate through it; Disabled otherwise.",
    "fieldname": "coordinator",
    "fieldtype": "Select",
    "label": "Coordinator",
    "options": "Disabled\nDefault",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_derived",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Derived. Set when a store is embedded (RocksDB or local files). Its data lives on one VPS and cannot be shared, so the cluster can only ever have one node.",
+   "fieldname": "single_node",
+   "fieldtype": "Check",
+   "label": "Single Node Only",
    "read_only": 1
   },
   {
@@ -216,7 +239,8 @@
    "fieldname": "acme_directory_url",
    "fieldtype": "Data",
    "label": "ACME Directory URL",
-   "length": 255
+   "length": 255,
+   "description": "Certificate authority the cluster requests its certificates from. Defaults to Suite Cloud Settings. Use the Let's Encrypt staging directory while testing."
   },
   {
    "fieldname": "column_break_tls",
@@ -226,7 +250,8 @@
    "fieldname": "acme_contact_email",
    "fieldtype": "Data",
    "label": "ACME Contact Email",
-   "options": "Email"
+   "options": "Email",
+   "description": "Address the certificate authority writes to about expiring certificates. Defaults to Suite Cloud Settings."
   },
   {
    "fieldname": "access_tab",
@@ -243,20 +268,22 @@
    "fieldname": "admin_username",
    "fieldtype": "Data",
    "label": "Admin Username",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Stalwart's built-in administrator account, created during bootstrap."
   },
   {
    "fieldname": "admin_password",
    "fieldtype": "Password",
    "hidden": 1,
-   "label": "Admin Password"
+   "label": "Admin Password",
+   "description": "Generated on save. Only used to mint the API key and for app-password creation; Show Admin Password reveals it to the Administrator."
   },
   {
    "fieldname": "column_break_admin",
    "fieldtype": "Column Break"
   },
   {
-   "description": "Bearer token Suite Cloud uses for management calls; minted when bootstrap finishes.",
+   "description": "Bearer token Suite Cloud uses for every management call. Minted when bootstrap finishes; Rotate API Key replaces it.",
    "fieldname": "api_key",
    "fieldtype": "Password",
    "hidden": 1,
@@ -272,21 +299,23 @@
    "fieldname": "ssh_user",
    "fieldtype": "Data",
    "label": "SSH User",
-   "reqd": 1
+   "reqd": 1,
+   "description": "User Ansible logs in as on the nodes. Needs root or passwordless sudo."
   },
   {
    "default": "22",
    "fieldname": "ssh_port",
    "fieldtype": "Int",
    "label": "SSH Port",
-   "reqd": 1
+   "reqd": 1,
+   "description": "SSH port on the nodes. Individual nodes can override user and port."
   },
   {
    "fieldname": "column_break_ssh",
    "fieldtype": "Column Break"
   },
   {
-   "description": "Add this key to every node and gateway VPS of the cluster.",
+   "description": "Generated on save. Add it to the authorized keys of the SSH user on every node and gateway VPS before provisioning.",
    "fieldname": "ssh_public_key",
    "fieldtype": "Code",
    "label": "SSH Public Key",
@@ -296,63 +325,8 @@
    "fieldname": "ssh_private_key",
    "fieldtype": "Password",
    "hidden": 1,
-   "label": "SSH Private Key"
-  },
-  {
-   "fieldname": "enterprise_tab",
-   "fieldtype": "Tab Break",
-   "label": "Enterprise"
-  },
-  {
-   "description": "Optional. Set both keys to activate a Stalwart Enterprise license on the cluster.",
-   "fieldname": "enterprise_license_key",
-   "fieldtype": "Password",
-   "label": "License Key"
-  },
-  {
-   "fieldname": "column_break_enterprise",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "enterprise_api_key",
-   "fieldtype": "Password",
-   "label": "License API Key"
-  },
-  {
-   "fieldname": "config_tab",
-   "fieldtype": "Tab Break",
-   "label": "Configuration"
-  },
-  {
-   "default": "0",
-   "fieldname": "config_version",
-   "fieldtype": "Int",
-   "label": "Config Version",
-   "read_only": 1
-  },
-  {
-   "fieldname": "last_config_sync_at",
-   "fieldtype": "Datetime",
-   "label": "Last Config Sync At",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_config",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "drift_report",
-   "fieldtype": "JSON",
-   "label": "Drift Report",
-   "read_only": 1
-  },
-  {
-   "description": "Last generated plan, secrets redacted.",
-   "fieldname": "config_plan",
-   "fieldtype": "Code",
-   "label": "Config Plan",
-   "options": "JSON",
-   "read_only": 1
+   "label": "SSH Private Key",
+   "description": "Generated on save; written to a temporary file only while a job runs."
   },
   {
    "fieldname": "egress_tab",
@@ -360,7 +334,7 @@
    "label": "Egress"
   },
   {
-   "description": "Outbound mail of domains without a pool of their own leaves through this pool; empty means direct delivery from the nodes.",
+   "description": "Outbound mail of domains without a pool of their own leaves through this pool. Leave blank for direct delivery from the nodes.",
    "fieldname": "default_egress_pool",
    "fieldtype": "Link",
    "label": "Default Egress Pool",
@@ -382,7 +356,47 @@
    "fieldname": "relay_password",
    "fieldtype": "Password",
    "hidden": 1,
-   "label": "Relay Password"
+   "label": "Relay Password",
+   "description": "Generated on save; pushed to the gateways with their configuration."
+  },
+  {
+   "fieldname": "config_tab",
+   "fieldtype": "Tab Break",
+   "label": "Configuration"
+  },
+  {
+   "default": "0",
+   "fieldname": "config_version",
+   "fieldtype": "Int",
+   "label": "Config Version",
+   "read_only": 1,
+   "description": "Increases every time the generated configuration is pushed to the cluster."
+  },
+  {
+   "fieldname": "last_config_sync_at",
+   "fieldtype": "Datetime",
+   "label": "Last Config Sync At",
+   "read_only": 1,
+   "description": "When the configuration was last pushed."
+  },
+  {
+   "fieldname": "column_break_config",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "drift_report",
+   "fieldtype": "JSON",
+   "label": "Drift Report",
+   "read_only": 1,
+   "description": "Result of the last Check Drift: settings on the cluster that differ from the generated plan. Cleared by Sync Config."
+  },
+  {
+   "description": "Last generated plan, secrets redacted.",
+   "fieldname": "config_plan",
+   "fieldtype": "Code",
+   "label": "Config Plan",
+   "options": "JSON",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -418,7 +432,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-04 12:00:00.000000",
+ "modified": "2026-09-04 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Stalwart Cluster",

@@ -130,18 +130,6 @@ def cluster_plan(cluster: Document) -> list[dict]:
         }
     )
 
-    if cluster.enterprise_license_key and cluster.enterprise_api_key:
-        plan.append(
-            {
-                "@type": "update",
-                "object": "Enterprise",
-                "value": {
-                    "licenseKey": secret_value(cluster.get_password("enterprise_license_key")),
-                    "apiKey": secret_value(cluster.get_password("enterprise_api_key")),
-                },
-            }
-        )
-
     plan.extend(egress_operations(cluster))
     return plan
 

@@ -61,11 +61,23 @@ class TestStalwartCluster(IntegrationTestCase):
         )
         self.assertRaisesRegex(frappe.ValidationError, "Data store", cluster.insert)
 
-    def test_second_node_needs_shared_stores(self) -> None:
+    def test_embedded_stores_pin_the_cluster_to_one_full_node(self) -> None:
         cluster = make_cluster(name="solo", hostname=f"mail.solo.{ROOT_DOMAIN}", multi_node=False)
+        self.assertEqual(cluster.single_node, 1)
+        self.assertEqual(cluster.coordinator, "Disabled")
+        self.assertRaisesRegex(
+            frappe.ValidationError, "full role", make_node, cluster, "n1", "203.0.113.1", role="frontend"
+        )
         make_node(cluster, "n1", "203.0.113.1")
 
-        self.assertRaisesRegex(frappe.ValidationError, "embedded", make_node, cluster, "n2", "203.0.113.2")
+        self.assertRaisesRegex(frappe.ValidationError, "one node", make_node, cluster, "n2", "203.0.113.2")
+
+        # Redis on a single node is allowed but coordinates nothing.
+        redis = make_store("In-Memory", "Redis", title="solo redis", url="redis://redis.example.test:6379")
+        cluster.reload()  # the node insert re-saved it
+        cluster.in_memory_store = redis.name
+        cluster.save()
+        self.assertEqual(cluster.coordinator, "Disabled")
 
     def test_node_hostname_must_sit_under_the_zone(self) -> None:
         cluster = make_cluster()
@@ -285,7 +297,6 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(
             operations["Role"]["value"]["disabled"]["enabledPermissions"], {"emailReceive": True}
         )
-        self.assertNotIn("Enterprise", operations)
 
         redacted = plan.redacted(plan.bootstrap_plan(cluster))
         self.assertNotIn("pg-secret", redacted)

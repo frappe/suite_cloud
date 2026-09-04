@@ -42,6 +42,13 @@ frappe.ui.form.on('Stalwart Cluster', {
 
 	add_indicators(frm) {
 		if (frm.doc.__islocal) return
+		if (frm.doc.single_node) {
+			frm.dashboard.add_comment(
+				__('A store is embedded (RocksDB or local files), so this cluster can only ever have one node. Use PostgreSQL or MySQL, S3 and Redis stores for a cluster that can grow.'),
+				'orange',
+				true,
+			)
+		}
 		if (frm.doc.status === 'Pending') {
 			frm.dashboard.add_comment(
 				__('Add the cluster SSH public key to the first node VPS, create a Stalwart Node and provision it.'),

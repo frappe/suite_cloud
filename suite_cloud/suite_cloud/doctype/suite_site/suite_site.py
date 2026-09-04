@@ -32,7 +32,6 @@ class SuiteSite(Document):
         max_domains: DF.Int
         site_name: DF.Data
         status: DF.Literal["Active", "Suspended", "Archived"]
-        tenant_id: DF.Data | None
         user: DF.Link | None
     # end: auto-generated types
 
