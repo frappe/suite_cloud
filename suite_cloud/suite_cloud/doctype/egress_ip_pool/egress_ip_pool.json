@@ -9,7 +9,6 @@
   "pool_name",
   "description",
   "column_break_main",
-  "is_default",
   "relay_port",
   "hostname",
   "addresses_section",
@@ -46,13 +45,6 @@
   {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "description": "Domains without a pool of their own, on sites without one, leave the cluster through this pool. Only one pool per cluster can be default. Without a default, such domains deliver directly from the nodes.",
-   "fieldname": "is_default",
-   "fieldtype": "Check",
-   "label": "Is Cluster Default"
   },
   {
    "description": "Port the cluster relays to on every gateway hosting this pool. Assigned on save, starting at 2525, one per pool.",

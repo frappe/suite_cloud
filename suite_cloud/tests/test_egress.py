@@ -97,7 +97,7 @@ class TestEgress(IntegrationTestCase):
 
     def test_pool_assigns_ports_hostnames_and_records(self) -> None:
         pool = self.make_pool("ded", ("203.0.113.51", "203.0.113.52"))
-        second = self.make_pool("shared", ("203.0.113.53",), is_default=1)
+        second = self.make_pool("shared", ("203.0.113.53",))
 
         self.assertEqual((pool.relay_port, second.relay_port), (2525, 2526))
         self.assertEqual(pool.hostname, f"ded.out.{self.cluster.default_domain}")

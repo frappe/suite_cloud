@@ -31,7 +31,6 @@ class EgressIPPool(Document):
         cluster: DF.Link
         description: DF.Data | None
         hostname: DF.Data | None
-        is_default: DF.Check
         pool_name: DF.Data
         relay_port: DF.Int
     # end: auto-generated types
@@ -49,10 +48,6 @@ class EgressIPPool(Document):
         if not self.relay_port:
             self.relay_port = self.next_relay_port()
         self.validate_addresses(cluster)
-        if self.is_default:
-            frappe.db.set_value(
-                "Egress IP Pool", {"cluster": self.cluster, "name": ["!=", self.name]}, "is_default", 0
-            )
 
     def validate_addresses(self, cluster: Document) -> None:
         seen: set[str] = set()
@@ -94,7 +89,7 @@ class EgressIPPool(Document):
     @staticmethod
     def snapshot(doc: Document) -> tuple:
         addresses = sorted((r.gateway, r.ip_address, r.ehlo_hostname) for r in doc.addresses)
-        return (doc.relay_port, doc.hostname, bool(doc.is_default), tuple(addresses))
+        return (doc.relay_port, doc.hostname, tuple(addresses))
 
     def on_trash(self) -> None:
         for doctype, field in (
