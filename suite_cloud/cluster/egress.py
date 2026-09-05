@@ -1,9 +1,10 @@
 """Egress gateways: outbound-only Stalwart instances that deliver from an IP pool.
 
-The cluster keeps signing and queueing mail; for domains assigned to a pool it hands
-messages to the pool's gateways over authenticated SMTP (an MtaRoute of type Relay), and the
-gateway binds the outbound connection to one of the pool's addresses. Stalwart has no
-forward-proxy support, so a relay hop is the only way to change the source address.
+The cluster keeps signing and queueing mail; everything it sends leaves through the cluster's
+default pool, and domains assigned to another pool through that one. Each hop hands messages to
+the pool's gateways over authenticated SMTP (an MtaRoute of type Relay), and the gateway binds
+the outbound connection to one of the pool's addresses. Stalwart has no forward-proxy support,
+so a relay hop is the only way to change the source address.
 """
 
 from typing import TYPE_CHECKING
@@ -32,20 +33,27 @@ def pool_for_domain(domain: Document, site_pool: str | None, cluster_pool: str |
     return domain.egress_pool or site_pool or cluster_pool
 
 
+def populated_pools(cluster: Document) -> set[str]:
+    """Pools of the cluster that hold at least one address; only those can relay."""
+
+    return {
+        name
+        for name in frappe.get_all("Egress IP Pool", {"cluster": cluster.name}, pluck="name")
+        if frappe.db.exists("Egress IP Pool Address", {"parent": name, "parenttype": "Egress IP Pool"})
+    }
+
+
+def default_pool(cluster: Document) -> str | None:
+    """The cluster's default pool when it can relay, else None (mail goes direct)."""
+
+    pool = cluster.default_egress_pool
+    return pool if pool and pool in populated_pools(cluster) else None
+
+
 def domains_by_pool(cluster: Document) -> dict[str, list[str]]:
     """Enabled domains grouped by the pool they leave through (pools without addresses are skipped)."""
 
-    pools = {
-        p.name: p
-        for p in frappe.get_all(
-            "Egress IP Pool", {"cluster": cluster.name}, ["name", "relay_port", "hostname"]
-        )
-    }
-    populated = {
-        name
-        for name in pools
-        if frappe.db.exists("Egress IP Pool Address", {"parent": name, "parenttype": "Egress IP Pool"})
-    }
+    populated = populated_pools(cluster)
     site_pools = dict(
         frappe.get_all("Suite Site", {"cluster": cluster.name}, ["name", "egress_pool"], as_list=True)
     )
@@ -67,20 +75,27 @@ def domains_by_pool(cluster: Document) -> dict[str, list[str]]:
 
 
 def cluster_operations(cluster: Document) -> list[dict]:
-    """Relay routes plus the routing rules that send pooled domains through them."""
+    """Relay routes plus the routing rules that send mail through them.
+
+    The default pool is the ``else`` of the route expression, so it carries every sender the
+    cluster has (bounces and reports included); only domains on another pool need a rule.
+    """
 
     grouped = domains_by_pool(cluster)
-    if not grouped:
+    default = default_pool(cluster)
+    overrides = {pool: domains for pool, domains in grouped.items() if pool != default}
+    pools = set(grouped) | ({default} if default else set())
+    if not pools:
         return [
             {
                 "@type": "update",
                 "object": "MtaOutboundStrategy",
-                "value": {"route": route_expression(cluster, {})},
+                "value": {"route": route_expression(cluster, {}, None)},
             }
         ]
 
     routes = {}
-    for pool_name in grouped:
+    for pool_name in sorted(pools):
         pool = frappe.get_cached_doc("Egress IP Pool", pool_name)
         routes[f"egress-{pool.pool_name}"] = {
             "@type": "Relay",
@@ -100,13 +115,18 @@ def cluster_operations(cluster: Document) -> list[dict]:
         {
             "@type": "update",
             "object": "MtaOutboundStrategy",
-            "value": {"route": route_expression(cluster, grouped)},
+            "value": {"route": route_expression(cluster, overrides, default)},
         },
     ]
 
 
-def route_expression(cluster: Document, grouped: dict[str, list[str]]) -> dict:
-    """Suite Cloud's rules go first; whatever else the strategy holds is preserved."""
+def route_name(pool_name: str) -> str:
+    return f"'egress-{frappe.get_cached_value('Egress IP Pool', pool_name, 'pool_name')}'"
+
+
+def route_expression(cluster: Document, grouped: dict[str, list[str]], default: str | None) -> dict:
+    """Suite Cloud's rules go first and its default pool is the fallback; anything else the
+    strategy holds (rules and a foreign ``else``) is preserved."""
 
     current = current_route_expression(cluster)
     kept = [
@@ -116,10 +136,14 @@ def route_expression(cluster: Document, grouped: dict[str, list[str]]) -> dict:
     ]
     rules = []
     for pool_name, domain_names in grouped.items():
-        pool_short = frappe.get_cached_value("Egress IP Pool", pool_name, "pool_name")
         condition = " || ".join(f"sender_domain == '{d}'" for d in domain_names)
-        rules.append({"if": condition, "then": f"'egress-{pool_short}'"})
-    return {"match": plan.as_list(rules + kept), "else": current.get("else") or "'mx'"}
+        rules.append({"if": condition, "then": route_name(pool_name)})
+    fallback = current.get("else") or "'mx'"
+    if default:
+        fallback = route_name(default)
+    elif fallback.startswith(SUITE_RULE_PREFIX):
+        fallback = "'mx'"  # our former default pool is gone; back to direct delivery
+    return {"match": plan.as_list(rules + kept), "else": fallback}
 
 
 def expression_rules(expression: dict) -> list[dict]:

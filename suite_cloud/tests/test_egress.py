@@ -159,10 +159,62 @@ class TestEgress(IntegrationTestCase):
         grouped = egress.domains_by_pool(frappe.get_doc("Stalwart Cluster", self.cluster.name))
         self.assertEqual(grouped, {pool.name: ["acme.com", "direct.com"]})
 
-        # Re-applying is idempotent: our rules are replaced, not stacked.
+        # Re-applying is idempotent: our rules are replaced, not stacked. The default pool is the
+        # fallback of the expression, so domains on it need no rule of their own.
         egress.resync_cluster(frappe.get_doc("Stalwart Cluster", self.cluster.name))
-        live_rules = egress.expression_rules(self.fake.singletons["MtaOutboundStrategy"]["route"])
-        self.assertEqual(len([r for r in live_rules if r["then"].startswith("'egress-")]), 1)
+        live = self.fake.singletons["MtaOutboundStrategy"]["route"]
+        self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'"])
+        self.assertEqual(live["else"], "'egress-ded'")
+
+    def test_default_pool_is_the_fallback_route(self) -> None:
+        cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
+
+        # A default pool without addresses cannot relay: nothing changes.
+        empty = frappe.get_doc(
+            {"doctype": "Egress IP Pool", "cluster": cluster.name, "pool_name": "empty"}
+        ).insert()
+        cluster.db_set("default_egress_pool", empty.name)
+        operations = egress.cluster_operations(cluster)
+        self.assertEqual([op["object"] for op in operations], ["MtaOutboundStrategy"])
+        self.assertEqual(operations[0]["value"]["route"]["else"], "'mx'")
+
+        # A populated default pool gets its relay route and the else branch before any domain exists.
+        pool = self.make_pool("ded")
+        cluster.db_set("default_egress_pool", pool.name)
+        egress.resync_cluster(cluster)
+        self.assertEqual(self.fake.find("MtaRoute", name="egress-ded")["address"], pool.hostname)
+        live = self.fake.singletons["MtaOutboundStrategy"]["route"]
+        self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'"])
+        self.assertEqual(live["else"], "'egress-ded'")
+
+        # A domain on another pool is the only one that needs a rule; both pools keep a route.
+        other = self.make_pool("bulk", ("203.0.113.52",))
+        frappe.get_doc(
+            {
+                "doctype": "Mail Domain",
+                "domain_name": "news.com",
+                "site": self.site.name,
+                "egress_pool": other.name,
+            }
+        ).insert()
+        frappe.get_doc({"doctype": "Mail Domain", "domain_name": "acme.com", "site": self.site.name}).insert()
+        operations = {op["object"]: op for op in egress.cluster_operations(cluster)}
+        self.assertEqual(sorted(operations["MtaRoute"]["value"]), ["egress-bulk", "egress-ded"])
+        route = operations["MtaOutboundStrategy"]["value"]["route"]
+        self.assertEqual(
+            egress.expression_rules(route)[0], {"if": "sender_domain == 'news.com'", "then": "'egress-bulk'"}
+        )
+        self.assertEqual(route["else"], "'egress-ded'")
+
+        # Clearing the default hands the fallback back to direct delivery; a foreign else is kept.
+        cluster.db_set("default_egress_pool", None)
+        egress.resync_cluster(cluster)
+        live = self.fake.singletons["MtaOutboundStrategy"]["route"]
+        self.assertEqual(live["else"], "'mx'")
+        self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'egress-bulk'", "'local'"])
+        self.fake.singletons["MtaOutboundStrategy"]["route"]["else"] = "'custom'"
+        operations = {op["object"]: op for op in egress.cluster_operations(cluster)}
+        self.assertEqual(operations["MtaOutboundStrategy"]["value"]["route"]["else"], "'custom'")
 
     def test_gateway_plan(self) -> None:
         pool = self.make_pool("ded", ("203.0.113.51",))

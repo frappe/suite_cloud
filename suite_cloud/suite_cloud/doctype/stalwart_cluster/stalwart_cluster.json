@@ -335,7 +335,7 @@
    "label": "Egress"
   },
   {
-   "description": "Outbound mail of domains without a pool of their own leaves through this pool. Leave blank for direct delivery from the nodes.",
+   "description": "Everything the cluster sends leaves through this pool, bounces and reports included, unless a site or domain names another pool. Leave blank for direct delivery from the nodes.",
    "fieldname": "default_egress_pool",
    "fieldtype": "Link",
    "label": "Default Egress Pool",
