@@ -64,6 +64,8 @@ class EgressGateway(Document):
 
         self.base_url = f"https://{self.hostname}"
         self.ipv4_address = validate_ip(self.ipv4_address, 4)
+        if self.has_value_changed("ipv4_address"):
+            self.ssh_verified = 0
         self.ssh_user = self.ssh_user or cluster.ssh_user
         self.ssh_port = self.ssh_port or cluster.ssh_port
         self.stalwart_version = (

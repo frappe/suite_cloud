@@ -97,6 +97,16 @@ class TestEgress(IntegrationTestCase):
             [(r.host, r.value, r.category) for r in record], [("out1.blr", "203.0.113.50", "Egress")]
         )
 
+        # A new address means a new server as far as SSH is concerned.
+        self.gateway.db_set("ssh_verified", 1)
+        self.gateway.reload()
+        self.gateway.ipv4_address = "203.0.113.60"
+        self.gateway.save()
+        self.assertEqual(self.gateway.ssh_verified, 0)
+        self.assertEqual(
+            frappe.db.get_value("DNS Record", {"managed_by": self.gateway.name}, "value"), "203.0.113.60"
+        )
+
     def test_pool_assigns_ports_hostnames_and_records(self) -> None:
         pool = self.make_pool("ded", ("203.0.113.51", "203.0.113.52"))
         second = self.make_pool("shared", ("203.0.113.53",))
