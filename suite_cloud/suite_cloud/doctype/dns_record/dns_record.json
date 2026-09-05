@@ -6,19 +6,19 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "section_break_lxj3",
-  "is_verified",
-  "column_break_ihb5",
-  "last_checked_at",
-  "section_break_gd3y",
+  "record_section",
   "dns_zone",
-  "category",
   "host",
   "type",
+  "category",
+  "column_break_record",
+  "value",
   "priority",
   "ttl",
-  "column_break_hszw",
-  "value",
+  "status_section",
+  "is_verified",
+  "column_break_status",
+  "last_checked_at",
   "managed_by_section",
   "managed_by_doctype",
   "column_break_managed",
@@ -26,39 +26,11 @@
  ],
  "fields": [
   {
-   "fieldname": "section_break_lxj3",
+   "fieldname": "record_section",
    "fieldtype": "Section Break"
   },
   {
-   "default": "0",
-   "depends_on": "eval: !doc.__islocal",
-   "fieldname": "is_verified",
-   "fieldtype": "Check",
-   "in_list_view": 1,
-   "label": "Verified",
-   "no_copy": 1,
-   "read_only": 1,
-   "description": "The record resolves publicly with this exact value. Set by the provider push, by Verify DNS Record and by the daily check."
-  },
-  {
-   "fieldname": "column_break_ihb5",
-   "fieldtype": "Column Break"
-  },
-  {
-   "depends_on": "eval: !doc.__islocal",
-   "fieldname": "last_checked_at",
-   "fieldtype": "Datetime",
-   "label": "Last Checked At",
-   "no_copy": 1,
-   "read_only": 1,
-   "description": "When the record was last pushed to the provider or verified."
-  },
-  {
-   "fieldname": "section_break_gd3y",
-   "fieldtype": "Section Break"
-  },
-  {
-   "description": "Zone the record is published in. The host is relative to it. Defaults to the default zone for records created by hand.",
+   "description": "Zone the record is published in; the host is relative to it. Defaults to the default zone for records created by hand.",
    "fieldname": "dns_zone",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -67,17 +39,6 @@
    "options": "DNS Zone",
    "reqd": 1,
    "set_only_once": 1
-  },
-  {
-   "default": "Other",
-   "fieldname": "category",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Category",
-   "options": "Node\nIngress\nEgress\nSPF\nOther",
-   "reqd": 1,
-   "description": "What the record is for. Node: a server's own address. Ingress: the cluster hostname's round-robin entry. Egress: gateway and pool addresses. SPF: the include target customer domains reference. Other: created by hand."
   },
   {
    "description": "Name relative to the zone, e.g. n1.blr for n1.blr.frappemail.com. Use @ for the zone itself.",
@@ -91,6 +52,7 @@
    "set_only_once": 1
   },
   {
+   "description": "A and AAAA carry IP addresses, MX a mail server name with a priority, TXT free text such as SPF, CNAME an alias.",
    "fieldname": "type",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -98,33 +60,25 @@
    "label": "Type",
    "options": "\nA\nAAAA\nCNAME\nMX\nTXT",
    "reqd": 1,
-   "set_only_once": 1,
-   "description": "Record type. A and AAAA carry IP addresses, MX a mail server name with a priority, TXT free text such as SPF, CNAME an alias."
+   "set_only_once": 1
   },
   {
-   "depends_on": "eval: doc.type == \"MX\"",
-   "fieldname": "priority",
-   "fieldtype": "Int",
+   "default": "Other",
+   "description": "What the record is for. Node: a server's own hostname. Ingress: the cluster hostname's round-robin entry. Egress: gateway, pool and EHLO hostnames. SPF: the include target customer domains reference. Other: created by hand.",
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Priority",
-   "mandatory_depends_on": "eval: doc.type == \"MX\"",
-   "no_copy": 1,
-   "non_negative": 1,
-   "description": "MX only: lower numbers are tried first."
+   "label": "Category",
+   "options": "Node\nIngress\nEgress\nSPF\nOther",
+   "reqd": 1
   },
   {
-   "fieldname": "ttl",
-   "fieldtype": "Int",
-   "in_standard_filter": 1,
-   "label": "TTL",
-   "non_negative": 1,
-   "description": "Seconds resolvers may cache the record. Blank uses the zone's TTL, then the default from Suite Cloud Settings."
-  },
-  {
-   "fieldname": "column_break_hszw",
+   "fieldname": "column_break_record",
    "fieldtype": "Column Break"
   },
   {
+   "description": "The record's content: an IP address, a hostname for MX and CNAME, or the text for TXT. Several records may share host and type with different values (round-robin). Pushed to the zone's provider on save.",
    "fieldname": "value",
    "fieldtype": "Text",
    "ignore_xss_filter": 1,
@@ -132,8 +86,54 @@
    "in_standard_filter": 1,
    "label": "Value",
    "reqd": 1,
-   "set_only_once": 1,
-   "description": "The record's content: an IP address, a hostname for MX and CNAME, or the text for TXT. Several records may share host and type with different values (round-robin)."
+   "set_only_once": 1
+  },
+  {
+   "depends_on": "eval: doc.type == \"MX\"",
+   "description": "MX only: lower numbers are tried first.",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "in_standard_filter": 1,
+   "label": "Priority",
+   "mandatory_depends_on": "eval: doc.type == \"MX\"",
+   "no_copy": 1,
+   "non_negative": 1
+  },
+  {
+   "description": "Seconds resolvers may cache the record. Blank uses the zone's default TTL, then the one in Suite Cloud Settings. Changing it updates the provider.",
+   "fieldname": "ttl",
+   "fieldtype": "Int",
+   "in_standard_filter": 1,
+   "label": "TTL",
+   "non_negative": 1
+  },
+  {
+   "depends_on": "eval: !doc.__islocal",
+   "fieldname": "status_section",
+   "fieldtype": "Section Break",
+   "label": "Status"
+  },
+  {
+   "default": "0",
+   "description": "The record resolves at public resolvers with this exact value. Set when the zone's provider confirms it, by Verify DNS Record and by the daily check. If the zone has no provider, add the record by hand and verify.",
+   "fieldname": "is_verified",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Verified",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_status",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "When the record was last pushed to the provider or verified.",
+   "fieldname": "last_checked_at",
+   "fieldtype": "Datetime",
+   "label": "Last Checked At",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "collapsible": 1,
@@ -157,6 +157,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "The document that owns this record. Deleting the record here only lasts until that document is saved again.",
    "fieldname": "managed_by",
    "fieldtype": "Dynamic Link",
    "in_list_view": 1,
@@ -164,13 +165,12 @@
    "label": "Managed By",
    "options": "managed_by_doctype",
    "read_only": 1,
-   "set_only_once": 1,
-   "description": "The document that owns this record."
+   "set_only_once": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-04 18:00:00.000000",
+ "modified": "2026-09-05 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "DNS Record",
