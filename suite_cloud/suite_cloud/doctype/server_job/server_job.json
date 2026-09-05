@@ -13,7 +13,6 @@
   "status",
   "retries",
   "max_retries",
-  "callback",
   "timing_section",
   "started_at",
   "ended_at",
@@ -31,54 +30,269 @@
   "tasks",
   "variables_section",
   "variables_builder",
+  "callback",
   "context",
+  "column_break_execution",
   "variables",
   "error_section",
   "error_log"
  ],
  "fields": [
-  {"fieldname": "title", "fieldtype": "Data", "in_list_view": 1, "label": "Title", "read_only": 1, "reqd": 1, "set_only_once": 1},
-  {"fieldname": "server_doctype", "fieldtype": "Select", "in_standard_filter": 1, "label": "Server Type", "options": "Stalwart Node\nEgress Gateway", "read_only": 1, "reqd": 1, "set_only_once": 1},
-  {"fieldname": "server", "fieldtype": "Dynamic Link", "in_list_view": 1, "in_standard_filter": 1, "label": "Server", "options": "server_doctype", "read_only": 1, "reqd": 1, "set_only_once": 1},
-  {"fieldname": "playbook", "fieldtype": "Data", "in_list_view": 1, "label": "Playbook", "read_only": 1, "reqd": 1, "set_only_once": 1},
-  {"fieldname": "column_break_main", "fieldtype": "Column Break"},
-  {"default": "Pending", "fieldname": "status", "fieldtype": "Select", "in_list_view": 1, "in_standard_filter": 1, "label": "Status", "options": "Pending\nRunning\nSuccess\nFailed", "read_only": 1},
-  {"default": "0", "fieldname": "retries", "fieldtype": "Int", "label": "Retries", "read_only": 1},
-  {"default": "1", "fieldname": "max_retries", "fieldtype": "Int", "label": "Max Retries", "set_only_once": 1},
-  {"description": "Method run on the server document when the job succeeds (<callback>_failed on failure).", "fieldname": "callback", "fieldtype": "Data", "label": "Callback", "read_only": 1, "set_only_once": 1},
-  {"fieldname": "timing_section", "fieldtype": "Section Break", "label": "Timing"},
-  {"fieldname": "started_at", "fieldtype": "Datetime", "label": "Started At", "read_only": 1},
-  {"fieldname": "ended_at", "fieldtype": "Datetime", "label": "Ended At", "read_only": 1},
-  {"fieldname": "column_break_timing", "fieldtype": "Column Break"},
-  {"fieldname": "duration", "fieldtype": "Float", "label": "Duration (s)", "read_only": 1},
-  {"collapsible": 1, "fieldname": "stats_section", "fieldtype": "Section Break", "label": "Ansible Stats"},
-  {"fieldname": "ok", "fieldtype": "Int", "label": "OK", "read_only": 1},
-  {"fieldname": "changed", "fieldtype": "Int", "label": "Changed", "read_only": 1},
-  {"fieldname": "column_break_stats", "fieldtype": "Column Break"},
-  {"fieldname": "failures", "fieldtype": "Int", "label": "Failures", "read_only": 1},
-  {"fieldname": "unreachable", "fieldtype": "Int", "label": "Unreachable", "read_only": 1},
-  {"fieldname": "column_break_stats2", "fieldtype": "Column Break"},
-  {"fieldname": "skipped", "fieldtype": "Int", "label": "Skipped", "read_only": 1},
-  {"fieldname": "tasks_section", "fieldtype": "Section Break", "label": "Tasks"},
-  {"fieldname": "tasks", "fieldtype": "Table", "label": "Tasks", "options": "Server Job Task", "read_only": 1},
-  {"collapsible": 1, "fieldname": "variables_section", "fieldtype": "Section Break", "label": "Variables"},
-  {"description": "Dotted path of the function that builds the playbook variables from the context at run time, so no secret is ever stored.", "fieldname": "variables_builder", "fieldtype": "Data", "label": "Variables Builder", "read_only": 1, "set_only_once": 1},
-  {"fieldname": "context", "fieldtype": "JSON", "label": "Context", "read_only": 1, "set_only_once": 1},
-  {"description": "Snapshot of the variables passed to the playbook, secrets redacted.", "fieldname": "variables", "fieldtype": "JSON", "label": "Variables", "read_only": 1},
-  {"collapsible": 1, "depends_on": "eval: doc.error_log", "fieldname": "error_section", "fieldtype": "Section Break", "label": "Error"},
-  {"fieldname": "error_log", "fieldtype": "Code", "label": "Error Log", "read_only": 1}
+  {
+   "description": "What the job does, e.g. Provision n1.blr.frappemail.com. Set by the action that created it.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "read_only": 1,
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Kind of server the playbook runs against: a Stalwart Node of a cluster or an Egress Gateway.",
+   "fieldname": "server_doctype",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Server Type",
+   "options": "Stalwart Node\nEgress Gateway",
+   "read_only": 1,
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "The node or gateway the playbook runs against, over SSH with the cluster's key.",
+   "fieldname": "server",
+   "fieldtype": "Dynamic Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Server",
+   "options": "server_doctype",
+   "read_only": 1,
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Ansible playbook in the app's provisioning folder, e.g. bootstrap-cluster.yml or upgrade-stalwart.yml. Its task names fill the Tasks table when the job is created.",
+   "fieldname": "playbook",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Playbook",
+   "read_only": 1,
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "description": "Pending: waiting for a worker. Running: the playbook is executing and the Tasks table fills in live. Success: every task passed and the callback ran. Failed: a task failed, the server was unreachable or the callback raised; see Error.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nRunning\nSuccess\nFailed",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Failed attempts so far. Increases each time the job ends in Failed.",
+   "fieldname": "retries",
+   "fieldtype": "Int",
+   "label": "Retries",
+   "read_only": 1
+  },
+  {
+   "default": "1",
+   "description": "Automatic retries the scheduler may make after a failure, every 5 minutes, unless a newer job exists for the same server. Retry from the form works regardless.",
+   "fieldname": "max_retries",
+   "fieldtype": "Int",
+   "label": "Max Retries",
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "timing_section",
+   "fieldtype": "Section Break",
+   "label": "Timing"
+  },
+  {
+   "description": "When a worker picked the job up. Reset on every retry.",
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At",
+   "read_only": 1
+  },
+  {
+   "description": "When the playbook finished or the job failed.",
+   "fieldname": "ended_at",
+   "fieldtype": "Datetime",
+   "label": "Ended At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_timing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Seconds between Started At and Ended At.",
+   "fieldname": "duration",
+   "fieldtype": "Float",
+   "label": "Duration (s)",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "stats_section",
+   "fieldtype": "Section Break",
+   "label": "Ansible Stats"
+  },
+  {
+   "description": "Tasks that ran without error, including those that changed nothing.",
+   "fieldname": "ok",
+   "fieldtype": "Int",
+   "label": "OK",
+   "read_only": 1
+  },
+  {
+   "description": "Tasks that changed something on the server.",
+   "fieldname": "changed",
+   "fieldtype": "Int",
+   "label": "Changed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_stats",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Tasks that failed. One is enough to fail the job.",
+   "fieldname": "failures",
+   "fieldtype": "Int",
+   "label": "Failures",
+   "read_only": 1
+  },
+  {
+   "description": "Tasks that could not reach the server over SSH. One is enough to fail the job.",
+   "fieldname": "unreachable",
+   "fieldtype": "Int",
+   "label": "Unreachable",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_stats2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Tasks skipped by their condition, or failed with errors ignored.",
+   "fieldname": "skipped",
+   "fieldtype": "Int",
+   "label": "Skipped",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tasks_section",
+   "fieldtype": "Section Break",
+   "label": "Tasks"
+  },
+  {
+   "description": "One row per task of the playbook, in run order, with its status, timing and output. Updated live while the job runs and reset on Retry.",
+   "fieldname": "tasks",
+   "fieldtype": "Table",
+   "label": "Tasks",
+   "options": "Server Job Task",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "variables_section",
+   "fieldtype": "Section Break",
+   "label": "Execution"
+  },
+  {
+   "description": "Dotted path of the function that builds the playbook variables from the context when the job runs, e.g. suite_cloud.cluster.bootstrap.build_node_variables. Secrets are fetched then, never stored.",
+   "fieldname": "variables_builder",
+   "fieldtype": "Data",
+   "label": "Variables Builder",
+   "read_only": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Method of the server document run when the job ends: this name on success, the same name with _failed on failure, e.g. after_provision and after_provision_failed. If it raises, the job is marked Failed.",
+   "fieldname": "callback",
+   "fieldtype": "Data",
+   "label": "Callback",
+   "read_only": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Inputs the builder needs, as JSON: document names and ids only, never secrets.",
+   "fieldname": "context",
+   "fieldtype": "JSON",
+   "label": "Context",
+   "read_only": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "column_break_execution",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "What the playbook received, secrets shown as ***. Written when the job starts, so a retry refreshes it.",
+   "fieldname": "variables",
+   "fieldtype": "JSON",
+   "label": "Variables",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval: doc.error_log",
+   "fieldname": "error_section",
+   "fieldtype": "Section Break",
+   "label": "Error"
+  },
+  {
+   "description": "Why the job failed: the Ansible summary with the tail of its output, or the traceback of the callback. Secrets masked; cleared when the job starts again.",
+   "fieldname": "error_log",
+   "fieldtype": "Code",
+   "label": "Error Log",
+   "read_only": 1
+  }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-03 12:00:00.000000",
+ "modified": "2026-09-05 18:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Server Job",
  "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
-  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "System Manager", "share": 1, "write": 1},
-  {"create": 1, "delete": 1, "email": 1, "export": 1, "print": 1, "read": 1, "report": 1, "role": "Suite Cloud Manager", "share": 1, "write": 1}
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Suite Cloud Manager",
+   "share": 1,
+   "write": 1
+  }
  ],
  "row_format": "Dynamic",
  "sort_field": "creation",
