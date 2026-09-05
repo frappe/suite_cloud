@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "format:{cluster}-{pool_name}",
- "creation": "2026-09-03 12:00:00.000000",
+ "creation": "2026-09-03 12:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -16,6 +16,7 @@
  ],
  "fields": [
   {
+   "description": "Cluster whose mail this pool sends. Only gateways of the same cluster can host its addresses.",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -23,24 +24,24 @@
    "label": "Cluster",
    "options": "Stalwart Cluster",
    "reqd": 1,
-   "set_only_once": 1,
-   "description": "Cluster whose mail this pool sends. Only gateways of the same cluster can host its addresses."
+   "set_only_once": 1
   },
   {
    "description": "Short id, up to 8 lowercase letters or digits, e.g. ded or shared. It names the relay listener and connection strategy on the gateways and cannot change after saving.",
    "fieldname": "pool_name",
    "fieldtype": "Data",
    "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Pool Name",
    "reqd": 1,
    "set_only_once": 1
   },
   {
+   "description": "Free text, e.g. which customer the pool is dedicated to.",
    "fieldname": "description",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Description",
-   "description": "Free text, e.g. which customer the pool is dedicated to."
+   "label": "Description"
   },
   {
    "fieldname": "column_break_main",
@@ -50,13 +51,16 @@
    "description": "Port the cluster relays to on every gateway hosting this pool. Assigned on save, starting at 2525, one per pool.",
    "fieldname": "relay_port",
    "fieldtype": "Int",
+   "in_standard_filter": 1,
    "label": "Relay Port",
    "read_only": 1
   },
   {
-   "description": "<pool>.out.<cluster zone>, e.g. ded.out.blr.frappemail.com. Resolves to every gateway hosting an address of the pool; the cluster relays to it.",
+   "description": "Pool name, then .out., then the cluster zone, e.g. ded.out.blr.frappemail.com. Resolves to every gateway hosting an address of the pool; the cluster relays to it.",
    "fieldname": "hostname",
    "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
    "label": "Hostname",
    "read_only": 1
   },
@@ -66,11 +70,11 @@
    "label": "Addresses"
   },
   {
+   "description": "The IP addresses mail leaves from, each on a gateway of this cluster. An address can belong to one pool only. Adding or removing rows updates DNS, the SPF include and both servers' configuration on save.",
    "fieldname": "addresses",
    "fieldtype": "Table",
    "label": "Addresses",
-   "options": "Egress IP Pool Address",
-   "description": "The IP addresses mail leaves from, each on a gateway of this cluster. An address can belong to one pool only. Adding or removing rows updates DNS, the SPF include and both servers' configuration on save."
+   "options": "Egress IP Pool Address"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -91,7 +95,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-04 20:00:00.000000",
+ "modified": "2026-09-05 18:42:40.241109",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Egress IP Pool",
