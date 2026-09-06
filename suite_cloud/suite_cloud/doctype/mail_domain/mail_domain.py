@@ -11,8 +11,8 @@ from suite_cloud.cluster import egress
 from suite_cloud.cluster.zone import build_domain_records
 from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.stalwart.directory import Domain
-from suite_cloud.tenancy import sync
-from suite_cloud.tenancy.addresses import validate_domain_name
+from suite_cloud.tenancy import ownership, sync
+from suite_cloud.tenancy.addresses import assert_domain_available, validate_domain_name
 from suite_cloud.utils import get_config
 
 PUSHED_FIELDS = ("description", "catch_all_address", "sub_addressing", "enabled")
@@ -60,13 +60,10 @@ class MailDomain(Document):
         site = self.get_site()
         self.cluster = site.cluster
         if self.is_new():
-            if frappe.db.exists("Mail Domain", self.domain_name):
-                # Neutral on purpose: another site holding the name is not this site's business.
-                frappe.throw(
-                    _("Domain {0} is not available.").format(self.domain_name), frappe.DuplicateEntryError
-                )
+            assert_domain_available(self.domain_name, self.site)
             site.assert_can_add_domain()
-            self.validate_not_reserved()
+            if not self.flags.skip_ownership_check:
+                ownership.assert_ownership(site, self.domain_name)
         if self.catch_all_address:
             self.catch_all_address = self.catch_all_address.strip().lower()
         if (
@@ -74,11 +71,6 @@ class MailDomain(Document):
             and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
-
-    def validate_not_reserved(self) -> None:
-        for zone in frappe.get_all("DNS Zone", pluck="name"):
-            if self.domain_name == zone or self.domain_name.endswith(f".{zone}"):
-                frappe.throw(_("{0} is reserved for the mail infrastructure.").format(self.domain_name))
 
     def after_insert(self) -> None:
         sync.push_create(self, "domains", self.stalwart_payload())

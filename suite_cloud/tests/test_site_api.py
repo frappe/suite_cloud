@@ -15,6 +15,7 @@ from suite_cloud.api.site import (
 )
 from suite_cloud.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.stalwart import forget_sessions
+from suite_cloud.tenancy.ownership import VALUE_PREFIX, DomainNotVerifiedError, OwnershipLookupError
 from suite_cloud.tests.fake_stalwart import FakeStalwart
 from suite_cloud.tests.fixtures import (
     activate_cluster,
@@ -22,6 +23,7 @@ from suite_cloud.tests.fixtures import (
     configure_settings,
     make_cluster,
     make_site,
+    verified_ownership,
 )
 
 
@@ -43,6 +45,9 @@ class SiteApiTestCase(IntegrationTestCase):
         self.addCleanup(self._install.__exit__, None, None, None)
         forget_sessions(self.cluster)
         clear_request_cache()
+        self._ownership = verified_ownership()
+        self._ownership.start()
+        self.addCleanup(self._ownership.stop)
         self.site = make_site(self.cluster)
         self.other = make_site(self.cluster, "other.frappe.test")
         self.act_as(self.site)
@@ -90,6 +95,40 @@ class TestSiteResolution(SiteApiTestCase):
         frappe.local.request = frappe._dict(headers={})
         frappe.local.form_dict = frappe._dict(site=self.other.name)
         self.assertEqual(current_site().name, self.other.name)
+
+
+class TestDomainOwnership(SiteApiTestCase):
+    def test_check_domain_hands_out_the_site_record(self) -> None:
+        result = domains.check_domain("Acme.com")
+        record = result["ownership_record"]
+        self.assertEqual(result["domain"], "acme.com")
+        self.assertEqual((record["type"], record["host"], record["fqdn"]), ("TXT", "@", "acme.com"))
+        self.assertEqual(record["value"], f"{VALUE_PREFIX}{self.site.domain_verification_token}")
+        # The same record for every domain of the site, a different one per site.
+        self.assertEqual(domains.check_domain("other.com")["ownership_record"]["value"], record["value"])
+        self.act_as(self.other)
+        self.assertNotEqual(domains.check_domain("acme.com")["ownership_record"]["value"], record["value"])
+
+    def test_domain_is_added_only_once_its_record_resolves(self) -> None:
+        target = "suite_cloud.tenancy.ownership.verify_dns_record"
+        with patch(target, return_value=False):
+            self.assertRaisesRegex(
+                DomainNotVerifiedError, self.site.domain_verification_token, domains.create_domain, "acme.com"
+            )
+        with patch(target, return_value=None):
+            self.assertRaises(OwnershipLookupError, domains.create_domain, "acme.com")
+        self.assertFalse(frappe.db.exists("Mail Domain", "acme.com"))
+        self.assertEqual(self.fake.all("Domain"), [])
+
+        with patch(target, return_value=True) as verify:
+            domains.create_domain("acme.com")
+        verify.assert_called_once_with(
+            "acme.com", "TXT", f"{VALUE_PREFIX}{self.site.domain_verification_token}"
+        )
+        self.assertRaisesRegex(frappe.DuplicateEntryError, "already added", domains.check_domain, "acme.com")
+        self.act_as(self.other)
+        self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", domains.check_domain, "acme.com")
+        self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", domains.create_domain, "acme.com")
 
 
 class TestDirectoryApi(SiteApiTestCase):

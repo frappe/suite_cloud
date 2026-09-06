@@ -22,7 +22,8 @@
   "api_key",
   "api_secret",
   "column_break_access",
-  "user"
+  "user",
+  "domain_verification_token"
  ],
  "fields": [
   {
@@ -149,6 +150,15 @@
    "fieldtype": "Link",
    "label": "Egress Pool",
    "options": "Egress IP Pool"
+  },
+  {
+   "description": "Proves the site owns a domain before the domain is added: the site publishes a TXT record at the domain's apex with the value frappe-suite-verification= followed by this token. Fixed for the life of the site, so every domain it adds asks for the same record.",
+   "fieldname": "domain_verification_token",
+   "fieldtype": "Data",
+   "label": "Domain Verification Token",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -174,7 +184,7 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-09-06 10:00:00.000000",
+ "modified": "2026-09-06 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Site",

@@ -15,6 +15,7 @@ from suite_cloud.tests.fixtures import (
     make_node,
     make_site,
     remove_cluster,
+    verified_ownership,
 )
 
 
@@ -41,6 +42,9 @@ class TestEgress(IntegrationTestCase):
         self.addCleanup(self._install.__exit__, None, None, None)
         forget_sessions(self.cluster)
         clear_request_cache()
+        self._ownership = verified_ownership()
+        self._ownership.start()
+        self.addCleanup(self._ownership.stop)
         self.site = make_site(self.cluster)
         self.gateway = frappe.get_doc(
             {

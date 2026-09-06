@@ -95,12 +95,12 @@ class TestDNSZone(IntegrationTestCase):
         )
 
     def test_every_zone_is_reserved_for_mail_domains(self) -> None:
-        from suite_cloud.suite_cloud.doctype.mail_domain.mail_domain import MailDomain
+        from suite_cloud.tenancy.addresses import assert_domain_available
 
         make_zone(OTHER_ZONE, is_default=0)
-        domain = frappe.new_doc("Mail Domain")
-        domain.domain_name = f"customer.{OTHER_ZONE}"
-        self.assertRaisesRegex(frappe.ValidationError, "reserved", MailDomain.validate_not_reserved, domain)
+        self.assertRaisesRegex(
+            frappe.ValidationError, "reserved", assert_domain_available, f"customer.{OTHER_ZONE}", "any-site"
+        )
 
 
 def make_dns_record(zone: str | None = None):

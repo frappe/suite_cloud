@@ -25,6 +25,7 @@ class SuiteSite(Document):
         archived_at: DF.Datetime | None
         cluster: DF.Link
         default_disk_quota_gb: DF.Float
+        domain_verification_token: DF.Data | None
         egress_pool: DF.Link | None
         enabled: DF.Check
         fc_reference: DF.Data | None
@@ -45,6 +46,7 @@ class SuiteSite(Document):
         self.status = "Active"
         self.api_key = frappe.generate_hash(length=32)
         self.new_secret = self.generate_secret()
+        self.domain_verification_token = frappe.generate_hash(length=32)
 
     def validate(self) -> None:
         self.site_name = (self.site_name or "").strip().lower().rstrip("/")

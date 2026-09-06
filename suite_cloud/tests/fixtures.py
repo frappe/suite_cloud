@@ -109,6 +109,12 @@ def make_node(cluster, label: str = "n1", ipv4: str = "203.0.113.10", **fields):
     return node
 
 
+def verified_ownership():
+    """Every domain's ownership record resolves, so tests may add domains without publishing one."""
+
+    return patch("suite_cloud.tenancy.ownership.verify_dns_record", return_value=True)
+
+
 def no_dns_provider():
     """DNS Record pushes go nowhere: the provider is unset, so records stay unverified."""
 

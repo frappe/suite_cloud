@@ -1,6 +1,8 @@
 import frappe
 
 from suite_cloud.api.site import current_site, owned, owned_names, site_api
+from suite_cloud.tenancy.addresses import assert_domain_available, validate_domain_name
+from suite_cloud.tenancy.ownership import ownership_record
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -17,6 +19,21 @@ def get_domain(domain: str) -> dict:
     return owned("Mail Domain", domain).to_api()
 
 
+@frappe.whitelist(methods=["GET", "POST"])
+@site_api
+def check_domain(domain: str) -> dict:
+    """Whether the domain can be added, and the record the site must publish to prove it owns it.
+
+    Nothing is stored: the site shows the record to its admin and calls ``create_domain`` once it
+    is published. The record is the same for every domain the site ever adds.
+    """
+
+    site = current_site()
+    domain = validate_domain_name(domain)
+    assert_domain_available(domain, site.name)
+    return {"domain": domain, "ownership_record": ownership_record(site, domain)}
+
+
 @frappe.whitelist(methods=["POST"])
 @site_api
 def create_domain(
@@ -26,6 +43,8 @@ def create_domain(
     sub_addressing: bool = True,
     publish_client_discovery_records: bool = False,
 ) -> dict:
+    """Adds the domain once its ownership record resolves; until then the error names the record."""
+
     doc = frappe.get_doc(
         {
             "doctype": "Mail Domain",

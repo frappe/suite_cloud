@@ -48,6 +48,22 @@ def get_site_domain(site: str, domain_name: str):
     return domain
 
 
+def assert_domain_available(domain_name: str, site: str) -> None:
+    """Free for this site to add: unclaimed, and not a zone of the mail infrastructure itself."""
+
+    owner = frappe.db.get_value("Mail Domain", domain_name, "site")
+    if owner == site:
+        frappe.throw(
+            _("Domain {0} is already added to this site.").format(domain_name), frappe.DuplicateEntryError
+        )
+    if owner:
+        # Neutral on purpose: another site holding the name is not this site's business.
+        frappe.throw(_("Domain {0} is not available.").format(domain_name), frappe.DuplicateEntryError)
+    for zone in frappe.get_all("DNS Zone", pluck="name"):
+        if domain_name == zone or domain_name.endswith(f".{zone}"):
+            frappe.throw(_("{0} is reserved for the mail infrastructure.").format(domain_name))
+
+
 def assert_address_available(email: str, exclude: tuple[str, str] | None = None) -> None:
     """An address may be a primary address or an alias exactly once across the whole directory."""
 
