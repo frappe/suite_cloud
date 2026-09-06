@@ -29,6 +29,7 @@
  ],
  "fields": [
   {
+   "description": "The domain mail is sent from and received for, e.g. acme.com. Lowercased and IDNA-encoded on save; it names the record and cannot change.",
    "fieldname": "domain_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -38,6 +39,7 @@
    "unique": 1
   },
   {
+   "description": "The Suite Site that owns the domain and administers it through the API. Fixed once the domain exists; it counts against the site's domain limit.",
    "fieldname": "site",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -48,6 +50,7 @@
    "set_only_once": 1
   },
   {
+   "description": "The site's cluster, copied on every save. The domain is created on this cluster and its DNS records point at it.",
    "fetch_from": "site.cluster",
    "fieldname": "cluster",
    "fieldtype": "Link",
@@ -62,16 +65,19 @@
   },
   {
    "default": "1",
+   "description": "Unchecked, the domain stops sending and receiving on the cluster even if verified. Its accounts and aliases stay in place.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
   },
   {
+   "description": "Free text shown on the cluster next to the domain. Blank falls back to the site's name.",
    "fieldname": "description",
    "fieldtype": "Data",
    "label": "Description"
   },
   {
+   "description": "The domain's id on the cluster, set when it is created there. Blank means the cluster never accepted it.",
    "fieldname": "stalwart_id",
    "fieldtype": "Data",
    "label": "Stalwart ID",
@@ -84,7 +90,7 @@
    "label": "Settings"
   },
   {
-   "description": "Receives mail addressed to unknown local parts.",
+   "description": "Receives mail addressed to local parts that match no account or alias. Blank rejects such mail.",
    "fieldname": "catch_all_address",
    "fieldtype": "Data",
    "label": "Catch-all Address",
@@ -92,7 +98,7 @@
   },
   {
    "default": "1",
-   "description": "user+tag@domain delivers to user@domain.",
+   "description": "user+tag@domain delivers to user@domain. Turn off if a local part legitimately contains a plus sign.",
    "fieldname": "sub_addressing",
    "fieldtype": "Check",
    "label": "Sub-addressing"
@@ -115,6 +121,7 @@
   },
   {
    "default": "0",
+   "description": "Set when MX, SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled.",
    "fieldname": "is_verified",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -122,6 +129,7 @@
    "read_only": 1
   },
   {
+   "description": "When the records were last resolved, by the Verify DNS Records action or the hourly check of unverified domains.",
    "fieldname": "last_verified_at",
    "fieldtype": "Datetime",
    "label": "Last Verified At",
@@ -132,12 +140,14 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "When the record rows were last rebuilt from the cluster's zone file. Refreshed daily, and hourly while a DKIM key rotates.",
    "fieldname": "last_refreshed_at",
    "fieldtype": "Datetime",
    "label": "Records Refreshed At",
    "read_only": 1
   },
   {
+   "description": "What the domain's DNS provider must publish, rebuilt from the cluster's zone file. Mandatory rows decide verification; verified rows keep their state across refreshes.",
    "fieldname": "dns_records",
    "fieldtype": "Table",
    "label": "DNS Records",
@@ -151,13 +161,14 @@
    "label": "Zone File"
   },
   {
+   "description": "The zone file the cluster generated for the domain, as last refreshed. The rows above are parsed from it.",
    "fieldname": "dns_zone_file",
    "fieldtype": "Code",
    "label": "Zone File",
    "read_only": 1
   },
   {
-   "description": "Outbound mail of this domain leaves through this pool (overrides the site and cluster defaults).",
+   "description": "Outbound mail of this domain leaves through this pool instead of the site's or the cluster's default. The pool must belong to the domain's cluster.",
    "fieldname": "egress_pool",
    "fieldtype": "Link",
    "label": "Egress Pool",
@@ -182,7 +193,7 @@
    "link_fieldname": "domain"
   }
  ],
- "modified": "2026-09-03 12:00:00.000000",
+ "modified": "2026-09-06 10:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Domain",
