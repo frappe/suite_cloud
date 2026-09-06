@@ -26,7 +26,7 @@
  ],
  "fields": [
   {
-   "description": "The Frappe Cloud site domain, e.g. acme.frappe.cloud",
+   "description": "The Frappe Cloud site domain, e.g. acme.frappe.cloud. Lowercased on save and used as the record name; it cannot change afterwards.",
    "fieldname": "site_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -36,6 +36,7 @@
    "unique": 1
   },
   {
+   "description": "The Stalwart cluster hosting every mail domain and account of the site. Fixed once the site exists; the cluster must be active at creation.",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -46,6 +47,7 @@
    "set_only_once": 1
   },
   {
+   "description": "Frappe Cloud's own identifier for the site, passed at creation. Only for cross-referencing; nothing here depends on it.",
    "fieldname": "fc_reference",
    "fieldtype": "Data",
    "label": "Frappe Cloud Reference"
@@ -56,13 +58,14 @@
   },
   {
    "default": "1",
-   "description": "Disabled sites cannot authenticate against the API.",
+   "description": "Unchecked, the site's API key stops authenticating. Archive clears it and Resume sets it again; Suspend leaves it checked so the site gets a 403 naming the suspension instead of a bare 401.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
   },
   {
    "default": "Active",
+   "description": "Active serves the API. Suspended keeps the key valid but answers every request with a 403 naming the suspension. Archived is final and required before deletion.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -72,6 +75,7 @@
    "read_only": 1
   },
   {
+   "description": "When the site was archived. Set by the Archive action; the site cannot be resumed after this.",
    "fieldname": "archived_at",
    "fieldtype": "Datetime",
    "label": "Archived At",
@@ -84,12 +88,14 @@
   },
   {
    "default": "10",
+   "description": "Mail Domains the site may hold. Adding one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_domains",
    "fieldtype": "Int",
    "label": "Max Domains"
   },
   {
    "default": "500",
+   "description": "Mail Accounts the site may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_accounts",
    "fieldtype": "Int",
    "label": "Max Accounts"
@@ -100,7 +106,7 @@
   },
   {
    "default": "1",
-   "description": "Applied to accounts created without a quota. 0 means unlimited.",
+   "description": "Disk quota given to accounts created without one, in gigabytes. 0 means unlimited. Existing accounts keep their own quota.",
    "fieldname": "default_disk_quota_gb",
    "fieldtype": "Float",
    "label": "Default Disk Quota (GB)"
@@ -111,7 +117,7 @@
    "label": "API Access"
   },
   {
-   "description": "Sent by the site as Authorization: token <key>:<secret> with Frappe-Authorization-Source: Suite Site.",
+   "description": "Sent by the site as Authorization: token key:secret with Frappe-Authorization-Source: Suite Site. Generated at creation and never changes.",
    "fieldname": "api_key",
    "fieldtype": "Data",
    "label": "API Key",
@@ -119,6 +125,7 @@
    "unique": 1
   },
   {
+   "description": "Stored encrypted and shown once, at creation or after Rotate Secret. Rotating it invalidates the previous secret immediately.",
    "fieldname": "api_secret",
    "fieldtype": "Password",
    "hidden": 1,
@@ -129,7 +136,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Requests authenticated with this site's key run as this user.",
+   "description": "Requests authenticated with the site's key run as this service user. Taken from Suite Cloud Settings on every save.",
    "fieldname": "user",
    "fieldtype": "Link",
    "label": "Service User",
@@ -137,7 +144,7 @@
    "read_only": 1
   },
   {
-   "description": "Outbound mail of this site's domains leaves through this pool (overrides the cluster default).",
+   "description": "Outbound mail of this site's domains leaves through this pool instead of the cluster default. A domain may name its own pool. The pool must belong to the site's cluster.",
    "fieldname": "egress_pool",
    "fieldtype": "Link",
    "label": "Egress Pool",
@@ -167,7 +174,7 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-09-04 15:00:00.000000",
+ "modified": "2026-09-06 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Site",
