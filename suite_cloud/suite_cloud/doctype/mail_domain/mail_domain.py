@@ -62,7 +62,7 @@ class MailDomain(Document):
         if self.is_new():
             assert_domain_available(self.domain_name, self.site)
             site.assert_can_add_domain()
-            if not self.flags.skip_ownership_check:
+            if ownership.required():
                 ownership.assert_ownership(site, self.domain_name)
         if self.catch_all_address:
             self.catch_all_address = self.catch_all_address.strip().lower()

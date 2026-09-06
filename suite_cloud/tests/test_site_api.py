@@ -130,6 +130,19 @@ class TestDomainOwnership(SiteApiTestCase):
         self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", domains.check_domain, "acme.com")
         self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", domains.create_domain, "acme.com")
 
+    def test_operators_add_domains_without_the_record(self) -> None:
+        target = "suite_cloud.tenancy.ownership.verify_dns_record"
+        frappe.set_user("Administrator")
+        with patch(target, return_value=False) as verify:
+            frappe.get_doc(
+                {"doctype": "Mail Domain", "domain_name": "acme.com", "site": self.site.name}
+            ).insert()
+        verify.assert_not_called()
+
+        self.act_as(self.site)
+        with patch(target, return_value=False):
+            self.assertRaises(DomainNotVerifiedError, domains.create_domain, "other.com")
+
 
 class TestDirectoryApi(SiteApiTestCase):
     def test_domain_account_group_list_flow(self) -> None:

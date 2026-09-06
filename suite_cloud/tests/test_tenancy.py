@@ -11,7 +11,6 @@ from suite_cloud.tests.fixtures import (
     configure_settings,
     make_cluster,
     make_site,
-    verified_ownership,
 )
 
 
@@ -38,9 +37,6 @@ class TenancyTestCase(IntegrationTestCase):
         self.addCleanup(self._install.__exit__, None, None, None)
         forget_sessions(self.cluster)
         clear_request_cache()
-        self._ownership = verified_ownership()
-        self._ownership.start()
-        self.addCleanup(self._ownership.stop)
         self.site = make_site(self.cluster)
 
     def tearDown(self) -> None:
