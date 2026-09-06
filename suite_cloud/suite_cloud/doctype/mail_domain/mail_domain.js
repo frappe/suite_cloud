@@ -2,6 +2,15 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Mail Domain', {
+	setup(frm) {
+		frm.set_query('egress_pool', () => ({ filters: { cluster: frm.doc.cluster || '' } }))
+	},
+
+	site(frm) {
+		// The cluster follows the site; a pool picked for the old cluster no longer fits.
+		frm.set_value('egress_pool', null)
+	},
+
 	refresh(frm) {
 		if (frm.doc.__islocal) return
 		frm.add_custom_button(__('Refresh DNS Records'), () => frm.events.call(frm, 'refresh_dns_records', __('Reading zone...')))

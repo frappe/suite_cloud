@@ -7,12 +7,14 @@ from suite_cloud.cluster import dns, egress
 from suite_cloud.stalwart import forget_sessions
 from suite_cloud.tests.fake_stalwart import FakeStalwart
 from suite_cloud.tests.fixtures import (
+    ROOT_DOMAIN,
     activate_cluster,
     clear_request_cache,
     configure_settings,
     make_cluster,
     make_node,
     make_site,
+    remove_cluster,
 )
 
 
@@ -283,6 +285,34 @@ class TestEgress(IntegrationTestCase):
             [(r.ip_address, r.ptr_verified) for r in rows], [("203.0.113.51", 1), ("203.0.113.52", 0)]
         )
         self.assertEqual(second.ptr_verified, 0)
+
+    def test_pool_must_belong_to_the_cluster(self) -> None:
+        pool = self.make_pool("ded")
+        other = activate_cluster(make_cluster("blr-2", hostname=f"mail.blr2.{ROOT_DOMAIN}"))
+        self.addCleanup(remove_cluster, other.name)
+
+        other.default_egress_pool = pool.name
+        self.assertRaisesRegex(frappe.ValidationError, "another cluster", other.save)
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "another cluster",
+            make_site,
+            other,
+            "other.frappe.test",
+            egress_pool=pool.name,
+        )
+
+        site = make_site(other, "other.frappe.test")
+        self.addCleanup(frappe.db.delete, "Suite Site", {"name": site.name})
+        domain = frappe.get_doc(
+            {
+                "doctype": "Mail Domain",
+                "domain_name": "other.com",
+                "site": site.name,
+                "egress_pool": pool.name,
+            }
+        )
+        self.assertRaisesRegex(frappe.ValidationError, "another cluster", domain.insert)
 
     def test_pool_deletion_is_blocked_while_used(self) -> None:
         pool = self.make_pool("ded")
