@@ -155,7 +155,7 @@
    "read_only": 1
   },
   {
-   "description": "Generated on save. Used once to mint the API key; Show Admin Password is not offered for gateways, read it from the database if ever needed.",
+   "description": "Generated on save. Logs Suite Cloud in to mint the API key, and is what Show Admin Password (Administrator only) reveals for the gateway's web admin.",
    "fieldname": "admin_password",
    "fieldtype": "Password",
    "hidden": 1,
@@ -246,7 +246,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-08 10:00:00.000000",
+ "modified": "2026-09-08 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Egress Gateway",

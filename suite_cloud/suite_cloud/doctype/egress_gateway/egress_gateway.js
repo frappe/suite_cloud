@@ -28,6 +28,25 @@ frappe.ui.form.on('Egress Gateway', {
 			frm.add_custom_button(__('Sync Config'), () => frm.events.call(frm, 'sync_config', __('Syncing...')), __('Actions'))
 			frm.add_custom_button(__('Upgrade'), () => frm.events.call(frm, 'upgrade', __('Queueing...')), __('Actions'))
 		}
+		if (frappe.session.user === 'Administrator') {
+			frm.add_custom_button(__('Show Admin Password'), () => frm.trigger('show_admin_password'), __('Access'))
+		}
+	},
+
+	show_admin_password(frm) {
+		frappe.call({
+			doc: frm.doc,
+			method: 'show_admin_password',
+			freeze: true,
+			freeze_message: __('Fetching...'),
+			callback: (r) => {
+				if (r.exc) return
+				frappe.msgprint({
+					title: __('Admin Password'),
+					message: `${__('Web admin')}: <a href="${frm.doc.base_url}" target="_blank">${frm.doc.base_url}</a><br>${__('Username')}: <code>${frappe.utils.escape_html(frm.doc.admin_username)}</code><br>${__('Password')}: <code>${frappe.utils.escape_html(r.message)}</code>`,
+				})
+			},
+		})
 	},
 
 	call(frm, method, freeze_message, done) {

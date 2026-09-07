@@ -186,6 +186,11 @@ class EgressGateway(Document):
         return plan.redacted(egress.gateway_plan(self))
 
     @frappe.whitelist()
+    def show_admin_password(self) -> str:
+        frappe.only_for("Administrator")
+        return self.get_password("admin_password")
+
+    @frappe.whitelist()
     def check_health(self) -> bool:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         return egress.check_gateway(self)
