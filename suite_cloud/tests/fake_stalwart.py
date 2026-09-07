@@ -309,8 +309,9 @@ class FakeStalwart:
         self._check_unique(type, payload)
         obj = {**payload, "id": self._new_id(type), "createdAt": "2026-01-01T00:00:00Z"}
         if type == "Domain":
-            # Automatic DKIM management: Stalwart generates one key per algorithm on creation.
-            for algorithm in ("ed25519", "rsa"):
+            # Automatic DKIM management: Stalwart generates one key per algorithm on creation,
+            # both kinds when the payload names none.
+            for algorithm in dkim_key_types(payload.get("dkimManagement")):
                 self._add(
                     "DkimSignature",
                     {"domainId": obj["id"], "selector": f"v1-{algorithm}-20260101", "stage": "active"},
@@ -390,6 +391,17 @@ class FakeAdapter(BaseAdapter):
 
     def close(self) -> None:
         pass
+
+
+def dkim_key_types(management: dict | None) -> list[str]:
+    """Key types Stalwart generates for a domain: none under Manual management, otherwise the
+    algorithms named, or both when the payload names none (Stalwart's default)."""
+
+    management = management or {}
+    if management.get("@type") == "Manual":
+        return []
+    algorithms = management.get("algorithms") or {"Dkim1Ed25519Sha256": True, "Dkim1RsaSha256": True}
+    return ["ed25519" if "Ed25519" in a else "rsa" for a in algorithms]
 
 
 def json_response(status: int, payload: dict) -> requests.Response:

@@ -342,7 +342,16 @@ class TestStalwartCluster(IntegrationTestCase):
             {f"*.{cluster.default_domain}": True},
         )
         self.assertEqual(domain["dnsManagement"], {"@type": "Manual"})
-        self.assertEqual(domain["dkimManagement"], {"@type": "Automatic"})
+        self.assertEqual(domain["dkimManagement"]["@type"], "Automatic")
+        self.assertEqual(domain["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
+
+        configure_settings(sign_with_ed25519=1)
+        self.addCleanup(configure_settings, sign_with_ed25519=0)
+        operations = {op["object"]: op for op in plan.cluster_plan(cluster)}
+        self.assertEqual(
+            operations["Domain"]["value"]["default"]["dkimManagement"]["algorithms"],
+            {"Dkim1Ed25519Sha256": True, "Dkim1RsaSha256": True},
+        )
         self.assertEqual(
             operations["SystemSettings"]["value"]["mailExchangers"],
             {"0": {"hostname": cluster.hostname, "priority": 10}},

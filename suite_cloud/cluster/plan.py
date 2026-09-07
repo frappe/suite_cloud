@@ -13,7 +13,8 @@ from typing import TYPE_CHECKING
 import frappe
 
 from suite_cloud.stalwart.client import is_write_only
-from suite_cloud.utils import get_config
+from suite_cloud.stalwart.directory import dkim_management_payload
+from suite_cloud.utils import dkim_algorithms, get_config
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -168,7 +169,7 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
     """The cluster zone: carries the wildcard certificate and signs the cluster's own mail.
 
     Reports, alarms and notifications leave from this domain, so it gets DKIM keys like any
-    customer domain.
+    customer domain, chosen by the same setting.
     """
 
     domain = {
@@ -182,7 +183,7 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
             # order that lists a name its wildcard already covers.
             "subjectAlternativeNames": as_set([f"*.{cluster.default_domain}"]),
         },
-        "dkimManagement": {"@type": "Automatic"},
+        "dkimManagement": dkim_management_payload(dkim_algorithms()),
         "subAddressing": {"@type": "Disabled"},
     }
     if with_dns:

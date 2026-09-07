@@ -18,6 +18,8 @@
   "column_break_stalwart",
   "stalwart_cli_version",
   "stalwart_cli_download_url_template",
+  "dkim_section",
+  "sign_with_ed25519",
   "certificates_tab",
   "acme_section",
   "acme_directory_url",
@@ -64,11 +66,11 @@
   },
   {
    "default": "1800",
+   "description": "How long an install, bootstrap or upgrade job may run before it is marked failed. Bootstrapping the first node includes waiting for a certificate, so keep this generous. 1800 = 30 minutes.",
    "fieldname": "server_job_timeout",
    "fieldtype": "Int",
    "label": "Server Job Timeout (Seconds)",
-   "reqd": 1,
-   "description": "How long an install, bootstrap or upgrade job may run before it is marked failed. Bootstrapping the first node includes waiting for a certificate, so keep this generous. 1800 = 30 minutes."
+   "reqd": 1
   },
   {
    "fieldname": "stalwart_tab",
@@ -103,20 +105,32 @@
   },
   {
    "default": "v1.0.12",
+   "description": "Release of stalwart-cli installed next to the server, e.g. v1.0.12. Only used on a node while it bootstraps a cluster.",
    "fieldname": "stalwart_cli_version",
    "fieldtype": "Data",
    "label": "Stalwart CLI Version",
-   "reqd": 1,
-   "description": "Release of stalwart-cli installed next to the server, e.g. v1.0.12. Only used on a node while it bootstraps a cluster."
+   "reqd": 1
   },
   {
    "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
+   "description": "Where the node downloads the stalwart-cli archive from. Same placeholders as the server URL.",
    "fieldname": "stalwart_cli_download_url_template",
    "fieldtype": "Data",
    "label": "Stalwart CLI Download URL Template",
    "length": 255,
-   "reqd": 1,
-   "description": "Where the node downloads the stalwart-cli archive from. Same placeholders as the server URL."
+   "reqd": 1
+  },
+  {
+   "fieldname": "dkim_section",
+   "fieldtype": "Section Break",
+   "label": "DKIM Signing"
+  },
+  {
+   "default": "0",
+   "description": "Every domain gets an RSA key; check this to add an Ed25519 key as well. Off by default because many receivers still ignore Ed25519 signatures and treat the mail as unsigned. Applies to domains registered on Stalwart after the change, the cluster default domain included; existing domains keep the keys they were created with.",
+   "fieldname": "sign_with_ed25519",
+   "fieldtype": "Check",
+   "label": "Sign with Ed25519 as well as RSA"
   },
   {
    "fieldname": "certificates_tab",
@@ -170,7 +184,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-04 13:00:00.000000",
+ "modified": "2026-09-07 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

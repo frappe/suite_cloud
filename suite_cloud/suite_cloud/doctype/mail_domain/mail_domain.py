@@ -13,7 +13,7 @@ from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.stalwart.directory import Domain
 from suite_cloud.tenancy import ownership, sync
 from suite_cloud.tenancy.addresses import assert_domain_available, validate_domain_name
-from suite_cloud.utils import get_config
+from suite_cloud.utils import dkim_algorithms, get_config
 
 PUSHED_FIELDS = ("description", "catch_all_address", "sub_addressing", "enabled")
 
@@ -114,6 +114,7 @@ class MailDomain(Document):
             name=self.domain_name,
             description=self.description or f"Suite site {self.site}",
             is_enabled=self.is_live(),
+            dkim_algorithms=dkim_algorithms(),
             catch_all_address=self.catch_all_address or None,
             sub_addressing=bool(self.sub_addressing),
             report_address_uri=f"mailto:postmaster@{self.domain_name}",

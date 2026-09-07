@@ -106,7 +106,8 @@ class TestMailDomain(TenancyTestCase):
 
         live = self.fake.find("Domain", name="acme.com")
         self.assertEqual(domain.stalwart_id, live["id"])
-        self.assertEqual(live["dkimManagement"]["@type"], "Automatic")
+        # RSA only unless the setting opts into Ed25519: many receivers ignore Ed25519 signatures.
+        self.assertEqual(live["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
         self.assertEqual(live["dnsManagement"], {"@type": "Manual"})
         self.assertEqual(live["reportAddressUri"], "mailto:postmaster@acme.com")
 
@@ -114,7 +115,7 @@ class TestMailDomain(TenancyTestCase):
         self.assertIn(("Receiving", "@", 1), categories)
         self.assertIn(("Sending", "@", 1), categories)
         self.assertIn(("DMARC", "_dmarc", 1), categories)
-        self.assertEqual(sum(1 for c in categories if c[0] == "DKIM"), 2)
+        self.assertEqual([c[1] for c in categories if c[0] == "DKIM"], ["v1-rsa-20260101._domainkey"])
         self.assertNotIn("MTA-STS", [c[0] for c in categories])
         spf = next(r for r in domain.dns_records if r.category == "Sending")
         self.assertEqual(spf.value, f"v=spf1 include:spf.{self.cluster.default_domain} -all")
@@ -193,7 +194,7 @@ class TestMailDomain(TenancyTestCase):
         ):
             result = domain.verify_dns_records()
         self.assertTrue(result["is_verified"])  # DKIM rows kept their verified state
-        self.assertEqual(result["inconclusive"], 2)
+        self.assertEqual(result["inconclusive"], 1)  # the one DKIM row
 
         # One verified DKIM selector is enough after a rotation adds an unpublished one.
         domain.append(
@@ -222,6 +223,25 @@ class TestMailDomain(TenancyTestCase):
         other = make_site(self.cluster, "other.frappe.test")
         doc = frappe.get_doc({"doctype": "Mail Domain", "domain_name": "acme.com", "site": other.name})
         self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", doc.insert)
+
+    def test_ed25519_signing_is_opt_in_and_applies_to_domains_added_afterwards(self) -> None:
+        before = self.make_domain()
+        configure_settings(sign_with_ed25519=1)
+        self.addCleanup(configure_settings, sign_with_ed25519=0)
+        after = self.make_domain("acme.net")
+
+        live = self.fake.find("Domain", name="acme.net")
+        self.assertEqual(
+            live["dkimManagement"]["algorithms"], {"Dkim1Ed25519Sha256": True, "Dkim1RsaSha256": True}
+        )
+        selectors = sorted(r.host for r in after.dns_records if r.category == "DKIM")
+        self.assertEqual(selectors, ["v1-ed25519-20260101._domainkey", "v1-rsa-20260101._domainkey"])
+
+        # The earlier domain keeps the keys it was created with; a save does not push algorithms.
+        before.description = "renamed"
+        before.save()
+        live = self.fake.find("Domain", name="acme.com")
+        self.assertEqual(live["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
 
     def test_domain_delete_blocked_by_aliases_on_it(self) -> None:
         self.make_domain()

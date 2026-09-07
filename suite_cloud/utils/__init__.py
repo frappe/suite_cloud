@@ -5,6 +5,7 @@ from typing import Any
 
 import frappe
 from frappe import _
+from frappe.utils import cint
 from frappe.utils.caching import request_cache
 
 CONFIG_KEYS = (
@@ -18,6 +19,7 @@ CONFIG_KEYS = (
     "acme_directory_url",
     "acme_contact_email",
     "server_job_timeout",
+    "sign_with_ed25519",
 )
 
 
@@ -46,6 +48,17 @@ def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tup
             frappe.throw(_("Suite Cloud config key '{0}' not found").format(k))
 
     return tuple(config[k] for k in keys) if len(keys) > 1 else config[keys[0]]
+
+
+def dkim_algorithms() -> tuple[str, ...]:
+    """The key types Stalwart generates for a domain registered now: RSA always, Ed25519 by choice.
+
+    Read at registration time only; Stalwart keeps the algorithms a domain was created with.
+    """
+
+    from suite_cloud.stalwart.directory import DKIM_ED25519, DKIM_RSA
+
+    return (DKIM_ED25519, DKIM_RSA) if cint(get_config("sign_with_ed25519")) else (DKIM_RSA,)
 
 
 def get_public_url() -> str:

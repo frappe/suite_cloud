@@ -18,6 +18,7 @@ class SuiteCloudSettings(Document):
         default_dns_ttl: DF.Int
         public_url: DF.Data | None
         server_job_timeout: DF.Int
+        sign_with_ed25519: DF.Check
         site_service_user: DF.Link | None
         stalwart_cli_download_url_template: DF.Data
         stalwart_cli_version: DF.Data

@@ -7,7 +7,10 @@ from suite_cloud.stalwart.service import ManagementService, id_set, indexed
 
 # Stalwart locales are BCP 47 tags (en-US), not POSIX names (en_US).
 DEFAULT_LOCALE = "en-US"
-DKIM_ALGORITHMS = ("Dkim1Ed25519Sha256", "Dkim1RsaSha256")
+DKIM_ED25519 = "Dkim1Ed25519Sha256"
+DKIM_RSA = "Dkim1RsaSha256"
+# Stalwart's own default when a domain is created without naming its algorithms.
+DKIM_ALGORITHMS = (DKIM_ED25519, DKIM_RSA)
 DKIM_SELECTOR_TEMPLATE = "v{version}-{algorithm}-{date-%Y%m%d}"
 DAY_MS = 24 * 60 * 60 * 1000
 GB = 1024**3
