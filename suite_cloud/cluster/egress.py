@@ -24,6 +24,9 @@ GATEWAY_ROLE = "egress"
 GATEWAY_DEADLINE_MINUTES = 45
 GATEWAY_VARIABLES_BUILDER = "suite_cloud.cluster.egress.build_gateway_variables"
 SUITE_RULE_PREFIX = "'egress-"
+# Mail between domains of the cluster never leaves it: without this rule first, a relay fallback
+# would send it out through a gateway only to come back through the cluster's own MX.
+LOCAL_RULE = {"if": "is_local_domain(rcpt_domain)", "then": "'local'"}
 
 
 # --- pool resolution ------------------------------------------------------------------------
@@ -125,16 +128,17 @@ def route_name(pool_name: str) -> str:
 
 
 def route_expression(cluster: Document, grouped: dict[str, list[str]], default: str | None) -> dict:
-    """Suite Cloud's rules go first and its default pool is the fallback; anything else the
-    strategy holds (rules and a foreign ``else``) is preserved."""
+    """Local delivery first, then Suite Cloud's pool rules, with its default pool as the fallback;
+    anything else the strategy holds (foreign rules and a foreign ``else``) is preserved."""
 
     current = current_route_expression(cluster)
     kept = [
         rule
         for rule in expression_rules(current)
         if not str(rule.get("then", "")).startswith(SUITE_RULE_PREFIX)
+        and rule.get("then") != LOCAL_RULE["then"]
     ]
-    rules = []
+    rules = [LOCAL_RULE]
     for pool_name, domain_names in grouped.items():
         condition = " || ".join(f"sender_domain == '{d}'" for d in domain_names)
         rules.append({"if": condition, "then": route_name(pool_name)})
