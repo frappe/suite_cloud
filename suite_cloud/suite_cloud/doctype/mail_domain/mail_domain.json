@@ -23,6 +23,7 @@
   "last_verified_at",
   "column_break_dns",
   "last_refreshed_at",
+  "dns_records_section",
   "dns_records",
   "zone_section",
   "dns_zone_file"
@@ -147,6 +148,11 @@
    "read_only": 1
   },
   {
+   "fieldname": "dns_records_section",
+   "fieldtype": "Section Break",
+   "hide_border": 1
+  },
+  {
    "description": "What the domain's DNS provider must publish, rebuilt from the cluster's zone file. Mandatory rows decide verification; verified rows keep their state across refreshes.",
    "fieldname": "dns_records",
    "fieldtype": "Table",
@@ -193,7 +199,7 @@
    "link_fieldname": "domain"
   }
  ],
- "modified": "2026-09-06 10:30:00.000000",
+ "modified": "2026-09-07 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Domain",
