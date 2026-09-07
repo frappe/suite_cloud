@@ -15,7 +15,9 @@ from frappe.utils import add_to_date, get_datetime, now
 
 from suite_cloud.cluster import dns, plan
 from suite_cloud.stalwart.credentials import Credential
+from suite_cloud.stalwart.directory import dkim_management_payload
 from suite_cloud.stalwart.errors import StalwartError
+from suite_cloud.utils import dkim_algorithms
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -213,7 +215,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
     """The gateway's whole configuration: relay listeners per pool, source IPs, its own certificate."""
 
     cluster = gateway.get_cluster()
-    zone = f"out.{cluster.default_domain}"
+    zone = dns.egress_zone(cluster)
     pools = gateway.pools()
     listeners, strategies, rules, sender_rules = {}, {}, [], []
     for pool in pools:
@@ -264,16 +266,20 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "value": {"acme": plan.acme_provider(cluster)},
         }
     )
+    # Each gateway signs its own mail (delivery status notifications) from a domain named after
+    # itself. Gateways run separate Stalwarts with separate keys, so a domain shared between them
+    # would publish clashing DKIM selectors. The certificate also covers the egress sub-zone, which
+    # every pool hostname sits under, so the relay listeners present it for any pool.
     domain = {
-        "name": zone,
-        "description": "Egress zone",
+        "name": gateway.hostname,
+        "description": "Gateway domain",
         "isEnabled": True,
         "certificateManagement": {
             "@type": "Automatic",
             "acmeProviderId": "#acme",
-            "subjectAlternativeNames": plan.as_set([gateway.hostname, f"*.{zone}"]),
+            "subjectAlternativeNames": plan.as_set([f"*.{zone}"]),
         },
-        "dkimManagement": {"@type": "Manual"},
+        "dkimManagement": dkim_management_payload(dkim_algorithms()),
         "dnsManagement": {
             "@type": "Automatic",
             "dnsServerId": "#dns",
@@ -285,7 +291,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
         "subAddressing": {"@type": "Disabled"},
     }
     operations.append(
-        {"@type": "upsert", "object": "Domain", "matchOn": ["name"], "value": {"egress": domain}}
+        {"@type": "upsert", "object": "Domain", "matchOn": ["name"], "value": {"gateway": domain}}
     )
     operations.append(
         {
@@ -293,8 +299,10 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "object": "SystemSettings",
             "value": {
                 "defaultHostname": gateway.hostname,
-                "defaultDomainId": "#egress",
-                "mailExchangers": {},
+                "defaultDomainId": "#gateway",
+                # Published as the zone's MX: replies to notifications reach the cluster, whose
+                # port 25 is open, rather than a gateway's, which is firewalled.
+                "mailExchangers": plan.as_list([{"hostname": cluster.hostname, "priority": 10}]),
             },
         }
     )
@@ -307,7 +315,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
                 "relay": {
                     "@type": "User",
                     "name": cluster.relay_username or "relay",
-                    "domainId": "#egress",
+                    "domainId": "#gateway",
                     "description": "Cluster relay login",
                     "credentials": {
                         "0": {"@type": "Password", "secret": cluster.get_password("relay_password")}
@@ -374,10 +382,9 @@ def gateway_recovery_plan(gateway: Document) -> list[dict]:
 
 
 def gateway_bootstrap_plan(gateway: Document) -> list[dict]:
-    cluster = gateway.get_cluster()
     value = {
         "serverHostname": gateway.hostname,
-        "defaultDomain": f"out.{cluster.default_domain}",
+        "defaultDomain": gateway.hostname,
         "requestTlsCertificate": False,
         "generateDkimKeys": False,
         "dataStore": gateway.get_store("data_store").config,

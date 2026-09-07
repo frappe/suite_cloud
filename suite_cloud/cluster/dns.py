@@ -114,6 +114,12 @@ def spf_records(cluster: Document) -> list[dict]:
     return [include_target, zone_spf]
 
 
+def egress_zone(cluster: Document) -> str:
+    """The sub-zone pool hostnames live under; every gateway certificate carries its wildcard."""
+
+    return f"out.{cluster.default_domain}"
+
+
 def sync_spf_record(cluster: Document) -> None:
     reconcile_managed_records("Stalwart Cluster", cluster.name, spf_records(cluster))
 
@@ -125,10 +131,26 @@ def delete_cluster_records(cluster: Document) -> None:
 # --- egress -----------------------------------------------------------------------------------
 
 
+def gateway_records(gateway: Document) -> list[dict]:
+    """The gateway's address, and SPF for its hostname: its notifications leave from that domain,
+    from the same addresses every other sender of the cluster uses."""
+
+    cluster = frappe.get_cached_doc("Stalwart Cluster", gateway.cluster)
+    records = address_records(cluster.dns_zone, gateway.hostname, gateway.ipv4_address, None, "Egress")
+    records.append(
+        {
+            "dns_zone": cluster.dns_zone,
+            "host": relative_host(gateway.hostname, cluster.dns_zone),
+            "type": "TXT",
+            "value": f"v=spf1 include:{spf_include(cluster)} -all",
+            "category": "SPF",
+        }
+    )
+    return records
+
+
 def sync_gateway_records(gateway: Document) -> None:
-    zone = cluster_zone(gateway.cluster)
-    records = address_records(zone, gateway.hostname, gateway.ipv4_address, None, "Egress")
-    reconcile_managed_records("Egress Gateway", gateway.name, records)
+    reconcile_managed_records("Egress Gateway", gateway.name, gateway_records(gateway))
 
 
 def delete_gateway_records(gateway: Document) -> None:

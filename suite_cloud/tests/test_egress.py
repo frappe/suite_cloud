@@ -87,10 +87,15 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(frappe.db.get_value("Stalwart Store", self.gateway.data_store, "type"), "RocksDb")
         self.assertEqual(len(self.gateway.get_password("admin_password")), 32)
         record = frappe.get_all(
-            "DNS Record", {"managed_by": self.gateway.name}, ["host", "value", "category"]
+            "DNS Record", {"managed_by": self.gateway.name}, ["host", "value", "category"], order_by="type"
         )
+        # Its address, and SPF for its own domain: notifications leave from g1.<zone>.
         self.assertEqual(
-            [(r.host, r.value, r.category) for r in record], [("g1.blr", "203.0.113.50", "Egress")]
+            [(r.host, r.value, r.category) for r in record],
+            [
+                ("g1.blr", "203.0.113.50", "Egress"),
+                ("g1.blr", f"v=spf1 include:spf.{self.cluster.default_domain} -all", "SPF"),
+            ],
         )
 
         # A new address means a new server as far as SSH is concerned.
@@ -100,7 +105,8 @@ class TestEgress(IntegrationTestCase):
         self.gateway.save()
         self.assertEqual(self.gateway.ssh_verified, 0)
         self.assertEqual(
-            frappe.db.get_value("DNS Record", {"managed_by": self.gateway.name}, "value"), "203.0.113.60"
+            frappe.db.get_value("DNS Record", {"managed_by": self.gateway.name, "type": "A"}, "value"),
+            "203.0.113.60",
         )
 
     def test_pool_assigns_ports_hostnames_and_records(self) -> None:
@@ -253,10 +259,20 @@ class TestEgress(IntegrationTestCase):
         role = operations["ClusterRole"]["value"]["gateway-role"]
         self.assertEqual(role["name"], "egress")
         self.assertEqual(role["listeners"], {"@type": "EnableAll"})  # the firewall limits exposure
-        domain = operations["Domain"]["value"]["egress"]
+        # The gateway's own domain: its name, a certificate that also covers every pool hostname,
+        # DKIM keys of its own (a domain shared between gateways would publish clashing selectors)
+        # and an MX at the cluster since a gateway's port 25 is firewalled.
+        domain = operations["Domain"]["value"]["gateway"]
+        self.assertEqual(domain["name"], self.gateway.hostname)
         self.assertEqual(
             domain["certificateManagement"]["subjectAlternativeNames"],
-            {self.gateway.hostname: True, f"*.out.{self.cluster.default_domain}": True},
+            {f"*.out.{self.cluster.default_domain}": True},
+        )
+        self.assertEqual(domain["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
+        self.assertEqual(operations["SystemSettings"]["value"]["defaultDomainId"], "#gateway")
+        self.assertEqual(
+            operations["SystemSettings"]["value"]["mailExchangers"],
+            {"0": {"hostname": self.cluster.hostname, "priority": 10}},
         )
         relay = operations["Account"]["value"]["relay"]
         self.assertEqual(relay["credentials"]["0"]["secret"], self.cluster.get_password("relay_password"))
