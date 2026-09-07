@@ -38,6 +38,7 @@
    "label": "DNS Zone",
    "options": "DNS Zone",
    "reqd": 1,
+   "search_index": 1,
    "set_only_once": 1
   },
   {
@@ -49,6 +50,7 @@
    "label": "Host",
    "length": 255,
    "reqd": 1,
+   "search_index": 1,
    "set_only_once": 1
   },
   {
@@ -165,12 +167,13 @@
    "label": "Managed By",
    "options": "managed_by_doctype",
    "read_only": 1,
+   "search_index": 1,
    "set_only_once": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-05 19:00:00.000000",
+ "modified": "2026-09-08 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "DNS Record",

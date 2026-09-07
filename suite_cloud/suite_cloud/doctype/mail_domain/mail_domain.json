@@ -52,6 +52,7 @@
    "label": "Site",
    "options": "Suite Site",
    "reqd": 1,
+   "search_index": 1,
    "set_only_once": 1
   },
   {
@@ -62,7 +63,8 @@
    "in_standard_filter": 1,
    "label": "Cluster",
    "options": "Stalwart Cluster",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_main",
@@ -236,7 +238,7 @@
    "link_fieldname": "domain"
   }
  ],
- "modified": "2026-09-07 11:04:06.655456",
+ "modified": "2026-09-08 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Domain",

@@ -69,6 +69,7 @@
    "options": "server_doctype",
    "read_only": 1,
    "reqd": 1,
+   "search_index": 1,
    "set_only_once": 1
   },
   {
@@ -94,7 +95,8 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Pending\nRunning\nSuccess\nFailed",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "default": "0",
@@ -262,7 +264,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-05 18:30:00.000000",
+ "modified": "2026-09-08 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Server Job",
