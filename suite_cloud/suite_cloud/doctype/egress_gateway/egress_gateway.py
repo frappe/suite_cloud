@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, now
 
-from suite_cloud.cluster import dns, egress, plan
+from suite_cloud.cluster import dns, egress, naming, plan
 from suite_cloud.provisioning.ansible import ping
 from suite_cloud.provisioning.ssh import SSHTarget
 from suite_cloud.stalwart import get_admin_client, get_client
@@ -46,6 +46,10 @@ class EgressGateway(Document):
     # end: auto-generated types
 
     # --- lifecycle --------------------------------------------------------------
+
+    def autoname(self) -> None:
+        self.hostname = naming.next_hostname("Egress Gateway", self.cluster, naming.GATEWAY_PREFIX)
+        self.name = self.hostname
 
     def before_insert(self) -> None:
         self.status = "Pending"

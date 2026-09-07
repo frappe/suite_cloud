@@ -204,7 +204,7 @@ class TestServerJob(IntegrationTestCase):
         self.assertTrue(self.node.is_bootstrap_node)
         self.assertEqual(self.node.status, "Provisioning")
 
-        second = make_node(self.cluster, "n2", "203.0.113.11")
+        second = make_node(self.cluster, "203.0.113.11")
         self.assertRaisesRegex(
             frappe.ValidationError, "still bootstrapping", bootstrap.provision_node, second
         )

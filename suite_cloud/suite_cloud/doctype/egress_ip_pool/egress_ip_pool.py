@@ -8,7 +8,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint
 
-from suite_cloud.cluster import dns, egress
+from suite_cloud.cluster import dns, egress, naming
 from suite_cloud.dns.resolver import verify_ptr_record
 from suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node import validate_ip
 
@@ -38,7 +38,7 @@ class EgressIPPool(Document):
     # end: auto-generated types
 
     def autoname(self) -> None:
-        self.pool_name = (self.pool_name or "").strip().lower()
+        self.pool_name = naming.next_pool_name(self.cluster)
         self.name = f"{self.cluster}-{self.pool_name}"
 
     def validate(self) -> None:
@@ -52,6 +52,7 @@ class EgressIPPool(Document):
         self.validate_addresses(cluster)
 
     def validate_addresses(self, cluster: Document) -> None:
+        naming.assign_ehlo_hostnames(self, cluster.default_domain)
         seen: set[str] = set()
         for row in self.addresses:
             row.ip_address = validate_ip(row.ip_address, 6 if ":" in (row.ip_address or "") else 4)

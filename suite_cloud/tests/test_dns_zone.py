@@ -71,7 +71,7 @@ class TestDNSZone(IntegrationTestCase):
         make_zone(OTHER_ZONE, is_default=0)
         remove_cluster("eu-1")
         cluster = make_cluster("eu-1", hostname=f"mail.eu.{OTHER_ZONE}", dns_zone=OTHER_ZONE)
-        node = make_node(cluster, "n1", "203.0.113.50")
+        node = make_node(cluster, "203.0.113.50")
         clear_request_cache()
 
         zones = frappe.get_all(

@@ -48,12 +48,12 @@
    "set_only_once": 1
   },
   {
-   "description": "Name of this server: one label under the cluster's default domain, e.g. out1.blr.frappemail.com. It gets an A record in the zone and is what the reverse DNS of the IP must point to.",
+   "description": "Assigned on first save: g1, g2 and so on under the cluster's default domain, e.g. g1.blr.frappemail.com. It gets an A record in the zone and is what the reverse DNS of the IP must point to.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Hostname",
-   "reqd": 1,
+   "read_only": 1,
    "set_only_once": 1,
    "unique": 1
   },
@@ -246,7 +246,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-05 18:45:00.000000",
+ "modified": "2026-09-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Egress Gateway",

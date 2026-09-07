@@ -46,7 +46,6 @@ class TestEgress(IntegrationTestCase):
             {
                 "doctype": "Egress Gateway",
                 "cluster": self.cluster.name,
-                "hostname": f"out1.{self.cluster.default_domain}",
                 "ipv4_address": "203.0.113.50",
             }
         ).insert()
@@ -67,20 +66,14 @@ class TestEgress(IntegrationTestCase):
         )
         frappe.flags.do_not_enqueue = False
 
-    def make_pool(self, name: str = "ded", ips: tuple[str, ...] = ("203.0.113.51",), **fields):
+    def make_pool(self, ips: tuple[str, ...] = ("203.0.113.51",), **fields):
+        """Pools name themselves p1, p2, ... and their addresses p1-1, p1-2, ..."""
+
         pool = frappe.get_doc(
             {
                 "doctype": "Egress IP Pool",
                 "cluster": self.cluster.name,
-                "pool_name": name,
-                "addresses": [
-                    {
-                        "gateway": self.gateway.name,
-                        "ip_address": ip,
-                        "ehlo_hostname": f"{name}{i}.{self.cluster.default_domain}",
-                    }
-                    for i, ip in enumerate(ips, start=1)
-                ],
+                "addresses": [{"gateway": self.gateway.name, "ip_address": ip} for ip in ips],
                 **fields,
             }
         )
@@ -89,14 +82,15 @@ class TestEgress(IntegrationTestCase):
 
     def test_gateway_defaults_and_dns(self) -> None:
         self.assertEqual(self.gateway.status, "Pending")
-        self.assertEqual(self.gateway.base_url, f"https://out1.{self.cluster.default_domain}")
+        self.assertEqual(self.gateway.name, f"g1.{self.cluster.default_domain}")
+        self.assertEqual(self.gateway.base_url, f"https://g1.{self.cluster.default_domain}")
         self.assertEqual(frappe.db.get_value("Stalwart Store", self.gateway.data_store, "type"), "RocksDb")
         self.assertEqual(len(self.gateway.get_password("admin_password")), 32)
         record = frappe.get_all(
             "DNS Record", {"managed_by": self.gateway.name}, ["host", "value", "category"]
         )
         self.assertEqual(
-            [(r.host, r.value, r.category) for r in record], [("out1.blr", "203.0.113.50", "Egress")]
+            [(r.host, r.value, r.category) for r in record], [("g1.blr", "203.0.113.50", "Egress")]
         )
 
         # A new address means a new server as far as SSH is concerned.
@@ -110,30 +104,30 @@ class TestEgress(IntegrationTestCase):
         )
 
     def test_pool_assigns_ports_hostnames_and_records(self) -> None:
-        pool = self.make_pool("ded", ("203.0.113.51", "203.0.113.52"))
-        second = self.make_pool("shared", ("203.0.113.53",))
+        pool = self.make_pool(("203.0.113.51", "203.0.113.52"))
+        second = self.make_pool(("203.0.113.53",))
 
         self.assertEqual((pool.relay_port, second.relay_port), (2525, 2526))
-        self.assertEqual(pool.hostname, f"ded.out.{self.cluster.default_domain}")
+        self.assertEqual((pool.pool_name, second.pool_name), ("p1", "p2"))
+        self.assertEqual(pool.hostname, f"p1.out.{self.cluster.default_domain}")
         hosts = sorted(
             (r.host, r.value)
             for r in frappe.get_all("DNS Record", {"managed_by": pool.name}, ["host", "value"])
         )
         self.assertEqual(
             hosts,
-            [("ded.out.blr", "203.0.113.50"), ("ded1.blr", "203.0.113.51"), ("ded2.blr", "203.0.113.52")],
+            [("p1-1.blr", "203.0.113.51"), ("p1-2.blr", "203.0.113.52"), ("p1.out.blr", "203.0.113.50")],
         )
         spf = frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value")
         for ip in ("203.0.113.51", "203.0.113.52", "203.0.113.53"):
             self.assertIn(f"ip4:{ip}", spf)
 
-        self.assertRaisesRegex(
-            frappe.ValidationError, "already belongs", self.make_pool, "dup", ("203.0.113.51",)
-        )
-        self.assertRaisesRegex(frappe.ValidationError, "1-8 lowercase", self.make_pool, "TooLongName")
+        self.assertRaisesRegex(frappe.ValidationError, "already belongs", self.make_pool, ("203.0.113.51",))
+        # A typed pool name is ignored: names are handed out in order.
+        self.assertEqual(self.make_pool(("203.0.113.54",), pool_name="custom").pool_name, "p3")
 
     def test_cluster_routes_follow_pool_assignment(self) -> None:
-        pool = self.make_pool("ded")
+        pool = self.make_pool()
         domain = frappe.get_doc(
             {"doctype": "Mail Domain", "domain_name": "acme.com", "site": self.site.name}
         ).insert()
@@ -153,18 +147,18 @@ class TestEgress(IntegrationTestCase):
         domain.egress_pool = pool.name
         domain.save()
         operations = {op["object"]: op for op in egress.cluster_operations(self.cluster)}
-        route = operations["MtaRoute"]["value"]["egress-ded"]
+        route = operations["MtaRoute"]["value"]["egress-p1"]
         self.assertEqual(
             (route["address"], route["port"], route["authUsername"]), (pool.hostname, 2525, "relay")
         )
         self.assertEqual(route["authSecret"]["secret"], self.cluster.get_password("relay_password"))
         rules = egress.expression_rules(operations["MtaOutboundStrategy"]["value"]["route"])
         self.assertEqual(rules[0]["then"], "'local'")  # cluster-to-cluster mail never leaves
-        self.assertEqual(rules[1], {"if": "sender_domain == 'acme.com'", "then": "'egress-ded'"})
+        self.assertEqual(rules[1], {"if": "sender_domain == 'acme.com'", "then": "'egress-p1'"})
         # The save synced the running cluster: the fake now carries the relay route and rules.
-        self.assertEqual(self.fake.find("MtaRoute", name="egress-ded")["port"], 2525)
+        self.assertEqual(self.fake.find("MtaRoute", name="egress-p1")["port"], 2525)
         live_rules = egress.expression_rules(self.fake.singletons["MtaOutboundStrategy"]["route"])
-        self.assertEqual([r["then"] for r in live_rules], ["'local'", "'egress-ded'"])
+        self.assertEqual([r["then"] for r in live_rules], ["'local'", "'egress-p1'"])
 
         # Cluster default pool pulls every unassigned domain in; site and domain overrides win.
         self.cluster.db_set("default_egress_pool", pool.name)
@@ -177,7 +171,7 @@ class TestEgress(IntegrationTestCase):
         egress.resync_cluster(frappe.get_doc("Stalwart Cluster", self.cluster.name))
         live = self.fake.singletons["MtaOutboundStrategy"]["route"]
         self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'"])
-        self.assertEqual(live["else"], "'egress-ded'")
+        self.assertEqual(live["else"], "'egress-p1'")
 
     def test_default_pool_is_the_fallback_route(self) -> None:
         cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
@@ -191,17 +185,18 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual([op["object"] for op in operations], ["MtaOutboundStrategy"])
         self.assertEqual(operations[0]["value"]["route"]["else"], "'mx'")
 
-        # A populated default pool gets its relay route and the else branch before any domain exists.
-        pool = self.make_pool("ded")
+        # A populated default pool (p2: the empty one took p1) gets its relay route and the else branch
+        # before any domain exists.
+        pool = self.make_pool()
         cluster.db_set("default_egress_pool", pool.name)
         egress.resync_cluster(cluster)
-        self.assertEqual(self.fake.find("MtaRoute", name="egress-ded")["address"], pool.hostname)
+        self.assertEqual(self.fake.find("MtaRoute", name="egress-p2")["address"], pool.hostname)
         live = self.fake.singletons["MtaOutboundStrategy"]["route"]
         self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'"])
-        self.assertEqual(live["else"], "'egress-ded'")
+        self.assertEqual(live["else"], "'egress-p2'")
 
         # A domain on another pool is the only one that needs a rule; both pools keep a route.
-        other = self.make_pool("bulk", ("203.0.113.52",))
+        other = self.make_pool(("203.0.113.52",))
         frappe.get_doc(
             {
                 "doctype": "Mail Domain",
@@ -212,43 +207,43 @@ class TestEgress(IntegrationTestCase):
         ).insert()
         frappe.get_doc({"doctype": "Mail Domain", "domain_name": "acme.com", "site": self.site.name}).insert()
         operations = {op["object"]: op for op in egress.cluster_operations(cluster)}
-        self.assertEqual(sorted(operations["MtaRoute"]["value"]), ["egress-bulk", "egress-ded"])
+        self.assertEqual(sorted(operations["MtaRoute"]["value"]), ["egress-p2", "egress-p3"])
         route = operations["MtaOutboundStrategy"]["value"]["route"]
         self.assertEqual(
-            egress.expression_rules(route)[1], {"if": "sender_domain == 'news.com'", "then": "'egress-bulk'"}
+            egress.expression_rules(route)[1], {"if": "sender_domain == 'news.com'", "then": "'egress-p3'"}
         )
-        self.assertEqual(route["else"], "'egress-ded'")
+        self.assertEqual(route["else"], "'egress-p2'")
 
         # Clearing the default hands the fallback back to direct delivery; a foreign else is kept.
         cluster.db_set("default_egress_pool", None)
         egress.resync_cluster(cluster)
         live = self.fake.singletons["MtaOutboundStrategy"]["route"]
         self.assertEqual(live["else"], "'mx'")
-        self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'", "'egress-bulk'"])
+        self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'", "'egress-p3'"])
         self.fake.singletons["MtaOutboundStrategy"]["route"]["else"] = "'custom'"
         operations = {op["object"]: op for op in egress.cluster_operations(cluster)}
         self.assertEqual(operations["MtaOutboundStrategy"]["value"]["route"]["else"], "'custom'")
 
     def test_gateway_plan(self) -> None:
-        pool = self.make_pool("ded", ("203.0.113.51",))
+        pool = self.make_pool(("203.0.113.51",))
         operations = {
             op["object"]: op
             for op in egress.gateway_plan(frappe.get_doc("Egress Gateway", self.gateway.name))
         }
 
-        listener = operations["NetworkListener"]["value"]["relay-ded"]
+        listener = operations["NetworkListener"]["value"]["relay-p1"]
         self.assertEqual(
             (listener["protocol"], listener["bind"], listener["useTls"]),
             ("smtp", {"0.0.0.0:2525": True}, True),
         )
-        strategy = operations["MtaConnectionStrategy"]["value"]["ded"]
+        strategy = operations["MtaConnectionStrategy"]["value"]["p1"]
         self.assertEqual(
             strategy["sourceIps"],
-            {"0": {"sourceIp": "203.0.113.51", "ehloHostname": f"ded1.{self.cluster.default_domain}"}},
+            {"0": {"sourceIp": "203.0.113.51", "ehloHostname": f"p1-1.{self.cluster.default_domain}"}},
         )
         self.assertEqual(
             operations["MtaOutboundStrategy"]["value"]["connection"],
-            {"match": {"0": {"if": "received_via_port == 2525", "then": "'ded'"}}, "else": "'default'"},
+            {"match": {"0": {"if": "received_via_port == 2525", "then": "'p1'"}}, "else": "'default'"},
         )
         # The relay login belongs to the egress zone; customer sender addresses must pass on relay ports.
         self.assertEqual(
@@ -275,7 +270,7 @@ class TestEgress(IntegrationTestCase):
         self.assertIn(pool.pool_name, variables["cluster_ndjson"])
 
     def test_verify_ptr_marks_rows_one_or_all(self) -> None:
-        pool = self.make_pool("ded", ("203.0.113.51", "203.0.113.52"))
+        pool = self.make_pool(("203.0.113.51", "203.0.113.52"))
         first, second = pool.addresses
         target = "suite_cloud.suite_cloud.doctype.egress_ip_pool.egress_ip_pool.verify_ptr_record"
 
@@ -294,7 +289,7 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(second.ptr_verified, 0)
 
     def test_pool_must_belong_to_the_cluster(self) -> None:
-        pool = self.make_pool("ded")
+        pool = self.make_pool()
         other = activate_cluster(make_cluster("blr-2", hostname=f"mail.blr2.{ROOT_DOMAIN}"))
         self.addCleanup(remove_cluster, other.name)
 
@@ -322,7 +317,7 @@ class TestEgress(IntegrationTestCase):
         self.assertRaisesRegex(frappe.ValidationError, "another cluster", domain.insert)
 
     def test_pool_deletion_is_blocked_while_used(self) -> None:
-        pool = self.make_pool("ded")
+        pool = self.make_pool()
         self.site.db_set("egress_pool", pool.name)
         self.assertRaisesRegex(frappe.ValidationError, "still used", pool.delete)
         self.site.db_set("egress_pool", None)
@@ -331,9 +326,9 @@ class TestEgress(IntegrationTestCase):
         self.assertNotIn("ip4:203.0.113.51", frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"))
 
     def test_spf_includes_nodes_and_pools(self) -> None:
-        node = make_node(self.cluster, "n1", "203.0.113.10")
+        node = make_node(self.cluster, "203.0.113.10")
         node.db_set("status", "Active")
-        self.make_pool("ded", ("203.0.113.51",))
+        self.make_pool(("203.0.113.51",))
         dns.sync_spf_record(self.cluster)
         self.assertEqual(
             frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"),

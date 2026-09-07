@@ -33,6 +33,7 @@
  ],
  "fields": [
   {
+   "description": "Cluster this server belongs to. It provides the stores, the SSH key and the version the node runs.",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -40,16 +41,15 @@
    "label": "Cluster",
    "options": "Stalwart Cluster",
    "reqd": 1,
-   "set_only_once": 1,
-   "description": "Cluster this server belongs to. It provides the stores, the SSH key and the version the node runs."
+   "set_only_once": 1
   },
   {
-   "description": "Name of this server: one label under the cluster's default domain, e.g. n1.blr.frappemail.com. It gets an A record in the zone and is what the reverse DNS of the IP must point to.",
+   "description": "Assigned on first save: n1, n2 and so on under the cluster's default domain, e.g. n1.blr.frappemail.com. It gets an A record in the zone and is what the reverse DNS of the IP must point to.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Hostname",
-   "reqd": 1,
+   "read_only": 1,
    "set_only_once": 1,
    "unique": 1
   },
@@ -67,29 +67,29 @@
   },
   {
    "default": "1",
+   "description": "Untick to take the node out of service: it leaves the cluster hostname's DNS and Stalwart is stopped. Tick again and Restore to bring it back.",
    "fieldname": "enabled",
    "fieldtype": "Check",
-   "label": "Enabled",
-   "description": "Untick to take the node out of service: it leaves the cluster hostname's DNS and Stalwart is stopped. Tick again and Restore to bring it back."
+   "label": "Enabled"
   },
   {
    "default": "Pending",
+   "description": "Pending: created, not provisioned. Provisioning: a job is running. Provisioned: installed, waiting for Stalwart to report healthy. Active: serving. Draining: removed from DNS for maintenance. Failed: the job or health check failed, see Last Error. Disabled: stopped by an operator.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Pending\nProvisioning\nProvisioned\nActive\nDraining\nFailed\nDisabled",
-   "read_only": 1,
-   "description": "Pending: created, not provisioned. Provisioning: a job is running. Provisioned: installed, waiting for Stalwart to report healthy. Active: serving. Draining: removed from DNS for maintenance. Failed: the job or health check failed, see Last Error. Disabled: stopped by an operator."
+   "read_only": 1
   },
   {
    "default": "0",
+   "description": "This node ran the first-time setup of the cluster. It cannot be deleted while the cluster is active.",
    "fieldname": "is_bootstrap_node",
    "fieldtype": "Check",
    "label": "Is Bootstrap Node",
-   "read_only": 1,
-   "description": "This node ran the first-time setup of the cluster. It cannot be deleted while the cluster is active."
+   "read_only": 1
   },
   {
    "fieldname": "network_section",
@@ -97,18 +97,18 @@
    "label": "Network"
   },
   {
+   "description": "Public IPv4 of the VPS. Used for SSH, the node's A record and, while the node is active, the cluster hostname's A record.",
    "fieldname": "ipv4_address",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "IPv4 Address",
-   "reqd": 1,
-   "description": "Public IPv4 of the VPS. Used for SSH, the node's A record and, while the node is active, the cluster hostname's A record."
+   "reqd": 1
   },
   {
+   "description": "Public IPv6 of the VPS, if it has one. Gets an AAAA record alongside the A record.",
    "fieldname": "ipv6_address",
    "fieldtype": "Data",
-   "label": "IPv6 Address",
-   "description": "Public IPv6 of the VPS, if it has one. Gets an AAAA record alongside the A record."
+   "label": "IPv6 Address"
   },
   {
    "fieldname": "column_break_network",
@@ -136,16 +136,16 @@
    "label": "SSH"
   },
   {
+   "description": "User Ansible logs in as. Leave blank to use the cluster's SSH user.",
    "fieldname": "ssh_user",
    "fieldtype": "Data",
-   "label": "SSH User",
-   "description": "User Ansible logs in as. Leave blank to use the cluster's SSH user."
+   "label": "SSH User"
   },
   {
+   "description": "Leave blank to use the cluster's SSH port.",
    "fieldname": "ssh_port",
    "fieldtype": "Int",
-   "label": "SSH Port",
-   "description": "Leave blank to use the cluster's SSH port."
+   "label": "SSH Port"
   },
   {
    "fieldname": "column_break_ssh",
@@ -153,11 +153,11 @@
   },
   {
    "default": "0",
+   "description": "Verify SSH reached the server with the cluster's key. Required before Provision; reset when the IP changes.",
    "fieldname": "ssh_verified",
    "fieldtype": "Check",
    "label": "SSH Verified",
-   "read_only": 1,
-   "description": "Verify SSH reached the server with the cluster's key. Required before Provision; reset when the IP changes."
+   "read_only": 1
   },
   {
    "fieldname": "state_section",
@@ -165,11 +165,11 @@
    "label": "State"
   },
   {
+   "description": "Stalwart release the last job installed on this node.",
    "fieldname": "installed_version",
    "fieldtype": "Data",
    "label": "Installed Version",
-   "read_only": 1,
-   "description": "Stalwart release the last job installed on this node."
+   "read_only": 1
   },
   {
    "description": "Id Stalwart's cluster registry assigned to this node. Stays 0 on single-node clusters without a coordinator.",
@@ -183,25 +183,25 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "When the last provisioning or upgrade job finished successfully.",
    "fieldname": "provisioned_at",
    "fieldtype": "Datetime",
    "label": "Provisioned At",
-   "read_only": 1,
-   "description": "When the last provisioning or upgrade job finished successfully."
+   "read_only": 1
   },
   {
+   "description": "When Stalwart on this node last answered a health check.",
    "fieldname": "last_health_at",
    "fieldtype": "Datetime",
    "label": "Last Health At",
-   "read_only": 1,
-   "description": "When Stalwart on this node last answered a health check."
+   "read_only": 1
   },
   {
+   "description": "Why the last job, health check or SSH check failed. Cleared by the next success.",
    "fieldname": "last_error",
    "fieldtype": "Small Text",
    "label": "Last Error",
-   "read_only": 1,
-   "description": "Why the last job, health check or SSH check failed. Cleared by the next success."
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -217,7 +217,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-04 16:00:00.000000",
+ "modified": "2026-09-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Stalwart Node",

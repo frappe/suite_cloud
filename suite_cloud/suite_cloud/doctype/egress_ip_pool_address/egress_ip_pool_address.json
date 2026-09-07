@@ -15,13 +15,13 @@
  "fields": [
   {
    "columns": 3,
+   "description": "Gateway the address is configured on.",
    "fieldname": "gateway",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Gateway",
    "options": "Egress Gateway",
-   "reqd": 1,
-   "description": "Gateway the address is configured on."
+   "reqd": 1
   },
   {
    "columns": 2,
@@ -38,22 +38,22 @@
   },
   {
    "columns": 3,
-   "description": "Name the gateway announces when sending from this address: one label under the cluster's default domain, e.g. ded1.blr.frappemail.com. It gets an A record pointing at the address, and the address's reverse DNS must point back at it.",
+   "description": "Assigned on save: the pool name, a dash and a number under the cluster's default domain, e.g. p1-1.blr.frappemail.com. The gateway announces it when sending from this address; it gets an A record pointing at the address, and the address's reverse DNS must point back at it.",
    "fieldname": "ehlo_hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "EHLO Hostname",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "columns": 1,
    "default": "0",
+   "description": "Reverse DNS of the address points at the EHLO hostname. Checked daily; receivers reject mail from addresses without it.",
    "fieldname": "ptr_verified",
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "PTR Verified",
-   "read_only": 1,
-   "description": "Reverse DNS of the address points at the EHLO hostname. Checked daily; receivers reject mail from addresses without it."
+   "read_only": 1
   },
   {
    "columns": 1,
@@ -66,7 +66,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-04 20:10:00.000000",
+ "modified": "2026-09-08 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Egress IP Pool Address",

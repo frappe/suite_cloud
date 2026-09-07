@@ -96,15 +96,11 @@ def remove_cluster(name: str) -> None:
     frappe.delete_doc("Stalwart Cluster", name, force=True, ignore_permissions=True, ignore_on_trash=True)
 
 
-def make_node(cluster, label: str = "n1", ipv4: str = "203.0.113.10", **fields):
+def make_node(cluster, ipv4: str = "203.0.113.10", **fields):
+    """Nodes name themselves n1, n2, ... in creation order."""
+
     node = frappe.get_doc(
-        {
-            "doctype": "Stalwart Node",
-            "cluster": cluster.name,
-            "hostname": f"{label}.{cluster.default_domain}",
-            "ipv4_address": ipv4,
-            **fields,
-        }
+        {"doctype": "Stalwart Node", "cluster": cluster.name, "ipv4_address": ipv4, **fields}
     )
     node.insert()
     return node

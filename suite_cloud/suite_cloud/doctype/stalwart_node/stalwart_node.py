@@ -8,7 +8,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, now
 
-from suite_cloud.cluster import bootstrap, dns
+from suite_cloud.cluster import bootstrap, dns, naming
 from suite_cloud.dns.resolver import verify_ptr_record
 from suite_cloud.provisioning.ansible import ping
 from suite_cloud.provisioning.ssh import SSHTarget
@@ -48,6 +48,10 @@ class StalwartNode(Document):
     # end: auto-generated types
 
     # --- lifecycle ------------------------------------------------------------
+
+    def autoname(self) -> None:
+        self.hostname = naming.next_hostname("Stalwart Node", self.cluster, naming.NODE_PREFIX)
+        self.name = self.hostname
 
     def validate(self) -> None:
         cluster = self.get_cluster()

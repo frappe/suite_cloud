@@ -66,11 +66,11 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(cluster.single_node, 1)
         self.assertEqual(cluster.coordinator, "Disabled")
         self.assertRaisesRegex(
-            frappe.ValidationError, "full role", make_node, cluster, "n1", "203.0.113.1", role="frontend"
+            frappe.ValidationError, "full role", make_node, cluster, "203.0.113.1", role="frontend"
         )
-        make_node(cluster, "n1", "203.0.113.1")
+        make_node(cluster, "203.0.113.1")
 
-        self.assertRaisesRegex(frappe.ValidationError, "one node", make_node, cluster, "n2", "203.0.113.2")
+        self.assertRaisesRegex(frappe.ValidationError, "one node", make_node, cluster, "203.0.113.2")
 
         # Redis on a single node is allowed but coordinates nothing.
         redis = make_store("In-Memory", "Redis", title="solo redis", url="redis://redis.example.test:6379")
@@ -79,21 +79,24 @@ class TestStalwartCluster(IntegrationTestCase):
         cluster.save()
         self.assertEqual(cluster.coordinator, "Disabled")
 
-    def test_node_hostname_must_sit_under_the_zone(self) -> None:
+    def test_node_hostnames_are_handed_out_in_order(self) -> None:
         cluster = make_cluster()
-        node = frappe.get_doc(
-            {
-                "doctype": "Stalwart Node",
-                "cluster": cluster.name,
-                "hostname": f"n1.other.{ROOT_DOMAIN}",
-                "ipv4_address": "203.0.113.1",
-            }
+        first = make_node(cluster, "203.0.113.1")
+        second = make_node(cluster, "203.0.113.2")
+        self.assertEqual(
+            (first.name, second.hostname), (f"n1.{cluster.default_domain}", f"n2.{cluster.default_domain}")
         )
-        self.assertRaisesRegex(frappe.ValidationError, "single label", node.insert)
+
+        # A typed hostname is ignored, and numbers are never handed out twice while a node holds them.
+        frappe.delete_doc(
+            "Stalwart Node", first.name, force=True, ignore_permissions=True, ignore_on_trash=True
+        )
+        third = make_node(cluster, "203.0.113.3", hostname=f"custom.{cluster.default_domain}")
+        self.assertEqual(third.hostname, f"n3.{cluster.default_domain}")
 
     def test_node_creates_its_dns_records_and_spf_tracks_ips(self) -> None:
         cluster = make_cluster()
-        node = make_node(cluster, "n1", "203.0.113.10", ipv6_address="2001:db8::10")
+        node = make_node(cluster, "203.0.113.10", ipv6_address="2001:db8::10")
 
         records = frappe.get_all(
             "DNS Record", {"managed_by": node.name}, ["host", "type", "value", "category"], order_by="type"
@@ -133,7 +136,7 @@ class TestStalwartCluster(IntegrationTestCase):
         from suite_cloud.cluster import bootstrap
 
         cluster = make_cluster()
-        node = make_node(cluster, "n1", "203.0.113.10")
+        node = make_node(cluster, "203.0.113.10")
         node.db_set({"status": "Active", "is_bootstrap_node": 1})
         dns.sync_spf_record(cluster)
         self.assertIn(
@@ -164,7 +167,7 @@ class TestStalwartCluster(IntegrationTestCase):
         from suite_cloud.cluster import bootstrap
 
         cluster = make_cluster()
-        node = make_node(cluster, "n1", "203.0.113.10")
+        node = make_node(cluster, "203.0.113.10")
         node.db_set({"status": "Active", "provisioned_at": frappe.utils.add_to_date(None, hours=-5)})
         self.assertFalse(bootstrap._not_ready(node, "registry hiccup"))
         self.assertEqual(
@@ -180,7 +183,7 @@ class TestStalwartCluster(IntegrationTestCase):
         from suite_cloud.suite_cloud.doctype.dns_record.dns_record import reconcile_managed_records
 
         cluster = make_cluster()
-        node = make_node(cluster, "n1", "203.0.113.10")
+        node = make_node(cluster, "203.0.113.10")
         wanted = [
             {
                 "dns_zone": ROOT_DOMAIN,
@@ -208,7 +211,7 @@ class TestStalwartCluster(IntegrationTestCase):
         from suite_cloud.tests.fixtures import clear_request_cache
 
         cluster = make_cluster()
-        node = make_node(cluster, "n1", "203.0.113.10")
+        node = make_node(cluster, "203.0.113.10")
         fake = FakeStalwart(base_url=cluster.base_url, admin_password=cluster.get_password("admin_password"))
         fake.objects["Certificate"]["cert1"] = {
             "id": "cert1",
@@ -274,7 +277,7 @@ class TestStalwartCluster(IntegrationTestCase):
         from suite_cloud.cluster import bootstrap
 
         cluster = make_cluster()
-        node = make_node(cluster, "n1", "203.0.113.10")
+        node = make_node(cluster, "203.0.113.10")
         node.db_set({"is_bootstrap_node": 1, "status": "Provisioning"})
         cluster.db_set({"status": "Failed", "bootstrap_node": node.name})
         job = frappe._dict(retries=1, max_retries=1, error_log="boom")
@@ -297,7 +300,7 @@ class TestStalwartCluster(IntegrationTestCase):
         from suite_cloud.cluster import bootstrap
 
         cluster = make_cluster()
-        node = make_node(cluster, "mta1", "203.0.113.20", role="outbound")
+        node = make_node(cluster, "203.0.113.20", role="outbound")
         self.assertFalse(bootstrap.serves_clients(node))
         self.assertEqual(bootstrap.build_node_variables({"node": node.name})["wait_ports"], [])
         bootstrap.activate_node(node)
@@ -384,7 +387,7 @@ class TestStalwartCluster(IntegrationTestCase):
 
     def test_node_env_and_config(self) -> None:
         cluster = make_cluster()
-        node = make_node(cluster, "n1", role="frontend")
+        node = make_node(cluster, role="frontend")
 
         self.assertEqual(
             plan.node_env(node),
