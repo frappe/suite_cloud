@@ -139,7 +139,7 @@ class MailDomain(Document):
     # --- DNS ------------------------------------------------------------------------
 
     @frappe.whitelist()
-    def refresh_dns_records(self, expected_dkim_keys: int = 0) -> None:
+    def refresh_dns_records(self, expected_dkim_keys: int | None = None) -> None:
         """Re-reads the zone Stalwart expects and rebuilds the record rows (verification kept).
 
         Right after creation the read waits for the DKIM keys Stalwart is still generating.
