@@ -64,6 +64,52 @@ CLUSTER_ROLES = {
 }
 
 
+# --- telemetry ------------------------------------------------------------------------
+
+LOG_DIRECTORY = "/var/log/stalwart"  # created by install-stalwart.yml, pruned by its tmpfiles rule
+
+
+def log_tracer(level: str = "info") -> dict:
+    """A plain-text log rotated daily: stalwart.<date> under LOG_DIRECTORY."""
+
+    return {
+        "@type": "Log",
+        "path": LOG_DIRECTORY,
+        "prefix": "stalwart",
+        "rotate": "daily",
+        "ansi": False,
+        "multiline": False,
+        "enable": True,
+        "level": level,
+        "lossy": False,
+        "events": {},
+        "eventsPolicy": "exclude",
+    }
+
+
+def tracer_operation() -> dict:
+    """Full detail goes to the log file; the journal keeps warnings so journalctl still shows trouble.
+
+    Tracers carry no name, so they are matched by kind: the Journal tracer bootstrap created is
+    turned down rather than duplicated, and the Log tracer is added once.
+    """
+
+    journal = {
+        "@type": "Journal",
+        "enable": True,
+        "level": "warn",
+        "lossy": False,
+        "events": {},
+        "eventsPolicy": "exclude",
+    }
+    return {
+        "@type": "upsert",
+        "object": "Tracer",
+        "matchOn": ["@type"],
+        "value": {"log": log_tracer(), "journal": journal},
+    }
+
+
 # --- bootstrap ------------------------------------------------------------------------
 
 
@@ -81,7 +127,7 @@ def bootstrap_plan(cluster: Document) -> list[dict]:
         "searchStore": store("search_store").config if cluster.search_store else {"@type": "Default"},
         "inMemoryStore": store("in_memory_store").config if cluster.in_memory_store else {"@type": "Default"},
         "directory": {"@type": "Internal"},
-        "tracer": {"@type": "Journal", "level": "info"},
+        "tracer": log_tracer(),
         "dnsServer": {"@type": "Manual"},
     }
     return [{"@type": "update", "object": "Bootstrap", "value": value}]
@@ -94,6 +140,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
     plan: list[dict] = [
         {"@type": "update", "object": "Coordinator", "value": {"@type": cluster.coordinator or "Disabled"}},
         {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
+        tracer_operation(),
     ]
 
     dns_server = dns_server_object(cluster)

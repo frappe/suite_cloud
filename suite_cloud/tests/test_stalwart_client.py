@@ -152,6 +152,22 @@ class TestStalwartClient(UnitTestCase):
         self.assertEqual(third.updated, [first.ids["full"], "SystemSettings/singleton"])
         self.assertEqual(self.fake.get("ClusterRole", first.ids["full"])["description"], "changed")
 
+    def test_tracers_are_matched_by_kind(self) -> None:
+        from suite_cloud.cluster.plan import tracer_operation
+
+        # What bootstrap leaves behind: one Journal tracer at info, no name to match on.
+        journal_id = self.fake._add("Tracer", {"@type": "Journal", "enable": True, "level": "info"})
+
+        first = self.client.apply([tracer_operation()])
+        tracers = {t["@type"]: t for t in self.fake.all("Tracer")}
+        self.assertEqual(set(tracers), {"Journal", "Log"})
+        self.assertEqual((tracers["Journal"]["id"], tracers["Journal"]["level"]), (journal_id, "warn"))
+        self.assertEqual((tracers["Log"]["path"], tracers["Log"]["rotate"]), ("/var/log/stalwart", "daily"))
+        self.assertEqual(first.updated, [journal_id])
+
+        second = self.client.apply([tracer_operation()])
+        self.assertEqual((second.updated, len(second.unchanged)), ([], 2))
+
     def test_plan_apply_does_not_resend_secrets(self) -> None:
         plan = [
             {

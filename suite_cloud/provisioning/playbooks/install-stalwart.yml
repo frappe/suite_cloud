@@ -45,6 +45,12 @@
         - /var/lib/stalwart
         - /var/log/stalwart
 
+    - name: Prune rotated Stalwart log files after 14 days
+      copy:
+        content: "d /var/log/stalwart 0750 stalwart stalwart 14d\n"
+        dest: /etc/tmpfiles.d/stalwart.conf
+        mode: "0644"
+
     - name: Determine the release target
       set_fact:
         stalwart_target: "{{ target_map[ansible_architecture] }}"

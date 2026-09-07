@@ -326,8 +326,13 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(value["inMemoryStore"]["@type"], "Redis")
         self.assertEqual(value["searchStore"], {"@type": "Default"})
         self.assertFalse(value["requestTlsCertificate"])
+        self.assertEqual((value["tracer"]["@type"], value["tracer"]["path"]), ("Log", "/var/log/stalwart"))
 
         operations = {op["object"]: op for op in plan.cluster_plan(cluster)}
+        # Tracers have no name: matched by kind, so bootstrap's journal is turned down, not doubled.
+        self.assertEqual(operations["Tracer"]["matchOn"], ["@type"])
+        self.assertEqual(operations["Tracer"]["value"]["log"]["rotate"], "daily")
+        self.assertEqual(operations["Tracer"]["value"]["journal"]["level"], "warn")
         self.assertEqual(operations["Coordinator"]["value"], {"@type": "Default"})
         self.assertEqual(set(operations["ClusterRole"]["value"]), {"full", "frontend", "outbound"})
         self.assertNotIn("DnsServer", operations)  # no DNS provider configured in tests

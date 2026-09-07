@@ -260,6 +260,7 @@ class TestEgress(IntegrationTestCase):
         relay = operations["Account"]["value"]["relay"]
         self.assertEqual(relay["credentials"]["0"]["secret"], self.cluster.get_password("relay_password"))
         self.assertEqual(operations["Coordinator"]["value"], {"@type": "Disabled"})
+        self.assertEqual(operations["Tracer"]["value"]["log"]["path"], "/var/log/stalwart")
 
         variables = egress.build_gateway_variables({"gateway": self.gateway.name})
         self.assertEqual(variables["wait_ports"], [443, 2525])

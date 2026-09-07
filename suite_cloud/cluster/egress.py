@@ -344,6 +344,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
             },
         }
     )
+    operations.append(plan.tracer_operation())
     operations.append(
         {
             "@type": "update",
@@ -370,7 +371,7 @@ def gateway_bootstrap_plan(gateway: Document) -> list[dict]:
         "searchStore": {"@type": "Default"},
         "inMemoryStore": {"@type": "Default"},
         "directory": {"@type": "Internal"},
-        "tracer": {"@type": "Journal", "level": "info"},
+        "tracer": plan.log_tracer(),
         "dnsServer": {"@type": "Manual"},
     }
     return [{"@type": "update", "object": "Bootstrap", "value": value}]
