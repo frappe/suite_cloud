@@ -80,13 +80,9 @@ def update_domain(
         doc.sub_addressing = int(bool(sub_addressing))
     if enabled is not None:
         doc.enabled = int(bool(enabled))
-    refresh = False
     if publish_client_discovery_records is not None:
-        refresh = bool(publish_client_discovery_records) != bool(doc.publish_client_discovery_records)
         doc.publish_client_discovery_records = int(bool(publish_client_discovery_records))
-    doc.save(ignore_permissions=True)
-    if refresh:
-        doc.refresh_dns_records()
+    doc.save(ignore_permissions=True)  # a changed discovery flag rebuilds the record tables
     return doc.to_api()
 
 
@@ -113,11 +109,7 @@ def refresh_dns_records(domain: str) -> dict:
 
 
 def _records(doc) -> dict:
-    return {
-        "domain": doc.domain_name,
-        "is_verified": bool(doc.is_verified),
-        "records": [r.to_api() for r in doc.dns_records],
-    }
+    return {"domain": doc.domain_name, "is_verified": bool(doc.is_verified), **doc.records_payload()}
 
 
 @frappe.whitelist(methods=["POST"])

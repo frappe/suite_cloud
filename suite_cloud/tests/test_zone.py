@@ -10,6 +10,8 @@ v1-rsa-20260101._domainkey.example.com. 3600 IN TXT "v=DKIM1; k=rsa; " "p=MIIBIj
 _dmarc.example.com. 3600 IN TXT "v=DMARC1; p=reject; rua=mailto:postmaster@example.com"
 _smtp._tls.example.com. 3600 IN TXT "v=TLSRPTv1; rua=mailto:postmaster@example.com"
 example.com. 3600 IN CAA 0 issue "letsencrypt.org"
+ua-auto-config.example.com. 3600 IN CNAME mail.blr.example.test.
+_ua-auto-config.example.com. 3600 IN TXT "v=UAAC1; a=sha256; d=abc"
 mta-sts.example.com. 3600 IN CNAME mail.blr.example.test.
 _mta-sts.example.com. 3600 IN TXT "v=STSv1; id=1"
 autoconfig.example.com. 3600 IN CNAME mail.blr.example.test.
@@ -42,11 +44,14 @@ class TestZone(UnitTestCase):
         rows = build_domain_records("example.com", ZONE, spf_include="spf.blr.example.test")
         by_category = {(r["category"], r["host"]): r for r in rows}
 
-        mx = by_category[("Receiving", "@")]
+        mx = by_category[("MX", "@")]
         self.assertEqual(
-            (mx["record_type"], mx["priority"], mx["value"]), ("MX", 10, "mail.blr.example.test")
+            (mx["record_type"], mx["priority"], mx["value"], mx["group"], mx["is_mandatory"]),
+            ("MX", 10, "mail.blr.example.test", "routing_records", 0),
         )
-        self.assertEqual(by_category[("Sending", "@")]["value"], "v=spf1 include:spf.blr.example.test -all")
+        spf = by_category[("SPF", "@")]
+        self.assertEqual(spf["value"], "v=spf1 include:spf.blr.example.test -all")
+        self.assertEqual((spf["group"], spf["is_mandatory"]), ("authentication_records", 1))
         dkim = by_category[("DKIM", "v1-rsa-20260101._domainkey")]
         self.assertEqual(dkim["value"], "v=DKIM1; k=rsa; p=MIIBIjANBg")  # quoted chunks joined
         self.assertEqual(
@@ -54,20 +59,28 @@ class TestZone(UnitTestCase):
             "v=DKIM1; k=rsa; h=sha256; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA",
         )
         self.assertEqual(by_category[("DMARC", "_dmarc")]["is_mandatory"], 1)
-        self.assertEqual(by_category[("TLS Reporting", "_smtp._tls")]["is_mandatory"], 0)
-        self.assertEqual(by_category[("Other", "@")]["record_type"], "CAA")
+        tlsrpt = by_category[("TLS-RPT", "_smtp._tls")]
+        self.assertEqual((tlsrpt["group"], tlsrpt["is_mandatory"]), ("transport_security_records", 0))
+        srv = by_category[("SRV", "_imaps._tcp")]  # targets the cluster host: no certificate needed
+        self.assertEqual((srv["group"], srv["value"]), ("discovery_records", "0 1 993 mail.blr.example.test"))
         self.assertNotIn(("MTA-STS", "mta-sts"), by_category)
-        self.assertNotIn(("Auto-config", "autoconfig"), by_category)
+        self.assertNotIn(("Autoconfig", "autoconfig"), by_category)
+        self.assertNotIn(("UA Auto Config", "ua-auto-config"), by_category)
+        self.assertFalse(any(r["record_type"] == "CAA" for r in rows))  # nothing the domain needs
         self.assertFalse(any(r["host"] == "other.org" for r in rows))
-        self.assertTrue(all(r["is_mandatory"] for r in rows[:4]))  # mandatory rows first
+        # Group order, authentication first.
+        self.assertEqual([r["category"] for r in rows[:5]], ["SPF", "DKIM", "DKIM", "DMARC", "MX"])
 
-    def test_client_discovery_records_are_opt_in(self) -> None:
+    def test_certificate_bound_records_are_opt_in(self) -> None:
         rows = build_domain_records("example.com", ZONE, spf_include="spf.x", include_client_discovery=True)
-        categories = {r["category"] for r in rows}
-        self.assertIn("MTA-STS", categories)
-        self.assertIn("Auto-config", categories)
-        srv = next(r for r in rows if r["record_type"] == "SRV")
-        self.assertEqual((srv["host"], srv["value"]), ("_imaps._tcp", "0 1 993 mail.blr.example.test"))
+        by_category = {(r["category"], r["host"]): r for r in rows}
+        self.assertEqual(by_category[("MTA-STS", "mta-sts")]["group"], "transport_security_records")
+        self.assertEqual(by_category[("MTA-STS", "_mta-sts")]["value"], "v=STSv1; id=1")
+        self.assertEqual(by_category[("Autoconfig", "autoconfig")]["group"], "autoconfig_records")
+        self.assertEqual(by_category[("UA Auto Config", "ua-auto-config")]["value"], "mail.blr.example.test")
+        self.assertEqual(
+            by_category[("UA Auto Config", "_ua-auto-config")]["value"], "v=UAAC1; a=sha256; d=abc"
+        )
 
     def test_fake_stalwart_zone_parses(self) -> None:
         fake = FakeStalwart()

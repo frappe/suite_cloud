@@ -8,7 +8,7 @@ from frappe.utils import cint, now
 
 from suite_cloud.cluster import dns as cluster_dns
 from suite_cloud.cluster import egress
-from suite_cloud.cluster.zone import build_domain_records
+from suite_cloud.cluster.zone import GROUPS, build_domain_records, group_summaries
 from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.stalwart.directory import Domain
 from suite_cloud.tenancy import ownership, sync
@@ -31,10 +31,12 @@ class MailDomain(Document):
             MailDomainDNSRecord,
         )
 
+        authentication_records: DF.Table[MailDomainDNSRecord]
+        autoconfig_records: DF.Table[MailDomainDNSRecord]
         catch_all_address: DF.Data | None
         cluster: DF.Link | None
         description: DF.Data | None
-        dns_records: DF.Table[MailDomainDNSRecord]
+        discovery_records: DF.Table[MailDomainDNSRecord]
         dns_zone_file: DF.Code | None
         domain_name: DF.Data
         egress_pool: DF.Link | None
@@ -43,9 +45,11 @@ class MailDomain(Document):
         last_refreshed_at: DF.Datetime | None
         last_verified_at: DF.Datetime | None
         publish_client_discovery_records: DF.Check
+        routing_records: DF.Table[MailDomainDNSRecord]
         site: DF.Link
         stalwart_id: DF.Data | None
         sub_addressing: DF.Check
+        transport_security_records: DF.Table[MailDomainDNSRecord]
     # end: auto-generated types
 
     # --- lifecycle --------------------------------------------------------------
@@ -71,6 +75,9 @@ class MailDomain(Document):
             and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
+        if not self.is_new() and self.has_value_changed("publish_client_discovery_records"):
+            # The zone already holds the certificate-bound records; only which tables list them changes.
+            self.rebuild_dns_records(self.dns_zone_file or "")
 
     def after_insert(self) -> None:
         payload = self.stalwart_payload()
@@ -141,6 +148,15 @@ class MailDomain(Document):
         zone_file = sync.client_for(self).domains.get_zone_file(
             self.stalwart_id, expected_dkim_keys=cint(expected_dkim_keys)
         )
+        self.rebuild_dns_records(zone_file)
+        self.last_refreshed_at = now()
+        # Liveness is only ever changed by a verification run: a rotated DKIM selector must not
+        # take a working domain offline before its owner had a chance to publish it.
+        self.save_records()
+
+    def rebuild_dns_records(self, zone_file: str) -> None:
+        """Replaces the group tables with the rows parsed from ``zone_file`` (verification kept)."""
+
         cluster = self.get_cluster()
         rows = build_domain_records(
             self.domain_name,
@@ -150,20 +166,16 @@ class MailDomain(Document):
             default_ttl=cint(get_config("default_dns_ttl")) or 300,
         )
         verified = {
-            (r.record_type, r.host, (r.value or "").strip()): r for r in self.dns_records if r.is_verified
+            (r.record_type, r.host, (r.value or "").strip()): r for r in self.dns_rows() if r.is_verified
         }
-        self.set("dns_records", [])
+        for group in GROUPS:
+            self.set(group["key"], [])
         for row in rows:
             previous = verified.get((row["record_type"], row["host"], row["value"].strip()))
             if previous:
                 row.update({"is_verified": 1, "last_checked_at": previous.last_checked_at})
-            self.append("dns_records", row)
-
+            self.append(row.pop("group"), row)
         self.dns_zone_file = zone_file
-        self.last_refreshed_at = now()
-        # Liveness is only ever changed by a verification run: a rotated DKIM selector must not
-        # take a working domain offline before its owner had a chance to publish it.
-        self.save_records()
 
     @frappe.whitelist()
     def verify_dns_records(self) -> dict:
@@ -171,7 +183,7 @@ class MailDomain(Document):
 
         checked_at = now()
         inconclusive = 0
-        for row in self.dns_records:
+        for row in self.dns_rows():
             verified = verify_dns_record(row.fqdn, row.record_type, self.expected_value(row))
             if verified is None:
                 inconclusive += 1  # resolver trouble says nothing about the record: keep its state
@@ -186,29 +198,34 @@ class MailDomain(Document):
             # Cluster first: a failed push must not leave the local flag ahead of Stalwart.
             sync.push_update(self, "domains", {"isEnabled": self.is_live()})
         self.save_records()
-        return {
-            "inconclusive": inconclusive,
-            "is_verified": bool(self.is_verified),
-            "records": [r.to_api() for r in self.dns_records],
-        }
+        return {"inconclusive": inconclusive, "is_verified": bool(self.is_verified), **self.records_payload()}
 
     def compute_is_verified(self) -> bool:
-        """MX, SPF and DMARC must all verify, plus at least one DKIM selector.
+        """SPF and DMARC must verify, plus at least one DKIM selector.
 
         Stalwart rotates DKIM keys; the retiring selector keeps signatures valid while the owner
-        publishes the new one, so a single verified selector is enough to stay live.
+        publishes the new one, so a single verified selector is enough to stay live. MX is the
+        owner's choice: a domain may send through the cluster and keep receiving elsewhere.
         """
 
-        rows = self.dns_records
+        rows = self.authentication_records
         if not rows:
             return False
         by_category: dict[str, list] = {}
         for row in rows:
             by_category.setdefault(row.category, []).append(row)
-        for category in ("Receiving", "Sending", "DMARC"):
+        for category in ("SPF", "DMARC"):
             if not by_category.get(category) or not all(r.is_verified for r in by_category[category]):
                 return False
         return any(r.is_verified for r in by_category.get("DKIM", []))
+
+    def dns_rows(self) -> list[Document]:
+        """Every record row across the group tables, in group order."""
+
+        return [row for group in GROUPS for row in self.get(group["key"])]
+
+    def records_payload(self) -> dict:
+        return {"groups": group_summaries(), "records": [r.to_api() for r in self.dns_rows()]}
 
     @staticmethod
     def expected_value(row: Document) -> str:
@@ -240,7 +257,9 @@ class MailDomain(Document):
             "created_at": self.creation,
         }
         if with_records:
-            payload["dns_records"] = [r.to_api() for r in self.dns_records]
+            records = self.records_payload()
+            payload["dns_record_groups"] = records["groups"]
+            payload["dns_records"] = records["records"]
         return payload
 
 

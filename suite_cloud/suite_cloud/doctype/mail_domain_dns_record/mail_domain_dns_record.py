@@ -14,15 +14,16 @@ class MailDomainDNSRecord(Document):
         from frappe.types import DF
 
         category: DF.Literal[
-            "Receiving",
-            "Sending",
+            "MX",
+            "SPF",
             "DKIM",
             "DMARC",
-            "TLS Reporting",
             "MTA-STS",
-            "Auto-config",
-            "Auto-discover",
-            "Other",
+            "TLS-RPT",
+            "SRV",
+            "Autoconfig",
+            "Autodiscover",
+            "UA Auto Config",
         ]
         host: DF.Data | None
         is_mandatory: DF.Check
@@ -32,7 +33,7 @@ class MailDomainDNSRecord(Document):
         parentfield: DF.Data
         parenttype: DF.Data
         priority: DF.Int
-        record_type: DF.Literal["MX", "TXT", "CNAME", "SRV", "CAA"]
+        record_type: DF.Literal["MX", "TXT", "CNAME", "SRV"]
         ttl: DF.Int
         value: DF.Text | None
     # end: auto-generated types
@@ -43,6 +44,7 @@ class MailDomainDNSRecord(Document):
 
     def to_api(self) -> dict:
         return {
+            "group": self.parentfield,
             "category": self.category,
             "type": self.record_type,
             "host": self.host,

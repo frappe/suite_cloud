@@ -16,7 +16,7 @@ frappe.ui.form.on('Mail Domain', {
 		frm.add_custom_button(__('Refresh DNS Records'), () => frm.events.call(frm, 'refresh_dns_records', __('Reading zone...')))
 		frm.add_custom_button(__('Verify DNS Records'), () => frm.events.call(frm, 'verify_dns_records', __('Resolving...')))
 		if (!frm.doc.is_verified) {
-			frm.dashboard.add_comment(__('Publish the mandatory records at the domain\'s DNS provider, then verify.'), 'yellow', true)
+			frm.dashboard.add_comment(__('Publish the Email Authentication records at the domain\'s DNS provider, then verify.'), 'yellow', true)
 		}
 	},
 

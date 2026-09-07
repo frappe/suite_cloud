@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "field:domain_name",
- "creation": "2026-09-03 12:00:00.000000",
+ "creation": "2026-09-03 12:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -24,7 +24,11 @@
   "column_break_dns",
   "last_refreshed_at",
   "dns_records_section",
-  "dns_records",
+  "authentication_records",
+  "routing_records",
+  "transport_security_records",
+  "discovery_records",
+  "autoconfig_records",
   "zone_section",
   "dns_zone_file"
  ],
@@ -110,7 +114,7 @@
   },
   {
    "default": "0",
-   "description": "Also list SRV, autoconfig, autodiscover and MTA-STS records. Those hostnames get no certificate from the cluster, so leave this off unless the site handles TLS for them.",
+   "description": "Also list the MTA-STS, autoconfig and autodiscover records. Those hostnames are served over HTTPS and get no certificate from the cluster, so leave this off unless the site handles TLS for them.",
    "fieldname": "publish_client_discovery_records",
    "fieldtype": "Check",
    "label": "Publish Client Discovery Records"
@@ -122,7 +126,7 @@
   },
   {
    "default": "0",
-   "description": "Set when MX, SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled.",
+   "description": "Set when SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled.",
    "fieldname": "is_verified",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -148,15 +152,43 @@
    "read_only": 1
   },
   {
-   "fieldname": "dns_records_section",
-   "fieldtype": "Section Break",
-   "hide_border": 1
+   "description": "Mandatory. Records that stop others sending mail as this domain: SPF, DKIM and DMARC. Mail flows once SPF, DMARC and at least one DKIM selector resolve.",
+   "fieldname": "authentication_records",
+   "fieldtype": "Table",
+   "label": "Email Authentication",
+   "options": "Mail Domain DNS Record",
+   "read_only": 1
   },
   {
-   "description": "What the domain's DNS provider must publish, rebuilt from the cluster's zone file. Mandatory rows decide verification; verified rows keep their state across refreshes.",
-   "fieldname": "dns_records",
+   "description": "Optional. Points mail sent to this domain at the cluster. Leave it out to keep receiving elsewhere and use the cluster for sending only.",
+   "fieldname": "routing_records",
    "fieldtype": "Table",
-   "label": "DNS Records",
+   "label": "Inbound Mail Routing",
+   "options": "Mail Domain DNS Record",
+   "read_only": 1
+  },
+  {
+   "description": "Optional. Asks sending servers to insist on encrypted delivery (MTA-STS) and to report failed or insecure connections (TLS-RPT). MTA-STS rows appear only with Publish Client Discovery Records on.",
+   "fieldname": "transport_security_records",
+   "fieldtype": "Table",
+   "label": "Transport Security",
+   "options": "Mail Domain DNS Record",
+   "read_only": 1
+  },
+  {
+   "description": "Optional. Lets mail, calendar and contacts apps find the servers for this domain on their own.",
+   "fieldname": "discovery_records",
+   "fieldtype": "Table",
+   "label": "Service Discovery",
+   "options": "Mail Domain DNS Record",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.publish_client_discovery_records",
+   "description": "Optional. Lets mail clients set themselves up from just an address. These hostnames are served over HTTPS by the cluster, which holds no certificate for them.",
+   "fieldname": "autoconfig_records",
+   "fieldtype": "Table",
+   "label": "Client Auto-configuration",
    "options": "Mail Domain DNS Record",
    "read_only": 1
   },
@@ -167,7 +199,7 @@
    "label": "Zone File"
   },
   {
-   "description": "The zone file the cluster generated for the domain, as last refreshed. The rows above are parsed from it.",
+   "description": "The zone file the cluster generated for the domain, as last refreshed. The tables above are parsed from it.",
    "fieldname": "dns_zone_file",
    "fieldtype": "Code",
    "label": "Zone File",
@@ -179,6 +211,11 @@
    "fieldtype": "Link",
    "label": "Egress Pool",
    "options": "Egress IP Pool"
+  },
+  {
+   "fieldname": "dns_records_section",
+   "fieldtype": "Section Break",
+   "label": "DNS Records"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -199,7 +236,7 @@
    "link_fieldname": "domain"
   }
  ],
- "modified": "2026-09-07 10:00:00.000000",
+ "modified": "2026-09-07 11:04:06.655456",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Domain",

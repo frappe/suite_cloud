@@ -113,21 +113,31 @@ class TestMailDomain(TenancyTestCase):
         self.assertEqual(live["dnsManagement"], {"@type": "Manual"})
         self.assertEqual(live["reportAddressUri"], "mailto:postmaster@acme.com")
 
-        categories = [(r.category, r.host, r.is_mandatory) for r in domain.dns_records]
-        self.assertIn(("Receiving", "@", 1), categories)
-        self.assertIn(("Sending", "@", 1), categories)
-        self.assertIn(("DMARC", "_dmarc", 1), categories)
-        self.assertEqual([c[1] for c in categories if c[0] == "DKIM"], ["v1-rsa-20260101._domainkey"])
-        self.assertNotIn("MTA-STS", [c[0] for c in categories])
-        spf = next(r for r in domain.dns_records if r.category == "Sending")
+        # Rows land in the table of their group; authentication rows are the mandatory ones.
+        auth = [(r.category, r.host, r.is_mandatory) for r in domain.authentication_records]
+        self.assertEqual(
+            auth, [("SPF", "@", 1), ("DKIM", "v1-rsa-20260101._domainkey", 1), ("DMARC", "_dmarc", 1)]
+        )
+        spf = domain.authentication_records[0]
         self.assertEqual(spf.value, f"v=spf1 include:spf.{self.cluster.default_domain} -all")
-        mx = next(r for r in domain.dns_records if r.category == "Receiving")
-        self.assertEqual((mx.value, mx.priority, mx.fqdn), (self.cluster.hostname, 10, "acme.com"))
+        mx = domain.routing_records[0]
+        self.assertEqual(
+            (mx.category, mx.value, mx.priority, mx.fqdn), ("MX", self.cluster.hostname, 10, "acme.com")
+        )
+        self.assertEqual(mx.is_mandatory, 0)
+        self.assertEqual([r.category for r in domain.transport_security_records], ["TLS-RPT"])
+        self.assertTrue(domain.discovery_records)
+        self.assertEqual(domain.autoconfig_records, [])  # certificate-bound: opt-in
+        api = domain.to_api()
+        self.assertEqual(
+            [g["key"] for g in api["dns_record_groups"]][:2], ["authentication_records", "routing_records"]
+        )
+        self.assertEqual(api["dns_records"][0]["group"], "authentication_records")
         self.assertFalse(domain.is_verified)
 
     def test_domain_updates_push_and_refresh_keeps_verification(self) -> None:
         domain = self.make_domain()
-        next(r for r in domain.dns_records if r.category == "Receiving").is_verified = 1
+        domain.routing_records[0].is_verified = 1
         domain.save_records()
 
         domain.description = "Main"
@@ -138,9 +148,16 @@ class TestMailDomain(TenancyTestCase):
         self.assertEqual(live["description"], "Main")
         self.assertEqual(live["catchAllAddress"], "catch@acme.com")
 
-        domain.refresh_dns_records()
-        self.assertIn("MTA-STS", [r.category for r in domain.dns_records])
-        self.assertEqual([r.is_verified for r in domain.dns_records if r.category == "Receiving"], [1])
+        # Turning the discovery flag on lists the certificate-bound records from the stored zone.
+        self.assertIn("MTA-STS", [r.category for r in domain.transport_security_records])
+        self.assertEqual([r.category for r in domain.autoconfig_records], ["Autoconfig", "Autodiscover"])
+        self.assertEqual([r.is_verified for r in domain.routing_records], [1])
+
+        domain.publish_client_discovery_records = 0
+        domain.save()
+        self.assertEqual([r.category for r in domain.transport_security_records], ["TLS-RPT"])
+        self.assertEqual(domain.autoconfig_records, [])
+        self.assertEqual([r.is_verified for r in domain.routing_records], [1])
 
     def test_domain_limits_reserved_names_and_ownership(self) -> None:
         self.site.db_set("max_domains", 1)
@@ -162,7 +179,7 @@ class TestMailDomain(TenancyTestCase):
         domain = self.make_domain()
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
 
-        for row in domain.dns_records:
+        for row in domain.dns_rows():
             row.is_verified = 1
         domain.save_records()
         # Simulate a verification pass where every record already resolves.
@@ -180,7 +197,7 @@ class TestMailDomain(TenancyTestCase):
 
     def test_verification_rule_and_inconclusive_lookups(self) -> None:
         domain = self.make_domain()
-        for row in domain.dns_records:
+        for row in domain.dns_rows():
             row.is_verified = 1
         domain.save_records()
 
@@ -196,7 +213,7 @@ class TestMailDomain(TenancyTestCase):
 
         # One verified DKIM selector is enough after a rotation adds an unpublished one.
         domain.append(
-            "dns_records",
+            "authentication_records",
             {
                 "category": "DKIM",
                 "record_type": "TXT",
@@ -206,10 +223,16 @@ class TestMailDomain(TenancyTestCase):
             },
         )
         self.assertTrue(domain.compute_is_verified())
-        for row in domain.dns_records:
+        for row in domain.authentication_records:
             if row.category == "DKIM":
                 row.is_verified = 0
         self.assertFalse(domain.compute_is_verified())
+
+        # MX is the owner's choice: a sending-only domain verifies without it.
+        for row in domain.authentication_records:
+            row.is_verified = 1
+        domain.routing_records[0].is_verified = 0
+        self.assertTrue(domain.compute_is_verified())
 
     def test_reserved_names_cover_every_cluster_zone(self) -> None:
         self.assertRaisesRegex(
@@ -242,7 +265,8 @@ class TestMailDomain(TenancyTestCase):
 
         sleep.assert_called_once()
         self.assertEqual(
-            [r.host for r in domain.dns_records if r.category == "DKIM"], ["v1-rsa-20260101._domainkey"]
+            [r.host for r in domain.authentication_records if r.category == "DKIM"],
+            ["v1-rsa-20260101._domainkey"],
         )
         self.assertIn("_domainkey", domain.dns_zone_file)
 
@@ -256,7 +280,7 @@ class TestMailDomain(TenancyTestCase):
         self.assertEqual(
             live["dkimManagement"]["algorithms"], {"Dkim1Ed25519Sha256": True, "Dkim1RsaSha256": True}
         )
-        selectors = sorted(r.host for r in after.dns_records if r.category == "DKIM")
+        selectors = sorted(r.host for r in after.authentication_records if r.category == "DKIM")
         self.assertEqual(selectors, ["v1-ed25519-20260101._domainkey", "v1-rsa-20260101._domainkey"])
 
         # The earlier domain keeps the keys it was created with; a save does not push algorithms.
