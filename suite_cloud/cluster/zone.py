@@ -25,9 +25,8 @@ class ZoneRecord:
 
 def parse_zone_file(text: str) -> list[ZoneRecord]:
     records = []
-    for raw in (text or "").splitlines():
-        line = _strip_comment(raw).strip()
-        if not line or line.startswith("$"):
+    for line in _logical_lines(text):
+        if line.startswith("$"):
             continue
         match = RECORD_LINE.match(line)
         if not match:
@@ -117,6 +116,51 @@ def _to_row(record: ZoneRecord, domain: str, spf_include: str, default_ttl: int)
 
     row["is_mandatory"] = int(row["category"] in MANDATORY)
     return row
+
+
+def _logical_lines(text: str):
+    """Yields one record per item: parentheses let rdata span lines (Stalwart writes RSA DKIM
+    keys that way), so a parenthesised group is joined into a single line without the parens."""
+
+    pending: list[str] = []
+    depth = 0
+    for raw in (text or "").splitlines():
+        line = _strip_comment(raw).strip()
+        if not line:
+            continue
+        depth += _paren_balance(line)
+        pending.append(line)
+        if depth > 0:
+            continue
+        joined = " ".join(pending)
+        pending, depth = [], 0
+        yield _drop_parens(joined) if "(" in joined else joined
+
+
+def _paren_balance(line: str) -> int:
+    """Opening minus closing parentheses outside quoted strings."""
+
+    balance = 0
+    quoted = False
+    for char in line:
+        if char == '"':
+            quoted = not quoted
+        elif not quoted and char == "(":
+            balance += 1
+        elif not quoted and char == ")":
+            balance -= 1
+    return balance
+
+
+def _drop_parens(line: str) -> str:
+    out = []
+    quoted = False
+    for char in line:
+        if char == '"':
+            quoted = not quoted
+        if quoted or char not in "()":
+            out.append(char)
+    return " ".join("".join(out).split())
 
 
 def _strip_comment(line: str) -> str:

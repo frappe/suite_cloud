@@ -15,6 +15,10 @@ _mta-sts.example.com. 3600 IN TXT "v=STSv1; id=1"
 autoconfig.example.com. 3600 IN CNAME mail.blr.example.test.
 _imaps._tcp.example.com. 3600 IN SRV 0 1 993 mail.blr.example.test.
 other.org. 3600 IN MX 10 mail.blr.example.test.
+v2-rsa-20260401._domainkey.example.com. IN TXT ( ; rotated key, written the way Stalwart does
+    "v=DKIM1; k=rsa; h=sha256; p=MIIBIjANBgkq"
+    "hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA"
+)
 """
 
 
@@ -25,6 +29,14 @@ class TestZone(UnitTestCase):
         self.assertEqual(records[0].type, "MX")
         self.assertEqual(records[0].rdata, "10 mail.blr.example.test.")
         self.assertEqual(records[2].rdata, '"v=DKIM1; k=rsa; " "p=MIIBIjANBg"')
+        multiline = records[-1]
+        self.assertEqual(
+            (multiline.name, multiline.ttl, multiline.type),
+            ("v2-rsa-20260401._domainkey.example.com", None, "TXT"),
+        )
+        self.assertEqual(
+            multiline.rdata, '"v=DKIM1; k=rsa; h=sha256; p=MIIBIjANBgkq" "hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA"'
+        )
 
     def test_build_domain_records(self) -> None:
         rows = build_domain_records("example.com", ZONE, spf_include="spf.blr.example.test")
@@ -37,6 +49,10 @@ class TestZone(UnitTestCase):
         self.assertEqual(by_category[("Sending", "@")]["value"], "v=spf1 include:spf.blr.example.test -all")
         dkim = by_category[("DKIM", "v1-rsa-20260101._domainkey")]
         self.assertEqual(dkim["value"], "v=DKIM1; k=rsa; p=MIIBIjANBg")  # quoted chunks joined
+        self.assertEqual(
+            by_category[("DKIM", "v2-rsa-20260401._domainkey")]["value"],
+            "v=DKIM1; k=rsa; h=sha256; p=MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA",
+        )
         self.assertEqual(by_category[("DMARC", "_dmarc")]["is_mandatory"], 1)
         self.assertEqual(by_category[("TLS Reporting", "_smtp._tls")]["is_mandatory"], 0)
         self.assertEqual(by_category[("Other", "@")]["record_type"], "CAA")

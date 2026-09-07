@@ -355,12 +355,15 @@ class FakeStalwart:
         lines.append(f'{name}. 3600 IN TXT "v=spf1 mx ra=postmaster -all"')
         for signature in self.all("DkimSignature"):
             if signature["domainId"] == domain["id"]:
-                key = (
-                    "k=ed25519; p=MCowBQYDK2VwAyEAabc"
-                    if "ed25519" in signature["selector"]
-                    else "k=rsa; p=MIIBIjANBg"
-                )
-                lines.append(f'{signature["selector"]}._domainkey.{name}. 3600 IN TXT "v=DKIM1; {key}"')
+                owner = f"{signature['selector']}._domainkey.{name}."
+                if "ed25519" in signature["selector"]:
+                    lines.append(f'{owner} 3600 IN TXT "v=DKIM1; k=ed25519; p=MCowBQYDK2VwAyEAabc"')
+                else:
+                    # Stalwart splits the long RSA key over a parenthesised group of quoted chunks.
+                    lines.append(f"{owner} 3600 IN TXT (")
+                    lines.append('    "v=DKIM1; k=rsa; p=MIIBIjANBg"')
+                    lines.append('    "kqhkiG9w0BAQEFAAOCAQ8A"')
+                    lines.append(")")
         lines.append(f'_dmarc.{name}. 3600 IN TXT "v=DMARC1; p=reject; rua=mailto:postmaster@{name}"')
         lines.append(f'_smtp._tls.{name}. 3600 IN TXT "v=TLSRPTv1; rua=mailto:postmaster@{name}"')
         lines.append(f'{name}. 3600 IN CAA 0 issue "letsencrypt.org"')
