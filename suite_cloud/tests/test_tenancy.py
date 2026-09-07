@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -164,8 +166,6 @@ class TestMailDomain(TenancyTestCase):
             row.is_verified = 1
         domain.save_records()
         # Simulate a verification pass where every record already resolves.
-        from unittest.mock import patch
-
         with patch(
             "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.verify_dns_record", return_value=True
         ):
@@ -179,8 +179,6 @@ class TestMailDomain(TenancyTestCase):
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
 
     def test_verification_rule_and_inconclusive_lookups(self) -> None:
-        from unittest.mock import patch
-
         domain = self.make_domain()
         for row in domain.dns_records:
             row.is_verified = 1
@@ -223,6 +221,30 @@ class TestMailDomain(TenancyTestCase):
         other = make_site(self.cluster, "other.frappe.test")
         doc = frappe.get_doc({"doctype": "Mail Domain", "domain_name": "acme.com", "site": other.name})
         self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", doc.insert)
+
+    def test_domain_creation_waits_for_dkim_keys_still_being_generated(self) -> None:
+        # Stalwart generates the RSA key after the domain exists; the first zone read misses it.
+        real_zone_file = FakeStalwart._zone_file
+        reads = []
+
+        def lagging_zone_file(fake, domain):
+            zone = real_zone_file(fake, domain)
+            if reads or domain["id"] not in fake.objects["Domain"]:  # creation renders it too
+                return zone
+            reads.append(domain["id"])
+            return "\n".join(line for line in zone.splitlines() if "_domainkey" not in line) + "\n"
+
+        with (
+            patch.object(FakeStalwart, "_zone_file", lagging_zone_file),
+            patch("suite_cloud.stalwart.directory.time.sleep") as sleep,
+        ):
+            domain = self.make_domain()
+
+        sleep.assert_called_once()
+        self.assertEqual(
+            [r.host for r in domain.dns_records if r.category == "DKIM"], ["v1-rsa-20260101._domainkey"]
+        )
+        self.assertIn("_domainkey", domain.dns_zone_file)
 
     def test_ed25519_signing_is_opt_in_and_applies_to_domains_added_afterwards(self) -> None:
         before = self.make_domain()

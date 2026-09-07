@@ -220,6 +220,9 @@ class FakeStalwart:
             objects = (
                 list(collection.values()) if ids is None else [collection[i] for i in ids if i in collection]
             )
+        if type == "Domain":
+            # Stalwart renders the zone on every read, so keys added since creation show up.
+            objects = [{**o, "dnsZoneFile": self._zone_file(o)} for o in objects]
         properties = args.get("properties")
         if properties:
             objects = [{"id": o["id"], **{p: o.get(p) for p in properties if p in o}} for o in objects]

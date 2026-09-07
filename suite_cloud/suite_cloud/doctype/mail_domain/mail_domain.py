@@ -73,9 +73,10 @@ class MailDomain(Document):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
 
     def after_insert(self) -> None:
-        sync.push_create(self, "domains", self.stalwart_payload())
+        payload = self.stalwart_payload()
+        sync.push_create(self, "domains", payload)
         try:
-            self.refresh_dns_records()
+            self.refresh_dns_records(expected_dkim_keys=len(payload.dkim_algorithms))
         except Exception:
             sync.push_destroy(self, "domains")  # the insert rolls back; the domain must not survive
             raise
@@ -131,10 +132,15 @@ class MailDomain(Document):
     # --- DNS ------------------------------------------------------------------------
 
     @frappe.whitelist()
-    def refresh_dns_records(self) -> None:
-        """Re-reads the zone Stalwart expects and rebuilds the record rows (verification kept)."""
+    def refresh_dns_records(self, expected_dkim_keys: int = 0) -> None:
+        """Re-reads the zone Stalwart expects and rebuilds the record rows (verification kept).
 
-        zone_file = sync.client_for(self).domains.get_zone_file(self.stalwart_id)
+        Right after creation the read waits for the DKIM keys Stalwart is still generating.
+        """
+
+        zone_file = sync.client_for(self).domains.get_zone_file(
+            self.stalwart_id, expected_dkim_keys=cint(expected_dkim_keys)
+        )
         cluster = self.get_cluster()
         rows = build_domain_records(
             self.domain_name,

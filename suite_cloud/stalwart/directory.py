@@ -1,5 +1,7 @@
 """Directory objects: domains, accounts (users and groups), mailing lists, roles, DKIM keys."""
 
+import re
+import time
 from dataclasses import dataclass, field
 from typing import ClassVar
 
@@ -13,6 +15,8 @@ DKIM_RSA = "Dkim1RsaSha256"
 DKIM_ALGORITHMS = (DKIM_ED25519, DKIM_RSA)
 DKIM_SELECTOR_TEMPLATE = "v{version}-{algorithm}-{date-%Y%m%d}"
 DAY_MS = 24 * 60 * 60 * 1000
+DKIM_KEY_WAIT_SECONDS = 15
+DKIM_KEY_POLL_SECONDS = 0.5
 GB = 1024**3
 
 
@@ -143,6 +147,10 @@ def dkim_management_payload(algorithms: tuple[str, ...] | None) -> dict:
     }
 
 
+def count_dkim_selectors(zone_file: str) -> int:
+    return len(re.findall(r"^\S+\._domainkey\.", zone_file, re.MULTILINE))
+
+
 @dataclass
 class MailingList:
     name: str
@@ -255,8 +263,21 @@ class DomainService(ManagementService):
     def find_by_name(self, name: str, properties: list[str] | None = None) -> dict | None:
         return self.find({"name": name}, properties=properties or ["id", "name"])
 
-    def get_zone_file(self, domain_id: str) -> str:
-        return (self.get(domain_id, properties=["dnsZoneFile"]) or {}).get("dnsZoneFile") or ""
+    def get_zone_file(self, domain_id: str, expected_dkim_keys: int = 0) -> str:
+        """The zone Stalwart expects the owner to publish.
+
+        Stalwart generates DKIM keys after the domain exists, RSA taking noticeably longer than
+        Ed25519, so a read straight after creation can miss a selector. With ``expected_dkim_keys``
+        the read is repeated for a short while until that many selectors appear; on timeout the
+        latest zone is returned and the scheduled refresh picks the rest up later.
+        """
+
+        deadline = time.monotonic() + DKIM_KEY_WAIT_SECONDS
+        while True:
+            zone_file = (self.get(domain_id, properties=["dnsZoneFile"]) or {}).get("dnsZoneFile") or ""
+            if count_dkim_selectors(zone_file) >= expected_dkim_keys or time.monotonic() >= deadline:
+                return zone_file
+            time.sleep(DKIM_KEY_POLL_SECONDS)
 
     def delete(self, ids: str | list[str]) -> None:
         """Deletes domains, first removing the DKIM signatures that would block the delete."""

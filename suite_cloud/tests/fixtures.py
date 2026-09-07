@@ -10,6 +10,7 @@ ROOT_DOMAIN = "example.test"
 def configure_settings(**overrides) -> None:
     settings = frappe.get_single("Suite Cloud Settings")
     settings.acme_contact_email = "ops@example.test"
+    settings.sign_with_ed25519 = 0  # tests assume the default; the local site may have it on
     for key, value in overrides.items():
         settings.set(key, value)
     settings.save()
