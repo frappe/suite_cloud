@@ -15,6 +15,7 @@ SINGLETON_TYPES = frozenset(
         "SearchStore",
         "InMemoryStore",
         "MtaOutboundStrategy",
+        "MtaStageAuth",
         "Enterprise",
         "Http",
         "Jmap",

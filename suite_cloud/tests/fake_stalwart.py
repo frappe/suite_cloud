@@ -32,6 +32,7 @@ SINGLETONS = {
     "SearchStore",
     "InMemoryStore",
     "MtaOutboundStrategy",
+    "MtaStageAuth",
     "Enterprise",
 }
 ACCOUNT_SCOPED = {"AppPassword", "ApiKey"}

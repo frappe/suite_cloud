@@ -211,7 +211,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
     cluster = gateway.get_cluster()
     zone = f"out.{cluster.default_domain}"
     pools = gateway.pools()
-    listeners, strategies, rules = {}, {}, []
+    listeners, strategies, rules, sender_rules = {}, {}, [], []
     for pool in pools:
         addresses = pool.addresses_on(gateway.name)
         if not addresses:
@@ -235,6 +235,9 @@ def gateway_plan(gateway: Document) -> list[dict]:
         # The connection strategy is chosen at delivery time, where the listener is no longer
         # known but the port the message arrived on is.
         rules.append({"if": f"received_via_port == {pool.relay_port}", "then": f"'{pool.pool_name}'"})
+        # The cluster logs in as the relay user of the egress zone but sends as its customers'
+        # addresses, so Stalwart's default "sender must match the login" check is lifted here.
+        sender_rules.append({"if": f"local_port == {pool.relay_port}", "then": "false"})
 
     operations: list[dict] = [
         {"@type": "update", "object": "Coordinator", "value": {"@type": "Disabled"}},
@@ -345,6 +348,13 @@ def gateway_plan(gateway: Document) -> list[dict]:
         }
     )
     operations.append(plan.tracer_operation())
+    operations.append(
+        {
+            "@type": "update",
+            "object": "MtaStageAuth",
+            "value": {"mustMatchSender": {"match": plan.as_list(sender_rules), "else": "true"}},
+        }
+    )
     operations.append(
         {
             "@type": "update",

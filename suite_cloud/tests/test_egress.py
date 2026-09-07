@@ -249,6 +249,11 @@ class TestEgress(IntegrationTestCase):
             operations["MtaOutboundStrategy"]["value"]["connection"],
             {"match": {"0": {"if": "received_via_port == 2525", "then": "'ded'"}}, "else": "'default'"},
         )
+        # The relay login belongs to the egress zone; customer sender addresses must pass on relay ports.
+        self.assertEqual(
+            operations["MtaStageAuth"]["value"]["mustMatchSender"],
+            {"match": {"0": {"if": "local_port == 2525", "then": "false"}}, "else": "true"},
+        )
         role = operations["ClusterRole"]["value"]["gateway-role"]
         self.assertEqual(role["name"], "egress")
         self.assertEqual(role["listeners"], {"@type": "EnableAll"})  # the firewall limits exposure
