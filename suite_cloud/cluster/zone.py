@@ -138,6 +138,8 @@ def _to_row(record: ZoneRecord, domain: str, spf_include: str, default_ttl: int)
         "host": host,
         "ttl": record.ttl or default_ttl,
         "priority": 0,
+        "weight": 0,
+        "port": 0,
         "value": record.rdata,
     }
 
@@ -174,7 +176,14 @@ def _to_row(record: ZoneRecord, domain: str, spf_include: str, default_ttl: int)
         else:
             return None
     elif record.type == "SRV":
-        row.update(value=record.rdata.rstrip("."), category="SRV")
+        priority, weight, port, target = record.rdata.split()
+        row.update(
+            priority=int(priority),
+            weight=int(weight),
+            port=int(port),
+            value=target.rstrip("."),
+            category="SRV",
+        )
     else:
         return None
 

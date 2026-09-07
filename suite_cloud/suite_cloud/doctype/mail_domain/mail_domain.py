@@ -229,6 +229,10 @@ class MailDomain(Document):
 
     @staticmethod
     def expected_value(row: Document) -> str:
+        """What the resolver's answer must render as; SRV answers carry all four fields."""
+
+        if row.record_type == "SRV":
+            return f"{row.priority} {row.weight} {row.port} {row.value}"
         return row.value
 
     def save_records(self) -> None:

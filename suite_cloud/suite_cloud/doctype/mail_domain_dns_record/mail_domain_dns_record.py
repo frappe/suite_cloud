@@ -32,10 +32,12 @@ class MailDomainDNSRecord(Document):
         parent: DF.Data
         parentfield: DF.Data
         parenttype: DF.Data
+        port: DF.Int
         priority: DF.Int
         record_type: DF.Literal["MX", "TXT", "CNAME", "SRV"]
         ttl: DF.Int
         value: DF.Text | None
+        weight: DF.Int
     # end: auto-generated types
 
     @property
@@ -51,6 +53,8 @@ class MailDomainDNSRecord(Document):
             "fqdn": self.fqdn,
             "value": self.value,
             "priority": self.priority,
+            "weight": self.weight,
+            "port": self.port,
             "ttl": self.ttl,
             "is_mandatory": bool(self.is_mandatory),
             "is_verified": bool(self.is_verified),

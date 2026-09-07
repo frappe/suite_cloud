@@ -126,7 +126,10 @@ class TestMailDomain(TenancyTestCase):
         )
         self.assertEqual(mx.is_mandatory, 0)
         self.assertEqual([r.category for r in domain.transport_security_records], ["TLS-RPT"])
-        self.assertTrue(domain.discovery_records)
+        srv = next(r for r in domain.discovery_records if r.host == "_imaps._tcp")
+        self.assertEqual((srv.priority, srv.weight, srv.port, srv.value), (0, 1, 993, self.cluster.hostname))
+        # Resolvers answer SRV with all four fields, so that is what verification compares against.
+        self.assertEqual(domain.expected_value(srv), f"0 1 993 {self.cluster.hostname}")
         self.assertEqual(domain.autoconfig_records, [])  # certificate-bound: opt-in
         api = domain.to_api()
         self.assertEqual(

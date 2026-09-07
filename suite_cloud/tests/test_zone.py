@@ -62,7 +62,11 @@ class TestZone(UnitTestCase):
         tlsrpt = by_category[("TLS-RPT", "_smtp._tls")]
         self.assertEqual((tlsrpt["group"], tlsrpt["is_mandatory"]), ("transport_security_records", 0))
         srv = by_category[("SRV", "_imaps._tcp")]  # targets the cluster host: no certificate needed
-        self.assertEqual((srv["group"], srv["value"]), ("discovery_records", "0 1 993 mail.blr.example.test"))
+        self.assertEqual(
+            (srv["group"], srv["priority"], srv["weight"], srv["port"], srv["value"]),
+            ("discovery_records", 0, 1, 993, "mail.blr.example.test"),
+        )
+        self.assertEqual((mx["weight"], mx["port"]), (0, 0))
         self.assertNotIn(("MTA-STS", "mta-sts"), by_category)
         self.assertNotIn(("Autoconfig", "autoconfig"), by_category)
         self.assertNotIn(("UA Auto Config", "ua-auto-config"), by_category)
