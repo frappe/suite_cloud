@@ -114,7 +114,7 @@
    "label": "Naming"
   },
   {
-   "description": "Short set-once id that namespaces the cluster under its zone: mail.<label>.<zone> for the cluster, n1.<label>.<zone> for nodes, and the wildcard certificate. Lowercase letters, digits and dashes; handed out as c1, c2, ... when left blank. Only a namespace, not a place.",
+   "description": "Short set-once id that namespaces the cluster under its zone. With label blr and zone frappemail.com the cluster is mail.blr.frappemail.com, its nodes n1.blr.frappemail.com and so on, and one wildcard certificate covers them. Lowercase letters, digits and dashes; handed out as c1, c2, ... when left blank. Only a namespace, not a place.",
    "fieldname": "label",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -136,7 +136,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Public address of the cluster and its document name: mail.<label>.<zone>. Mail clients, MX records and sites all use it.",
+   "description": "Public address of the cluster and its document name, built from the label and the zone, e.g. mail.blr.frappemail.com. Mail clients, MX records and sites all use it.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -146,7 +146,7 @@
    "read_only": 1
   },
   {
-   "description": "Sub-zone the cluster owns: <label>.<zone>. Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
+   "description": "Sub-zone the cluster owns, built from the label and the zone, e.g. blr.frappemail.com. Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
    "fieldname": "default_domain",
    "fieldtype": "Data",
    "label": "Default Domain",
@@ -454,7 +454,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-08 21:00:00.000000",
+ "modified": "2026-09-08 21:10:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Stalwart Cluster",
