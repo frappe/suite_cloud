@@ -42,6 +42,7 @@ class StalwartNode(Document):
         ssh_port: DF.Int
         ssh_user: DF.Data | None
         ssh_verified: DF.Check
+        title: DF.Data | None
         status: DF.Literal[
             "Pending", "Provisioning", "Provisioned", "Active", "Draining", "Failed", "Disabled"
         ]
@@ -55,6 +56,7 @@ class StalwartNode(Document):
 
     def validate(self) -> None:
         cluster = self.get_cluster()
+        self.title = (self.title or "").strip() or self.hostname
         self.hostname = (self.hostname or "").strip().lower().rstrip(".")
         suffix = f".{cluster.default_domain}"
         if not self.hostname.endswith(suffix) or "." in self.hostname[: -len(suffix)]:
