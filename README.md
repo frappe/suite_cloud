@@ -108,8 +108,9 @@ Call these with the API key and secret of a user that has the **Frappe Cloud** r
 
 | Method | What it does |
 | --- | --- |
-| `suite_cloud.api.fc.create_site(site, cluster=None, region=None, fc_reference=None, ...)` | Registers a site, choosing a cluster by its hostname, by region, or the default one. Returns the mail server URL, the Suite Cloud URL and the site's key and secret. The secret is shown only this once. |
-| `get_site(site)` | Status, cluster, limits and current usage. |
+| `suite_cloud.api.fc.create_site(site, cluster=None, region=None, fc_reference=None, title=None, contact_email=None, ...)` | Registers a site, choosing a cluster by its hostname, by region, or the default one. Returns the mail server URL, the Suite Cloud URL and the site's key and secret. The secret is shown only this once. |
+| `get_site(site)` | Status, cluster, title, contact email, limits and current usage. |
+| `update_site(site, title=None, contact_email=None, max_domains=None, ...)` | Changes the display name, the address for site-specific notices, or the limits. Omitted fields stay as they are. |
 | `rotate_site_secret(site)` | Issues a new secret, shown once. |
 | `suspend_site(site)`, `resume_site(site)`, `archive_site(site, delete_data=False)` | Turns a site off, back on, or retires it. |
 

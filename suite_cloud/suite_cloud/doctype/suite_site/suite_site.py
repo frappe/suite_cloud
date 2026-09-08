@@ -29,6 +29,7 @@ class SuiteSite(Document):
         api_secret: DF.Password | None
         archived_at: DF.Datetime | None
         cluster: DF.Link
+        contact_email: DF.Data | None
         default_disk_quota_gb: DF.Float
         domain_verification_token: DF.Data | None
         egress_pool: DF.Link | None
@@ -62,6 +63,9 @@ class SuiteSite(Document):
         if "/" in self.site_name or " " in self.site_name or "." not in self.site_name:
             frappe.throw(_("Site Name must be the site's domain, e.g. acme.frappe.cloud"))
         self.title = (self.title or "").strip() or self.site_name
+        if self.contact_email:
+            self.contact_email = self.contact_email.strip().lower()
+            frappe.utils.validate_email_address(self.contact_email, throw=True)
 
         self.user = get_config("site_service_user")
         if not self.user:
@@ -230,6 +234,8 @@ class SuiteSite(Document):
             "site": self.name,
             "cluster": self.cluster,
             "status": self.status,
+            "title": self.title,
+            "contact_email": self.contact_email,
             "enabled": bool(self.enabled),
             "jmap_url": cluster.base_url,
             "mail_hostname": cluster.hostname,

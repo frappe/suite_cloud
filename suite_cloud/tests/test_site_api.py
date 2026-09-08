@@ -244,9 +244,22 @@ class TestFrappeCloudApi(SiteApiTestCase):
 
     def test_create_site_returns_credentials_once(self) -> None:
         with patch("suite_cloud.api.fc.get_public_url", return_value="https://cloud.suite.test"):
-            result = fc.create_site("New.Frappe.Test", region="blr", fc_reference="site-42")
+            result = fc.create_site(
+                "New.Frappe.Test", region="blr", fc_reference="site-42", contact_email="Ops@New.Test"
+            )
 
         self.assertEqual(result["site"], "new.frappe.test")
+        self.assertEqual((result["title"], result["contact_email"]), ("new.frappe.test", "ops@new.test"))
+        updated = fc.update_site(
+            "new.frappe.test", title="New Co", contact_email="admin@new.test", max_groups=7
+        )
+        self.assertEqual(
+            (updated["title"], updated["contact_email"], updated["limits"]["max_groups"]),
+            ("New Co", "admin@new.test", 7),
+        )
+        self.assertRaises(
+            frappe.ValidationError, fc.update_site, "new.frappe.test", contact_email="not-an-address"
+        )
         self.assertEqual(result["cluster"], self.cluster.name)
         self.assertEqual(result["jmap_url"], self.cluster.base_url)
         self.assertEqual(result["suite_cloud_url"], "https://cloud.suite.test")

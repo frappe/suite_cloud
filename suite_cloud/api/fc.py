@@ -23,6 +23,8 @@ def create_site(
     cluster: str | None = None,
     region: str | None = None,
     fc_reference: str | None = None,
+    title: str | None = None,
+    contact_email: str | None = None,
     max_domains: int | None = None,
     max_accounts: int | None = None,
     max_groups: int | None = None,
@@ -44,6 +46,8 @@ def create_site(
         }
     )
     for field, value in {
+        "title": title,
+        "contact_email": contact_email,
         "max_domains": max_domains,
         "max_accounts": max_accounts,
         "max_groups": max_groups,
@@ -70,6 +74,38 @@ def rotate_site_secret(site: str) -> dict:
     require_frappe_cloud()
     doc = load(site)
     return credentials(doc, doc.rotate_secret())
+
+
+@frappe.whitelist(methods=["POST", "PUT"])
+def update_site(
+    site: str,
+    title: str | None = None,
+    contact_email: str | None = None,
+    max_domains: int | None = None,
+    max_accounts: int | None = None,
+    max_groups: int | None = None,
+    max_mailing_lists: int | None = None,
+    max_disk_gb: float | None = None,
+    default_disk_quota_gb: float | None = None,
+) -> dict:
+    """Changes the site's display name, contact address or limits; omitted fields stay as they are."""
+
+    require_frappe_cloud()
+    doc = load(site)
+    for field, value in {
+        "title": title,
+        "contact_email": contact_email,
+        "max_domains": max_domains,
+        "max_accounts": max_accounts,
+        "max_groups": max_groups,
+        "max_mailing_lists": max_mailing_lists,
+        "max_disk_gb": max_disk_gb,
+        "default_disk_quota_gb": default_disk_quota_gb,
+    }.items():
+        if value is not None:
+            doc.set(field, value)
+    doc.save(ignore_permissions=True)
+    return {**doc.to_api(), "suite_cloud_url": get_public_url()}
 
 
 @frappe.whitelist(methods=["POST"])
