@@ -165,6 +165,10 @@ class TestDirectoryApi(SiteApiTestCase):
         )
         self.assertEqual(account["groups"], ["sales@acme.com"])
         self.assertEqual(account["aliases"][0]["email"], "ally@acme.com")
+        self.assertTrue(account["api_key"].startswith("apikey-"))
+        self.assertNotIn("api_key", accounts.get_account("alice@acme.com"))
+        rotated = accounts.rotate_api_key("alice@acme.com")["api_key"]
+        self.assertNotEqual(rotated, account["api_key"])
         self.assertEqual(
             mailing_lists.get_mailing_list("all@acme.com")["recipients"],
             ["ext@example.org", "alice@acme.com"],

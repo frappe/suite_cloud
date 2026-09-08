@@ -368,6 +368,30 @@ class TestMailAccount(TenancyTestCase):
         secret = account.create_app_password("Suite")
         self.assertTrue(secret.startswith("apppassword-"))
 
+        # An API key is minted on creation, stored encrypted, and rotation revokes the old one.
+        first_key = account.get_password("api_key")
+        self.assertTrue(first_key.startswith("apikey-"))
+        self.assertIn(first_key, self.fake.tokens)
+        second_key = account.rotate_api_key()
+        self.assertNotEqual(first_key, second_key)
+        self.assertEqual(frappe.get_doc("Mail Account", account.name).show_api_key(), second_key)
+        keys = self.fake.objects[f"ApiKey:{account.stalwart_id}"]
+        self.assertEqual([k["description"] for k in keys.values()], ["Suite Cloud"])
+
+        # A blank reset generates a password; a typed one is pushed as given; none is stored.
+        generated = account.reset_password()
+        self.assertGreaterEqual(len(generated), 20)
+        self.assertEqual(
+            self.fake.get("Account", account.stalwart_id)["credentials"]["0"]["secret"], generated
+        )
+        account.reload()
+        account.new_password = "typed-pw-123"
+        account.save()
+        self.assertEqual(
+            self.fake.get("Account", account.stalwart_id)["credentials"]["0"]["secret"], "typed-pw-123"
+        )
+        self.assertIsNone(account.get_password("new_password", raise_exception=False))
+
         account.delete()
         self.assertIsNone(self.fake.get("Account", account.stalwart_id))
 

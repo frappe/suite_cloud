@@ -1,10 +1,13 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import secrets
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import flt
+from frappe.utils.password import set_encrypted_password
 
 from suite_cloud.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.stalwart import get_account_client
@@ -16,6 +19,9 @@ from suite_cloud.tenancy.addresses import (
     get_site_domain,
     validate_email_address,
 )
+
+API_KEY_DESCRIPTION = "Suite Cloud"
+MIN_PASSWORD_LENGTH = 8
 
 
 class MailAccount(Document):
@@ -31,6 +37,7 @@ class MailAccount(Document):
         from suite_cloud.suite_cloud.doctype.mail_group_member.mail_group_member import MailGroupMember
 
         aliases: DF.Table[MailAddressAlias]
+        api_key: DF.Password | None
         cluster: DF.Link | None
         description: DF.Data | None
         disk_quota_gb: DF.Float
@@ -40,6 +47,7 @@ class MailAccount(Document):
         enabled: DF.Check
         groups: DF.TableMultiSelect[MailGroupMember]
         locale: DF.Data | None
+        new_password: DF.Password | None
         site: DF.Link | None
         stalwart_id: DF.Data | None
         time_zone: DF.Data | None
@@ -72,6 +80,15 @@ class MailAccount(Document):
         assert_address_available(self.email, exclude=(self.doctype, self.name))
         sync.validate_aliases(self)
         self.validate_groups()
+        self.take_password()
+
+    def take_password(self) -> None:
+        """A password typed into the form is pushed to the cluster and never stored here."""
+
+        if self.new_password and not self.is_dummy_password(self.new_password):
+            validate_password(self.new_password)
+            self.flags.password = self.new_password
+        self.new_password = None
 
     def validate_groups(self) -> None:
         seen = set()
@@ -84,12 +101,13 @@ class MailAccount(Document):
 
     def after_insert(self) -> None:
         sync.push_create(self, "accounts", self.stalwart_payload(self.flags.password))
-        if not self.enabled:
-            try:
+        try:
+            self.mint_api_key()
+            if not self.enabled:
                 self.push_enabled()
-            except Exception:
-                sync.push_destroy(self, "accounts")  # the insert rolls back; the account must not survive
-                raise
+        except Exception:
+            sync.push_destroy(self, "accounts")  # the insert rolls back; the account must not survive
+            raise
 
     def on_update(self) -> None:
         if self.is_new() or not self.stalwart_id or self.flags.skip_push:
@@ -115,6 +133,8 @@ class MailAccount(Document):
             sync.push_update(self, "accounts", patch)
         if bool(before.enabled) != bool(self.enabled):
             self.push_enabled()
+        if self.flags.password:
+            self.set_password(self.flags.password)
 
     def on_trash(self) -> None:
         sync.push_destroy(self, "accounts")
@@ -160,17 +180,60 @@ class MailAccount(Document):
     # --- actions -------------------------------------------------------------------------
 
     def set_password(self, password: str) -> None:
-        if not password or len(password) < 8:
-            frappe.throw(_("Password must be at least 8 characters."))
+        validate_password(password)
         sync.client_for(self).accounts.set_password(self.stalwart_id, password)
+
+    @frappe.whitelist()
+    def reset_password(self, password: str | None = None) -> str:
+        """Sets a new password on the cluster and returns it; a blank one is generated."""
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        password = password or generate_password()
+        self.set_password(password)
+        return password
 
     def create_app_password(self, description: str) -> str:
         """Returns the generated secret; it is never stored on this side."""
 
-        cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
-        client = get_account_client(cluster, self.email)
-        _, secret = client.app_passwords.create_secret(Credential(description=description or "Suite"))
+        _, secret = self.account_client().app_passwords.create_secret(
+            Credential(description=description or "Suite")
+        )
         return secret
+
+    # --- API key -----------------------------------------------------------------------------
+
+    @frappe.whitelist()
+    def rotate_api_key(self) -> str:
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        return self.mint_api_key()
+
+    @frappe.whitelist()
+    def show_api_key(self) -> str:
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        return self.get_password("api_key")
+
+    def mint_api_key(self) -> str:
+        """Creates the account's Suite Cloud key, stores it, and revokes the previous one."""
+
+        client = self.account_client()
+        old_ids = [k["id"] for k in client.api_keys.get_all() if k.get("description") == API_KEY_DESCRIPTION]
+        _, secret = client.api_keys.create_secret(Credential(description=API_KEY_DESCRIPTION))
+        self.store_api_key(secret)
+        if old_ids:
+            client.api_keys.delete(old_ids)
+        return secret
+
+    def store_api_key(self, secret: str) -> None:
+        # Mirrors what Document.save does for Password fields, without a full save.
+        set_encrypted_password(self.doctype, self.name, secret, "api_key")
+        self.api_key = "*" * len(secret)
+        self.db_set("api_key", self.api_key, update_modified=False)
+
+    def account_client(self):
+        """Acts as the account itself (master-user login): app passwords and API keys need that."""
+
+        cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+        return get_account_client(cluster, self.email)
 
     def set_enabled(self, enabled: bool) -> None:
         if bool(self.enabled) == bool(enabled):
@@ -198,3 +261,12 @@ class MailAccount(Document):
             "groups": [g.group for g in self.groups],
             "created_at": self.creation,
         }
+
+
+def validate_password(password: str | None) -> None:
+    if not password or len(password) < MIN_PASSWORD_LENGTH:
+        frappe.throw(_("Password must be at least {0} characters.").format(MIN_PASSWORD_LENGTH))
+
+
+def generate_password() -> str:
+    return secrets.token_urlsafe(18)

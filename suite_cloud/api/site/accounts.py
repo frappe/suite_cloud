@@ -1,7 +1,7 @@
 import frappe
-from frappe import _
 
 from suite_cloud.api.site import as_list, current_site, owned, owned_names, site_api
+from suite_cloud.suite_cloud.doctype.mail_account.mail_account import validate_password
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -50,8 +50,7 @@ def create_account(
     locale: str | None = None,
     time_zone: str | None = None,
 ) -> dict:
-    if not password or len(password) < 8:
-        frappe.throw(_("Password must be at least 8 characters."))
+    validate_password(password)
 
     site = current_site()
     # Everything the account depends on is resolved first: a refusal after the insert would leave
@@ -80,7 +79,8 @@ def create_account(
             mailing_list.save(ignore_permissions=True)
 
     frappe.local.response["http_status_code"] = 201
-    return doc.to_api()
+    # The key is minted on creation and returned once; rotate_api_key issues a fresh one later.
+    return {**doc.to_api(), "api_key": doc.get_password("api_key")}
 
 
 @frappe.whitelist(methods=["POST", "PUT"])
@@ -119,6 +119,14 @@ def set_account_enabled(email: str, enabled: bool) -> dict:
 @site_api
 def set_password(email: str, password: str) -> None:
     owned("Mail Account", email).set_password(password)
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def rotate_api_key(email: str) -> dict:
+    """Mints a new API key for the account, revokes the previous one, and returns the new key once."""
+
+    return {"api_key": owned("Mail Account", email).mint_api_key()}
 
 
 @frappe.whitelist(methods=["POST"])
