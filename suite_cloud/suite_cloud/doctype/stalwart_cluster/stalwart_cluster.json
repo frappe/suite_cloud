@@ -6,21 +6,22 @@
  "engine": "InnoDB",
  "field_order": [
   "details_tab",
+  "identity_section",
   "title",
-  "is_default",
-  "column_break_details",
   "enabled",
+  "column_break_details",
   "status",
   "stalwart_version",
-  "regions",
   "naming_section",
   "label",
   "dns_zone",
+  "column_break_naming",
   "hostname",
   "default_domain",
-  "column_break_naming",
   "base_url",
-  "bootstrap_node",
+  "placement_section",
+  "is_default",
+  "regions",
   "stores_tab",
   "data_store",
   "blob_store",
@@ -53,6 +54,7 @@
   "relay_username",
   "relay_password",
   "config_tab",
+  "bootstrap_node",
   "config_version",
   "last_config_sync_at",
   "column_break_config",
@@ -67,7 +69,11 @@
    "label": "Details"
   },
   {
-   "description": "Display name, e.g. Bangalore 1. Editable; the document is named by its hostname.",
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Display name shown in lists and links, e.g. Bangalore 1. Editable; the document is named by its hostname.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -75,22 +81,15 @@
    "reqd": 1
   },
   {
-   "default": "0",
-   "description": "Cluster Frappe Cloud uses when it names neither a cluster nor a region. Only one cluster can be default.",
-   "fieldname": "is_default",
-   "fieldtype": "Check",
-   "label": "Is Default"
-  },
-  {
-   "fieldname": "column_break_details",
-   "fieldtype": "Column Break"
-  },
-  {
    "default": "1",
    "description": "Untick to stop placing new sites here and mark the cluster Disabled. Existing sites keep working.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
   },
   {
    "default": "Pending",
@@ -110,19 +109,12 @@
    "label": "Stalwart Version"
   },
   {
-   "description": "Regions Frappe Cloud may place sites from, e.g. blr, sfo. A cluster with no regions serves any region. Placement policy only: the servers may sit anywhere.",
-   "fieldname": "regions",
-   "fieldtype": "Table",
-   "label": "Regions Served",
-   "options": "Stalwart Cluster Region"
-  },
-  {
    "fieldname": "naming_section",
    "fieldtype": "Section Break",
    "label": "Naming"
   },
   {
-   "description": "Short set-once id that namespaces the cluster under its zone: mail.<label>.<zone>, n1.<label>.<zone> and the wildcard certificate. Lowercase letters, digits and dashes; handed out as c1, c2, ... when left blank. Not a place: a cluster may span regions.",
+   "description": "Short set-once id that namespaces the cluster under its zone: mail.<label>.<zone> for the cluster, n1.<label>.<zone> for nodes, and the wildcard certificate. Lowercase letters, digits and dashes; handed out as c1, c2, ... when left blank. Only a namespace, not a place.",
    "fieldname": "label",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -130,7 +122,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Zone the cluster's records are published in. Every hostname below must sit under it. Defaults to the default zone.",
+   "description": "Zone the cluster's hostnames are derived under and its records are published in. Defaults to the default zone. Cannot change after saving.",
    "fieldname": "dns_zone",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -140,7 +132,11 @@
    "set_only_once": 1
   },
   {
-   "description": "Public address of the cluster and its document name, derived as mail.<label>.<zone>. Mail clients, MX records and sites all use it.",
+   "fieldname": "column_break_naming",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Public address of the cluster and its document name: mail.<label>.<zone>. Mail clients, MX records and sites all use it.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -150,15 +146,11 @@
    "read_only": 1
   },
   {
-   "description": "Sub-zone the cluster owns, derived from the hostname (mail.blr.frappemail.com owns blr.frappemail.com). Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
+   "description": "Sub-zone the cluster owns: <label>.<zone>. Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
    "fieldname": "default_domain",
    "fieldtype": "Data",
    "label": "Default Domain",
    "read_only": 1
-  },
-  {
-   "fieldname": "column_break_naming",
-   "fieldtype": "Column Break"
   },
   {
    "description": "JMAP URL handed to sites: https:// plus the hostname.",
@@ -168,12 +160,23 @@
    "read_only": 1
   },
   {
-   "description": "The node that ran the first-time setup of the cluster. Set automatically.",
-   "fieldname": "bootstrap_node",
-   "fieldtype": "Link",
-   "label": "Bootstrap Node",
-   "options": "Stalwart Node",
-   "read_only": 1
+   "fieldname": "placement_section",
+   "fieldtype": "Section Break",
+   "label": "Placement"
+  },
+  {
+   "default": "0",
+   "description": "Cluster Frappe Cloud uses when it names no cluster and no cluster serves the requested region. Only one cluster can be default.",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "label": "Is Default"
+  },
+  {
+   "description": "Region codes Frappe Cloud may place sites from, e.g. blr, sfo. Leave empty to serve any region. Placement policy only: the cluster's servers may sit anywhere.",
+   "fieldname": "regions",
+   "fieldtype": "Table",
+   "label": "Regions Served",
+   "options": "Stalwart Cluster Region"
   },
   {
    "fieldname": "stores_tab",
@@ -372,6 +375,14 @@
    "label": "Configuration"
   },
   {
+   "description": "The node that ran the first-time setup of the cluster. Set automatically.",
+   "fieldname": "bootstrap_node",
+   "fieldtype": "Link",
+   "label": "Bootstrap Node",
+   "options": "Stalwart Node",
+   "read_only": 1
+  },
+  {
    "default": "0",
    "description": "Increases every time the generated configuration is pushed to the cluster.",
    "fieldname": "config_version",
@@ -443,7 +454,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-08 20:00:00.000000",
+ "modified": "2026-09-08 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Stalwart Cluster",
