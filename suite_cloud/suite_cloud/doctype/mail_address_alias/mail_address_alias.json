@@ -4,16 +4,44 @@
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
- "field_order": ["alias_email", "enabled", "description"],
+ "field_order": [
+  "alias_email",
+  "enabled",
+  "description"
+ ],
  "fields": [
-  {"columns": 5, "fieldname": "alias_email", "fieldtype": "Data", "in_list_view": 1, "label": "Alias", "options": "Email", "reqd": 1},
-  {"columns": 2, "default": "1", "fieldname": "enabled", "fieldtype": "Check", "in_list_view": 1, "label": "Enabled"},
-  {"columns": 3, "fieldname": "description", "fieldtype": "Data", "in_list_view": 1, "label": "Description"}
+  {
+   "columns": 5,
+   "fieldname": "alias_email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Alias",
+   "options": "Email",
+   "reqd": 1,
+   "description": "Additional address delivered here, e.g. sales@acme.com. Must be under one of the site's domains and unused by any account, group or list on the cluster."
+  },
+  {
+   "columns": 2,
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled",
+   "description": "Untick to stop accepting mail at this alias without removing it."
+  },
+  {
+   "columns": 3,
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Description",
+   "description": "What the alias is for, e.g. the old address after a rename."
+  }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-03 12:00:00.000000",
+ "modified": "2026-09-08 10:40:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Address Alias",
