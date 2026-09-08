@@ -1,12 +1,12 @@
 {
  "actions": [],
- "autoname": "field:cluster_name",
+ "autoname": "field:hostname",
  "creation": "2026-09-03 12:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
   "details_tab",
-  "cluster_name",
+  "title",
   "region",
   "is_default",
   "column_break_details",
@@ -66,14 +66,12 @@
    "label": "Details"
   },
   {
-   "description": "Internal label: lowercase letters, digits and dashes, e.g. blr-1. The public name is the hostname below.",
-   "fieldname": "cluster_name",
+   "description": "Display name, e.g. Bangalore 1. Editable; the document is named by its hostname.",
+   "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Cluster Name",
-   "reqd": 1,
-   "set_only_once": 1,
-   "unique": 1
+   "label": "Title",
+   "reqd": 1
   },
   {
    "description": "Short region code, e.g. blr. Frappe Cloud asks for a cluster by region when it does not name one. Defaults to the first label of the default domain.",
@@ -134,7 +132,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Public address of the cluster, e.g. mail.blr.frappemail.com. Mail clients, MX records and sites all use it. It needs at least two labels under the zone; the part after the first label becomes the default domain.",
+   "description": "Public address of the cluster and its document name, e.g. mail.blr.frappemail.com. Mail clients, MX records and sites all use it. It needs at least two labels under the zone; the part after the first label becomes the default domain.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -437,7 +435,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-04 17:58:05.893602",
+ "modified": "2026-09-08 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Stalwart Cluster",
@@ -473,5 +471,7 @@
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "track_changes": 1,
+ "title_field": "title",
+ "show_title_field_in_link": 1
 }

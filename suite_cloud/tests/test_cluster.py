@@ -42,7 +42,7 @@ class TestStalwartCluster(IntegrationTestCase):
         cluster = frappe.get_doc(
             {
                 "doctype": "Stalwart Cluster",
-                "cluster_name": "bad",
+                "title": "bad",
                 "hostname": f"mail.{ROOT_DOMAIN}",
                 "data_store": store.name,
             }
@@ -54,7 +54,7 @@ class TestStalwartCluster(IntegrationTestCase):
         cluster = frappe.get_doc(
             {
                 "doctype": "Stalwart Cluster",
-                "cluster_name": "kind",
+                "title": "kind",
                 "hostname": f"mail.kind.{ROOT_DOMAIN}",
                 "data_store": blob.name,
             }

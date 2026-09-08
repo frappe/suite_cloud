@@ -39,7 +39,9 @@ class EgressIPPool(Document):
 
     def autoname(self) -> None:
         self.pool_name = naming.next_pool_name(self.cluster)
-        self.name = f"{self.cluster}-{self.pool_name}"
+        default_domain = frappe.get_cached_value("Stalwart Cluster", self.cluster, "default_domain")
+        self.hostname = f"{self.pool_name}.out.{default_domain}"
+        self.name = self.hostname
 
     def validate(self) -> None:
         if not POOL_NAME.match(self.pool_name or ""):

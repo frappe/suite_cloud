@@ -55,6 +55,7 @@ def make_store(kind: str, type: str, title: str | None = None, **fields):
 
 
 def make_cluster(name: str = "blr-1", hostname: str | None = None, multi_node: bool = True, **fields):
+    """``name`` becomes the title; the document is named by its hostname."""
     if multi_node:
         data = make_store("Data", "PostgreSql", host="db.example.test", auth_secret="pg-secret")
         memory = make_store("In-Memory", "Redis", url="redis://redis.example.test:6379")
@@ -63,12 +64,13 @@ def make_cluster(name: str = "blr-1", hostname: str | None = None, multi_node: b
         data = make_store("Data", "RocksDb", path="/var/lib/stalwart")
         memory = blob = None
 
-    remove_cluster(name)
+    hostname = hostname or f"mail.blr.{ROOT_DOMAIN}"
+    remove_cluster(hostname)
     cluster = frappe.get_doc(
         {
             "doctype": "Stalwart Cluster",
-            "cluster_name": name,
-            "hostname": hostname or f"mail.blr.{ROOT_DOMAIN}",
+            "title": name,
+            "hostname": hostname,
             "data_store": data.name,
             "blob_store": blob.name if blob else None,
             "in_memory_store": memory.name if memory else None,

@@ -15,7 +15,6 @@ from suite_cloud.stalwart.credentials import Credential
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
 from suite_cloud.utils import get_config
 
-SLUG = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 STORE_KINDS = {
     "data_store": "Data",
     "blob_store": "Blob",
@@ -41,7 +40,6 @@ class StalwartCluster(Document):
         base_url: DF.Data | None
         blob_store: DF.Link | None
         bootstrap_node: DF.Link | None
-        cluster_name: DF.Data
         config_plan: DF.Code | None
         config_version: DF.Int
         coordinator: DF.Literal["Disabled", "Default"]
@@ -65,6 +63,7 @@ class StalwartCluster(Document):
         ssh_public_key: DF.Code | None
         ssh_user: DF.Data
         stalwart_version: DF.Data | None
+        title: DF.Data
         status: DF.Literal["Pending", "Bootstrapping", "Active", "Failed", "Disabled"]
     # end: auto-generated types
 
@@ -79,7 +78,7 @@ class StalwartCluster(Document):
         if not self.relay_password:
             self.relay_password = frappe.generate_hash(length=32)
         if not self.ssh_public_key:
-            self.ssh_private_key, self.ssh_public_key = generate_keypair(f"suite-cloud-{self.cluster_name}")
+            self.ssh_private_key, self.ssh_public_key = generate_keypair(f"suite-cloud-{self.hostname}")
 
     def validate(self) -> None:
         self.validate_names()
@@ -117,12 +116,14 @@ class StalwartCluster(Document):
 
     # --- validation -----------------------------------------------------------
 
-    def validate_names(self) -> None:
-        self.cluster_name = (self.cluster_name or "").strip().lower()
-        if not SLUG.match(self.cluster_name):
-            frappe.throw(_("Cluster Name must be a slug: lowercase letters, digits and dashes."))
+    def autoname(self) -> None:
+        # Naming runs before validate, so the hostname is normalised here too.
+        self.hostname = normalise_hostname(self.hostname)
+        self.name = self.hostname
 
-        self.hostname = (self.hostname or "").strip().lower().rstrip(".")
+    def validate_names(self) -> None:
+        self.hostname = normalise_hostname(self.hostname)
+        self.title = (self.title or "").strip() or self.hostname
         self.dns_zone = self.dns_zone or get_default_zone()
         if not self.dns_zone:
             frappe.throw(_("Create a DNS Zone before creating clusters."))
@@ -289,3 +290,7 @@ def check_all_clusters() -> None:
             cluster.check_drift()
         except Exception:
             cluster.log_error(f"Drift check failed for {name}")
+
+
+def normalise_hostname(hostname: str | None) -> str:
+    return (hostname or "").strip().lower().rstrip(".")

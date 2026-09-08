@@ -4,3 +4,4 @@ suite_cloud.patches.v1_0.drop_legacy_deployment_doctypes
 [post_model_sync]
 suite_cloud.patches.v1_0.move_dns_provider_to_dns_zone
 suite_cloud.patches.v1_0.move_mailing_list_recipients_out_of_child_table
+suite_cloud.patches.v1_0.name_clusters_and_pools_by_hostname

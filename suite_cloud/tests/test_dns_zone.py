@@ -69,7 +69,7 @@ class TestDNSZone(IntegrationTestCase):
 
     def test_cluster_records_live_in_the_cluster_zone(self) -> None:
         make_zone(OTHER_ZONE, is_default=0)
-        remove_cluster("eu-1")
+        remove_cluster(f"mail.eu.{OTHER_ZONE}")
         cluster = make_cluster("eu-1", hostname=f"mail.eu.{OTHER_ZONE}", dns_zone=OTHER_ZONE)
         node = make_node(cluster, "203.0.113.50")
         clear_request_cache()
@@ -80,11 +80,11 @@ class TestDNSZone(IntegrationTestCase):
         self.assertTrue(zones)
         self.assertEqual(set(zones), {OTHER_ZONE})
         self.assertTrue(frappe.db.exists("DNS Record", {"dns_zone": OTHER_ZONE, "host": "spf.eu"}))
-        remove_cluster("eu-1")
+        remove_cluster(f"mail.eu.{OTHER_ZONE}")
 
     def test_cluster_hostname_must_be_under_its_zone(self) -> None:
         make_zone(OTHER_ZONE, is_default=0)
-        remove_cluster("eu-1")
+        remove_cluster(f"mail.eu.{OTHER_ZONE}")
         self.assertRaisesRegex(
             frappe.ValidationError,
             "DNS zone",
