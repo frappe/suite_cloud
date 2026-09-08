@@ -33,7 +33,7 @@ def list_accounts(
 @frappe.whitelist(methods=["GET", "POST"])
 @site_api
 def get_account(email: str) -> dict:
-    return owned("Mail Account", email).to_api()
+    return owned("Mail Account", email).to_api(with_usage=True)
 
 
 @frappe.whitelist(methods=["POST"])

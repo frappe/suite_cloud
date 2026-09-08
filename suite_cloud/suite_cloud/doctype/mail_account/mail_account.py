@@ -6,7 +6,7 @@ import secrets
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt
+from frappe.utils import cint, flt
 from frappe.utils.password import set_encrypted_password
 
 from suite_cloud.cluster.plan import DISABLED_ROLE_DESCRIPTION
@@ -254,7 +254,18 @@ class MailAccount(Document):
 
     # --- helpers -----------------------------------------------------------------------------
 
-    def to_api(self) -> dict:
+    @property
+    def used_disk_bytes(self) -> int | None:
+        """Read from the cluster on access, one call per account; None until the account exists there."""
+
+        if not self.stalwart_id:
+            return None
+        account = sync.client_for(self).accounts.get(self.stalwart_id, properties=["usedDiskQuota"])
+        return cint((account or {}).get("usedDiskQuota"))
+
+    def to_api(self, with_usage: bool = False) -> dict:
+        """``with_usage`` costs a cluster round trip, so lists leave it out and single reads include it."""
+
         return {
             "email": self.email,
             "domain": self.domain,
@@ -262,7 +273,7 @@ class MailAccount(Document):
             "display_name": self.display_name,
             "description": self.description,
             "disk_quota_gb": flt(self.disk_quota_gb),
-            "used_disk_bytes": self.used_disk_bytes,
+            "used_disk_bytes": self.used_disk_bytes if with_usage else None,
             "locale": self.locale,
             "time_zone": self.time_zone,
             "aliases": [

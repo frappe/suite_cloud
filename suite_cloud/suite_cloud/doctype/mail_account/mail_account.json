@@ -171,7 +171,8 @@
    "fieldtype": "Int",
    "label": "Used Disk (bytes)",
    "read_only": 1,
-   "description": "Mailbox size as last reported by the cluster."
+   "description": "Mailbox size read from the cluster when the account is opened; nothing is stored.",
+   "is_virtual": 1
   },
   {
    "fieldname": "aliases_section",
@@ -200,7 +201,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-08 13:00:00.000000",
+ "modified": "2026-09-08 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Account",

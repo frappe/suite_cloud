@@ -169,6 +169,10 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(account["aliases"][0]["email"], "ally@acme.com")
         self.assertTrue(account["app_password"].startswith("apppassword-"))
         self.assertNotIn("app_password", accounts.get_account("alice@acme.com"))
+        # Usage is read from the cluster for a single account only; a list would cost one call each.
+        self.fake.find("Account", name="alice")["usedDiskQuota"] = 4096
+        self.assertEqual(accounts.get_account("alice@acme.com")["used_disk_bytes"], 4096)
+        self.assertIsNone(accounts.list_accounts()["items"][0]["used_disk_bytes"])
         rotated = accounts.rotate_app_password("alice@acme.com")["app_password"]
         self.assertNotEqual(rotated, account["app_password"])
         page = mailing_lists.list_recipients("all@acme.com")
