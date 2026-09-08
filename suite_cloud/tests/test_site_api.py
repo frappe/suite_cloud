@@ -145,11 +145,20 @@ class TestDomainOwnership(SiteApiTestCase):
 
 
 class TestDirectoryApi(SiteApiTestCase):
+    @staticmethod
+    def verify(domain: str) -> None:
+        """Marks the domain verified the way the DNS check would; only live domains take objects."""
+
+        frappe.db.set_value("Mail Domain", domain, "is_verified", 1)
+        frappe.clear_document_cache("Mail Domain", domain)
+
     def test_domain_account_group_list_flow(self) -> None:
         domain = domains.create_domain("Acme.com", description="Main")
         self.assertEqual(domain["domain"], "acme.com")
         self.assertTrue(any(r["category"] == "DKIM" for r in domain["dns_records"]))
         self.assertEqual([d["domain"] for d in domains.list_domains()], ["acme.com"])
+        self.assertRaisesRegex(frappe.ValidationError, "not active", groups.create_group, "sales@acme.com")
+        self.verify("acme.com")
 
         group = groups.create_group("sales@acme.com", description="Sales", disk_quota_gb=2)
         self.assertEqual(group["disk_quota_gb"], 2)
@@ -219,6 +228,7 @@ class TestDirectoryApi(SiteApiTestCase):
 
     def test_other_sites_objects_are_invisible(self) -> None:
         domains.create_domain("acme.com")
+        self.verify("acme.com")
         accounts.create_account("bob@acme.com", "secret-pw")
 
         self.act_as(self.other)
@@ -231,6 +241,7 @@ class TestDirectoryApi(SiteApiTestCase):
 
     def test_stalwart_refusals_become_422(self) -> None:
         domains.create_domain("acme.com")
+        self.verify("acme.com")
         self.fake.objects["Account"]["taken"] = {
             "@type": "User",
             "id": "taken",

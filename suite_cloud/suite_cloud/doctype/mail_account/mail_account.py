@@ -16,6 +16,7 @@ from suite_cloud.stalwart.directory import GB, Account
 from suite_cloud.tenancy import sync
 from suite_cloud.tenancy.addresses import (
     assert_address_available,
+    assert_domain_live,
     get_site_domain,
     validate_email_address,
 )
@@ -72,6 +73,8 @@ class MailAccount(Document):
         self.domain = domain.name
         self.site = domain.site
         self.cluster = domain.cluster
+        if self.is_new():
+            assert_domain_live(domain)
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
 

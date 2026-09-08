@@ -48,6 +48,17 @@ def get_site_domain(site: str, domain_name: str):
     return domain
 
 
+def assert_domain_live(domain) -> None:
+    """Accounts, groups and lists are created only on a domain that is enabled and verified."""
+
+    if not domain.is_live():
+        frappe.throw(
+            _("Domain {0} is not active: enable it and verify its DNS records first.").format(
+                domain.domain_name
+            )
+        )
+
+
 def assert_domain_available(domain_name: str, site: str) -> None:
     """Free for this site to add: unclaimed, and not a zone of the mail infrastructure itself."""
 

@@ -7,7 +7,12 @@ from frappe.utils import flt
 
 from suite_cloud.stalwart.directory import GB, Group, quotas_payload
 from suite_cloud.tenancy import sync
-from suite_cloud.tenancy.addresses import assert_address_available, get_site_domain, validate_email_address
+from suite_cloud.tenancy.addresses import (
+    assert_address_available,
+    assert_domain_live,
+    get_site_domain,
+    validate_email_address,
+)
 
 
 class MailGroup(Document):
@@ -44,6 +49,8 @@ class MailGroup(Document):
         self.domain = domain.name
         self.site = domain.site
         self.cluster = domain.cluster
+        if self.is_new():
+            assert_domain_live(domain)
         site = frappe.get_cached_doc("Suite Site", self.site)
         if self.is_new():
             site.assert_can_add_group()

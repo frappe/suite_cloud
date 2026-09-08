@@ -48,6 +48,8 @@ class TenancyTestCase(IntegrationTestCase):
         frappe.flags.do_not_enqueue = False
 
     def make_domain(self, name: str = "acme.com", **fields):
+        # Verified unless a test says otherwise: only a live domain takes accounts, groups and lists.
+        fields.setdefault("is_verified", 1)
         domain = frappe.get_doc(
             {"doctype": "Mail Domain", "domain_name": name, "site": self.site.name, **fields}
         )
@@ -104,7 +106,7 @@ class TestSuiteSite(TenancyTestCase):
 
 class TestMailDomain(TenancyTestCase):
     def test_domain_is_created_on_stalwart_with_dns_records(self) -> None:
-        domain = self.make_domain()
+        domain = self.make_domain(is_verified=0)
 
         live = self.fake.find("Domain", name="acme.com")
         self.assertEqual(domain.stalwart_id, live["id"])
@@ -179,7 +181,7 @@ class TestMailDomain(TenancyTestCase):
         self.assertRaises(frappe.DoesNotExistError, get_site_domain, other.name, "acme.com")
 
     def test_verified_set_by_hand_goes_live(self) -> None:
-        domain = self.make_domain()
+        domain = self.make_domain(is_verified=0)
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
 
         domain.is_verified = 1
@@ -191,7 +193,7 @@ class TestMailDomain(TenancyTestCase):
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
 
     def test_disabling_clears_verification(self) -> None:
-        domain = self.make_domain()
+        domain = self.make_domain(is_verified=0)
         domain.is_verified = 1
         domain.save()
         self.assertTrue(self.fake.find("Domain", name="acme.com")["isEnabled"])
@@ -207,8 +209,28 @@ class TestMailDomain(TenancyTestCase):
         self.assertFalse(domain.is_verified)
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
 
+    def test_only_a_live_domain_takes_accounts_groups_and_lists(self) -> None:
+        domain = self.make_domain(is_verified=0)
+        self.assertRaisesRegex(frappe.ValidationError, "not active", self.make_account, "a@acme.com")
+        group = frappe.get_doc({"doctype": "Mail Group", "email": "g@acme.com", "site": self.site.name})
+        self.assertRaisesRegex(frappe.ValidationError, "not active", group.insert)
+        mailing_list = frappe.get_doc(
+            {"doctype": "Mailing List", "email": "l@acme.com", "site": self.site.name}
+        )
+        self.assertRaisesRegex(frappe.ValidationError, "not active", mailing_list.insert)
+
+        domain.is_verified = 1
+        domain.save()
+        account = self.make_account("a@acme.com")
+        # An existing account keeps working on a domain that later goes dark.
+        domain.enabled = 0
+        domain.save()
+        account.display_name = "Still here"
+        account.save()
+        self.assertRaisesRegex(frappe.ValidationError, "not active", self.make_account, "b@acme.com")
+
     def test_domain_goes_live_only_once_verified(self) -> None:
-        domain = self.make_domain()
+        domain = self.make_domain(is_verified=0)
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
 
         for row in domain.dns_rows():
