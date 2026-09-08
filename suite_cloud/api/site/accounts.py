@@ -79,8 +79,9 @@ def create_account(
             mailing_list.save(ignore_permissions=True)
 
     frappe.local.response["http_status_code"] = 201
-    # The key is minted on creation and returned once; rotate_api_key issues a fresh one later.
-    return {**doc.to_api(), "api_key": doc.get_password("api_key")}
+    # The app password is minted on creation and returned once; rotate_app_password issues a
+    # fresh one later. Suite Cloud keeps it, the account's own password it never does.
+    return {**doc.to_api(), "app_password": doc.get_password("app_password")}
 
 
 @frappe.whitelist(methods=["POST", "PUT"])
@@ -123,10 +124,10 @@ def set_password(email: str, password: str) -> None:
 
 @frappe.whitelist(methods=["POST"])
 @site_api
-def rotate_api_key(email: str) -> dict:
-    """Mints a new API key for the account, revokes the previous one, and returns the new key once."""
+def rotate_app_password(email: str) -> dict:
+    """Mints a new app password for the account, revokes the previous one, and returns it once."""
 
-    return {"api_key": owned("Mail Account", email).mint_api_key()}
+    return {"app_password": owned("Mail Account", email).mint_credential("app_password")}
 
 
 @frappe.whitelist(methods=["POST"])

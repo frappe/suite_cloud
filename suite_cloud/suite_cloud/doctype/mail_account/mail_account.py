@@ -20,7 +20,9 @@ from suite_cloud.tenancy.addresses import (
     validate_email_address,
 )
 
-API_KEY_DESCRIPTION = "Suite Cloud"
+CREDENTIAL_DESCRIPTION = "Suite Cloud"
+# Stored credentials: (field, service attribute on the account client).
+STORED_CREDENTIALS = {"app_password": "app_passwords", "api_key": "api_keys"}
 MIN_PASSWORD_LENGTH = 8
 
 
@@ -38,6 +40,7 @@ class MailAccount(Document):
 
         aliases: DF.Table[MailAddressAlias]
         api_key: DF.Password | None
+        app_password: DF.Password | None
         cluster: DF.Link | None
         description: DF.Data | None
         disk_quota_gb: DF.Float
@@ -112,7 +115,7 @@ class MailAccount(Document):
     def after_insert(self) -> None:
         sync.push_create(self, "accounts", self.stalwart_payload(self.flags.password))
         try:
-            self.mint_api_key()
+            self.mint_credential("app_password")
             if not self.enabled:
                 self.push_enabled()
         except Exception:
@@ -207,34 +210,46 @@ class MailAccount(Document):
         )
         return secret
 
-    # --- API key -----------------------------------------------------------------------------
+    # --- stored credentials ------------------------------------------------------------------------
+
+    @frappe.whitelist()
+    def rotate_app_password(self) -> str:
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        return self.mint_credential("app_password")
+
+    @frappe.whitelist()
+    def show_app_password(self) -> str:
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        return self.get_password("app_password")
 
     @frappe.whitelist()
     def rotate_api_key(self) -> str:
+        """The API key exists only on demand; the first rotation creates it."""
+
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        return self.mint_api_key()
+        return self.mint_credential("api_key")
 
     @frappe.whitelist()
     def show_api_key(self) -> str:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         return self.get_password("api_key")
 
-    def mint_api_key(self) -> str:
-        """Creates the account's Suite Cloud key, stores it, and revokes the previous one."""
+    def mint_credential(self, field: str) -> str:
+        """Creates the account's Suite Cloud credential of this kind, stores it, revokes the old one."""
 
-        client = self.account_client()
-        old_ids = [k["id"] for k in client.api_keys.get_all() if k.get("description") == API_KEY_DESCRIPTION]
-        _, secret = client.api_keys.create_secret(Credential(description=API_KEY_DESCRIPTION))
-        self.store_api_key(secret)
+        service = getattr(self.account_client(), STORED_CREDENTIALS[field])
+        old_ids = [c["id"] for c in service.get_all() if c.get("description") == CREDENTIAL_DESCRIPTION]
+        _, secret = service.create_secret(Credential(description=CREDENTIAL_DESCRIPTION))
+        self.store_secret(field, secret)
         if old_ids:
-            client.api_keys.delete(old_ids)
+            service.delete(old_ids)
         return secret
 
-    def store_api_key(self, secret: str) -> None:
+    def store_secret(self, field: str, secret: str) -> None:
         # Mirrors what Document.save does for Password fields, without a full save.
-        set_encrypted_password(self.doctype, self.name, secret, "api_key")
-        self.api_key = "*" * len(secret)
-        self.db_set("api_key", self.api_key, update_modified=False)
+        set_encrypted_password(self.doctype, self.name, secret, field)
+        self.set(field, "*" * len(secret))
+        self.db_set(field, self.get(field), update_modified=False)
 
     def account_client(self):
         """Acts as the account itself (master-user login): app passwords and API keys need that."""

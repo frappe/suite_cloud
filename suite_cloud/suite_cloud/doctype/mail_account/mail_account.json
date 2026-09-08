@@ -17,6 +17,7 @@
   "credentials_section",
   "new_password",
   "column_break_credentials",
+  "app_password",
   "api_key",
   "settings_section",
   "disk_quota_gb",
@@ -122,7 +123,15 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Bearer token the Suite site uses for this account's JMAP access. Minted on creation; Rotate API Key replaces it and Show API Key reveals it.",
+   "description": "Login the Suite site uses for this account's mail access. Minted on creation and handed to the site once; Rotate App Password replaces it and Show App Password reveals it.",
+   "fieldname": "app_password",
+   "fieldtype": "Password",
+   "label": "App Password",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Bearer token for this account's JMAP access. Created only on demand with Rotate API Key, which also replaces an existing one; Show API Key reveals it.",
    "fieldname": "api_key",
    "fieldtype": "Password",
    "label": "API Key",
@@ -191,7 +200,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-08 12:00:00.000000",
+ "modified": "2026-09-08 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Account",

@@ -128,7 +128,7 @@ Rules that apply everywhere:
 | --- | --- |
 | `site` | `ping` |
 | `site.domains` | `list_domains`, `get_domain`, `create_domain`, `update_domain`, `delete_domain`, `get_dns_records`, `refresh_dns_records`, `verify_dns_records` |
-| `site.accounts` | `list_accounts`, `get_account`, `create_account`, `update_account`, `set_account_enabled`, `set_password`, `rotate_api_key`, `create_app_password`, `set_aliases`, `set_groups`, `delete_account` |
+| `site.accounts` | `list_accounts`, `get_account`, `create_account`, `update_account`, `set_account_enabled`, `set_password`, `rotate_app_password`, `create_app_password`, `set_aliases`, `set_groups`, `delete_account` |
 | `site.groups` | `list_groups`, `get_group`, `create_group`, `update_group`, `set_group_aliases`, `set_group_members`, `delete_group` |
 | `site.mailing_lists` | `list_mailing_lists`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `set_recipients`, `delete_mailing_list` |
 | `site.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
@@ -138,10 +138,11 @@ a total disk quota; when it does, the quotas of its accounts together may not ex
 create or quota increase beyond the remaining room is refused. Groups, lists and domains are
 counted against the site's other limits the same way.
 
-`create_account` needs a password of at least 8 characters and returns, once, an API key minted for
-the account; the site uses it as a Bearer token for that account's JMAP access. `rotate_api_key`
-issues a new key and revokes the old one. Suite Cloud keeps the key encrypted on the Mail Account
-and never keeps the password.
+`create_account` needs a password of at least 8 characters and returns, once, an app password
+minted for the account; the site uses it for that account's mail access. `rotate_app_password`
+issues a new one and revokes the old one. Suite Cloud keeps the app password encrypted on the Mail
+Account and never keeps the account's password. An API key (Bearer token) for the account exists
+only when an operator creates one from the Mail Account form.
 
 
 ### How a domain goes live
