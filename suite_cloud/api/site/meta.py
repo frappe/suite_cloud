@@ -29,6 +29,9 @@ def get_account_options() -> dict:
 
 
 def _enum_entry(entry) -> dict:
+    """Stalwart lists enum members as ``{name, label}``; a bare string is its own label."""
+
     if isinstance(entry, dict):
-        return {"id": entry.get("id"), "label": entry.get("description") or entry.get("id")}
-    return {"id": entry, "label": entry}
+        value = entry.get("name") or entry.get("id")
+        return {"value": value, "label": entry.get("label") or entry.get("description") or value}
+    return {"value": entry, "label": entry}
