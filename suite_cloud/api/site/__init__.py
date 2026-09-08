@@ -146,6 +146,32 @@ def owned_names(doctype: str, filters: dict | None = None, **kwargs) -> list[str
     return frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", **kwargs)
 
 
+def as_alias_rows(value: Any) -> list[dict]:
+    """Aliases arrive as addresses, or as ``{email, enabled, description}`` objects; rows come out.
+
+    A JSON string is accepted too, so a form can post either shape.
+    """
+
+    if isinstance(value, str) and value.strip().startswith("["):
+        value = frappe.parse_json(value)
+    rows = []
+    for item in as_list(value) if not isinstance(value, list) else value:
+        if isinstance(item, dict):
+            email = str(item.get("email") or item.get("alias_email") or "").strip()
+            if not email:
+                continue
+            rows.append(
+                {
+                    "alias_email": email,
+                    "enabled": int(bool(item.get("enabled", True))),
+                    "description": item.get("description") or None,
+                }
+            )
+        elif str(item).strip():
+            rows.append({"alias_email": str(item).strip(), "enabled": 1, "description": None})
+    return rows
+
+
 def as_list(value: Any) -> list[str]:
     """Accepts a JSON list, a comma/newline separated string or None."""
 

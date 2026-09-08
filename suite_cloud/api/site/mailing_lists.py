@@ -1,6 +1,6 @@
 import frappe
 
-from suite_cloud.api.site import as_list, current_site, owned, owned_names, site_api
+from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -20,7 +20,7 @@ def get_mailing_list(email: str) -> dict:
 def create_mailing_list(
     email: str,
     description: str | None = None,
-    aliases: list[str] | str | None = None,
+    aliases: list | str | None = None,
     recipients: list[str] | str | None = None,
 ) -> dict:
     doc = frappe.get_doc(
@@ -29,7 +29,7 @@ def create_mailing_list(
             "email": email,
             "site": current_site().name,
             "description": description,
-            "aliases": [{"alias_email": a} for a in as_list(aliases)],
+            "aliases": as_alias_rows(aliases),
         }
     )
     doc.insert(ignore_permissions=True)
@@ -51,9 +51,9 @@ def update_mailing_list(email: str, description: str | None = None) -> dict:
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def set_mailing_list_aliases(email: str, aliases: list[str] | str | None = None) -> dict:
+def set_mailing_list_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mailing List", email)
-    doc.set("aliases", [{"alias_email": a} for a in as_list(aliases)])
+    doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
     return doc.to_api()
 

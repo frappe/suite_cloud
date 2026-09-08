@@ -1,6 +1,6 @@
 import frappe
 
-from suite_cloud.api.site import as_list, current_site, owned, owned_names, site_api
+from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -20,7 +20,7 @@ def get_group(email: str) -> dict:
 def create_group(
     email: str,
     description: str | None = None,
-    aliases: list[str] | str | None = None,
+    aliases: list | str | None = None,
     members: list[str] | str | None = None,
     disk_quota_gb: float | None = None,
 ) -> dict:
@@ -32,7 +32,7 @@ def create_group(
             "site": current_site().name,
             "description": description,
             "disk_quota_gb": disk_quota_gb,
-            "aliases": [{"alias_email": a} for a in as_list(aliases)],
+            "aliases": as_alias_rows(aliases),
         }
     )
     doc.insert(ignore_permissions=True)
@@ -56,9 +56,9 @@ def update_group(email: str, description: str | None = None, disk_quota_gb: floa
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def set_group_aliases(email: str, aliases: list[str] | str | None = None) -> dict:
+def set_group_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mail Group", email)
-    doc.set("aliases", [{"alias_email": a} for a in as_list(aliases)])
+    doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
     return doc.to_api()
 

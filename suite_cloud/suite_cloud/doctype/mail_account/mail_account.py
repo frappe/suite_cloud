@@ -270,8 +270,21 @@ class MailAccount(Document):
                 for a in self.aliases
             ],
             "groups": [g.group for g in self.groups],
+            "mailing_lists": self.mailing_list_names(),
             "created_at": self.creation,
         }
+
+    def mailing_list_names(self) -> list[str]:
+        """Lists that deliver to any of the account's addresses, primary or alias."""
+
+        addresses = [self.email, *[a.alias_email for a in self.aliases]]
+        return frappe.get_all(
+            "Mailing List Recipient",
+            {"site": self.site, "email": ["in", addresses]},
+            pluck="mailing_list",
+            distinct=True,
+            order_by="mailing_list asc",
+        )
 
 
 def validate_password(password: str | None) -> None:

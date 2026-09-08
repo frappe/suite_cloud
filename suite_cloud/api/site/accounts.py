@@ -1,6 +1,6 @@
 import frappe
 
-from suite_cloud.api.site import as_list, current_site, owned, owned_names, site_api
+from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
 from suite_cloud.suite_cloud.doctype.mail_account.mail_account import validate_password
 
 
@@ -43,7 +43,7 @@ def create_account(
     password: str,
     display_name: str | None = None,
     description: str | None = None,
-    aliases: list[str] | str | None = None,
+    aliases: list | str | None = None,
     groups: list[str] | str | None = None,
     mailing_lists: list[str] | str | None = None,
     disk_quota_gb: float | None = None,
@@ -66,7 +66,7 @@ def create_account(
             "disk_quota_gb": disk_quota_gb,
             "locale": locale or "en-US",
             "time_zone": time_zone,
-            "aliases": [{"alias_email": a} for a in as_list(aliases)],
+            "aliases": as_alias_rows(aliases),
             "groups": [{"group": owned("Mail Group", g).name} for g in as_list(groups)],
         }
     )
@@ -138,9 +138,9 @@ def create_app_password(email: str, description: str = "Suite") -> dict:
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def set_aliases(email: str, aliases: list[str] | str | None = None) -> dict:
+def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mail Account", email)
-    doc.set("aliases", [{"alias_email": a} for a in as_list(aliases)])
+    doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
     return doc.to_api()
 
