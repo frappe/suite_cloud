@@ -72,7 +72,8 @@ def assert_address_available(email: str, exclude: tuple[str, str] | None = None)
             continue
         if frappe.db.exists(doctype, email):
             frappe.throw(
-                _("{0} is already used by a {1}.").format(email, _(doctype)), frappe.DuplicateEntryError
+                _("{0} is already the address of {1} {2}.").format(email, _(doctype), email),
+                frappe.DuplicateEntryError,
             )
 
     alias = frappe.db.get_value(
@@ -80,5 +81,6 @@ def assert_address_available(email: str, exclude: tuple[str, str] | None = None)
     )
     if alias and (alias.parenttype, alias.parent) != exclude:
         frappe.throw(
-            _("{0} is already an alias of {1}.").format(email, alias.parent), frappe.DuplicateEntryError
+            _("{0} is already an alias of {1} {2}.").format(email, _(alias.parenttype), alias.parent),
+            frappe.DuplicateEntryError,
         )
