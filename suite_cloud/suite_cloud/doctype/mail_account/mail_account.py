@@ -117,8 +117,8 @@ class MailAccount(Document):
             return
 
         patch = {}
-        if before.description != self.description or before.display_name != self.display_name:
-            patch["description"] = self.stalwart_description()
+        if before.display_name != self.display_name:
+            patch["description"] = self.display_name or None
         if before.locale != self.locale:
             patch["locale"] = self.locale
         if before.time_zone != self.time_zone:
@@ -148,14 +148,11 @@ class MailAccount(Document):
             password=password or frappe.generate_hash(length=24),
             member_group_ids=sync.group_ids(self),
             aliases=sync.aliases(self),
-            description=self.stalwart_description(),
+            description=self.display_name or None,
             locale=self.locale or "en-US",
             time_zone=self.time_zone or None,
             disk_quota_bytes=self.disk_quota_bytes(),
         )
-
-    def stalwart_description(self) -> str | None:
-        return self.display_name or self.description or None
 
     def disk_quota_bytes(self) -> int | None:
         return int(flt(self.disk_quota_gb) * GB) if flt(self.disk_quota_gb) > 0 else None

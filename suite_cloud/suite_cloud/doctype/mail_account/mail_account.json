@@ -89,13 +89,13 @@
    "fieldname": "display_name",
    "fieldtype": "Data",
    "label": "Display Name",
-   "description": "Name shown to other users, e.g. Alice Doe. Also used as the account description on the cluster."
+   "description": "Name shown to other users, e.g. Alice Doe. This is the only text sent to the cluster for the account."
   },
   {
    "fieldname": "description",
    "fieldtype": "Data",
    "label": "Description",
-   "description": "Internal note, e.g. the team or purpose. Shown on the cluster when there is no display name."
+   "description": "Internal note for operators, e.g. the team or purpose. Stays in Suite Cloud; the cluster never sees it."
   },
   {
    "fieldname": "stalwart_id",
@@ -191,7 +191,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-08 10:30:00.000000",
+ "modified": "2026-09-08 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Account",

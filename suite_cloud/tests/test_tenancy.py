@@ -341,6 +341,7 @@ class TestMailAccount(TenancyTestCase):
     def test_account_updates_are_patched(self) -> None:
         account = self.make_account("bob@acme.com")
         account.display_name = "Bob"
+        account.description = "internal note"
         account.disk_quota_gb = 0
         account.aliases = []
         account.append("aliases", {"alias_email": "robert@acme.com", "enabled": 0})
