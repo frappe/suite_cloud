@@ -449,9 +449,15 @@ class TestMailAccount(TenancyTestCase):
         site.default_disk_quota_gb = 5
         site.save()
 
-        first = self.make_account("q1@acme.com")  # 5 of 8
-        self.assertRaisesRegex(frappe.ValidationError, "3.0 GB of its 8", self.make_account, "q2@acme.com")
-        second = self.make_account("q2@acme.com", disk_quota_gb=3)  # exactly full
+        # The fixture group took the site's default quota when it was created; give it 1 GB so
+        # it leaves room and still counts in the total.
+        group = frappe.get_doc("Mail Group", self.group.name)
+        group.disk_quota_gb = 1
+        group.save()
+        self.assertEqual(self.fake.get("Account", group.stalwart_id)["quotas"], {"maxDiskQuota": 1024**3})
+        first = self.make_account("q1@acme.com")  # 5 + 1 of 8
+        self.assertRaisesRegex(frappe.ValidationError, "2.0 GB of its 8", self.make_account, "q2@acme.com")
+        second = self.make_account("q2@acme.com", disk_quota_gb=2)  # exactly full
         first.reload()
         first.disk_quota_gb = 6
         self.assertRaisesRegex(frappe.ValidationError, "total disk quota", first.save)
@@ -459,7 +465,9 @@ class TestMailAccount(TenancyTestCase):
         first.disk_quota_gb = 4  # shrinking is always fine
         first.save()
         usage = frappe.get_doc("Suite Site", self.site.name).to_api()["usage"]
-        self.assertEqual(usage["allocated_disk_gb"], 7)
+        self.assertEqual(usage["allocated_disk_gb"], 7)  # 4 + 2 accounts, 1 group
+        group.disk_quota_gb = 0
+        self.assertRaisesRegex(frappe.ValidationError, "above 0", group.save)
         second.delete()
 
     def test_group_and_mailing_list_limits(self) -> None:

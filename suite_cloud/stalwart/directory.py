@@ -88,6 +88,7 @@ class Group:
     domain_id: str
     description: str | None = None
     aliases: list[EmailAlias] | None = None
+    disk_quota_bytes: int | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -95,7 +96,7 @@ class Group:
             "name": self.name,
             "domainId": self.domain_id,
             "permissions": {"@type": "Inherit"},
-            "quotas": {},
+            "quotas": quotas_payload(self.disk_quota_bytes),
             "aliases": indexed(self.aliases),
             "description": self.description,
         }

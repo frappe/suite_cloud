@@ -125,14 +125,14 @@
   },
   {
    "default": "0",
-   "description": "Total disk the site may allocate to its accounts, in gigabytes: the sum of all account quotas may not exceed it. 0 means unlimited. Every account still needs a quota of its own.",
+   "description": "Total disk the site may allocate, in gigabytes: the quotas of its accounts and groups together may not exceed it. 0 means unlimited. Every account and group still needs a quota of its own.",
    "fieldname": "max_disk_gb",
    "fieldtype": "Float",
    "label": "Total Disk Quota (GB)"
   },
   {
    "default": "5",
-   "description": "Disk quota given to accounts created without one, in gigabytes. Must be above 0 and within the total disk quota. Existing accounts keep their own quota.",
+   "description": "Disk quota given to accounts and groups created without one, in gigabytes. Must be above 0 and within the total disk quota. Existing ones keep their own quota.",
    "fieldname": "default_disk_quota_gb",
    "fieldtype": "Float",
    "label": "Default Disk Quota (GB)"
@@ -209,7 +209,7 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-09-08 12:00:00.000000",
+ "modified": "2026-09-08 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Site",

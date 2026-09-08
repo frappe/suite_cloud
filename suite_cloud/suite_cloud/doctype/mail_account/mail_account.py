@@ -78,9 +78,7 @@ class MailAccount(Document):
         site = frappe.get_cached_doc("Suite Site", self.site)
         if self.is_new():
             site.assert_can_add_account()
-            if self.disk_quota_gb is None:
-                self.disk_quota_gb = site.default_disk_quota_gb
-        self.validate_disk_quota(site)
+        site.validate_quota_of(self)
         assert_address_available(self.email, exclude=(self.doctype, self.name))
         sync.validate_aliases(self)
         self.validate_groups()
@@ -93,15 +91,6 @@ class MailAccount(Document):
             validate_password(self.new_password)
             self.flags.password = self.new_password
         self.new_password = None
-
-    def validate_disk_quota(self, site: Document) -> None:
-        """Every account has a quota above 0, and together they stay within the site's total."""
-
-        if flt(self.disk_quota_gb) <= 0:
-            frappe.throw(_("Disk Quota must be above 0 GB."))
-        before = self.get_doc_before_save()
-        if self.is_new() or flt(before.disk_quota_gb) != flt(self.disk_quota_gb):
-            site.assert_can_allocate_disk(self.disk_quota_gb, exclude=None if self.is_new() else self.name)
 
     def validate_groups(self) -> None:
         seen = set()

@@ -22,6 +22,7 @@ def create_group(
     description: str | None = None,
     aliases: list[str] | str | None = None,
     members: list[str] | str | None = None,
+    disk_quota_gb: float | None = None,
 ) -> dict:
     member_names = [owned("Mail Account", m).name for m in as_list(members)]
     doc = frappe.get_doc(
@@ -30,6 +31,7 @@ def create_group(
             "email": email,
             "site": current_site().name,
             "description": description,
+            "disk_quota_gb": disk_quota_gb,
             "aliases": [{"alias_email": a} for a in as_list(aliases)],
         }
     )
@@ -42,10 +44,12 @@ def create_group(
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def update_group(email: str, description: str | None = None) -> dict:
+def update_group(email: str, description: str | None = None, disk_quota_gb: float | None = None) -> dict:
     doc = owned("Mail Group", email)
     if description is not None:
         doc.description = description
+    if disk_quota_gb is not None:
+        doc.disk_quota_gb = disk_quota_gb
     doc.save(ignore_permissions=True)
     return doc.to_api()
 

@@ -151,7 +151,9 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertTrue(any(r["category"] == "DKIM" for r in domain["dns_records"]))
         self.assertEqual([d["domain"] for d in domains.list_domains()], ["acme.com"])
 
-        group = groups.create_group("sales@acme.com", description="Sales")
+        group = groups.create_group("sales@acme.com", description="Sales", disk_quota_gb=2)
+        self.assertEqual(group["disk_quota_gb"], 2)
+        self.assertEqual(groups.update_group("sales@acme.com", disk_quota_gb=3)["disk_quota_gb"], 3)
         mailing_list = mailing_lists.create_mailing_list("all@acme.com", recipients=["ext@example.org"])
         self.assertEqual((group["members"], group["description"]), ([], "Sales"))
         self.assertEqual(mailing_list["recipients"], ["ext@example.org"])

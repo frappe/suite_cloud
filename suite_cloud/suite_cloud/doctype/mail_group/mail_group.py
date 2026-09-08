@@ -3,8 +3,9 @@
 
 import frappe
 from frappe.model.document import Document
+from frappe.utils import flt
 
-from suite_cloud.stalwart.directory import Group
+from suite_cloud.stalwart.directory import GB, Group, quotas_payload
 from suite_cloud.tenancy import sync
 from suite_cloud.tenancy.addresses import assert_address_available, get_site_domain, validate_email_address
 
@@ -23,6 +24,7 @@ class MailGroup(Document):
         aliases: DF.Table[MailAddressAlias]
         cluster: DF.Link | None
         description: DF.Data | None
+        disk_quota_gb: DF.Float
         domain: DF.Link | None
         email: DF.Data
         site: DF.Link | None
@@ -42,8 +44,10 @@ class MailGroup(Document):
         self.domain = domain.name
         self.site = domain.site
         self.cluster = domain.cluster
+        site = frappe.get_cached_doc("Suite Site", self.site)
         if self.is_new():
-            frappe.get_cached_doc("Suite Site", self.site).assert_can_add_group()
+            site.assert_can_add_group()
+        site.validate_quota_of(self)
         assert_address_available(self.email, exclude=(self.doctype, self.name))
         sync.validate_aliases(self)
 
@@ -59,6 +63,8 @@ class MailGroup(Document):
         patch = {}
         if before.description != self.description:
             patch["description"] = self.description
+        if flt(before.disk_quota_gb) != flt(self.disk_quota_gb):
+            patch["quotas"] = quotas_payload(self.disk_quota_bytes())
         if sync.aliases_changed(before, self):
             patch["aliases"] = sync.aliases_payload(self)
         if patch:
@@ -75,7 +81,11 @@ class MailGroup(Document):
             domain_id=sync.domain_stalwart_id(self.domain),
             description=self.description or None,
             aliases=sync.aliases(self),
+            disk_quota_bytes=self.disk_quota_bytes(),
         )
+
+    def disk_quota_bytes(self) -> int | None:
+        return int(flt(self.disk_quota_gb) * GB) if flt(self.disk_quota_gb) > 0 else None
 
     def member_emails(self) -> list[str]:
         return frappe.get_all(
@@ -87,6 +97,7 @@ class MailGroup(Document):
             "email": self.email,
             "domain": self.domain,
             "description": self.description,
+            "disk_quota_gb": flt(self.disk_quota_gb),
             "aliases": [
                 {"email": a.alias_email, "enabled": bool(a.enabled), "description": a.description}
                 for a in self.aliases

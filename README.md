@@ -133,10 +133,10 @@ Rules that apply everywhere:
 | `site.mailing_lists` | `list_mailing_lists`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `set_recipients`, `delete_mailing_list` |
 | `site.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
 
-Every account has a disk quota above 0 GB, defaulting to the site's default quota. A site may carry
-a total disk quota; when it does, the quotas of its accounts together may not exceed it, and a
-create or quota increase beyond the remaining room is refused. Groups, lists and domains are
-counted against the site's other limits the same way.
+Every account and group has a disk quota above 0 GB, defaulting to the site's default quota. A
+site may carry a total disk quota; when it does, the quotas of its accounts and groups together may
+not exceed it, and a create or quota increase beyond the remaining room is refused. Domains,
+accounts, groups and lists are counted against the site's other limits the same way.
 
 `create_account` needs a password of at least 8 characters and returns, once, an app password
 minted for the account; the site uses it for that account's mail access. `rotate_app_password`
