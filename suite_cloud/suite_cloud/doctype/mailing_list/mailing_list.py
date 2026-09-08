@@ -156,14 +156,6 @@ class MailingList(Document):
             batch = keys[start : start + PATCH_BATCH]
             sync.push_update(self, "mailing_lists", {f"recipients/{e}": changes[e] for e in batch})
 
-    @frappe.whitelist()
-    def add_recipients_from_text(self, text: str) -> int:
-        """Desk helper: one address per line or comma-separated."""
-
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        emails = [e.strip() for e in text.replace("\n", ",").split(",") if e.strip()]
-        return len(self.add_recipients(emails))
-
     def to_api(self) -> dict:
         return {
             "email": self.email,
