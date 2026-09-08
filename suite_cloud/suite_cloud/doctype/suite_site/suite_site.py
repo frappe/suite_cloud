@@ -4,7 +4,8 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now
+from frappe.query_builder.functions import Sum
+from frappe.utils import flt, now
 
 from suite_cloud.utils import get_config
 
@@ -30,6 +31,7 @@ class SuiteSite(Document):
         enabled: DF.Check
         fc_reference: DF.Data | None
         max_accounts: DF.Int
+        max_disk_gb: DF.Float
         max_domains: DF.Int
         max_groups: DF.Int
         max_mailing_lists: DF.Int
@@ -58,6 +60,7 @@ class SuiteSite(Document):
         self.user = get_config("site_service_user")
         if not self.user:
             frappe.throw(_("The site service user is missing; run bench migrate."))
+        self.validate_disk_quotas()
 
         if self.is_new():
             cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
@@ -135,6 +138,14 @@ class SuiteSite(Document):
 
     # --- limits -----------------------------------------------------------------
 
+    def validate_disk_quotas(self) -> None:
+        if flt(self.default_disk_quota_gb) <= 0:
+            frappe.throw(_("Default Disk Quota must be above 0: every account needs a quota."))
+        if flt(self.max_disk_gb) < 0:
+            frappe.throw(_("Total Disk Quota cannot be negative; 0 means unlimited."))
+        if flt(self.max_disk_gb) and flt(self.default_disk_quota_gb) > flt(self.max_disk_gb):
+            frappe.throw(_("Default Disk Quota cannot exceed the site's Total Disk Quota."))
+
     def domain_count(self) -> int:
         return frappe.db.count("Mail Domain", {"site": self.name})
 
@@ -158,6 +169,28 @@ class SuiteSite(Document):
 
     def assert_can_add_mailing_list(self) -> None:
         self.assert_within_limit(self.max_mailing_lists, self.mailing_list_count(), _("mailing lists"))
+
+    def allocated_disk_gb(self, exclude: str | None = None) -> float:
+        """Sum of the quotas of the site's accounts, optionally leaving one account out."""
+
+        account = frappe.qb.DocType("Mail Account")
+        query = frappe.qb.from_(account).select(Sum(account.disk_quota_gb)).where(account.site == self.name)
+        if exclude:
+            query = query.where(account.name != exclude)
+        return flt(query.run()[0][0])
+
+    def assert_can_allocate_disk(self, quota_gb: float, exclude: str | None = None) -> None:
+        """The site's accounts together may not exceed its total disk quota (0 = unlimited)."""
+
+        if not flt(self.max_disk_gb):
+            return
+        allocated = self.allocated_disk_gb(exclude)
+        if allocated + flt(quota_gb) > flt(self.max_disk_gb):
+            frappe.throw(
+                _("Site {0} has {1} GB of its {2} GB total disk quota left; {3} GB requested.").format(
+                    self.name, round(flt(self.max_disk_gb) - allocated, 2), self.max_disk_gb, quota_gb
+                )
+            )
 
     def assert_within_limit(self, limit: int, current: int, what: str) -> None:
         """A limit of 0 means unlimited."""
@@ -184,6 +217,7 @@ class SuiteSite(Document):
                 "max_accounts": self.max_accounts,
                 "max_groups": self.max_groups,
                 "max_mailing_lists": self.max_mailing_lists,
+                "max_disk_gb": self.max_disk_gb,
                 "default_disk_quota_gb": self.default_disk_quota_gb,
             },
             "usage": {
@@ -191,6 +225,7 @@ class SuiteSite(Document):
                 "accounts": self.account_count(),
                 "groups": self.group_count(),
                 "mailing_lists": self.mailing_list_count(),
+                "allocated_disk_gb": self.allocated_disk_gb(),
             },
         }
 

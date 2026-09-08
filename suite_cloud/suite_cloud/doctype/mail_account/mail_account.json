@@ -135,7 +135,7 @@
    "label": "Settings"
   },
   {
-   "description": "Mailbox size limit in GB. 0 means unlimited. Defaults to the site's default quota.",
+   "description": "Mailbox size limit in GB, above 0. Defaults to the site's default quota. Counts against the site's total disk quota.",
    "fieldname": "disk_quota_gb",
    "fieldtype": "Float",
    "label": "Disk Quota (GB)"
@@ -191,7 +191,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-08 11:00:00.000000",
+ "modified": "2026-09-08 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Account",

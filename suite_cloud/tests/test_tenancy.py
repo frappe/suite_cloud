@@ -342,7 +342,7 @@ class TestMailAccount(TenancyTestCase):
         account = self.make_account("bob@acme.com")
         account.display_name = "Bob"
         account.description = "internal note"
-        account.disk_quota_gb = 0
+        account.disk_quota_gb = 2
         account.aliases = []
         account.append("aliases", {"alias_email": "robert@acme.com", "enabled": 0})
         account.append("groups", {"group": "sales@acme.com"})
@@ -350,7 +350,7 @@ class TestMailAccount(TenancyTestCase):
 
         live = self.fake.get("Account", account.stalwart_id)
         self.assertEqual(live["description"], "Bob")
-        self.assertEqual(live["quotas"], {})
+        self.assertEqual(live["quotas"], {"maxDiskQuota": 2 * 1024**3})
         self.assertEqual(live["aliases"]["0"]["enabled"], False)
         self.assertEqual(live["memberGroupIds"], {self.group.stalwart_id: True})
 
@@ -426,6 +426,32 @@ class TestMailAccount(TenancyTestCase):
         self.site.db_set("max_accounts", 1)
         frappe.clear_document_cache("Suite Site", self.site.name)
         self.assertRaisesRegex(frappe.ValidationError, "limit", self.make_account, "g@acme.com")
+
+    def test_disk_quotas_are_positive_and_within_the_site_total(self) -> None:
+        self.assertRaisesRegex(
+            frappe.ValidationError, "above 0", self.make_account, "z@acme.com", disk_quota_gb=0
+        )
+
+        site = frappe.get_doc("Suite Site", self.site.name)
+        site.default_disk_quota_gb = 0
+        self.assertRaisesRegex(frappe.ValidationError, "above 0", site.save)
+        site.reload()
+        site.max_disk_gb = 8
+        site.default_disk_quota_gb = 5
+        site.save()
+
+        first = self.make_account("q1@acme.com")  # 5 of 8
+        self.assertRaisesRegex(frappe.ValidationError, "3.0 GB of its 8", self.make_account, "q2@acme.com")
+        second = self.make_account("q2@acme.com", disk_quota_gb=3)  # exactly full
+        first.reload()
+        first.disk_quota_gb = 6
+        self.assertRaisesRegex(frappe.ValidationError, "total disk quota", first.save)
+        first.reload()
+        first.disk_quota_gb = 4  # shrinking is always fine
+        first.save()
+        usage = frappe.get_doc("Suite Site", self.site.name).to_api()["usage"]
+        self.assertEqual(usage["allocated_disk_gb"], 7)
+        second.delete()
 
     def test_group_and_mailing_list_limits(self) -> None:
         self.site.db_set({"max_groups": 1, "max_mailing_lists": 0})  # one group exists; lists unlimited
