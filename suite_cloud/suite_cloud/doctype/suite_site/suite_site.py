@@ -40,6 +40,7 @@ class SuiteSite(Document):
         max_groups: DF.Int
         max_mailing_lists: DF.Int
         site_name: DF.Data
+        title: DF.Data | None
         status: DF.Literal["Active", "Suspended", "Archived"]
         user: DF.Link | None
     # end: auto-generated types
@@ -60,6 +61,7 @@ class SuiteSite(Document):
         self.site_name = (self.site_name or "").strip().lower().rstrip("/")
         if "/" in self.site_name or " " in self.site_name or "." not in self.site_name:
             frappe.throw(_("Site Name must be the site's domain, e.g. acme.frappe.cloud"))
+        self.title = (self.title or "").strip() or self.site_name
 
         self.user = get_config("site_service_user")
         if not self.user:

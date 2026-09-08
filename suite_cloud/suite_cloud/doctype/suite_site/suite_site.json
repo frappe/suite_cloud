@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "site_name",
+  "title",
   "cluster",
   "fc_reference",
   "column_break_main",
@@ -38,6 +39,13 @@
    "reqd": 1,
    "set_only_once": 1,
    "unique": 1
+  },
+  {
+   "description": "Display name shown in lists and links, e.g. Acme Corp. Defaults to the site name.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
   },
   {
    "description": "The Stalwart cluster hosting every mail domain and account of the site. Fixed once the site exists; the cluster must be active at creation.",
@@ -209,7 +217,7 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-09-08 14:00:00.000000",
+ "modified": "2026-09-08 19:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Site",
@@ -245,5 +253,7 @@
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1
+ "track_changes": 1,
+ "title_field": "title",
+ "show_title_field_in_link": 1
 }
