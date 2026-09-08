@@ -47,6 +47,8 @@ class MailingList(Document):
         self.domain = domain.name
         self.site = domain.site
         self.cluster = domain.cluster
+        if self.is_new():
+            frappe.get_cached_doc("Suite Site", self.site).assert_can_add_mailing_list()
         assert_address_available(self.email, exclude=(self.doctype, self.name))
         sync.validate_aliases(self)
         self.validate_recipients()

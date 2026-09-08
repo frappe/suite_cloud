@@ -25,6 +25,8 @@ def create_site(
     fc_reference: str | None = None,
     max_domains: int | None = None,
     max_accounts: int | None = None,
+    max_groups: int | None = None,
+    max_mailing_lists: int | None = None,
     default_disk_quota_gb: float | None = None,
 ) -> dict:
     require_frappe_cloud()
@@ -43,6 +45,8 @@ def create_site(
     for field, value in {
         "max_domains": max_domains,
         "max_accounts": max_accounts,
+        "max_groups": max_groups,
+        "max_mailing_lists": max_mailing_lists,
         "default_disk_quota_gb": default_disk_quota_gb,
     }.items():
         if value is not None:

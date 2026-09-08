@@ -326,14 +326,14 @@ class TestMailAccount(TenancyTestCase):
         )
 
         self.assertEqual(account.name, "alice@acme.com")
-        self.assertEqual(account.disk_quota_gb, 1)
+        self.assertEqual(account.disk_quota_gb, self.site.default_disk_quota_gb)
         live = self.fake.get("Account", account.stalwart_id)
         self.assertEqual(live["@type"], "User")
         self.assertEqual(live["credentials"]["0"]["secret"], "secret-pw")
         self.assertEqual(live["memberGroupIds"], {self.group.stalwart_id: True})
         self.assertEqual(live["aliases"]["0"]["name"], "ally")
         self.assertEqual(live["aliases"]["0"]["domainId"], self.domain.stalwart_id)
-        self.assertEqual(live["quotas"], {"maxDiskQuota": 1024**3})
+        self.assertEqual(live["quotas"], {"maxDiskQuota": int(self.site.default_disk_quota_gb * 1024**3)})
         self.assertEqual(live["description"], "Alice")
         self.assertEqual(live["roles"], {"@type": "User"})
         self.assertEqual(self.group.to_api()["members"], ["alice@acme.com"])
@@ -426,6 +426,19 @@ class TestMailAccount(TenancyTestCase):
         self.site.db_set("max_accounts", 1)
         frappe.clear_document_cache("Suite Site", self.site.name)
         self.assertRaisesRegex(frappe.ValidationError, "limit", self.make_account, "g@acme.com")
+
+    def test_group_and_mailing_list_limits(self) -> None:
+        self.site.db_set({"max_groups": 1, "max_mailing_lists": 0})  # one group exists; lists unlimited
+        frappe.clear_document_cache("Suite Site", self.site.name)
+        group = frappe.get_doc({"doctype": "Mail Group", "email": "ops@acme.com", "site": self.site.name})
+        self.assertRaisesRegex(frappe.ValidationError, "limit of 1 groups", group.insert)
+        frappe.get_doc({"doctype": "Mailing List", "email": "news@acme.com", "site": self.site.name}).insert()
+        self.site.db_set("max_mailing_lists", 1)
+        frappe.clear_document_cache("Suite Site", self.site.name)
+        more = frappe.get_doc({"doctype": "Mailing List", "email": "more@acme.com", "site": self.site.name})
+        self.assertRaisesRegex(frappe.ValidationError, "mailing lists", more.insert)
+        usage = frappe.get_doc("Suite Site", self.site.name).to_api()["usage"]
+        self.assertEqual((usage["groups"], usage["mailing_lists"]), (1, 1))
 
     def test_group_delete_clears_membership(self) -> None:
         account = self.make_account("dave@acme.com", groups=[{"group": "sales@acme.com"}])

@@ -31,6 +31,8 @@ class SuiteSite(Document):
         fc_reference: DF.Data | None
         max_accounts: DF.Int
         max_domains: DF.Int
+        max_groups: DF.Int
+        max_mailing_lists: DF.Int
         site_name: DF.Data
         status: DF.Literal["Active", "Suspended", "Archived"]
         user: DF.Link | None
@@ -139,17 +141,29 @@ class SuiteSite(Document):
     def account_count(self) -> int:
         return frappe.db.count("Mail Account", {"site": self.name})
 
+    def group_count(self) -> int:
+        return frappe.db.count("Mail Group", {"site": self.name})
+
+    def mailing_list_count(self) -> int:
+        return frappe.db.count("Mailing List", {"site": self.name})
+
     def assert_can_add_domain(self) -> None:
-        if self.max_domains and self.domain_count() >= self.max_domains:
-            frappe.throw(
-                _("Site {0} has reached its limit of {1} domains.").format(self.name, self.max_domains)
-            )
+        self.assert_within_limit(self.max_domains, self.domain_count(), _("domains"))
 
     def assert_can_add_account(self) -> None:
-        if self.max_accounts and self.account_count() >= self.max_accounts:
-            frappe.throw(
-                _("Site {0} has reached its limit of {1} accounts.").format(self.name, self.max_accounts)
-            )
+        self.assert_within_limit(self.max_accounts, self.account_count(), _("accounts"))
+
+    def assert_can_add_group(self) -> None:
+        self.assert_within_limit(self.max_groups, self.group_count(), _("groups"))
+
+    def assert_can_add_mailing_list(self) -> None:
+        self.assert_within_limit(self.max_mailing_lists, self.mailing_list_count(), _("mailing lists"))
+
+    def assert_within_limit(self, limit: int, current: int, what: str) -> None:
+        """A limit of 0 means unlimited."""
+
+        if limit and current >= limit:
+            frappe.throw(_("Site {0} has reached its limit of {1} {2}.").format(self.name, limit, what))
 
     # --- helpers ----------------------------------------------------------------
 
@@ -168,9 +182,16 @@ class SuiteSite(Document):
             "limits": {
                 "max_domains": self.max_domains,
                 "max_accounts": self.max_accounts,
+                "max_groups": self.max_groups,
+                "max_mailing_lists": self.max_mailing_lists,
                 "default_disk_quota_gb": self.default_disk_quota_gb,
             },
-            "usage": {"domains": self.domain_count(), "accounts": self.account_count()},
+            "usage": {
+                "domains": self.domain_count(),
+                "accounts": self.account_count(),
+                "groups": self.group_count(),
+                "mailing_lists": self.mailing_list_count(),
+            },
         }
 
 

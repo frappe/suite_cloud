@@ -1,7 +1,7 @@
 {
  "actions": [],
  "autoname": "field:site_name",
- "creation": "2026-09-03 12:00:00.000000",
+ "creation": "2026-09-03 12:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -15,6 +15,8 @@
   "limits_section",
   "max_domains",
   "max_accounts",
+  "max_groups",
+  "max_mailing_lists",
   "column_break_limits",
   "egress_pool",
   "default_disk_quota_gb",
@@ -103,11 +105,25 @@
    "label": "Max Accounts"
   },
   {
+   "default": "50",
+   "description": "Mail Groups the site may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
+   "fieldname": "max_groups",
+   "fieldtype": "Int",
+   "label": "Max Groups"
+  },
+  {
+   "default": "50",
+   "description": "Mailing Lists the site may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
+   "fieldname": "max_mailing_lists",
+   "fieldtype": "Int",
+   "label": "Max Mailing Lists"
+  },
+  {
    "fieldname": "column_break_limits",
    "fieldtype": "Column Break"
   },
   {
-   "default": "1",
+   "default": "5",
    "description": "Disk quota given to accounts created without one, in gigabytes. 0 means unlimited. Existing accounts keep their own quota.",
    "fieldname": "default_disk_quota_gb",
    "fieldtype": "Float",
@@ -185,7 +201,7 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-09-08 12:00:00.000000",
+ "modified": "2026-09-08 11:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Site",
