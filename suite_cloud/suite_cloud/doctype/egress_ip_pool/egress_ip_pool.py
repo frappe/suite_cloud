@@ -31,10 +31,10 @@ class EgressIPPool(Document):
 
         addresses: DF.Table[EgressIPPoolAddress]
         cluster: DF.Link
-        description: DF.Data | None
         hostname: DF.Data | None
         pool_name: DF.Data
         relay_port: DF.Int
+        title: DF.Data | None
     # end: auto-generated types
 
     def autoname(self) -> None:
@@ -49,6 +49,7 @@ class EgressIPPool(Document):
 
         cluster = self.get_cluster()
         self.hostname = f"{self.pool_name}.out.{cluster.default_domain}"
+        self.title = (self.title or "").strip() or self.hostname
         if not self.relay_port:
             self.relay_port = self.next_relay_port()
         self.validate_addresses(cluster)
