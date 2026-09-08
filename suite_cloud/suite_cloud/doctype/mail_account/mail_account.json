@@ -38,7 +38,8 @@
    "options": "Email",
    "reqd": 1,
    "set_only_once": 1,
-   "unique": 1
+   "unique": 1,
+   "description": "The mailbox address, e.g. alice@acme.com. Its domain must be a Mail Domain of the site. Cannot change after saving."
   },
   {
    "fieldname": "domain",
@@ -48,7 +49,8 @@
    "label": "Domain",
    "options": "Mail Domain",
    "read_only": 1,
-   "search_index": 1
+   "search_index": 1,
+   "description": "Mail Domain the address belongs to. Derived from the email."
   },
   {
    "fetch_from": "domain.site",
@@ -58,7 +60,8 @@
    "label": "Site",
    "options": "Suite Site",
    "read_only": 1,
-   "search_index": 1
+   "search_index": 1,
+   "description": "Suite site that owns the account. Derived from the domain; the site's account limit applies."
   },
   {
    "fetch_from": "domain.cluster",
@@ -67,7 +70,8 @@
    "label": "Cluster",
    "options": "Stalwart Cluster",
    "read_only": 1,
-   "search_index": 1
+   "search_index": 1,
+   "description": "Cluster the mailbox lives on. Derived from the site."
   },
   {
    "fieldname": "column_break_main",
@@ -75,7 +79,7 @@
   },
   {
    "default": "1",
-   "description": "Disabled accounts still receive mail but cannot log in.",
+   "description": "Untick to lock the account: it keeps receiving mail but can no longer log in, send or read. Tick again to restore it.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -84,19 +88,22 @@
   {
    "fieldname": "display_name",
    "fieldtype": "Data",
-   "label": "Display Name"
+   "label": "Display Name",
+   "description": "Name shown to other users, e.g. Alice Doe. Also used as the account description on the cluster."
   },
   {
    "fieldname": "description",
    "fieldtype": "Data",
-   "label": "Description"
+   "label": "Description",
+   "description": "Internal note, e.g. the team or purpose. Shown on the cluster when there is no display name."
   },
   {
    "fieldname": "stalwart_id",
    "fieldtype": "Data",
    "label": "Stalwart ID",
    "no_copy": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "Id of the account on the cluster. Set when it is created there."
   },
   {
    "fieldname": "credentials_section",
@@ -128,7 +135,7 @@
    "label": "Settings"
   },
   {
-   "description": "0 means unlimited.",
+   "description": "Mailbox size limit in GB. 0 means unlimited. Defaults to the site's default quota.",
    "fieldname": "disk_quota_gb",
    "fieldtype": "Float",
    "label": "Disk Quota (GB)"
@@ -137,7 +144,8 @@
    "default": "en-US",
    "fieldname": "locale",
    "fieldtype": "Data",
-   "label": "Locale"
+   "label": "Locale",
+   "description": "Language tag for server-generated messages and folder names, e.g. en-US or de-DE."
   },
   {
    "fieldname": "column_break_settings",
@@ -146,13 +154,15 @@
   {
    "fieldname": "time_zone",
    "fieldtype": "Data",
-   "label": "Time Zone"
+   "label": "Time Zone",
+   "description": "IANA time zone, e.g. Asia/Kolkata. Blank uses the server's."
   },
   {
    "fieldname": "used_disk_bytes",
    "fieldtype": "Int",
    "label": "Used Disk (bytes)",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Mailbox size as last reported by the cluster."
   },
   {
    "fieldname": "aliases_section",
@@ -163,7 +173,8 @@
    "fieldname": "aliases",
    "fieldtype": "Table",
    "label": "Aliases",
-   "options": "Mail Address Alias"
+   "options": "Mail Address Alias",
+   "description": "Other addresses delivered to this mailbox. Each must be unique across the cluster and under one of the site's domains."
   },
   {
    "fieldname": "groups_section",
@@ -174,12 +185,13 @@
    "fieldname": "groups",
    "fieldtype": "Table MultiSelect",
    "label": "Groups",
-   "options": "Mail Group Member"
+   "options": "Mail Group Member",
+   "description": "Mail Groups this account is a member of. Mail sent to a group reaches every member."
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-08 10:00:00.000000",
+ "modified": "2026-09-08 10:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Account",
