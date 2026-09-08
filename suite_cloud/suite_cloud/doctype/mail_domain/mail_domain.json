@@ -128,12 +128,12 @@
   },
   {
    "default": "0",
-   "description": "Set when SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled.",
+   "description": "Set by Verify DNS Records when SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled. A System Manager or Suite Cloud Manager can set it by hand; the hourly check re-verifies domains that are unchecked.",
    "fieldname": "is_verified",
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Verified",
-   "read_only": 1
+   "permlevel": 1
   },
   {
    "description": "When the records were last resolved, by the Verify DNS Records action or the hourly check of unverified domains.",
@@ -238,7 +238,7 @@
    "link_fieldname": "domain"
   }
  ],
- "modified": "2026-09-08 12:00:00.000000",
+ "modified": "2026-09-08 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Domain",
@@ -267,6 +267,18 @@
    "report": 1,
    "role": "Suite Cloud Manager",
    "share": 1,
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "permlevel": 1,
+   "read": 1,
+   "role": "Suite Cloud Manager",
    "write": 1
   }
  ],

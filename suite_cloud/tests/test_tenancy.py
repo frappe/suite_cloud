@@ -178,6 +178,18 @@ class TestMailDomain(TenancyTestCase):
         other = make_site(self.cluster, "other.frappe.test")
         self.assertRaises(frappe.DoesNotExistError, get_site_domain, other.name, "acme.com")
 
+    def test_verified_set_by_hand_goes_live(self) -> None:
+        domain = self.make_domain()
+        self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
+        domain.is_verified = 1
+        domain.save()
+        self.assertTrue(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
+        domain.is_verified = 0
+        domain.save()
+        self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
     def test_domain_goes_live_only_once_verified(self) -> None:
         domain = self.make_domain()
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])

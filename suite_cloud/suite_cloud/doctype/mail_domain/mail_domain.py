@@ -15,7 +15,8 @@ from suite_cloud.tenancy import ownership, sync
 from suite_cloud.tenancy.addresses import assert_domain_available, validate_domain_name
 from suite_cloud.utils import dkim_algorithms, get_config
 
-PUSHED_FIELDS = ("description", "catch_all_address", "sub_addressing", "enabled")
+# A change to any of these reaches the cluster; is_verified is set by hand only by managers.
+PUSHED_FIELDS = ("description", "catch_all_address", "sub_addressing", "enabled", "is_verified")
 
 
 class MailDomain(Document):
