@@ -13,6 +13,7 @@ from suite_cloud.tests.fixtures import (
     make_store,
     make_zone,
     no_dns_provider,
+    remove_cluster,
 )
 
 
@@ -37,17 +38,28 @@ class TestStalwartCluster(IntegrationTestCase):
             cluster.stalwart_version, frappe.db.get_single_value("Suite Cloud Settings", "stalwart_version")
         )
 
-    def test_hostname_must_be_two_labels_under_root(self) -> None:
+    def test_label_names_the_cluster_and_is_handed_out(self) -> None:
         store = make_store("Data", "PostgreSql", host="db", auth_secret="x")
-        cluster = frappe.get_doc(
-            {
-                "doctype": "Stalwart Cluster",
-                "title": "bad",
-                "hostname": f"mail.{ROOT_DOMAIN}",
-                "data_store": store.name,
-            }
+        bad = frappe.get_doc(
+            {"doctype": "Stalwart Cluster", "title": "bad", "label": "Bad Label!", "data_store": store.name}
         )
-        self.assertRaisesRegex(frappe.ValidationError, "two labels", cluster.insert)
+        self.assertRaisesRegex(frappe.ValidationError, "Label must be", bad.insert)
+
+        remove_cluster(f"mail.c1.{ROOT_DOMAIN}")
+        auto = frappe.get_doc(
+            {"doctype": "Stalwart Cluster", "title": "auto", "data_store": store.name}
+        ).insert()
+        self.assertEqual(
+            (auto.label, auto.name, auto.default_domain),
+            ("c1", f"mail.c1.{ROOT_DOMAIN}", f"c1.{ROOT_DOMAIN}"),
+        )
+        self.assertEqual(auto.regions, [])  # serves any region
+        self.assertTrue(auto.serves("anything"))
+        dup = frappe.get_doc(
+            {"doctype": "Stalwart Cluster", "title": "dup", "label": "c1", "data_store": store.name}
+        )
+        self.assertRaisesRegex(frappe.ValidationError, "already used", dup.insert)
+        remove_cluster(auto.name)
 
     def test_store_kind_is_enforced(self) -> None:
         blob = make_store("Blob", "S3", region="r", bucket="b", access_key="a", secret_key="s")
@@ -55,7 +67,7 @@ class TestStalwartCluster(IntegrationTestCase):
             {
                 "doctype": "Stalwart Cluster",
                 "title": "kind",
-                "hostname": f"mail.kind.{ROOT_DOMAIN}",
+                "label": "kind",
                 "data_store": blob.name,
             }
         )

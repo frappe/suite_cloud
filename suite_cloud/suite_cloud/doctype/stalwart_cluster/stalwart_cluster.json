@@ -7,13 +7,14 @@
  "field_order": [
   "details_tab",
   "title",
-  "region",
   "is_default",
   "column_break_details",
   "enabled",
   "status",
   "stalwart_version",
+  "regions",
   "naming_section",
+  "label",
   "dns_zone",
   "hostname",
   "default_domain",
@@ -74,14 +75,6 @@
    "reqd": 1
   },
   {
-   "description": "Short region code, e.g. blr. Frappe Cloud asks for a cluster by region when it does not name one. Defaults to the first label of the default domain.",
-   "fieldname": "region",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Region"
-  },
-  {
    "default": "0",
    "description": "Cluster Frappe Cloud uses when it names neither a cluster nor a region. Only one cluster can be default.",
    "fieldname": "is_default",
@@ -117,9 +110,24 @@
    "label": "Stalwart Version"
   },
   {
+   "description": "Regions Frappe Cloud may place sites from, e.g. blr, sfo. A cluster with no regions serves any region. Placement policy only: the servers may sit anywhere.",
+   "fieldname": "regions",
+   "fieldtype": "Table",
+   "label": "Regions Served",
+   "options": "Stalwart Cluster Region"
+  },
+  {
    "fieldname": "naming_section",
    "fieldtype": "Section Break",
    "label": "Naming"
+  },
+  {
+   "description": "Short set-once id that namespaces the cluster under its zone: mail.<label>.<zone>, n1.<label>.<zone> and the wildcard certificate. Lowercase letters, digits and dashes; handed out as c1, c2, ... when left blank. Not a place: a cluster may span regions.",
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Label",
+   "set_only_once": 1
   },
   {
    "description": "Zone the cluster's records are published in. Every hostname below must sit under it. Defaults to the default zone.",
@@ -132,14 +140,14 @@
    "set_only_once": 1
   },
   {
-   "description": "Public address of the cluster and its document name, e.g. mail.blr.frappemail.com. Mail clients, MX records and sites all use it. It needs at least two labels under the zone; the part after the first label becomes the default domain.",
+   "description": "Public address of the cluster and its document name, derived as mail.<label>.<zone>. Mail clients, MX records and sites all use it.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Hostname",
-   "reqd": 1,
    "set_only_once": 1,
-   "unique": 1
+   "unique": 1,
+   "read_only": 1
   },
   {
    "description": "Sub-zone the cluster owns, derived from the hostname (mail.blr.frappemail.com owns blr.frappemail.com). Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
@@ -390,16 +398,16 @@
    "read_only": 1
   },
   {
+   "fieldname": "section_break_wysw",
+   "fieldtype": "Section Break"
+  },
+  {
    "description": "Last generated plan, secrets redacted.",
    "fieldname": "config_plan",
    "fieldtype": "Code",
    "label": "Config Plan",
    "options": "JSON",
    "read_only": 1
-  },
-  {
-   "fieldname": "section_break_wysw",
-   "fieldtype": "Section Break"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -435,7 +443,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-08 18:00:00.000000",
+ "modified": "2026-09-08 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Stalwart Cluster",

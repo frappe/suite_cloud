@@ -283,7 +283,16 @@ class TestFrappeCloudApi(SiteApiTestCase):
     def test_cluster_selection(self) -> None:
         self.assertEqual(fc.pick_cluster(None, None), self.cluster.name)
         self.assertEqual(fc.pick_cluster(None, "BLR"), self.cluster.name)
-        self.assertEqual(
-            fc.pick_cluster(None, "sfo"), self.cluster.name
-        )  # falls back to the default/only cluster
+        self.assertEqual(fc.pick_cluster(None, "sfo"), self.cluster.name)  # falls back to the default
         self.assertRaisesRegex(frappe.ValidationError, "not active", fc.pick_cluster, "missing", None)
+
+        # Without a default, a region nobody serves is refused unless some cluster serves all regions.
+        # The site may hold real clusters serving "blr", so the fixture gets a region of its own.
+        self.cluster.db_set("is_default", 0)
+        self.cluster.append("regions", {"region": "fixture-only"})
+        self.cluster.save()
+        self.assertRaisesRegex(
+            frappe.ValidationError, "serves region nowhere", fc.pick_cluster, None, "nowhere"
+        )
+        self.assertEqual(fc.pick_cluster(None, "FIXTURE-ONLY"), self.cluster.name)
+        self.cluster.db_set("is_default", 1)

@@ -11,6 +11,7 @@ from collections.abc import Iterable
 
 import frappe
 
+CLUSTER_PREFIX = "c"
 NODE_PREFIX = "n"
 GATEWAY_PREFIX = "g"
 POOL_PREFIX = "p"
@@ -50,3 +51,10 @@ def assign_ehlo_hostnames(pool, default_domain: str) -> None:
         label = next_label(prefix, taken)
         taken.append(label)
         row.ehlo_hostname = f"{label}.{default_domain}"
+
+
+def next_cluster_label(zone: str) -> str:
+    """The next free ``c<n>`` among the clusters of a zone; operators may type a label instead."""
+
+    taken = frappe.get_all("Stalwart Cluster", {"dns_zone": zone}, pluck="label")
+    return next_label(CLUSTER_PREFIX, taken)

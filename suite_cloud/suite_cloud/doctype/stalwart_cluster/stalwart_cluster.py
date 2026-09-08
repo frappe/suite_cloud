@@ -8,13 +8,14 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now
 
-from suite_cloud.cluster import bootstrap, dns, egress, plan, reconcile
+from suite_cloud.cluster import bootstrap, dns, egress, naming, plan, reconcile
 from suite_cloud.provisioning.ssh import generate_keypair
 from suite_cloud.stalwart import forget_sessions, get_admin_client, get_client
 from suite_cloud.stalwart.credentials import Credential
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
 from suite_cloud.utils import get_config
 
+LABEL = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 STORE_KINDS = {
     "data_store": "Data",
     "blob_store": "Blob",
@@ -31,6 +32,10 @@ class StalwartCluster(Document):
 
     if TYPE_CHECKING:
         from frappe.types import DF
+
+        from suite_cloud.suite_cloud.doctype.stalwart_cluster_region.stalwart_cluster_region import (
+            StalwartClusterRegion,
+        )
 
         acme_contact_email: DF.Data | None
         acme_directory_url: DF.Data | None
@@ -52,8 +57,9 @@ class StalwartCluster(Document):
         hostname: DF.Data
         in_memory_store: DF.Link | None
         is_default: DF.Check
+        label: DF.Data | None
         last_config_sync_at: DF.Datetime | None
-        region: DF.Data | None
+        regions: DF.Table[StalwartClusterRegion]
         relay_password: DF.Password | None
         relay_username: DF.Data | None
         search_store: DF.Link | None
@@ -117,30 +123,56 @@ class StalwartCluster(Document):
     # --- validation -----------------------------------------------------------
 
     def autoname(self) -> None:
-        # Naming runs before validate, so the hostname is normalised here too.
-        self.hostname = normalise_hostname(self.hostname)
+        # Naming runs before validate: the label and zone settle here so the hostname can be derived.
+        self.resolve_label()
         self.name = self.hostname
 
-    def validate_names(self) -> None:
-        self.hostname = normalise_hostname(self.hostname)
-        self.title = (self.title or "").strip() or self.hostname
+    def resolve_label(self) -> None:
+        """Label + zone give the hostname and default domain; both are fixed once the cluster exists."""
+
         self.dns_zone = self.dns_zone or get_default_zone()
         if not self.dns_zone:
             frappe.throw(_("Create a DNS Zone before creating clusters."))
-        zone = self.dns_zone
-        if not self.hostname.endswith(f".{zone}") or self.hostname.count(".") < zone.count(".") + 2:
+        self.label = (self.label or "").strip().lower() or naming.next_cluster_label(self.dns_zone)
+        if not LABEL.match(self.label):
+            frappe.throw(_("Label must be lowercase letters, digits and dashes, e.g. c1 or eu."))
+        taken = frappe.db.exists(
+            "Stalwart Cluster", {"label": self.label, "dns_zone": self.dns_zone, "name": ["!=", self.name]}
+        )
+        if taken:
             frappe.throw(
-                _("Hostname must be at least two labels under the DNS zone, e.g. mail.blr.{0}").format(zone)
+                _("Label {0} is already used by another cluster in {1}.").format(self.label, self.dns_zone)
             )
-
-        self.default_domain = self.hostname.split(".", 1)[1]
+        self.hostname = f"mail.{self.label}.{self.dns_zone}"
+        self.default_domain = f"{self.label}.{self.dns_zone}"
         self.base_url = f"https://{self.hostname}"
+
+    def validate_names(self) -> None:
+        self.resolve_label()
+        self.title = (self.title or "").strip() or self.hostname
+        self.validate_regions()
+
+    def validate_regions(self) -> None:
+        seen = set()
+        for row in self.regions:
+            row.region = (row.region or "").strip().lower()
+            if not row.region:
+                frappe.throw(_("Region cannot be blank."))
+            if row.region in seen:
+                frappe.throw(_("Region {0} is listed twice.").format(row.region))
+            seen.add(row.region)
+
+    def serves(self, region: str | None) -> bool:
+        """No regions means any region."""
+
+        if not self.regions:
+            return True
+        return bool(region) and region.strip().lower() in {r.region for r in self.regions}
 
     def apply_defaults(self) -> None:
         self.stalwart_version = self.stalwart_version or get_config("stalwart_version")
         self.acme_directory_url = self.acme_directory_url or get_config("acme_directory_url")
         self.acme_contact_email = self.acme_contact_email or get_config("acme_contact_email")
-        self.region = (self.region or self.default_domain.split(".")[0]).strip().lower()
 
     def validate_stores(self) -> None:
         for field, kind in STORE_KINDS.items():
@@ -290,7 +322,3 @@ def check_all_clusters() -> None:
             cluster.check_drift()
         except Exception:
             cluster.log_error(f"Drift check failed for {name}")
-
-
-def normalise_hostname(hostname: str | None) -> str:
-    return (hostname or "").strip().lower().rstrip(".")

@@ -64,13 +64,17 @@ def make_cluster(name: str = "blr-1", hostname: str | None = None, multi_node: b
         data = make_store("Data", "RocksDb", path="/var/lib/stalwart")
         memory = blob = None
 
+    # ``hostname`` is accepted for readability; the cluster derives it from the label and zone.
     hostname = hostname or f"mail.blr.{ROOT_DOMAIN}"
+    label = hostname.split(".")[1]
+    regions = fields.pop("regions", [{"region": label}])
     remove_cluster(hostname)
     cluster = frappe.get_doc(
         {
             "doctype": "Stalwart Cluster",
             "title": name,
-            "hostname": hostname,
+            "label": label,
+            "regions": regions,
             "data_store": data.name,
             "blob_store": blob.name if blob else None,
             "in_memory_store": memory.name if memory else None,

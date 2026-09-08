@@ -69,9 +69,11 @@ Installing creates three roles and one user:
 3. **Stores.** Create a PostgreSQL (or MySQL) data store, an S3 blob store and a Redis in-memory
    store. Redis also coordinates the nodes. RocksDB and local files only work for a single-node
    cluster.
-4. **Cluster.** Create a Stalwart Cluster with hostname `mail.blr.frappemail.com`. Everything the
-   cluster owns gets a name directly under `blr.frappemail.com`. Copy the SSH public key shown on
-   the form.
+4. **Cluster.** Create a Stalwart Cluster. Give it a short label, or leave it blank to get `c1`,
+   `c2` and so on. The label and the zone make the hostname, `mail.c1.frappemail.com`, and the
+   default domain `c1.frappemail.com` that nodes, gateways and pools get their names under. The
+   label is only a namespace: a cluster may have servers in several regions. List the regions
+   Frappe Cloud may place sites from, or none to serve every region. Copy the SSH public key.
 5. **First node.** Put that public key on a fresh VPS and set the reverse DNS (PTR) of its IP to the
    node's hostname. Create a Stalwart Node (`n1.blr.frappemail.com` with its IPv4), click
    **Verify SSH**, then **Provision**. The job installs Stalwart and its CLI, sets up the system
@@ -108,7 +110,7 @@ Call these with the API key and secret of a user that has the **Frappe Cloud** r
 
 | Method | What it does |
 | --- | --- |
-| `suite_cloud.api.fc.create_site(site, cluster=None, region=None, fc_reference=None, title=None, contact_email=None, ...)` | Registers a site, choosing a cluster by its hostname, by region, or the default one. Returns the mail server URL, the Suite Cloud URL and the site's key and secret. The secret is shown only this once. |
+| `suite_cloud.api.fc.create_site(site, cluster=None, region=None, fc_reference=None, title=None, contact_email=None, ...)` | Registers a site, choosing a cluster by its hostname, by a region it serves (default cluster preferred), or the default; a cluster with no regions serves any region. Returns the mail server URL, the Suite Cloud URL and the site's key and secret. The secret is shown only this once. |
 | `get_site(site)` | Status, cluster, title, contact email, limits and current usage. |
 | `update_site(site, title=None, contact_email=None, max_domains=None, ...)` | Changes the display name, the address for site-specific notices, or the limits. Omitted fields stay as they are. |
 | `rotate_site_secret(site)` | Issues a new secret, shown once. |

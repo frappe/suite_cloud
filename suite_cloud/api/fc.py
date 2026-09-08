@@ -144,25 +144,33 @@ def credentials(doc, secret: str) -> dict:
 
 
 def pick_cluster(cluster: str | None, region: str | None) -> str:
-    """Explicit cluster, else the region's default (or only) cluster, else the global default."""
+    """Named cluster; else one serving the region (default preferred); else the default; else a
+    cluster serving every region. A cluster with no regions serves any region."""
 
-    candidates = frappe.get_all(
-        "Stalwart Cluster",
-        filters={"enabled": 1, "status": "Active"},
-        fields=["name", "region", "is_default"],
-        order_by="is_default desc, creation asc",
-    )
+    candidates = [
+        frappe.get_doc("Stalwart Cluster", name)
+        for name in frappe.get_all(
+            "Stalwart Cluster",
+            filters={"enabled": 1, "status": "Active"},
+            pluck="name",
+            order_by="is_default desc, creation asc",
+        )
+    ]
     if cluster:
         if not any(c.name == cluster for c in candidates):
             frappe.throw(_("Cluster {0} is not active.").format(cluster))
         return cluster
 
     if region:
-        regional = [c for c in candidates if (c.region or "").lower() == region.strip().lower()]
+        regional = [c for c in candidates if c.regions and c.serves(region)]
         if regional:
             return regional[0].name
 
-    default = next((c for c in candidates if c.is_default), None) or (candidates[0] if candidates else None)
+    default = next((c for c in candidates if c.is_default), None)
     if not default:
+        default = next((c for c in candidates if not c.regions), None)
+    if not default:
+        if region:
+            frappe.throw(_("No active cluster serves region {0}.").format(region))
         frappe.throw(_("No active cluster is available."))
     return default.name

@@ -82,17 +82,14 @@ class TestDNSZone(IntegrationTestCase):
         self.assertTrue(frappe.db.exists("DNS Record", {"dns_zone": OTHER_ZONE, "host": "spf.eu"}))
         remove_cluster(f"mail.eu.{OTHER_ZONE}")
 
-    def test_cluster_hostname_must_be_under_its_zone(self) -> None:
+    def test_cluster_hostname_follows_its_zone(self) -> None:
         make_zone(OTHER_ZONE, is_default=0)
         remove_cluster(f"mail.eu.{OTHER_ZONE}")
-        self.assertRaisesRegex(
-            frappe.ValidationError,
-            "DNS zone",
-            make_cluster,
-            "eu-1",
-            hostname=f"mail.eu.{ROOT_DOMAIN}",
-            dns_zone=OTHER_ZONE,
+        cluster = make_cluster("eu-1", hostname=f"mail.eu.{OTHER_ZONE}", dns_zone=OTHER_ZONE)
+        self.assertEqual(
+            (cluster.name, cluster.default_domain), (f"mail.eu.{OTHER_ZONE}", f"eu.{OTHER_ZONE}")
         )
+        remove_cluster(cluster.name)
 
     def test_every_zone_is_reserved_for_mail_domains(self) -> None:
         from suite_cloud.tenancy.addresses import assert_domain_available
