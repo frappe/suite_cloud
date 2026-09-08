@@ -130,7 +130,7 @@ Rules that apply everywhere:
 | `site.domains` | `list_domains`, `get_domain`, `create_domain`, `update_domain`, `delete_domain`, `get_dns_records`, `refresh_dns_records`, `verify_dns_records` |
 | `site.accounts` | `list_accounts`, `get_account`, `create_account`, `update_account`, `set_account_enabled`, `set_password`, `rotate_app_password`, `create_app_password`, `set_aliases`, `set_groups`, `delete_account` |
 | `site.groups` | `list_groups`, `get_group`, `create_group`, `update_group`, `set_group_aliases`, `set_group_members`, `delete_group` |
-| `site.mailing_lists` | `list_mailing_lists`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `set_recipients`, `delete_mailing_list` |
+| `site.mailing_lists` | `list_mailing_lists`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `list_recipients`, `add_recipients`, `remove_recipients`, `set_recipients`, `delete_mailing_list` |
 | `site.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
 
 Every account and group has a disk quota above 0 GB, defaulting to the site's default quota. A
@@ -144,6 +144,11 @@ issues a new one and revokes the old one. Suite Cloud keeps the app password enc
 Account and never keeps the account's password. An API key (Bearer token) for the account exists
 only when an operator creates one from the Mail Account form.
 
+
+Recipients of a mailing list are separate documents, not rows on the list, so a list can hold
+hundreds of thousands of addresses. `list_recipients` pages through them, `add_recipients` and
+`remove_recipients` change them in batches of up to 5000 and push only the changed addresses to
+the cluster, and `set_recipients` replaces the whole list, which is meant for small lists.
 
 ### How a domain goes live
 

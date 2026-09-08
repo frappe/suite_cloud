@@ -74,9 +74,7 @@ def create_account(
     doc.insert(ignore_permissions=True)
 
     for mailing_list in lists:
-        if doc.email not in [r.email for r in mailing_list.recipients]:
-            mailing_list.append("recipients", {"email": doc.email})
-            mailing_list.save(ignore_permissions=True)
+        mailing_list.add_recipients([doc.email])
 
     frappe.local.response["http_status_code"] = 201
     # The app password is minted on creation and returned once; rotate_app_password issues a

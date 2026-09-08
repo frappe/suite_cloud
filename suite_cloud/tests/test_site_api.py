@@ -156,7 +156,7 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(groups.update_group("sales@acme.com", disk_quota_gb=3)["disk_quota_gb"], 3)
         mailing_list = mailing_lists.create_mailing_list("all@acme.com", recipients=["ext@example.org"])
         self.assertEqual((group["members"], group["description"]), ([], "Sales"))
-        self.assertEqual(mailing_list["recipients"], ["ext@example.org"])
+        self.assertEqual(mailing_list["recipient_count"], 1)
         account = accounts.create_account(
             "alice@acme.com",
             "secret-pw",
@@ -171,10 +171,13 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertNotIn("app_password", accounts.get_account("alice@acme.com"))
         rotated = accounts.rotate_app_password("alice@acme.com")["app_password"]
         self.assertNotEqual(rotated, account["app_password"])
+        page = mailing_lists.list_recipients("all@acme.com")
+        self.assertEqual([r["email"] for r in page["items"]], ["alice@acme.com", "ext@example.org"])
+        self.assertEqual(page["total"], 2)
         self.assertEqual(
-            mailing_lists.get_mailing_list("all@acme.com")["recipients"],
-            ["ext@example.org", "alice@acme.com"],
+            mailing_lists.add_recipients("all@acme.com", ["x@y.org", "ext@example.org"])["added"], ["x@y.org"]
         )
+        self.assertEqual(mailing_lists.remove_recipients("all@acme.com", ["x@y.org"])["recipient_count"], 2)
         self.assertEqual(groups.get_group("sales@acme.com")["members"], ["alice@acme.com"])
 
         page = accounts.list_accounts(search="ali")
@@ -189,7 +192,10 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(
             groups.set_group_members("sales@acme.com", ["alice@acme.com"])["members"], ["alice@acme.com"]
         )
-        self.assertEqual(mailing_lists.set_recipients("all@acme.com", ["a@b.co"])["recipients"], ["a@b.co"])
+        self.assertEqual(mailing_lists.set_recipients("all@acme.com", ["a@b.co"])["recipient_count"], 1)
+        self.assertEqual(
+            [r["email"] for r in mailing_lists.list_recipients("all@acme.com")["items"]], ["a@b.co"]
+        )
 
         accounts.delete_account("alice@acme.com")
         groups.delete_group("sales@acme.com")

@@ -499,22 +499,62 @@ class TestMailingList(TenancyTestCase):
                 "doctype": "Mailing List",
                 "email": "all@acme.com",
                 "site": self.site.name,
-                "recipients": [{"email": "a@acme.com"}, {"email": "ext@example.org"}],
                 "aliases": [{"alias_email": "everyone@acme.com"}],
             }
         ).insert()
-
         live = self.fake.get("MailingList", mailing_list.stalwart_id)
-        self.assertEqual(live["recipients"], {"a@acme.com": True, "ext@example.org": True})
+        self.assertEqual(live["recipients"], {})
         self.assertEqual(live["aliases"]["0"]["name"], "everyone")
 
-        mailing_list.recipients = []
-        mailing_list.append("recipients", {"email": "b@acme.com"})
-        mailing_list.save()
+        # Recipients are standalone documents; changes reach the cluster as key patches.
+        added = mailing_list.add_recipients(["A@acme.com", "ext@example.org", "a@acme.com"])
+        self.assertEqual(added, ["a@acme.com", "ext@example.org"])
         self.assertEqual(
-            self.fake.get("MailingList", mailing_list.stalwart_id)["recipients"], {"b@acme.com": True}
+            self.fake.get("MailingList", mailing_list.stalwart_id)["recipients"],
+            {"a@acme.com": True, "ext@example.org": True},
+        )
+        self.assertEqual(mailing_list.add_recipients(["ext@example.org"]), [])  # already there
+        self.assertEqual(mailing_list.recipient_count(), 2)
+
+        row = frappe.get_doc(
+            "Mailing List Recipient", {"mailing_list": mailing_list.name, "email": "a@acme.com"}
+        )
+        self.assertEqual(row.site, self.site.name)
+        row.enabled = 0
+        row.save()
+        self.assertEqual(
+            self.fake.get("MailingList", mailing_list.stalwart_id)["recipients"], {"ext@example.org": True}
+        )
+        self.assertRaises(
+            frappe.DuplicateEntryError,
+            frappe.get_doc(
+                {
+                    "doctype": "Mailing List Recipient",
+                    "mailing_list": mailing_list.name,
+                    "email": "a@acme.com",
+                }
+            ).insert,
+        )
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "own recipient",
+            frappe.get_doc(
+                {
+                    "doctype": "Mailing List Recipient",
+                    "mailing_list": mailing_list.name,
+                    "email": "all@acme.com",
+                }
+            ).insert,
+        )
+
+        mailing_list.set_recipients(["b@acme.com", "ext@example.org"])
+        self.assertEqual(mailing_list.recipient_emails(), ["b@acme.com", "ext@example.org"])
+        self.assertEqual(
+            self.fake.get("MailingList", mailing_list.stalwart_id)["recipients"],
+            {"b@acme.com": True, "ext@example.org": True},
         )
 
         self.assertRaises(frappe.DuplicateEntryError, self.make_account, "everyone@acme.com")
         mailing_list.delete()
         self.assertIsNone(self.fake.get("MailingList", mailing_list.stalwart_id))
+        self.assertFalse(frappe.db.exists("Mailing List Recipient", {"mailing_list": "all@acme.com"}))
