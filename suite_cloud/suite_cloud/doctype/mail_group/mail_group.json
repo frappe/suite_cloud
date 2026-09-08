@@ -25,7 +25,8 @@
    "options": "Email",
    "reqd": 1,
    "set_only_once": 1,
-   "unique": 1
+   "unique": 1,
+   "description": "The group's address, e.g. sales@acme.com. Mail sent to it reaches every member. Its domain must be a Mail Domain of the site. Cannot change after saving."
   },
   {
    "fieldname": "domain",
@@ -35,7 +36,8 @@
    "label": "Domain",
    "options": "Mail Domain",
    "read_only": 1,
-   "search_index": 1
+   "search_index": 1,
+   "description": "Mail Domain the address belongs to. Derived from the email."
   },
   {
    "fetch_from": "domain.site",
@@ -45,7 +47,8 @@
    "label": "Site",
    "options": "Suite Site",
    "read_only": 1,
-   "search_index": 1
+   "search_index": 1,
+   "description": "Suite site that owns the group. Derived from the domain; the site's group limit applies."
   },
   {
    "fetch_from": "domain.cluster",
@@ -54,7 +57,8 @@
    "label": "Cluster",
    "options": "Stalwart Cluster",
    "read_only": 1,
-   "search_index": 1
+   "search_index": 1,
+   "description": "Cluster the group lives on. Derived from the site."
   },
   {
    "fieldname": "column_break_main",
@@ -64,7 +68,8 @@
    "fieldname": "description",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Description"
+   "label": "Description",
+   "description": "What the group is for, e.g. Sales team. Shown on the cluster as the group's name."
   },
   {
    "description": "Size limit of the group's shared mailbox in GB, above 0. Defaults to the site's default quota. Counts against the site's total disk quota.",
@@ -77,7 +82,8 @@
    "fieldtype": "Data",
    "label": "Stalwart ID",
    "no_copy": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "Id of the group on the cluster. Set when it is created there."
   },
   {
    "fieldname": "aliases_section",
@@ -88,7 +94,8 @@
    "fieldname": "aliases",
    "fieldtype": "Table",
    "label": "Aliases",
-   "options": "Mail Address Alias"
+   "options": "Mail Address Alias",
+   "description": "Other addresses delivered to the group. Each must be unique across the cluster and under one of the site's domains."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -100,7 +107,7 @@
    "table_fieldname": "groups"
   }
  ],
- "modified": "2026-09-08 14:00:00.000000",
+ "modified": "2026-09-08 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Group",
