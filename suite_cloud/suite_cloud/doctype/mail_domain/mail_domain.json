@@ -72,7 +72,7 @@
   },
   {
    "default": "1",
-   "description": "Unchecked, the domain stops sending and receiving on the cluster even if verified. Its accounts and aliases stay in place.",
+   "description": "Unchecked, the domain stops sending and receiving on the cluster and loses its verification, so it must be verified again after it is enabled. Its accounts and aliases stay in place.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
@@ -238,7 +238,7 @@
    "link_fieldname": "domain"
   }
  ],
- "modified": "2026-09-08 13:00:00.000000",
+ "modified": "2026-09-08 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Mail Domain",

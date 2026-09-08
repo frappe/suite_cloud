@@ -76,6 +76,9 @@ class MailDomain(Document):
             and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
+        if not self.is_new() and self.has_value_changed("enabled") and not self.enabled:
+            # Proof of control lapses with the domain: enabling it again needs a fresh verification.
+            self.is_verified = 0
         if not self.is_new() and self.has_value_changed("publish_client_discovery_records"):
             # The zone already holds the certificate-bound records; only which tables list them changes.
             self.rebuild_dns_records(self.dns_zone_file or "")
@@ -291,7 +294,12 @@ def refresh_rotating_domains() -> None:
 def verify_unverified_domains() -> None:
     """Hourly: unverified domains, plus verified ones with a mandatory row still unverified (rotations)."""
 
-    names = set(frappe.get_all("Mail Domain", {"is_verified": 0, "stalwart_id": ["is", "set"]}, pluck="name"))
+    # Disabled domains stay unverified on purpose: verification resumes once they are enabled.
+    names = set(
+        frappe.get_all(
+            "Mail Domain", {"is_verified": 0, "enabled": 1, "stalwart_id": ["is", "set"]}, pluck="name"
+        )
+    )
     names.update(
         frappe.get_all(
             "Mail Domain DNS Record",
@@ -301,7 +309,8 @@ def verify_unverified_domains() -> None:
         )
     )
     for name in sorted(names):
-        if frappe.db.get_value("Mail Domain", name, "stalwart_id"):
+        stalwart_id, enabled = frappe.db.get_value("Mail Domain", name, ["stalwart_id", "enabled"])
+        if stalwart_id and enabled:
             _run_isolated(
                 name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
             )

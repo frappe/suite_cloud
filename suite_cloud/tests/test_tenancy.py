@@ -190,6 +190,23 @@ class TestMailDomain(TenancyTestCase):
         domain.save()
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
 
+    def test_disabling_clears_verification(self) -> None:
+        domain = self.make_domain()
+        domain.is_verified = 1
+        domain.save()
+        self.assertTrue(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
+        domain.enabled = 0
+        domain.save()
+        self.assertFalse(domain.is_verified)
+        self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
+        # Enabling brings nothing back on its own: the records have to be verified again.
+        domain.enabled = 1
+        domain.save()
+        self.assertFalse(domain.is_verified)
+        self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
     def test_domain_goes_live_only_once_verified(self) -> None:
         domain = self.make_domain()
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
