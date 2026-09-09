@@ -12,6 +12,7 @@ from suite_cloud.api.site import (
     domains,
     groups,
     mailing_lists,
+    update_site_title,
 )
 from suite_cloud.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.stalwart import forget_sessions
@@ -71,6 +72,12 @@ class SiteApiTestCase(IntegrationTestCase):
 
 
 class TestSiteResolution(SiteApiTestCase):
+    def test_site_title_follows_the_workspace_name(self) -> None:
+        self.assertEqual(update_site_title("  Acme Corp ")["title"], "Acme Corp")
+        self.assertEqual(frappe.db.get_value("Suite Site", self.site.name, "title"), "Acme Corp")
+        # Blank falls back to the site name, as the Suite Site itself does.
+        self.assertEqual(update_site_title("")["title"], self.site.name)
+
     def test_current_site_comes_from_the_authorization_header(self) -> None:
         self.assertEqual(current_site().name, self.site.name)
 

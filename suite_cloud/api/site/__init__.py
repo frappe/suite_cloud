@@ -188,3 +188,14 @@ def ping() -> dict:
     """Confirms the credentials and returns where the site's mail lives."""
 
     return current_site().to_api()
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def update_site_title(title: str) -> dict:
+    """The site's workspace name; Suite Cloud shows it wherever it names the site."""
+
+    site = current_site()
+    site.title = (title or "").strip()
+    site.save(ignore_permissions=True)
+    return site.to_api()
