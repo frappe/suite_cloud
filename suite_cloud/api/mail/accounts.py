@@ -1,7 +1,10 @@
 import frappe
 
 from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
-from suite_cloud.cloud_mail.doctype.mail_account.mail_account import validate_password
+from suite_cloud.cloud_mail.doctype.mail_account.mail_account import (
+    mailing_lists_by_account,
+    validate_password,
+)
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -27,7 +30,9 @@ def list_accounts(
         limit_start=int(start),
         limit_page_length=min(int(limit), 200),
     )
-    return {"items": [frappe.get_doc("Mail Account", n).to_api() for n in names], "total": total}
+    accounts = [frappe.get_doc("Mail Account", n) for n in names]
+    lists = mailing_lists_by_account(accounts)
+    return {"items": [a.to_api(mailing_lists=lists.get(a.name, [])) for a in accounts], "total": total}
 
 
 @frappe.whitelist(methods=["GET", "POST"])

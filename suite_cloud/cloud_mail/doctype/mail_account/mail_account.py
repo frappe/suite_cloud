@@ -266,8 +266,11 @@ class MailAccount(Document):
         account = sync.client_for(self).accounts.get(self.stalwart_id, properties=["usedDiskQuota"])
         return cint((account or {}).get("usedDiskQuota"))
 
-    def to_api(self, with_usage: bool = False) -> dict:
-        """``with_usage`` costs a cluster round trip, so lists leave it out and single reads include it."""
+    def to_api(self, with_usage: bool = False, mailing_lists: list[str] | None = None) -> dict:
+        """``with_usage`` costs a cluster round trip, so lists leave it out and single reads include it.
+
+        A list page passes ``mailing_lists`` looked up for the whole page in one query.
+        """
 
         return {
             "email": self.email,
@@ -284,17 +287,19 @@ class MailAccount(Document):
                 for a in self.aliases
             ],
             "groups": [g.group for g in self.groups],
-            "mailing_lists": self.mailing_list_names(),
+            "mailing_lists": self.mailing_list_names() if mailing_lists is None else mailing_lists,
             "created_at": self.creation,
         }
+
+    def addresses(self) -> list[str]:
+        return [self.email, *[a.alias_email for a in self.aliases]]
 
     def mailing_list_names(self) -> list[str]:
         """Lists that deliver to any of the account's addresses, primary or alias."""
 
-        addresses = [self.email, *[a.alias_email for a in self.aliases]]
         return frappe.get_all(
             "Mailing List Recipient",
-            {"site": self.site, "email": ["in", addresses]},
+            {"site": self.site, "email": ["in", self.addresses()]},
             pluck="mailing_list",
             distinct=True,
             order_by="mailing_list asc",
@@ -308,3 +313,23 @@ def validate_password(password: str | None) -> None:
 
 def generate_password() -> str:
     return secrets.token_urlsafe(18)
+
+
+def mailing_lists_by_account(accounts: list["MailAccount"]) -> dict[str, list[str]]:
+    """``{account name: [list addresses]}`` for a page of accounts in one query."""
+
+    by_address: dict[str, str] = {}
+    for account in accounts:
+        for address in account.addresses():
+            by_address[address] = account.name
+    if not by_address:
+        return {}
+    rows = frappe.get_all(
+        "Mailing List Recipient",
+        {"site": accounts[0].site, "email": ["in", list(by_address)]},
+        ["email", "mailing_list"],
+    )
+    lists: dict[str, set[str]] = {account.name: set() for account in accounts}
+    for row in rows:
+        lists[by_address[row.email]].add(row.mailing_list)
+    return {name: sorted(names) for name, names in lists.items()}

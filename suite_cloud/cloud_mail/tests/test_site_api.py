@@ -220,6 +220,7 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertFalse(accounts.set_account_enabled("alice@acme.com", False)["enabled"])
         self.assertEqual(accounts.set_groups("alice@acme.com", [])["groups"], [])
         self.assertEqual(accounts.get_account("alice@acme.com")["mailing_lists"], ["all@acme.com"])
+        self.assertEqual(accounts.list_accounts()["items"][0]["mailing_lists"], ["all@acme.com"])
         rows = accounts.set_aliases(
             "alice@acme.com",
             [{"email": "al@acme.com", "enabled": False, "description": "old"}, "ally@acme.com"],
