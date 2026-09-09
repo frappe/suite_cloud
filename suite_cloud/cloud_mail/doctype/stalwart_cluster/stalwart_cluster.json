@@ -1,0 +1,496 @@
+{
+ "actions": [],
+ "autoname": "field:hostname",
+ "creation": "2026-09-03 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "details_tab",
+  "identity_section",
+  "title",
+  "enabled",
+  "column_break_details",
+  "status",
+  "stalwart_version",
+  "naming_section",
+  "label",
+  "dns_zone",
+  "column_break_naming",
+  "hostname",
+  "default_domain",
+  "base_url",
+  "placement_section",
+  "is_default",
+  "regions",
+  "stores_tab",
+  "data_store",
+  "blob_store",
+  "column_break_stores",
+  "search_store",
+  "in_memory_store",
+  "derived_section",
+  "coordinator",
+  "column_break_derived",
+  "single_node",
+  "tls_tab",
+  "acme_directory_url",
+  "column_break_tls",
+  "acme_contact_email",
+  "access_tab",
+  "admin_section",
+  "admin_username",
+  "admin_password",
+  "column_break_admin",
+  "api_key",
+  "ssh_section",
+  "ssh_user",
+  "ssh_port",
+  "column_break_ssh",
+  "ssh_public_key",
+  "ssh_private_key",
+  "egress_tab",
+  "default_egress_pool",
+  "column_break_egress",
+  "relay_username",
+  "relay_password",
+  "config_tab",
+  "bootstrap_node",
+  "config_version",
+  "last_config_sync_at",
+  "column_break_config",
+  "drift_report",
+  "section_break_wysw",
+  "config_plan"
+ ],
+ "fields": [
+  {
+   "fieldname": "details_tab",
+   "fieldtype": "Tab Break",
+   "label": "Details"
+  },
+  {
+   "fieldname": "identity_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Display name shown in lists and links, e.g. Bangalore 1. Editable; the document is named by its hostname.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "Untick to stop placing new sites here and mark the cluster Disabled. Existing sites keep working.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "fieldname": "column_break_details",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "description": "Pending: no node yet. Bootstrapping: first node provisioned, waiting for the certificate. Active: ready for sites. Failed: the first node did not come up; provision it again.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nBootstrapping\nActive\nFailed\nDisabled",
+   "read_only": 1
+  },
+  {
+   "description": "Stalwart release the nodes run, e.g. v0.16.20. Defaults to the version in Suite Cloud Settings. Change it and run Upgrade Nodes.",
+   "fieldname": "stalwart_version",
+   "fieldtype": "Data",
+   "label": "Stalwart Version"
+  },
+  {
+   "fieldname": "naming_section",
+   "fieldtype": "Section Break",
+   "label": "Naming"
+  },
+  {
+   "description": "Short set-once id that namespaces the cluster under its zone. With label blr and zone frappemail.com the cluster is mail.blr.frappemail.com, its nodes n1.blr.frappemail.com and so on, and one wildcard certificate covers them. Lowercase letters, digits and dashes; handed out as c1, c2, ... when left blank. Only a namespace, not a place.",
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Label",
+   "set_only_once": 1
+  },
+  {
+   "description": "Zone the cluster's hostnames are derived under and its records are published in. Defaults to the default zone. Cannot change after saving.",
+   "fieldname": "dns_zone",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "DNS Zone",
+   "options": "DNS Zone",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "column_break_naming",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Public address of the cluster and its document name, built from the label and the zone, e.g. mail.blr.frappemail.com. Mail clients, MX records and sites all use it.",
+   "fieldname": "hostname",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Hostname",
+   "set_only_once": 1,
+   "unique": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Sub-zone the cluster owns, built from the label and the zone, e.g. blr.frappemail.com. Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
+   "fieldname": "default_domain",
+   "fieldtype": "Data",
+   "label": "Default Domain",
+   "read_only": 1
+  },
+  {
+   "description": "JMAP URL handed to sites: https:// plus the hostname.",
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "Base URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "placement_section",
+   "fieldtype": "Section Break",
+   "label": "Placement"
+  },
+  {
+   "default": "0",
+   "description": "Cluster Frappe Cloud uses when it names no cluster and no cluster serves the requested region. Only one cluster can be default.",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "label": "Is Default"
+  },
+  {
+   "description": "Region codes Frappe Cloud may place sites from, e.g. blr, sfo. Leave empty to serve any region. Placement policy only: the cluster's servers may sit anywhere.",
+   "fieldname": "regions",
+   "fieldtype": "Table",
+   "label": "Regions Served",
+   "options": "Stalwart Cluster Region"
+  },
+  {
+   "fieldname": "stores_tab",
+   "fieldtype": "Tab Break",
+   "label": "Stores"
+  },
+  {
+   "description": "Where settings, the directory and message metadata live. PostgreSQL or MySQL for a real cluster; RocksDB only for a single test node.",
+   "fieldname": "data_store",
+   "fieldtype": "Link",
+   "label": "Data Store",
+   "options": "Stalwart Store",
+   "reqd": 1
+  },
+  {
+   "description": "Where message bodies and attachments live. Leave blank to keep them in the data store; S3 is the usual choice for a cluster.",
+   "fieldname": "blob_store",
+   "fieldtype": "Link",
+   "label": "Blob Store",
+   "options": "Stalwart Store"
+  },
+  {
+   "fieldname": "column_break_stores",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Where the full-text index lives. Leave blank to keep it in the data store.",
+   "fieldname": "search_store",
+   "fieldtype": "Link",
+   "label": "Search Store",
+   "options": "Stalwart Store"
+  },
+  {
+   "description": "Caches, rate limits and cluster coordination. Leave blank to keep them in the data store; Redis is required for more than one node.",
+   "fieldname": "in_memory_store",
+   "fieldtype": "Link",
+   "label": "In-Memory Store",
+   "options": "Stalwart Store"
+  },
+  {
+   "fieldname": "derived_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Derived. Default when a Redis in-memory store is set on a multi-node cluster, so nodes can coordinate through it; Disabled otherwise.",
+   "fieldname": "coordinator",
+   "fieldtype": "Select",
+   "label": "Coordinator",
+   "options": "Disabled\nDefault",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_derived",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Derived. Set when a store is embedded (RocksDB or local files). Its data lives on one VPS and cannot be shared, so the cluster can only ever have one node.",
+   "fieldname": "single_node",
+   "fieldtype": "Check",
+   "label": "Single Node Only",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tls_tab",
+   "fieldtype": "Tab Break",
+   "label": "TLS"
+  },
+  {
+   "description": "Certificate authority the cluster requests its certificates from. Defaults to Suite Cloud Settings. Use the Let's Encrypt staging directory while testing.",
+   "fieldname": "acme_directory_url",
+   "fieldtype": "Data",
+   "label": "ACME Directory URL",
+   "length": 255
+  },
+  {
+   "fieldname": "column_break_tls",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Address the certificate authority writes to about expiring certificates. Defaults to Suite Cloud Settings.",
+   "fieldname": "acme_contact_email",
+   "fieldtype": "Data",
+   "label": "ACME Contact Email",
+   "options": "Email"
+  },
+  {
+   "fieldname": "access_tab",
+   "fieldtype": "Tab Break",
+   "label": "Access"
+  },
+  {
+   "fieldname": "admin_section",
+   "fieldtype": "Section Break",
+   "label": "Stalwart Admin"
+  },
+  {
+   "default": "admin",
+   "description": "Stalwart's built-in administrator account, created during bootstrap.",
+   "fieldname": "admin_username",
+   "fieldtype": "Data",
+   "label": "Admin Username",
+   "read_only": 1
+  },
+  {
+   "description": "Generated on save. Only used to mint the API key and for app-password creation; Show Admin Password reveals it to the Administrator.",
+   "fieldname": "admin_password",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Admin Password"
+  },
+  {
+   "fieldname": "column_break_admin",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Bearer token Suite Cloud uses for every management call. Minted when bootstrap finishes; Rotate API Key replaces it.",
+   "fieldname": "api_key",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "API Key"
+  },
+  {
+   "fieldname": "ssh_section",
+   "fieldtype": "Section Break",
+   "label": "SSH"
+  },
+  {
+   "default": "root",
+   "description": "User Ansible logs in as on the nodes. Needs root or passwordless sudo.",
+   "fieldname": "ssh_user",
+   "fieldtype": "Data",
+   "label": "SSH User",
+   "reqd": 1
+  },
+  {
+   "default": "22",
+   "description": "SSH port on the nodes. Individual nodes can override user and port.",
+   "fieldname": "ssh_port",
+   "fieldtype": "Int",
+   "label": "SSH Port",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_ssh",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Generated on save. Add it to the authorized keys of the SSH user on every node and gateway VPS before provisioning.",
+   "fieldname": "ssh_public_key",
+   "fieldtype": "Code",
+   "label": "SSH Public Key",
+   "read_only": 1
+  },
+  {
+   "description": "Generated on save; written to a temporary file only while a job runs.",
+   "fieldname": "ssh_private_key",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "SSH Private Key"
+  },
+  {
+   "fieldname": "egress_tab",
+   "fieldtype": "Tab Break",
+   "label": "Egress"
+  },
+  {
+   "description": "Everything the cluster sends leaves through this pool, bounces and reports included, unless a site or domain names another pool. Leave blank for direct delivery from the nodes.",
+   "fieldname": "default_egress_pool",
+   "fieldtype": "Link",
+   "label": "Default Egress Pool",
+   "options": "Egress IP Pool"
+  },
+  {
+   "fieldname": "column_break_egress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "relay",
+   "description": "SMTP AUTH user the cluster presents to its egress gateways.",
+   "fieldname": "relay_username",
+   "fieldtype": "Data",
+   "label": "Relay Username",
+   "read_only": 1
+  },
+  {
+   "description": "Generated on save; pushed to the gateways with their configuration.",
+   "fieldname": "relay_password",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Relay Password"
+  },
+  {
+   "fieldname": "config_tab",
+   "fieldtype": "Tab Break",
+   "label": "Configuration"
+  },
+  {
+   "description": "The node that ran the first-time setup of the cluster. Set automatically.",
+   "fieldname": "bootstrap_node",
+   "fieldtype": "Link",
+   "label": "Bootstrap Node",
+   "options": "Stalwart Node",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Increases every time the generated configuration is pushed to the cluster.",
+   "fieldname": "config_version",
+   "fieldtype": "Int",
+   "label": "Config Version",
+   "read_only": 1
+  },
+  {
+   "description": "When the configuration was last pushed.",
+   "fieldname": "last_config_sync_at",
+   "fieldtype": "Datetime",
+   "label": "Last Config Sync At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_config",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Result of the last Check Drift: settings on the cluster that differ from the generated plan. Cleared by Sync Config.",
+   "fieldname": "drift_report",
+   "fieldtype": "JSON",
+   "label": "Drift Report",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_wysw",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "Last generated plan, secrets redacted.",
+   "fieldname": "config_plan",
+   "fieldtype": "Code",
+   "label": "Config Plan",
+   "options": "JSON",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "group": "Cluster",
+   "link_doctype": "Stalwart Node",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Cluster",
+   "link_doctype": "Egress Gateway",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Cluster",
+   "link_doctype": "Egress IP Pool",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Tenancy",
+   "link_doctype": "Suite Site",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Tenancy",
+   "link_doctype": "Mail Domain",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "DNS",
+   "link_doctype": "DNS Record",
+   "link_fieldname": "managed_by"
+  }
+ ],
+ "modified": "2026-09-08 21:10:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "Stalwart Cluster",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Suite Cloud Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "title_field": "title",
+ "show_title_field_in_link": 1
+}

@@ -1,6 +1,6 @@
 from frappe.tests import UnitTestCase
 
-from suite_cloud.cluster.zone import build_domain_records, parse_zone_file
+from suite_cloud.cloud_mail.cluster.zone import build_domain_records, parse_zone_file
 from suite_cloud.tests.fake_stalwart import FakeStalwart
 
 ZONE = """

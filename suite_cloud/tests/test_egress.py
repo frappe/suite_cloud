@@ -3,8 +3,8 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.cluster import dns, egress
-from suite_cloud.stalwart import forget_sessions
+from suite_cloud.cloud_mail.cluster import dns, egress
+from suite_cloud.cloud_mail.stalwart import forget_sessions
 from suite_cloud.tests.fake_stalwart import FakeStalwart
 from suite_cloud.tests.fixtures import (
     ROOT_DOMAIN,
@@ -288,7 +288,7 @@ class TestEgress(IntegrationTestCase):
     def test_verify_ptr_marks_rows_one_or_all(self) -> None:
         pool = self.make_pool(("203.0.113.51", "203.0.113.52"))
         first, second = pool.addresses
-        target = "suite_cloud.suite_cloud.doctype.egress_ip_pool.egress_ip_pool.verify_ptr_record"
+        target = "suite_cloud.cloud_mail.doctype.egress_ip_pool.egress_ip_pool.verify_ptr_record"
 
         with patch(target, side_effect=lambda ip, host: ip == "203.0.113.51") as check:
             self.assertEqual(pool.verify_ptr(first.name), {"203.0.113.51": True})

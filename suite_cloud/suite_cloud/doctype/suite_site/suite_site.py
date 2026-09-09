@@ -86,7 +86,7 @@ class SuiteSite(Document):
     def on_update(self) -> None:
         before = self.get_doc_before_save()
         if before and before.egress_pool != self.egress_pool:
-            from suite_cloud.cluster import egress
+            from suite_cloud.cloud_mail.cluster import egress
 
             egress.resync_cluster(self.get_cluster())
 

@@ -14,9 +14,13 @@ from suite_cloud.api.site import (
     mailing_lists,
     update_site_profile,
 )
-from suite_cloud.cluster.plan import DISABLED_ROLE_DESCRIPTION
-from suite_cloud.stalwart import forget_sessions
-from suite_cloud.tenancy.ownership import VALUE_PREFIX, DomainNotVerifiedError, OwnershipLookupError
+from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
+from suite_cloud.cloud_mail.stalwart import forget_sessions
+from suite_cloud.cloud_mail.tenancy.ownership import (
+    VALUE_PREFIX,
+    DomainNotVerifiedError,
+    OwnershipLookupError,
+)
 from suite_cloud.tests.fake_stalwart import FakeStalwart
 from suite_cloud.tests.fixtures import (
     activate_cluster,
@@ -121,7 +125,7 @@ class TestDomainOwnership(SiteApiTestCase):
         self.assertNotEqual(domains.check_domain("acme.com")["ownership_record"]["value"], record["value"])
 
     def test_domain_is_added_only_once_its_record_resolves(self) -> None:
-        target = "suite_cloud.tenancy.ownership.verify_dns_record"
+        target = "suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record"
         with patch(target, return_value=False):
             self.assertRaisesRegex(
                 DomainNotVerifiedError, self.site.domain_verification_token, domains.create_domain, "acme.com"
@@ -142,7 +146,7 @@ class TestDomainOwnership(SiteApiTestCase):
         self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", domains.create_domain, "acme.com")
 
     def test_operators_add_domains_without_the_record(self) -> None:
-        target = "suite_cloud.tenancy.ownership.verify_dns_record"
+        target = "suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record"
         frappe.set_user("Administrator")
         with patch(target, return_value=False) as verify:
             frappe.get_doc(

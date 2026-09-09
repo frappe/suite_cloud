@@ -213,7 +213,7 @@
    "label": "Execution"
   },
   {
-   "description": "Dotted path of the function that builds the playbook variables from the context when the job runs, e.g. suite_cloud.cluster.bootstrap.build_node_variables. Secrets are fetched then, never stored.",
+   "description": "Dotted path of the function that builds the playbook variables from the context when the job runs, e.g. suite_cloud.cloud_mail.cluster.bootstrap.build_node_variables. Secrets are fetched then, never stored.",
    "fieldname": "variables_builder",
    "fieldtype": "Data",
    "label": "Variables Builder",

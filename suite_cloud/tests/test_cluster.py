@@ -4,7 +4,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.cluster import dns, plan
+from suite_cloud.cloud_mail.cluster import dns, plan
 from suite_cloud.tests.fixtures import (
     ROOT_DOMAIN,
     configure_settings,
@@ -145,7 +145,7 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(frappe.db.get_value("Stalwart Node", node.name, "in_ingress_dns"), 0)
 
     def test_removing_a_node_updates_spf_and_frees_a_failed_bootstrap(self) -> None:
-        from suite_cloud.cluster import bootstrap
+        from suite_cloud.cloud_mail.cluster import bootstrap
 
         cluster = make_cluster()
         node = make_node(cluster, "203.0.113.10")
@@ -176,7 +176,7 @@ class TestStalwartCluster(IntegrationTestCase):
         )
 
     def test_active_nodes_are_not_failed_by_transient_checks(self) -> None:
-        from suite_cloud.cluster import bootstrap
+        from suite_cloud.cloud_mail.cluster import bootstrap
 
         cluster = make_cluster()
         node = make_node(cluster, "203.0.113.10")
@@ -217,8 +217,8 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertFalse(frappe.db.exists("DNS Record", {"dns_zone": ROOT_DOMAIN, "host": "n1.blr"}))
 
     def test_finish_bootstrap_and_key_rotation_through_the_fake(self) -> None:
-        from suite_cloud.cluster import bootstrap
-        from suite_cloud.stalwart import forget_sessions
+        from suite_cloud.cloud_mail.cluster import bootstrap
+        from suite_cloud.cloud_mail.stalwart import forget_sessions
         from suite_cloud.tests.fake_stalwart import FakeStalwart
         from suite_cloud.tests.fixtures import clear_request_cache
 
@@ -286,7 +286,7 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
 
     def test_retried_bootstrap_recovers_a_failed_cluster(self) -> None:
-        from suite_cloud.cluster import bootstrap
+        from suite_cloud.cloud_mail.cluster import bootstrap
 
         cluster = make_cluster()
         node = make_node(cluster, "203.0.113.10")
@@ -298,9 +298,9 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Failed")
 
         with (
-            patch("suite_cloud.cluster.bootstrap.check_node", return_value=False),
-            patch("suite_cloud.cluster.dns.sync_node_records"),
-            patch("suite_cloud.cluster.dns.sync_spf_record"),
+            patch("suite_cloud.cloud_mail.cluster.bootstrap.check_node", return_value=False),
+            patch("suite_cloud.cloud_mail.cluster.dns.sync_node_records"),
+            patch("suite_cloud.cloud_mail.cluster.dns.sync_spf_record"),
         ):
             bootstrap.after_provision(node, job)
         self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Bootstrapping")
@@ -309,7 +309,7 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Failed")
 
     def test_outbound_nodes_stay_out_of_ingress(self) -> None:
-        from suite_cloud.cluster import bootstrap
+        from suite_cloud.cloud_mail.cluster import bootstrap
 
         cluster = make_cluster()
         node = make_node(cluster, "203.0.113.20", role="outbound")

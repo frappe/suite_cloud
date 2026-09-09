@@ -1,7 +1,7 @@
 import frappe
 
 from suite_cloud.api.site import current_site, site_api
-from suite_cloud.stalwart import get_client
+from suite_cloud.cloud_mail.stalwart import get_client
 
 SCHEMA_CACHE_TTL = 3600
 

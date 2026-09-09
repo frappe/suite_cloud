@@ -22,20 +22,20 @@ scheduler_events = {
     "cron": {
         "*/5 * * * *": [
             "suite_cloud.suite_cloud.doctype.server_job.server_job.retry_failed_jobs",
-            "suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node.poll_pending_nodes",
-            "suite_cloud.suite_cloud.doctype.egress_gateway.egress_gateway.poll_pending_gateways",
+            "suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node.poll_pending_nodes",
+            "suite_cloud.cloud_mail.doctype.egress_gateway.egress_gateway.poll_pending_gateways",
         ],
     },
     "hourly": [
-        "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.refresh_rotating_domains",
-        "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.verify_unverified_domains",
+        "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.refresh_rotating_domains",
+        "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.verify_unverified_domains",
     ],
     "daily": [
         "suite_cloud.suite_cloud.doctype.dns_record.dns_record.verify_all_dns_records",
-        "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.refresh_all_domains",
-        "suite_cloud.suite_cloud.doctype.stalwart_cluster.stalwart_cluster.check_all_clusters",
-        "suite_cloud.suite_cloud.doctype.stalwart_node.stalwart_node.verify_all_ptr_records",
-        "suite_cloud.suite_cloud.doctype.egress_ip_pool.egress_ip_pool.verify_all_ptr_records",
+        "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.refresh_all_domains",
+        "suite_cloud.cloud_mail.doctype.stalwart_cluster.stalwart_cluster.check_all_clusters",
+        "suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node.verify_all_ptr_records",
+        "suite_cloud.cloud_mail.doctype.egress_ip_pool.egress_ip_pool.verify_all_ptr_records",
     ],
 }
 

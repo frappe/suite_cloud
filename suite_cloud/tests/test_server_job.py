@@ -5,7 +5,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.cluster import bootstrap, plan
+from suite_cloud.cloud_mail.cluster import bootstrap, plan
 from suite_cloud.provisioning.ansible import playbook_task_names
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 from suite_cloud.tests.fixtures import configure_settings, make_cluster, make_node
@@ -74,14 +74,14 @@ class TestServerJob(IntegrationTestCase):
         tasks = playbook_task_names("run-commands.yml")
         with (
             patch("suite_cloud.provisioning.ansible.ansible_runner.run", fake_runner(tasks)),
-            patch("suite_cloud.cluster.bootstrap.after_provision") as callback,
+            patch("suite_cloud.cloud_mail.cluster.bootstrap.after_provision") as callback,
         ):
             job = create_server_job(
                 self.node,
                 "run-commands.yml",
                 title="Run",
                 context={"commands": ["echo hi"]},
-                variables_builder="suite_cloud.cluster.bootstrap.build_command_variables",
+                variables_builder="suite_cloud.cloud_mail.cluster.bootstrap.build_command_variables",
                 callback="after_provision",
             )
 
@@ -100,7 +100,7 @@ class TestServerJob(IntegrationTestCase):
                 "suite_cloud.provisioning.ansible.ansible_runner.run",
                 fake_runner(tasks, fail_task="Write config.json"),
             ),
-            patch("suite_cloud.cluster.bootstrap.after_provision") as callback,
+            patch("suite_cloud.cloud_mail.cluster.bootstrap.after_provision") as callback,
         ):
             job = create_server_job(
                 self.node,

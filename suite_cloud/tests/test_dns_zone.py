@@ -92,7 +92,7 @@ class TestDNSZone(IntegrationTestCase):
         remove_cluster(cluster.name)
 
     def test_every_zone_is_reserved_for_mail_domains(self) -> None:
-        from suite_cloud.tenancy.addresses import assert_domain_available
+        from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_available
 
         make_zone(OTHER_ZONE, is_default=0)
         self.assertRaisesRegex(

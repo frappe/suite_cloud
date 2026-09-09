@@ -1,8 +1,8 @@
 import frappe
 
 from suite_cloud.api.site import current_site, owned, owned_names, site_api
-from suite_cloud.tenancy.addresses import assert_domain_available, validate_domain_name
-from suite_cloud.tenancy.ownership import ownership_record
+from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_available, validate_domain_name
+from suite_cloud.cloud_mail.tenancy.ownership import ownership_record
 
 
 @frappe.whitelist(methods=["GET", "POST"])

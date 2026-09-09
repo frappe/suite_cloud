@@ -3,9 +3,9 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.cluster.plan import DISABLED_ROLE_DESCRIPTION
-from suite_cloud.stalwart import forget_sessions
-from suite_cloud.tenancy.addresses import get_site_domain
+from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
+from suite_cloud.cloud_mail.stalwart import forget_sessions
+from suite_cloud.cloud_mail.tenancy.addresses import get_site_domain
 from suite_cloud.tests.fake_stalwart import FakeStalwart
 from suite_cloud.tests.fixtures import (
     activate_cluster,
@@ -238,7 +238,7 @@ class TestMailDomain(TenancyTestCase):
         domain.save_records()
         # Simulate a verification pass where every record already resolves.
         with patch(
-            "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.verify_dns_record", return_value=True
+            "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.verify_dns_record", return_value=True
         ):
             result = domain.verify_dns_records()
 
@@ -259,7 +259,7 @@ class TestMailDomain(TenancyTestCase):
             return None if "_domainkey" in fqdn else True  # DKIM lookups time out
 
         with patch(
-            "suite_cloud.suite_cloud.doctype.mail_domain.mail_domain.verify_dns_record", side_effect=resolve
+            "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.verify_dns_record", side_effect=resolve
         ):
             result = domain.verify_dns_records()
         self.assertTrue(result["is_verified"])  # DKIM rows kept their verified state
@@ -313,7 +313,7 @@ class TestMailDomain(TenancyTestCase):
 
         with (
             patch.object(FakeStalwart, "_zone_file", lagging_zone_file),
-            patch("suite_cloud.stalwart.directory.time.sleep") as sleep,
+            patch("suite_cloud.cloud_mail.stalwart.directory.time.sleep") as sleep,
         ):
             domain = self.make_domain()
 

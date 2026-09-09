@@ -1,7 +1,7 @@
 import frappe
 
 from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
-from suite_cloud.suite_cloud.doctype.mail_account.mail_account import validate_password
+from suite_cloud.cloud_mail.doctype.mail_account.mail_account import validate_password
 
 
 @frappe.whitelist(methods=["GET", "POST"])

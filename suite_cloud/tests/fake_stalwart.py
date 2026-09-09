@@ -94,7 +94,7 @@ class FakeStalwart:
             session.mount(self.base_url, adapter)
             return session
 
-        with patch("suite_cloud.stalwart.connection.http_session_factory", factory):
+        with patch("suite_cloud.cloud_mail.stalwart.connection.http_session_factory", factory):
             yield self
 
     # --- helpers for tests --------------------------------------------------------

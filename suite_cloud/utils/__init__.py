@@ -56,7 +56,7 @@ def dkim_algorithms() -> tuple[str, ...]:
     Read at registration time only; Stalwart keeps the algorithms a domain was created with.
     """
 
-    from suite_cloud.stalwart.directory import DKIM_ED25519, DKIM_RSA
+    from suite_cloud.cloud_mail.stalwart.directory import DKIM_ED25519, DKIM_RSA
 
     return (DKIM_ED25519, DKIM_RSA) if cint(get_config("sign_with_ed25519")) else (DKIM_RSA,)
 

@@ -1,10 +1,10 @@
 from frappe.tests import UnitTestCase
 
-from suite_cloud.stalwart.client import StalwartClient
-from suite_cloud.stalwart.connection import ConnectionInfo, JMAPConnection
-from suite_cloud.stalwart.credentials import Credential
-from suite_cloud.stalwart.directory import Account, Domain, EmailAlias, Group, MailingList
-from suite_cloud.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
+from suite_cloud.cloud_mail.stalwart.client import StalwartClient
+from suite_cloud.cloud_mail.stalwart.connection import ConnectionInfo, JMAPConnection
+from suite_cloud.cloud_mail.stalwart.credentials import Credential
+from suite_cloud.cloud_mail.stalwart.directory import Account, Domain, EmailAlias, Group, MailingList
+from suite_cloud.cloud_mail.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
 from suite_cloud.tests.fake_stalwart import FakeStalwart
 
 
@@ -153,7 +153,7 @@ class TestStalwartClient(UnitTestCase):
         self.assertEqual(self.fake.get("ClusterRole", first.ids["full"])["description"], "changed")
 
     def test_tracers_are_matched_by_kind(self) -> None:
-        from suite_cloud.cluster.plan import tracer_operation
+        from suite_cloud.cloud_mail.cluster.plan import tracer_operation
 
         # What bootstrap leaves behind: one Journal tracer at info, no name to match on.
         journal_id = self.fake._add("Tracer", {"@type": "Journal", "enable": True, "level": "info"})
