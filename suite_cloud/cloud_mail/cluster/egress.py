@@ -177,10 +177,31 @@ def apply_pool_changes(pool: Document) -> None:
     """A pool changed: the cluster's routes and every hosting gateway's listeners follow."""
 
     resync_cluster(pool.get_cluster())
+    before = pool.get_doc_before_save()
+    port_is_new = before is None or before.relay_port != pool.relay_port
+    hosted_before = set(before.gateway_names()) if before else set()
     for gateway_name in pool.gateway_names():
         gateway = frappe.get_doc("Egress Gateway", gateway_name)
-        if gateway.status == "Active":
-            gateway.push_config()
+        if gateway.status != "Active":
+            continue  # provisioning opens every port of every pool it hosts
+        gateway.push_config()
+        if pool.relay_port and (port_is_new or gateway_name not in hosted_before):
+            open_relay_port(gateway, pool.relay_port)
+
+
+def open_relay_port(gateway: Document, port: int) -> None:
+    """The listener is live once the config is pushed, but ufw on the gateway only learned the
+    ports it had at provisioning; a job opens the new one so mail does not queue silently."""
+
+    from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
+
+    create_server_job(
+        gateway,
+        "run-commands.yml",
+        title=f"Open relay port {port} on {gateway.name}",
+        context={"commands": [f"ufw allow {int(port)}/tcp"]},
+        variables_builder="suite_cloud.cloud_mail.cluster.bootstrap.build_command_variables",
+    )
 
 
 def resync_cluster_after_commit(cluster_name: str) -> None:
