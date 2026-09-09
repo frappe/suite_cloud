@@ -258,9 +258,23 @@ class MailAccount(Document):
 
     # --- helpers -----------------------------------------------------------------------------
 
+    def onload(self) -> None:
+        self.flags.with_usage = True  # the form shows the live figure
+
     @property
     def used_disk_bytes(self) -> int | None:
-        """Read from the cluster on access, one call per account; None until the account exists there."""
+        """The virtual field: the cluster is asked only when a caller opted in.
+
+        Every serialisation reads virtual fields, including the Deleted Document snapshot a delete
+        takes and any as_dict(), so an unconditional lookup would cost a cluster call each time.
+        """
+
+        if not self.flags.with_usage:
+            return None
+        return self.fetch_used_disk_bytes()
+
+    def fetch_used_disk_bytes(self) -> int | None:
+        """One cluster call; None until the account exists there."""
 
         if not self.stalwart_id:
             return None
@@ -280,7 +294,7 @@ class MailAccount(Document):
             "display_name": self.display_name,
             "description": self.description,
             "disk_quota_gb": flt(self.disk_quota_gb),
-            "used_disk_bytes": self.used_disk_bytes if with_usage else None,
+            "used_disk_bytes": self.fetch_used_disk_bytes() if with_usage else None,
             "locale": self.locale,
             "time_zone": self.time_zone,
             "aliases": [
