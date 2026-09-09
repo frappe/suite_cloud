@@ -168,7 +168,7 @@ class TestStalwartClient(UnitTestCase):
         second = self.client.apply([tracer_operation()])
         self.assertEqual((second.updated, len(second.unchanged)), ([], 2))
 
-    def test_plan_apply_does_not_resend_secrets(self) -> None:
+    def test_plan_apply_resends_secrets_without_counting_them_as_changes(self) -> None:
         plan = [
             {
                 "@type": "upsert",
@@ -188,6 +188,11 @@ class TestStalwartClient(UnitTestCase):
         result = self.client.apply(plan)
         self.assertEqual(result.updated, [])
         self.assertEqual(len(result.unchanged), 1)
+        # A rotated secret still reaches the existing object, which Stalwart cannot report as changed.
+        plan[0]["value"]["r"]["authSecret"] = {"@type": "Value", "secret": "rotated"}
+        result = self.client.apply(plan)
+        self.assertEqual(result.updated, [])
+        self.assertEqual(self.fake.find("MtaRoute", name="egress-x")["authSecret"]["secret"], "rotated")
 
     def test_unsupported_query_filters_are_refused_by_the_fake(self) -> None:
         self.assertRaises(StalwartRejectedError, self.client.roles.find, {"description": "x"})

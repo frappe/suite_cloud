@@ -159,17 +159,20 @@ class PlanApplier:
                 continue
 
             self.ids[ref] = match["id"]
-            # Stalwart never echoes secrets, so a rotated one would look unchanged and never
-            # reach an existing object; write-only values are therefore always sent. Account
-            # credentials stay out: replacing the map would wipe app passwords and API keys.
-            patch = {
+            # Stalwart never echoes secrets, so a rotated one cannot be told from the old one:
+            # write-only values are always sent, but only a visible difference counts as an update.
+            # Account credentials stay out: replacing the map would wipe app passwords and API keys.
+            visible = {
                 k: v
                 for k, v in value.items()
-                if k not in match_on and k != "credentials" and (is_write_only(k, v) or match.get(k) != v)
+                if k not in match_on and k != "credentials" and not is_write_only(k, v) and match.get(k) != v
             }
+            secrets = {k: v for k, v in value.items() if k != "credentials" and is_write_only(k, v)}
+            patch = {**visible, **secrets}
             if patch:
                 service.update(match["id"], patch)
                 match.update(patch)
+            if visible:
                 self.result.updated.append(match["id"])
             else:
                 self.result.unchanged.append(match["id"])
