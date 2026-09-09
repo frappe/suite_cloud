@@ -193,6 +193,11 @@ class TestDirectoryApi(SiteApiTestCase):
         self.fake.find("Account", name="alice")["usedDiskQuota"] = 4096
         self.assertEqual(accounts.get_account("alice@acme.com")["used_disk_bytes"], 4096)
         self.assertIsNone(accounts.list_accounts()["items"][0]["used_disk_bytes"])
+        # Allotments come in bulk; unknown or foreign addresses are simply absent.
+        self.assertEqual(
+            accounts.get_quotas(["alice@acme.com", "nobody@acme.com"]),
+            {"alice@acme.com": self.site.default_disk_quota_gb},
+        )
         rotated = accounts.rotate_app_password("alice@acme.com")["app_password"]
         self.assertNotEqual(rotated, account["app_password"])
         page = mailing_lists.list_recipients("all@acme.com")

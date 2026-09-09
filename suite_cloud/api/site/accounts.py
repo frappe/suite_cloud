@@ -36,6 +36,29 @@ def get_account(email: str) -> dict:
     return owned("Mail Account", email).to_api(with_usage=True)
 
 
+QUOTA_LOOKUP_LIMIT = 500
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+@site_api
+def get_quotas(emails: list[str] | str) -> dict:
+    """``{email: allotted GB}`` for the site's accounts among ``emails``, from Suite Cloud alone.
+
+    Usage would cost a cluster call per account; the allotment is one query, so a list page can
+    show it for every row.
+    """
+
+    wanted = [e.strip().lower() for e in as_list(emails) if e and e.strip()][:QUOTA_LOOKUP_LIMIT]
+    if not wanted:
+        return {}
+    rows = frappe.get_all(
+        "Mail Account",
+        filters={"site": current_site().name, "name": ["in", wanted]},
+        fields=["name", "disk_quota_gb"],
+    )
+    return {row.name: row.disk_quota_gb for row in rows}
+
+
 @frappe.whitelist(methods=["POST"])
 @site_api
 def create_account(
