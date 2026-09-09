@@ -167,6 +167,8 @@ class TestDirectoryApi(SiteApiTestCase):
     def test_domain_account_group_list_flow(self) -> None:
         domain = domains.create_domain("Acme.com", description="Main")
         self.assertEqual(domain["domain"], "acme.com")
+        # Timestamps leave the API as UTC so a site in another zone does not read them as local.
+        self.assertRegex(domain["created_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
         self.assertTrue(any(r["category"] == "DKIM" for r in domain["dns_records"]))
         self.assertEqual([d["domain"] for d in domains.list_domains()], ["acme.com"])
         self.assertRaisesRegex(frappe.ValidationError, "not active", groups.create_group, "sales@acme.com")

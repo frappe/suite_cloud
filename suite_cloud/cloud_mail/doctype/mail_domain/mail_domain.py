@@ -13,7 +13,7 @@ from suite_cloud.cloud_mail.stalwart.directory import Domain
 from suite_cloud.cloud_mail.tenancy import ownership, sync
 from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_available, validate_domain_name
 from suite_cloud.dns.resolver import verify_dns_record
-from suite_cloud.utils import dkim_algorithms, get_config
+from suite_cloud.utils import dkim_algorithms, get_config, utc_iso
 
 # A change to any of these reaches the cluster; is_verified is set by hand only by managers.
 PUSHED_FIELDS = ("description", "catch_all_address", "sub_addressing", "enabled", "is_verified")
@@ -261,8 +261,8 @@ class MailDomain(Document):
             "sub_addressing": bool(self.sub_addressing),
             "publish_client_discovery_records": bool(self.publish_client_discovery_records),
             "is_verified": bool(self.is_verified),
-            "last_verified_at": self.last_verified_at,
-            "created_at": self.creation,
+            "last_verified_at": utc_iso(self.last_verified_at),
+            "created_at": utc_iso(self.creation),
         }
         if with_records:
             records = self.records_payload()

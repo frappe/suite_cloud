@@ -20,6 +20,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
     get_site_domain,
     validate_email_address,
 )
+from suite_cloud.utils import utc_iso
 
 CREDENTIAL_DESCRIPTION = "Suite Cloud"
 # Stored credentials: (field, service attribute on the account client).
@@ -288,7 +289,7 @@ class MailAccount(Document):
             ],
             "groups": [g.group for g in self.groups],
             "mailing_lists": self.mailing_list_names() if mailing_lists is None else mailing_lists,
-            "created_at": self.creation,
+            "created_at": utc_iso(self.creation),
         }
 
     def addresses(self) -> list[str]:
@@ -315,7 +316,7 @@ def generate_password() -> str:
     return secrets.token_urlsafe(18)
 
 
-def mailing_lists_by_account(accounts: list["MailAccount"]) -> dict[str, list[str]]:
+def mailing_lists_by_account(accounts: list[MailAccount]) -> dict[str, list[str]]:
     """``{account name: [list addresses]}`` for a page of accounts in one query."""
 
     by_address: dict[str, str] = {}

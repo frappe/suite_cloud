@@ -13,6 +13,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
     get_site_domain,
     validate_email_address,
 )
+from suite_cloud.utils import utc_iso
 
 
 class MailGroup(Document):
@@ -110,5 +111,5 @@ class MailGroup(Document):
                 for a in self.aliases
             ],
             "members": sorted(self.member_emails()),
-            "created_at": self.creation,
+            "created_at": utc_iso(self.creation),
         }

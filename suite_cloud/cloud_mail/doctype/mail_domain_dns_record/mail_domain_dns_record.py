@@ -3,6 +3,8 @@
 
 from frappe.model.document import Document
 
+from suite_cloud.utils import utc_iso
+
 
 class MailDomainDNSRecord(Document):
     # begin: auto-generated types
@@ -58,5 +60,5 @@ class MailDomainDNSRecord(Document):
             "ttl": self.ttl,
             "is_mandatory": bool(self.is_mandatory),
             "is_verified": bool(self.is_verified),
-            "last_checked_at": self.last_checked_at,
+            "last_checked_at": utc_iso(self.last_checked_at),
         }

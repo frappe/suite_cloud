@@ -13,6 +13,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
     get_site_domain,
     validate_email_address,
 )
+from suite_cloud.utils import utc_iso
 
 # Keys per JMAP patch when recipients change in bulk; keeps requests well under server limits.
 PATCH_BATCH = 1000
@@ -173,5 +174,5 @@ class MailingList(Document):
                 {"email": a.alias_email, "enabled": bool(a.enabled), "description": a.description}
                 for a in self.aliases
             ],
-            "created_at": self.creation,
+            "created_at": utc_iso(self.creation),
         }
