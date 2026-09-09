@@ -25,6 +25,17 @@ class TestStalwartCluster(IntegrationTestCase):
     def tearDown(self) -> None:
         frappe.flags.do_not_enqueue = False
 
+    def test_ssh_user_is_a_plain_login_name(self) -> None:
+        cluster = make_cluster()
+        cluster.ssh_user = "root ansible_connection=local"
+        self.assertRaisesRegex(frappe.ValidationError, "plain login name", cluster.save)
+        cluster.reload()
+        cluster.ssh_user = "deploy-user"
+        cluster.save()
+        from suite_cloud.provisioning.ssh import SSHTarget, inventory_line
+
+        self.assertRaises(ValueError, inventory_line, "n1", SSHTarget("203.0.113.1", "root\nx", 22), "/k")
+
     def test_cluster_derives_zone_url_and_coordinator(self) -> None:
         cluster = make_cluster()
 

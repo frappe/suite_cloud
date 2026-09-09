@@ -11,7 +11,7 @@ from frappe.utils import cint, now
 from suite_cloud.cloud_mail.cluster import bootstrap, dns, naming
 from suite_cloud.dns.resolver import verify_ptr_record
 from suite_cloud.provisioning.ansible import ping
-from suite_cloud.provisioning.ssh import SSHTarget
+from suite_cloud.provisioning.ssh import validate_ssh_user_field, SSHTarget
 
 REMOVABLE_STATUSES = ("Pending", "Failed", "Disabled")
 
@@ -56,6 +56,7 @@ class StalwartNode(Document):
         self.name = self.hostname
 
     def validate(self) -> None:
+        validate_ssh_user_field(self)
         cluster = self.get_cluster()
         self.title = (self.title or "").strip() or self.hostname
         self.hostname = (self.hostname or "").strip().lower().rstrip(".")

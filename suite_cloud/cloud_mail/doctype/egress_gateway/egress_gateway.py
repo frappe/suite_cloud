@@ -10,7 +10,7 @@ from suite_cloud.cloud_mail.cluster import dns, egress, naming, plan
 from suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node import validate_ip
 from suite_cloud.cloud_mail.stalwart import get_admin_client, get_client
 from suite_cloud.provisioning.ansible import ping
-from suite_cloud.provisioning.ssh import SSHTarget
+from suite_cloud.provisioning.ssh import validate_ssh_user_field, SSHTarget
 from suite_cloud.utils import get_config
 
 
@@ -62,6 +62,7 @@ class EgressGateway(Document):
             self.data_store = self.create_local_store().name
 
     def validate(self) -> None:
+        validate_ssh_user_field(self)
         cluster = self.get_cluster()
         self.title = (self.title or "").strip() or self.hostname
         self.hostname = (self.hostname or "").strip().lower().rstrip(".")
