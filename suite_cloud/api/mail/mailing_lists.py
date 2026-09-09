@@ -1,5 +1,6 @@
 import frappe
 
+from suite_cloud.cloud_mail.tenancy import sync
 from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
 
 
@@ -34,7 +35,11 @@ def create_mailing_list(
     )
     doc.insert(ignore_permissions=True)
     if recipients:
-        doc.add_recipients(as_list(recipients))
+        try:
+            doc.add_recipients(as_list(recipients))
+        except Exception:
+            sync.push_destroy(doc, "mailing_lists")  # the row rolls back; the cluster list must too
+            raise
     frappe.local.response["http_status_code"] = 201
     return doc.to_api()
 

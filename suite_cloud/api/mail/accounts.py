@@ -1,6 +1,7 @@
 import frappe
 
 from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
+from suite_cloud.cloud_mail.tenancy import sync
 from suite_cloud.cloud_mail.doctype.mail_account.mail_account import (
     mailing_lists_by_account,
     validate_password,
@@ -101,8 +102,14 @@ def create_account(
     doc.flags.password = password
     doc.insert(ignore_permissions=True)
 
-    for mailing_list in lists:
-        mailing_list.add_recipients([doc.email])
+    # The list memberships are separate cluster calls after the insert: if one fails the row
+    # rolls back, so the cluster account must go too or a retry meets "already exists".
+    try:
+        for mailing_list in lists:
+            mailing_list.add_recipients([doc.email])
+    except Exception:
+        sync.push_destroy(doc, "accounts")
+        raise
 
     frappe.local.response["http_status_code"] = 201
     # The app password is minted on creation and returned once; rotate_app_password issues a
