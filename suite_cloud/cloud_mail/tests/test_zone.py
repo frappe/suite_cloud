@@ -91,3 +91,27 @@ class TestZone(UnitTestCase):
         domain = fake._create("Domain", {"name": "acme.com"}, fake.objects["Domain"])
         rows = build_domain_records("acme.com", domain["dnsZoneFile"], spf_include="spf.x")
         self.assertEqual(sum(r["category"] == "DKIM" for r in rows), 2)
+
+
+class TestSpfTexts(UnitTestCase):
+    def test_short_lists_stay_one_record(self) -> None:
+        from suite_cloud.cloud_mail.cluster.dns import spf_texts
+
+        self.assertEqual(
+            spf_texts("spf.c1.example.test", ["ip4:203.0.113.1"]),
+            [("spf.c1.example.test", "v=spf1 ip4:203.0.113.1 -all")],
+        )
+
+    def test_long_lists_split_into_children_under_the_txt_limit(self) -> None:
+        from suite_cloud.cloud_mail.cluster.dns import SPF_TEXT_LIMIT, spf_texts
+
+        mechanisms = [f"ip6:2001:db8:{i:x}::{i:x}" for i in range(40)]
+        records = spf_texts("spf.c1.example.test", mechanisms)
+        parent, children = records[0], records[1:]
+        self.assertEqual(parent[0], "spf.c1.example.test")
+        self.assertTrue(all(len(text) <= SPF_TEXT_LIMIT for _, text in records))
+        self.assertEqual(
+            parent[1], "v=spf1 " + " ".join(f"include:{host}" for host, _ in children) + " -all"
+        )
+        listed = " ".join(text for _, text in children)
+        self.assertTrue(all(mechanism in listed for mechanism in mechanisms))
