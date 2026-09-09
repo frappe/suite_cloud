@@ -83,6 +83,14 @@ class TestSiteResolution(SiteApiTestCase):
         self.assertEqual((profile["title"], profile["contact_email"]), (self.site.name, None))
         self.assertRaises(frappe.ValidationError, update_site_profile, contact_email="not-an-address")
 
+    def test_page_sizes_stay_between_one_and_the_cap(self) -> None:
+        from suite_cloud.api.site import page_size
+
+        self.assertEqual(page_size(0, 200), 1)  # 0 would mean "no limit" to Frappe
+        self.assertEqual(page_size(-5, 200), 1)
+        self.assertEqual(page_size(5000, 200), 200)
+        self.assertEqual(page_size("x", 200), 200)
+
     def test_list_params_accept_json_text(self) -> None:
         from suite_cloud.api.site import as_list
 

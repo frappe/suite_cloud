@@ -1,6 +1,6 @@
 import frappe
 
-from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
+from suite_cloud.api.site import page_size, as_alias_rows, as_list, current_site, owned, owned_names, site_api
 from suite_cloud.cloud_mail.tenancy import sync
 
 
@@ -79,7 +79,7 @@ def list_recipients(email: str, search: str | None = None, start: int = 0, limit
         fields=["email", "enabled"],
         order_by="email asc",
         limit_start=int(start),
-        limit_page_length=min(int(limit), 1000),
+        limit_page_length=page_size(limit, 1000),
     )
     return {
         "items": [{"email": r.email, "enabled": bool(r.enabled)} for r in rows],

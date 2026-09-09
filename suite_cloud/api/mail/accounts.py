@@ -1,6 +1,6 @@
 import frappe
 
-from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
+from suite_cloud.api.site import page_size, as_alias_rows, as_list, current_site, owned, owned_names, site_api
 from suite_cloud.cloud_mail.doctype.mail_account.mail_account import (
     mailing_lists_by_account,
     validate_password,
@@ -29,7 +29,7 @@ def list_accounts(
         pluck="name",
         order_by="email asc",
         limit_start=int(start),
-        limit_page_length=min(int(limit), 200),
+        limit_page_length=page_size(limit, 200),
     )
     accounts = [frappe.get_doc("Mail Account", n) for n in names]
     lists = mailing_lists_by_account(accounts)

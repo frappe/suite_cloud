@@ -185,6 +185,16 @@ def as_alias_rows(value: Any) -> list[dict]:
     return rows
 
 
+def page_size(limit: Any, cap: int) -> int:
+    """A page length between 1 and ``cap``; Frappe reads 0 as no limit, which would return every row."""
+
+    try:
+        wanted = int(limit)
+    except (TypeError, ValueError):
+        wanted = cap
+    return max(1, min(wanted, cap))
+
+
 def as_list(value: Any) -> list[str]:
     """Accepts a JSON list, a comma/newline separated string or None."""
 
