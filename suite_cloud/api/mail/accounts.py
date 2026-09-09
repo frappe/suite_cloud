@@ -1,11 +1,23 @@
 import frappe
+from frappe.utils import sbool
 
-from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, page_size, site_api
+from suite_cloud.api.mail import aliases
+from suite_cloud.api.site import (
+    as_alias_rows,
+    as_list,
+    current_site,
+    owned,
+    owned_page,
+    page_size,
+    site_api,
+)
 from suite_cloud.cloud_mail.doctype.mail_account.mail_account import (
     mailing_lists_by_account,
     validate_password,
 )
 from suite_cloud.cloud_mail.tenancy import sync
+
+ACCOUNT_PAGE_CAP = 200
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -13,23 +25,9 @@ from suite_cloud.cloud_mail.tenancy import sync
 def list_accounts(
     domain: str | None = None, search: str | None = None, start: int = 0, limit: int = 50
 ) -> dict:
-    filters = {"site": current_site().name}
-    if domain:
-        filters["domain"] = owned("Mail Domain", domain).name
-    or_filters = None
-    if search:
-        like = f"%{search.strip()}%"
-        or_filters = [["email", "like", like], ["display_name", "like", like]]
-
-    total = frappe.db.count("Mail Account", filters)  # search narrows the page, not the total
-    names = frappe.get_all(
-        "Mail Account",
-        filters=filters,
-        or_filters=or_filters,
-        pluck="name",
-        order_by="email asc",
-        limit_start=int(start),
-        limit_page_length=page_size(limit, 200),
+    filters = {"domain": owned("Mail Domain", domain).name} if domain else None
+    names, total = owned_page(
+        "Mail Account", search, start, limit, ACCOUNT_PAGE_CAP, ("name", "display_name"), filters
     )
     accounts = [frappe.get_doc("Mail Account", n) for n in names]
     lists = mailing_lists_by_account(accounts)
@@ -178,6 +176,24 @@ def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
     return doc.to_api()
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def add_alias(email: str, alias: str, description: str | None = None) -> dict:
+    return aliases.add("Mail Account", email, alias, description).to_api()
+
+
+@frappe.whitelist(methods=["POST", "DELETE"])
+@site_api
+def remove_alias(email: str, alias: str) -> dict:
+    return aliases.remove("Mail Account", email, alias).to_api()
+
+
+@frappe.whitelist(methods=["POST", "PUT"])
+@site_api
+def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
+    return aliases.set_enabled("Mail Account", email, alias, sbool(enabled)).to_api()
 
 
 @frappe.whitelist(methods=["POST", "PUT"])

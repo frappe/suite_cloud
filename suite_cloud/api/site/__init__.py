@@ -15,6 +15,8 @@ from typing import Any
 
 import frappe
 from frappe import _
+from frappe.query_builder.functions import Count
+from frappe.utils import cint
 
 from suite_cloud.cloud_mail.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
 from suite_cloud.utils import get_config
@@ -140,15 +142,21 @@ def normalize_name(name: str | None) -> str:
     return f"{local}@{domain}" if at else domain
 
 
-def owned(doctype: str, name: str):
-    """Loads one of the site's documents; anything else is a 404."""
+def owned(doctype: str, name: str, for_update: bool = False):
+    """Loads one of the site's documents; anything else is a 404.
+
+    ``for_update`` locks the row until the request commits, for read-modify-write changes such
+    as adding one alias, so two concurrent edits cannot drop each other's rows.
+    """
 
     site = current_site()
     if doctype not in OWNED_DOCTYPES:
         raise ValueError(doctype)
 
     name = normalize_name(name)
-    doc = frappe.get_doc(doctype, name) if name and frappe.db.exists(doctype, name) else None
+    doc = None
+    if name and frappe.db.exists(doctype, name):
+        doc = frappe.get_doc(doctype, name, for_update=for_update)
     if doc is None or doc.site != site.name:
         raise frappe.DoesNotExistError(_("{0} {1} not found.").format(_(doctype), name))
     return doc
@@ -157,6 +165,37 @@ def owned(doctype: str, name: str):
 def owned_names(doctype: str, filters: dict | None = None, **kwargs) -> list[str]:
     filters = {"site": current_site().name, **(filters or {})}
     return frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", **kwargs)
+
+
+def owned_page(
+    doctype: str,
+    search: str | None,
+    start: Any,
+    limit: Any,
+    cap: int,
+    search_fields: tuple[str, ...] = ("name", "description"),
+    filters: dict | None = None,
+) -> tuple[list[str], int]:
+    """One page of the site's document names by name, plus how many match in all."""
+
+    filters = {"site": current_site().name, **(filters or {})}
+    or_filters = None
+    if search and search.strip():
+        like = f"%{search.strip()}%"
+        or_filters = [[field, "like", like] for field in search_fields]
+    total = frappe.qb.get_query(
+        doctype, filters=filters, or_filters=or_filters, fields=Count("*"), distinct=True
+    ).run()[0][0]
+    names = frappe.get_all(
+        doctype,
+        filters=filters,
+        or_filters=or_filters,
+        pluck="name",
+        order_by="name asc",
+        limit_start=max(cint(start), 0),
+        limit_page_length=page_size(limit, cap),
+    )
+    return names, cint(total)
 
 
 def as_alias_rows(value: Any) -> list[dict]:

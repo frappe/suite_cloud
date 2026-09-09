@@ -1,13 +1,18 @@
 import frappe
+from frappe.utils import sbool
 
-from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, page_size, site_api
+from suite_cloud.api.mail import aliases as alias_rows
+from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_page, page_size, site_api
+
+PAGE_CAP = 500  # the dashboard's largest page
 from suite_cloud.cloud_mail.tenancy import sync
 
 
 @frappe.whitelist(methods=["GET", "POST"])
 @site_api
-def list_mailing_lists() -> list[dict]:
-    return [frappe.get_doc("Mailing List", name).to_api() for name in owned_names("Mailing List")]
+def list_mailing_lists(search: str | None = None, start: int = 0, limit: int = 100) -> dict:
+    names, total = owned_page("Mailing List", search, start, limit, PAGE_CAP)
+    return {"items": [frappe.get_doc("Mailing List", name).to_api() for name in names], "total": total}
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -61,6 +66,24 @@ def set_mailing_list_aliases(email: str, aliases: list | str | None = None) -> d
     doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
     return doc.to_api()
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def add_mailing_list_alias(email: str, alias: str, description: str | None = None) -> dict:
+    return alias_rows.add("Mailing List", email, alias, description).to_api()
+
+
+@frappe.whitelist(methods=["POST", "DELETE"])
+@site_api
+def remove_mailing_list_alias(email: str, alias: str) -> dict:
+    return alias_rows.remove("Mailing List", email, alias).to_api()
+
+
+@frappe.whitelist(methods=["POST", "PUT"])
+@site_api
+def set_mailing_list_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
+    return alias_rows.set_enabled("Mailing List", email, alias, sbool(enabled)).to_api()
 
 
 # --- recipients: standalone documents, so large lists page instead of loading whole ---------------

@@ -1,12 +1,17 @@
 import frappe
+from frappe.utils import sbool
 
-from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
+from suite_cloud.api.mail import aliases as alias_rows
+from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_page, site_api
+
+PAGE_CAP = 500  # the dashboard's largest page
 
 
 @frappe.whitelist(methods=["GET", "POST"])
 @site_api
-def list_groups() -> list[dict]:
-    return [frappe.get_doc("Mail Group", name).to_api() for name in owned_names("Mail Group")]
+def list_groups(search: str | None = None, start: int = 0, limit: int = 100) -> dict:
+    names, total = owned_page("Mail Group", search, start, limit, PAGE_CAP)
+    return {"items": [frappe.get_doc("Mail Group", name).to_api() for name in names], "total": total}
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -61,6 +66,24 @@ def set_group_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
     return doc.to_api()
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def add_group_alias(email: str, alias: str, description: str | None = None) -> dict:
+    return alias_rows.add("Mail Group", email, alias, description).to_api()
+
+
+@frappe.whitelist(methods=["POST", "DELETE"])
+@site_api
+def remove_group_alias(email: str, alias: str) -> dict:
+    return alias_rows.remove("Mail Group", email, alias).to_api()
+
+
+@frappe.whitelist(methods=["POST", "PUT"])
+@site_api
+def set_group_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
+    return alias_rows.set_enabled("Mail Group", email, alias, sbool(enabled)).to_api()
 
 
 @frappe.whitelist(methods=["POST", "PUT"])

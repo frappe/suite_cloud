@@ -273,6 +273,89 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(domains.list_domains(), [])
         self.assertEqual(self.fake.all("Domain"), [])
 
+    def test_lists_page_and_search_by_name(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        for name in ("ops", "sales", "support"):
+            groups.create_group(f"{name}@acme.com", description=f"{name.title()} team")
+            mailing_lists.create_mailing_list(f"{name}-news@acme.com")
+
+        page = groups.list_groups(start=1, limit=1)
+        self.assertEqual(([g["email"] for g in page["items"]], page["total"]), (["sales@acme.com"], 3))
+        page = groups.list_groups(search="Support team")  # description matches too
+        self.assertEqual(([g["email"] for g in page["items"]], page["total"]), (["support@acme.com"], 1))
+        page = mailing_lists.list_mailing_lists(search="ops", limit=0)  # 0 is not "everything"
+        self.assertEqual(([m["email"] for m in page["items"]], page["total"]), (["ops-news@acme.com"], 1))
+        self.assertEqual(mailing_lists.list_mailing_lists(search="nobody")["total"], 0)
+
+    def test_aliases_change_one_at_a_time(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw", aliases=["ally@acme.com"])
+        groups.create_group("sales@acme.com")
+        mailing_lists.create_mailing_list("all@acme.com")
+
+        rows = accounts.add_alias("alice@acme.com", "Al@Acme.com", description="short")["aliases"]
+        self.assertEqual(
+            [(a["email"], a["description"]) for a in rows],
+            [("ally@acme.com", None), ("al@acme.com", "short")],
+        )
+        # Adding it again changes nothing, and the cluster sees the same set once.
+        self.assertEqual(len(accounts.add_alias("alice@acme.com", "al@acme.com")["aliases"]), 2)
+        stored = self.fake.find("Account", name="alice")
+        self.assertEqual(sorted(a["name"] for a in stored["aliases"].values()), ["al", "ally"])
+
+        rows = accounts.set_alias_enabled("alice@acme.com", "al@acme.com", False)["aliases"]
+        self.assertEqual(
+            [(a["email"], a["enabled"]) for a in rows], [("ally@acme.com", True), ("al@acme.com", False)]
+        )
+        self.assertRaises(
+            frappe.DoesNotExistError, accounts.set_alias_enabled, "alice@acme.com", "x@acme.com", True
+        )
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "primary address",
+            accounts.remove_alias,
+            "alice@acme.com",
+            "alice@acme.com",
+        )
+        self.assertRaisesRegex(
+            frappe.ValidationError, "primary address", accounts.add_alias, "alice@acme.com", "alice@acme.com"
+        )
+        self.assertEqual(
+            [a["email"] for a in accounts.remove_alias("alice@acme.com", "ally@acme.com")["aliases"]],
+            ["al@acme.com"],
+        )
+        self.assertEqual(
+            len(accounts.remove_alias("alice@acme.com", "ally@acme.com")["aliases"]), 1
+        )  # already gone
+
+        self.assertEqual(
+            [a["email"] for a in groups.add_group_alias("sales@acme.com", "team@acme.com")["aliases"]],
+            ["team@acme.com"],
+        )
+        self.assertFalse(
+            groups.set_group_alias_enabled("sales@acme.com", "team@acme.com", "0")["aliases"][0]["enabled"]
+        )
+        self.assertEqual(groups.remove_group_alias("sales@acme.com", "team@acme.com")["aliases"], [])
+        self.assertEqual(
+            [
+                a["email"]
+                for a in mailing_lists.add_mailing_list_alias("all@acme.com", "everyone@acme.com")["aliases"]
+            ],
+            ["everyone@acme.com"],
+        )
+        self.assertFalse(
+            mailing_lists.set_mailing_list_alias_enabled("all@acme.com", "everyone@acme.com", False)[
+                "aliases"
+            ][0]["enabled"]
+        )
+        self.assertEqual(
+            mailing_lists.remove_mailing_list_alias("all@acme.com", "everyone@acme.com")["aliases"], []
+        )
+        # An alias that is taken elsewhere is refused, whichever object asks for it.
+        self.assertRaises(frappe.DuplicateEntryError, groups.add_group_alias, "sales@acme.com", "al@acme.com")
+
     def test_other_sites_objects_are_invisible(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")
