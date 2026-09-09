@@ -58,8 +58,10 @@ class SiteApiTestCase(IntegrationTestCase):
         frappe.local.suite_site = None
         frappe.local.request = None
         frappe.set_user("Administrator")
+        # Only the fixture sites: the dev site holds real accounts, and deleting those even
+        # inside the rolled-back transaction serialises each one, which asks the live cluster.
         for doctype in ("Mail Account", "Mail Group", "Mailing List", "Mail Domain"):
-            for name in frappe.get_all(doctype, pluck="name"):
+            for name in frappe.get_all(doctype, {"site": ["like", "%.frappe.test"]}, pluck="name"):
                 frappe.delete_doc(doctype, name, force=True, ignore_permissions=True, ignore_on_trash=True)
         frappe.flags.do_not_enqueue = False
 
