@@ -343,6 +343,7 @@ class TestFrappeCloudApi(SiteApiTestCase):
         self.assertEqual(fc.suspend_site(self.site.name)["status"], "Suspended")
         self.assertEqual(fc.resume_site(self.site.name)["status"], "Active")
         self.assertEqual(fc.archive_site(self.site.name)["status"], "Archived")
+        self.assertRaisesRegex(frappe.ValidationError, "negative", fc.update_site, self.site.name, max_domains=-1)
         # Archived is final: neither suspend nor resume may bring the site back.
         self.assertRaisesRegex(frappe.ValidationError, "archived", fc.suspend_site, self.site.name)
 

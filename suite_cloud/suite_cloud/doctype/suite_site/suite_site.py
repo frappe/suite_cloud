@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder.functions import Sum
-from frappe.utils import flt, now
+from frappe.utils import cint, flt, now
 
 from suite_cloud.utils import get_config
 
@@ -151,6 +151,11 @@ class SuiteSite(Document):
     # --- limits -----------------------------------------------------------------
 
     def validate_disk_quotas(self) -> None:
+        for field in ("max_domains", "max_accounts", "max_groups", "max_mailing_lists"):
+            if cint(self.get(field)) < 0:
+                frappe.throw(
+                    _("{0} cannot be negative; 0 means unlimited.").format(self.meta.get_label(field))
+                )
         if flt(self.default_disk_quota_gb) <= 0:
             frappe.throw(_("Default Disk Quota must be above 0: every account needs a quota."))
         if flt(self.max_disk_gb) < 0:
