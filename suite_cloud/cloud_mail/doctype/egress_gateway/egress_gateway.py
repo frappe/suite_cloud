@@ -136,10 +136,22 @@ class EgressGateway(Document):
         )
 
     def set_status(self, status: str, error: str | None = None) -> None:
+        serving_before = self.status == "Active"
         values = {"status": status}
         if error is not None:
             values["last_error"] = error[:1000]
         self.db_set(values, update_modified=False, notify=True)
+        if serving_before != (status == "Active"):
+            self.resync_pool_records()
+
+    def resync_pool_records(self) -> None:
+        """The pool hostnames list only serving gateways, so they follow this one's status."""
+
+        for pool in self.pools():
+            try:
+                dns.sync_pool_records(pool)
+            except Exception:
+                self.log_error(f"Pool DNS for {pool.name} could not follow {self.name}")
 
     def get_client(self):
         return get_client(self)

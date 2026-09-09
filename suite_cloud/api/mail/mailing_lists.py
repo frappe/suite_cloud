@@ -1,6 +1,6 @@
 import frappe
 
-from suite_cloud.api.site import page_size, as_alias_rows, as_list, current_site, owned, owned_names, site_api
+from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, page_size, site_api
 from suite_cloud.cloud_mail.tenancy import sync
 
 

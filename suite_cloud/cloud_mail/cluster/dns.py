@@ -196,7 +196,9 @@ def pool_records(pool: Document) -> list[dict]:
     zone = cluster_zone(pool.cluster)
     records = []
     for gateway_name in pool.gateway_names():
-        ip = frappe.get_cached_value("Egress Gateway", gateway_name, "ipv4_address")
+        ip, status = frappe.db.get_value("Egress Gateway", gateway_name, ["ipv4_address", "status"])
+        if status != "Active":
+            continue  # a gateway that is not serving must not be in the round robin
         records += address_records(zone, pool.hostname, ip, None, "Egress")
     for row in pool.addresses:
         ipv4, ipv6 = (None, row.ip_address) if ":" in row.ip_address else (row.ip_address, None)

@@ -120,10 +120,19 @@ class TestEgress(IntegrationTestCase):
             (r.host, r.value)
             for r in frappe.get_all("DNS Record", {"managed_by": pool.name}, ["host", "value"])
         )
+        # The gateway is still Pending, so the pool hostname lists nobody yet.
+        self.assertEqual(hosts, [("p1-1.blr", "203.0.113.51"), ("p1-2.blr", "203.0.113.52")])
+        self.gateway.set_status("Active")
+        hosts = sorted(
+            (r.host, r.value)
+            for r in frappe.get_all("DNS Record", {"managed_by": pool.name}, ["host", "value"])
+        )
         self.assertEqual(
             hosts,
             [("p1-1.blr", "203.0.113.51"), ("p1-2.blr", "203.0.113.52"), ("p1.out.blr", "203.0.113.50")],
         )
+        self.gateway.set_status("Disabled")
+        self.assertFalse(frappe.db.exists("DNS Record", {"managed_by": pool.name, "host": "p1.out.blr"}))
         spf = frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value")
         for ip in ("203.0.113.51", "203.0.113.52", "203.0.113.53"):
             self.assertIn(f"ip4:{ip}", spf)
