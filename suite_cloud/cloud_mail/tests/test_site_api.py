@@ -218,11 +218,11 @@ class TestDirectoryApi(SiteApiTestCase):
         self.fake.find("Account", name="alice")["usedDiskQuota"] = 4096
         self.assertEqual(accounts.get_account("alice@acme.com")["used_disk_bytes"], 4096)
         self.assertIsNone(accounts.list_accounts()["items"][0]["used_disk_bytes"])
-        # Serialising the document does not ask the cluster; the desk form opts in on load.
+        # The property asks the cluster only after the desk form opts in on load.
         doc = frappe.get_doc("Mail Account", "alice@acme.com")
-        self.assertIsNone(doc.as_dict()["used_disk_bytes"])
+        self.assertIsNone(doc.used_disk_bytes)
         doc.run_method("onload")
-        self.assertEqual(doc.as_dict()["used_disk_bytes"], 4096)
+        self.assertEqual(doc.used_disk_bytes, 4096)
         # Allotments come in bulk; unknown or foreign addresses are simply absent.
         self.assertEqual(
             accounts.get_quotas(["alice@acme.com", "nobody@acme.com"]),
