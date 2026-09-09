@@ -192,10 +192,20 @@ def ping() -> dict:
 
 @frappe.whitelist(methods=["POST"])
 @site_api
-def update_site_title(title: str) -> dict:
-    """The site's workspace name; Suite Cloud shows it wherever it names the site."""
+def update_site_profile(title: str | None = None, contact_email: str | None = None) -> dict:
+    """What the site says about itself: its workspace name as the title, and where to reach it.
+
+    Only the fields passed change; an empty string clears the contact and resets the title to the
+    site name.
+    """
 
     site = current_site()
-    site.title = (title or "").strip()
+    if title is not None:
+        site.title = title.strip()
+    if contact_email is not None:
+        contact_email = contact_email.strip().lower()
+        if contact_email:
+            frappe.utils.validate_email_address(contact_email, throw=True)
+        site.contact_email = contact_email or None
     site.save(ignore_permissions=True)
     return site.to_api()

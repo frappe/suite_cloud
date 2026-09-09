@@ -12,7 +12,7 @@ from suite_cloud.api.site import (
     domains,
     groups,
     mailing_lists,
-    update_site_title,
+    update_site_profile,
 )
 from suite_cloud.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.stalwart import forget_sessions
@@ -72,11 +72,15 @@ class SiteApiTestCase(IntegrationTestCase):
 
 
 class TestSiteResolution(SiteApiTestCase):
-    def test_site_title_follows_the_workspace_name(self) -> None:
-        self.assertEqual(update_site_title("  Acme Corp ")["title"], "Acme Corp")
+    def test_site_profile_follows_the_workspace(self) -> None:
+        profile = update_site_profile(title="  Acme Corp ", contact_email="Ops@Acme.test")
+        self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", "ops@acme.test"))
         self.assertEqual(frappe.db.get_value("Suite Site", self.site.name, "title"), "Acme Corp")
-        # Blank falls back to the site name, as the Suite Site itself does.
-        self.assertEqual(update_site_title("")["title"], self.site.name)
+        # Only the fields passed change; blanks clear the contact and reset the title to the site name.
+        self.assertEqual(update_site_profile(contact_email="")["title"], "Acme Corp")
+        profile = update_site_profile(title="", contact_email="")
+        self.assertEqual((profile["title"], profile["contact_email"]), (self.site.name, None))
+        self.assertRaises(frappe.ValidationError, update_site_profile, contact_email="not-an-address")
 
     def test_current_site_comes_from_the_authorization_header(self) -> None:
         self.assertEqual(current_site().name, self.site.name)
