@@ -179,6 +179,10 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertRegex(domain["created_at"], r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
         self.assertTrue(any(r["category"] == "DKIM" for r in domain["dns_records"]))
         self.assertEqual([d["domain"] for d in domains.list_domains()], ["acme.com"])
+        # A Unicode domain is stored IDNA-encoded and reachable under either spelling.
+        self.assertEqual(domains.create_domain("bücher.de")["domain"], "xn--bcher-kva.de")
+        self.assertEqual(domains.get_domain("Bücher.de")["domain"], "xn--bcher-kva.de")
+        domains.delete_domain("bücher.de")
         self.assertRaisesRegex(frappe.ValidationError, "not active", groups.create_group, "sales@acme.com")
         self.verify("acme.com")
 

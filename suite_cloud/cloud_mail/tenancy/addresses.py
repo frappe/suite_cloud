@@ -10,6 +10,16 @@ DOMAIN_LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$")
 ADDRESS_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List")
 
 
+def normalize_domain(value: str | None) -> str:
+    """Lowercase and IDNA-encoded, as domains are stored, without judging validity."""
+
+    domain = (value or "").strip().lower().rstrip(".")
+    try:
+        return domain.encode("idna").decode()
+    except UnicodeError:
+        return domain
+
+
 def validate_domain_name(value: str | None) -> str:
     domain = (value or "").strip().lower().rstrip(".")
     try:
@@ -36,6 +46,7 @@ def validate_email_address(value: str | None) -> str:
 def get_site_domain(site: str, domain_name: str):
     """The site's Mail Domain named ``domain_name``; other sites' domains are invisible (404)."""
 
+    domain_name = normalize_domain(domain_name)
     domain = (
         frappe.get_cached_doc("Mail Domain", domain_name)
         if frappe.db.exists("Mail Domain", domain_name)

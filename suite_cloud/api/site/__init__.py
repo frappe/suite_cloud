@@ -128,6 +128,18 @@ def _describe(error: StalwartRejectedError) -> str:
     return error.error_type or error.description or "unknown error"
 
 
+def normalize_name(name: str | None) -> str:
+    """A domain or address the way it is stored: lowercase, the domain part IDNA-encoded."""
+
+    name = (name or "").strip().lower()
+    local, at, domain = name.rpartition("@")
+    try:
+        domain = domain.encode("idna").decode()
+    except UnicodeError:
+        pass  # a bad domain simply does not match anything
+    return f"{local}@{domain}" if at else domain
+
+
 def owned(doctype: str, name: str):
     """Loads one of the site's documents; anything else is a 404."""
 
@@ -135,7 +147,7 @@ def owned(doctype: str, name: str):
     if doctype not in OWNED_DOCTYPES:
         raise ValueError(doctype)
 
-    name = (name or "").strip().lower()
+    name = normalize_name(name)
     doc = frappe.get_doc(doctype, name) if name and frappe.db.exists(doctype, name) else None
     if doc is None or doc.site != site.name:
         raise frappe.DoesNotExistError(_("{0} {1} not found.").format(_(doctype), name))
