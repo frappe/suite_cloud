@@ -141,7 +141,10 @@ class DNSProvider:
         if record := self.find_dns_record(type, host, value):
             if int(record.get("ttl") or 0) == int(ttl):
                 return True
-            return self.update_dns_record(record["id"], type, host, value, ttl, priority)
+            # Delete by value and recreate rather than update by id: Route53 derives one id for a
+            # whole record set, so an update by id would rewrite the first value, not this one.
+            self.delete_dns_record(type, host, value)
+            return self.create_dns_record(type, host, value, ttl, priority)
 
         return self.create_dns_record(type, host, value, ttl, priority)
 
@@ -154,7 +157,11 @@ class DNSProvider:
 
         success = True
         for record in records:
-            config = {"action": "delete", "type": type, "name": host, "identifier": record["id"]}
+            config = {"action": "delete", "type": type, "name": host}
+            if value is not None:
+                config["content"] = record.get("content")  # by value: see ensure_dns_record
+            else:
+                config["identifier"] = record["id"]
             try:
                 self.get_client(config).execute()
             except Exception:
