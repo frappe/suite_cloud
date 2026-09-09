@@ -7,7 +7,7 @@ from frappe.tests import IntegrationTestCase
 
 from suite_cloud.cloud_mail.cluster import bootstrap, plan
 from suite_cloud.cloud_mail.tests.fixtures import configure_settings, make_cluster, make_node
-from suite_cloud.provisioning.ansible import playbook_task_names
+from suite_cloud.provisioning.ansible import _spellings, playbook_task_names
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 
 
@@ -174,6 +174,9 @@ class TestServerJob(IntegrationTestCase):
         run = PlaybookRun(SimpleNamespace(tasks=[]), variables)
         self.assertNotIn("__secret_values__", variables)
         self.assertEqual(run.mask(f"authSecret {admin_password} pg-secret"), "authSecret *** ***")
+        # A secret quoted the way JSON in a CLI error would show it is masked as well.
+        run.secrets = sorted(_spellings(['pa"ss\\word']), key=len, reverse=True)
+        self.assertEqual(run.mask('{"secret": "pa\\"ss\\\\word"}'), '{"secret": "***"}')
 
     def test_large_task_results_stay_valid_json(self) -> None:
         import json

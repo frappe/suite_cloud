@@ -95,6 +95,19 @@ def ping(target: SSHTarget) -> tuple[bool, str]:
     return ok, detail
 
 
+def _spellings(secrets) -> set[str]:
+    """A secret as it is, and as JSON and shell output would quote it (``\"``, ``\\``, ``\u00e9``)."""
+
+    out = set()
+    for secret in secrets:
+        if not secret:
+            continue
+        out.add(secret)
+        out.add(json.dumps(secret)[1:-1])
+        out.add(json.dumps(secret, ensure_ascii=False)[1:-1])
+    return out
+
+
 class PlaybookRun:
     """One execution of a Server Job's playbook; events update the job's task rows."""
 
@@ -102,7 +115,7 @@ class PlaybookRun:
         self.job = job
         # Literal secrets the playbook may echo (a CLI error quoting the plan, say); masked
         # before anything is stored. Longest first so a secret containing another is caught whole.
-        self.secrets = sorted({s for s in variables.pop("__secret_values__", []) if s}, key=len, reverse=True)
+        self.secrets = sorted(_spellings(variables.pop("__secret_values__", [])), key=len, reverse=True)
         self.variables = variables
         self.tasks = {row.task: row.name for row in job.tasks}
         self.total = len(job.tasks)
