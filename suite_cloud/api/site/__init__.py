@@ -8,6 +8,7 @@ owned by that site. Objects of other sites are reported as missing, never as for
 """
 
 import base64
+import json
 import functools
 from collections.abc import Callable
 from typing import Any
@@ -178,7 +179,15 @@ def as_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
-        value = value.replace("\n", ",").split(",")
+        text = value.strip()
+        if text.startswith("["):
+            # Form-encoded clients (FrappeClient, query strings) send lists as JSON text.
+            try:
+                value = json.loads(text)
+            except ValueError:
+                frappe.throw(_("Expected a list."))
+        else:
+            value = text.replace("\n", ",").split(",")
     return [str(v).strip() for v in value if str(v).strip()]
 
 

@@ -83,6 +83,14 @@ class TestSiteResolution(SiteApiTestCase):
         self.assertEqual((profile["title"], profile["contact_email"]), (self.site.name, None))
         self.assertRaises(frappe.ValidationError, update_site_profile, contact_email="not-an-address")
 
+    def test_list_params_accept_json_text(self) -> None:
+        from suite_cloud.api.site import as_list
+
+        self.assertEqual(as_list('["a@x.com", "b@x.com"]'), ["a@x.com", "b@x.com"])
+        self.assertEqual(as_list("a@x.com, b@x.com\nc@x.com"), ["a@x.com", "b@x.com", "c@x.com"])
+        self.assertEqual(as_list(["a@x.com", " "]), ["a@x.com"])
+        self.assertRaises(frappe.ValidationError, as_list, "[not json")
+
     def test_current_site_comes_from_the_authorization_header(self) -> None:
         self.assertEqual(current_site().name, self.site.name)
 
