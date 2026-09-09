@@ -4,14 +4,11 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.api import fc
+from suite_cloud.api.mail import accounts, domains, groups, mailing_lists
 from suite_cloud.api.site import (
     SiteAuthError,
     SiteSuspendedError,
-    accounts,
     current_site,
-    domains,
-    groups,
-    mailing_lists,
     update_site_profile,
 )
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
