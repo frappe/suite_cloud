@@ -67,6 +67,24 @@ def get_public_url() -> str:
     return (get_config("public_url") or frappe.utils.get_url()).rstrip("/")
 
 
+def utc_iso(value) -> str | None:
+    """A stored datetime as an aware UTC string (``2026-09-09T10:00:00Z``) for API payloads.
+
+    Frappe stores naive system-time values; handing them out naive lets a site in another time
+    zone read them as its own local time and show them hours off.
+    """
+
+    if not value:
+        return None
+    from datetime import UTC
+    from zoneinfo import ZoneInfo
+
+    moment = frappe.utils.get_datetime(value)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=ZoneInfo(frappe.utils.get_system_timezone()))
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 def password_or_none(doc, field: str) -> str | None:
     """Returns the decrypted password if the field is set, otherwise None."""
 
