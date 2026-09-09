@@ -21,6 +21,10 @@ frappe.ui.form.on('Mail Domain', {
 	},
 
 	call(frm, method, freeze_message) {
+		if (frm.is_dirty()) {
+			frappe.msgprint(__('Save the domain first; the records are refreshed from the saved document.'))
+			return
+		}
 		frappe.call({ doc: frm.doc, method, freeze: true, freeze_message, callback: () => frm.reload_doc() })
 	},
 })

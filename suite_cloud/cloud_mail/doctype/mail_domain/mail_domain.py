@@ -144,6 +144,7 @@ class MailDomain(Document):
 
     @frappe.whitelist()
     def refresh_dns_records(self, expected_dkim_keys: int | None = None) -> None:
+        self.assert_saved()
         """Re-reads the zone Stalwart expects and rebuilds the record rows (verification kept).
 
         Right after creation the read waits for the DKIM keys Stalwart is still generating.
@@ -183,6 +184,7 @@ class MailDomain(Document):
 
     @frappe.whitelist()
     def verify_dns_records(self) -> dict:
+        self.assert_saved()
         """Resolves every record on public resolvers; the domain is verified when all mandatory ones match."""
 
         checked_at = now()
@@ -243,6 +245,21 @@ class MailDomain(Document):
         self.flags.skip_push = True
         self.save(ignore_permissions=True)
         self.flags.skip_push = False
+
+    def assert_saved(self) -> None:
+        """Refuses to act on a form with unsaved edits to pushed fields.
+
+        The desk sends the form as it is; saving it here with pushes skipped would commit those
+        edits locally without the cluster ever hearing of them, and no later save would push them.
+        """
+
+        if self.is_new():
+            return
+        fields = [*PUSHED_FIELDS, "egress_pool", "publish_client_discovery_records"]
+        stored = frappe.db.get_value(self.doctype, self.name, fields, as_dict=True) or {}
+        for field in fields:
+            if (stored.get(field) or "") != (self.get(field) or ""):
+                frappe.throw(_("Save the domain before running this action."))
 
     # --- helpers -----------------------------------------------------------------------
 

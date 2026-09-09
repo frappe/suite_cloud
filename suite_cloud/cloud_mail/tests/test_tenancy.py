@@ -229,6 +229,13 @@ class TestMailDomain(TenancyTestCase):
         account.save()
         self.assertRaisesRegex(frappe.ValidationError, "not active", self.make_account, "b@acme.com")
 
+    def test_record_actions_refuse_unsaved_pushed_edits(self) -> None:
+        domain = self.make_domain()
+        domain.enabled = 0  # edited on the form, not saved
+        self.assertRaisesRegex(frappe.ValidationError, "Save the domain", domain.verify_dns_records)
+        self.assertRaisesRegex(frappe.ValidationError, "Save the domain", domain.refresh_dns_records)
+        self.assertTrue(self.fake.find("Domain", name="acme.com")["isEnabled"])
+
     def test_domain_goes_live_only_once_verified(self) -> None:
         domain = self.make_domain(is_verified=0)
         self.assertFalse(self.fake.find("Domain", name="acme.com")["isEnabled"])
