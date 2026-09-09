@@ -285,6 +285,18 @@ class TestEgress(IntegrationTestCase):
         self.assertIn('"@type":"RocksDb"', variables["bootstrap_ndjson"])
         self.assertIn(pool.pool_name, variables["cluster_ndjson"])
 
+    def test_a_failed_ptr_lookup_keeps_the_last_state(self) -> None:
+        pool = self.make_pool()
+        row = pool.addresses[0]
+        row.db_set("ptr_verified", 1, update_modified=False)
+        target = "suite_cloud.cloud_mail.doctype.egress_ip_pool.egress_ip_pool.verify_ptr_record"
+        with patch(target, return_value=None):
+            self.assertTrue(pool.verify_ptr(row.name)[row.ip_address])
+        self.assertEqual(frappe.db.get_value(row.doctype, row.name, "ptr_verified"), 1)
+        with patch(target, return_value=False):
+            self.assertFalse(pool.verify_ptr(row.name)[row.ip_address])
+        self.assertEqual(frappe.db.get_value(row.doctype, row.name, "ptr_verified"), 0)
+
     def test_verify_ptr_marks_rows_one_or_all(self) -> None:
         pool = self.make_pool(("203.0.113.51", "203.0.113.52"))
         first, second = pool.addresses

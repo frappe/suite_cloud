@@ -61,17 +61,24 @@ def normalize_record_value(type: str, value: str, fqdn: str) -> str:
     return value
 
 
-def verify_ptr_record(ip_address: str, expected_hostname: str) -> bool:
-    """True when the reverse record of ``ip_address`` names ``expected_hostname``."""
+def verify_ptr_record(ip_address: str, expected_hostname: str) -> bool | None:
+    """True when the reverse record of ``ip_address`` names ``expected_hostname``.
+
+    None when the lookup itself failed (timeout, no nameserver answered): that says nothing about
+    the record, so callers keep the state they had instead of flapping to unverified.
+    """
 
     try:
+        import dns.resolver
         import dns.reversename
 
         resolver = dns.resolver.Resolver(configure=False)
         resolver.nameservers = NAMESERVERS
         answer = resolver.resolve(dns.reversename.from_address(ip_address), "PTR")
-    except Exception:
+    except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
         return False
+    except Exception:
+        return None
 
     expected = expected_hostname.rstrip(".").lower()
     return any(record.to_text().rstrip(".").lower() == expected for record in answer)

@@ -138,6 +138,8 @@ class EgressIPPool(Document):
 
 def verify_address_ptr(row: Document) -> bool:
     ok = verify_ptr_record(row.ip_address, row.ehlo_hostname)
+    if ok is None:
+        return bool(row.ptr_verified)  # the lookup failed; the last known state stands
     row.db_set("ptr_verified", cint(ok), update_modified=False)
     return ok
 

@@ -187,6 +187,8 @@ class StalwartNode(Document):
     def verify_ptr(self) -> bool:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         ok = verify_ptr_record(self.ipv4_address, self.hostname)
+        if ok is None:
+            return bool(self.ptr_verified)  # the lookup failed; the last known state stands
         self.db_set("ptr_verified", cint(ok), update_modified=False)
         return ok
 
@@ -237,6 +239,6 @@ def poll_pending_nodes() -> None:
 def verify_all_ptr_records() -> None:
     for name in frappe.get_all("Stalwart Node", {"enabled": 1}, pluck="name"):
         node = frappe.get_doc("Stalwart Node", name)
-        node.db_set(
-            "ptr_verified", cint(verify_ptr_record(node.ipv4_address, node.hostname)), update_modified=False
-        )
+        ok = verify_ptr_record(node.ipv4_address, node.hostname)
+        if ok is not None:
+            node.db_set("ptr_verified", cint(ok), update_modified=False)
