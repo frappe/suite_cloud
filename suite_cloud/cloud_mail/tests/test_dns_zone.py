@@ -2,7 +2,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import cint
 
-from suite_cloud.tests.fixtures import (
+from suite_cloud.cloud_mail.tests.fixtures import (
     ROOT_DOMAIN,
     clear_request_cache,
     configure_settings,

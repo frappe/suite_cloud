@@ -16,8 +16,20 @@ concurrency:
 
 jobs:
   tests:
-    name: Tests
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
+
+    # One runner per deployment type. Core covers what every hosted product shares (sites,
+    # zones, settings); each product's tests live in its own module folder and get a runner
+    # of their own, so a Cloud Meet leg is one more row here.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Core
+            tests: suite_cloud/tests
+          - name: Mail
+            tests: suite_cloud/cloud_mail/tests
 
     services:
       redis-cache:
@@ -83,12 +95,19 @@ jobs:
         env:
           CI: "Yes"
 
-      - name: Run Tests
+      - name: Run ${{ matrix.name }} Tests
         working-directory: /home/runner/frappe-bench
         run: |
           bench --site test_site set-config allow_tests true
-          # The unit tests need no site; the integration tests talk to an in-process fake Stalwart.
-          bench --site test_site run-tests --app suite_cloud
+          status=0
+          for file in "$GITHUB_WORKSPACE"/${{ matrix.tests }}/test_*.py; do
+            rel="${file#"$GITHUB_WORKSPACE"/}"
+            module="$(echo "${rel%.py}" | tr / .)"
+            echo "::group::$module"
+            bench --site test_site run-tests --app suite_cloud --module "$module" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
         env:
           TYPE: server
 

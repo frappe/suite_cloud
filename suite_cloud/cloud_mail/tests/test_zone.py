@@ -1,7 +1,7 @@
 from frappe.tests import UnitTestCase
 
 from suite_cloud.cloud_mail.cluster.zone import build_domain_records, parse_zone_file
-from suite_cloud.tests.fake_stalwart import FakeStalwart
+from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
 
 ZONE = """
 example.com. 3600 IN MX 10 mail.blr.example.test.

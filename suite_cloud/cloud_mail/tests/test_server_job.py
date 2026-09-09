@@ -6,9 +6,9 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.cloud_mail.cluster import bootstrap, plan
+from suite_cloud.cloud_mail.tests.fixtures import configure_settings, make_cluster, make_node
 from suite_cloud.provisioning.ansible import playbook_task_names
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
-from suite_cloud.tests.fixtures import configure_settings, make_cluster, make_node
 
 
 def fake_runner(job_tasks: list[str], fail_task: str | None = None):

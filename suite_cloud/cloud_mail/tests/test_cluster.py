@@ -5,7 +5,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.cloud_mail.cluster import dns, plan
-from suite_cloud.tests.fixtures import (
+from suite_cloud.cloud_mail.tests.fixtures import (
     ROOT_DOMAIN,
     configure_settings,
     make_cluster,
@@ -219,8 +219,8 @@ class TestStalwartCluster(IntegrationTestCase):
     def test_finish_bootstrap_and_key_rotation_through_the_fake(self) -> None:
         from suite_cloud.cloud_mail.cluster import bootstrap
         from suite_cloud.cloud_mail.stalwart import forget_sessions
-        from suite_cloud.tests.fake_stalwart import FakeStalwart
-        from suite_cloud.tests.fixtures import clear_request_cache
+        from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
+        from suite_cloud.cloud_mail.tests.fixtures import clear_request_cache
 
         cluster = make_cluster()
         node = make_node(cluster, "203.0.113.10")

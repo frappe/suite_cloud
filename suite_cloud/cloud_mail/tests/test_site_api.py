@@ -18,8 +18,8 @@ from suite_cloud.cloud_mail.tenancy.ownership import (
     DomainNotVerifiedError,
     OwnershipLookupError,
 )
-from suite_cloud.tests.fake_stalwart import FakeStalwart
-from suite_cloud.tests.fixtures import (
+from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
+from suite_cloud.cloud_mail.tests.fixtures import (
     activate_cluster,
     clear_request_cache,
     configure_settings,

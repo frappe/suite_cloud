@@ -5,7 +5,7 @@ from suite_cloud.cloud_mail.stalwart.connection import ConnectionInfo, JMAPConne
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
 from suite_cloud.cloud_mail.stalwart.directory import Account, Domain, EmailAlias, Group, MailingList
 from suite_cloud.cloud_mail.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
-from suite_cloud.tests.fake_stalwart import FakeStalwart
+from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
 
 
 class TestStalwartClient(UnitTestCase):

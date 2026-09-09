@@ -6,8 +6,8 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import forget_sessions
 from suite_cloud.cloud_mail.tenancy.addresses import get_site_domain
-from suite_cloud.tests.fake_stalwart import FakeStalwart
-from suite_cloud.tests.fixtures import (
+from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
+from suite_cloud.cloud_mail.tests.fixtures import (
     activate_cluster,
     clear_request_cache,
     configure_settings,

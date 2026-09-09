@@ -5,8 +5,8 @@ from frappe.tests import IntegrationTestCase
 
 from suite_cloud.cloud_mail.cluster import dns, egress
 from suite_cloud.cloud_mail.stalwart import forget_sessions
-from suite_cloud.tests.fake_stalwart import FakeStalwart
-from suite_cloud.tests.fixtures import (
+from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
+from suite_cloud.cloud_mail.tests.fixtures import (
     ROOT_DOMAIN,
     activate_cluster,
     clear_request_cache,
