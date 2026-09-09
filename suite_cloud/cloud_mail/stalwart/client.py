@@ -165,9 +165,7 @@ class PlanApplier:
             patch = {
                 k: v
                 for k, v in value.items()
-                if k not in match_on
-                and k != "credentials"
-                and (is_write_only(k, v) or match.get(k) != v)
+                if k not in match_on and k != "credentials" and (is_write_only(k, v) or match.get(k) != v)
             }
             if patch:
                 service.update(match["id"], patch)

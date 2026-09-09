@@ -11,7 +11,7 @@ from frappe.utils import now
 from suite_cloud.cloud_mail.cluster import bootstrap, dns, egress, naming, plan, reconcile
 from suite_cloud.cloud_mail.stalwart import forget_sessions, get_admin_client, get_client
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
-from suite_cloud.provisioning.ssh import validate_ssh_user_field, generate_keypair
+from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
 from suite_cloud.utils import get_config
 

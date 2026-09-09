@@ -1,11 +1,11 @@
 import frappe
 
 from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_names, site_api
-from suite_cloud.cloud_mail.tenancy import sync
 from suite_cloud.cloud_mail.doctype.mail_account.mail_account import (
     mailing_lists_by_account,
     validate_password,
 )
+from suite_cloud.cloud_mail.tenancy import sync
 
 
 @frappe.whitelist(methods=["GET", "POST"])

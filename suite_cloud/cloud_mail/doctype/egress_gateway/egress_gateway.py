@@ -10,7 +10,7 @@ from suite_cloud.cloud_mail.cluster import dns, egress, naming, plan
 from suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node import validate_ip
 from suite_cloud.cloud_mail.stalwart import get_admin_client, get_client
 from suite_cloud.provisioning.ansible import ping
-from suite_cloud.provisioning.ssh import validate_ssh_user_field, SSHTarget
+from suite_cloud.provisioning.ssh import SSHTarget, validate_ssh_user_field
 from suite_cloud.utils import get_config
 
 

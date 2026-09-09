@@ -110,8 +110,6 @@ class TestSpfTexts(UnitTestCase):
         parent, children = records[0], records[1:]
         self.assertEqual(parent[0], "spf.c1.example.test")
         self.assertTrue(all(len(text) <= SPF_TEXT_LIMIT for _, text in records))
-        self.assertEqual(
-            parent[1], "v=spf1 " + " ".join(f"include:{host}" for host, _ in children) + " -all"
-        )
+        self.assertEqual(parent[1], "v=spf1 " + " ".join(f"include:{host}" for host, _ in children) + " -all")
         listed = " ".join(text for _, text in children)
         self.assertTrue(all(mechanism in listed for mechanism in mechanisms))

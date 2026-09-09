@@ -11,7 +11,7 @@ from frappe.utils import cint, now
 from suite_cloud.cloud_mail.cluster import bootstrap, dns, naming
 from suite_cloud.dns.resolver import verify_ptr_record
 from suite_cloud.provisioning.ansible import ping
-from suite_cloud.provisioning.ssh import validate_ssh_user_field, SSHTarget
+from suite_cloud.provisioning.ssh import SSHTarget, validate_ssh_user_field
 
 REMOVABLE_STATUSES = ("Pending", "Failed", "Disabled")
 

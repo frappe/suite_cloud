@@ -34,7 +34,9 @@ class TestStalwartCluster(IntegrationTestCase):
         cluster.save()
         from suite_cloud.provisioning.ssh import SSHTarget, inventory_line
 
-        self.assertRaises(ValueError, inventory_line, "n1", SSHTarget("203.0.113.1", "root\nx", 22, "k"), "/k")
+        self.assertRaises(
+            ValueError, inventory_line, "n1", SSHTarget("203.0.113.1", "root\nx", 22, "k"), "/k"
+        )
 
     def test_cluster_derives_zone_url_and_coordinator(self) -> None:
         cluster = make_cluster()

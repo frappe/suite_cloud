@@ -92,7 +92,10 @@ def spf_texts(include_host: str, mechanisms: list[str]) -> list[tuple[str, str]]
     parent = " ".join(["v=spf1", *[f"include:{host}" for host, _ in children], "-all"])
     if len(parent) > SPF_TEXT_LIMIT:
         raise ValueError("too many sending addresses for one SPF include chain")
-    return [(include_host, parent), *[(host, " ".join(["v=spf1", *chunk, "-all"])) for host, chunk in children]]
+    return [
+        (include_host, parent),
+        *[(host, " ".join(["v=spf1", *chunk, "-all"])) for host, chunk in children],
+    ]
 
 
 def sending_ips(cluster: Document) -> list[str]:
