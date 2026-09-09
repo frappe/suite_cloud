@@ -118,6 +118,8 @@ class SuiteSite(Document):
     def suspend(self) -> None:
         # The key keeps authenticating so the site gets a 403 naming the suspension, not a bare 401.
         frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        if self.status == "Archived":
+            frappe.throw(_("An archived site cannot be suspended."))
         self.db_set({"status": "Suspended"})
 
     @frappe.whitelist()

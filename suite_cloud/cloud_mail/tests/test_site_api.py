@@ -323,6 +323,8 @@ class TestFrappeCloudApi(SiteApiTestCase):
         self.assertEqual(fc.suspend_site(self.site.name)["status"], "Suspended")
         self.assertEqual(fc.resume_site(self.site.name)["status"], "Active")
         self.assertEqual(fc.archive_site(self.site.name)["status"], "Archived")
+        # Archived is final: neither suspend nor resume may bring the site back.
+        self.assertRaisesRegex(frappe.ValidationError, "archived", fc.suspend_site, self.site.name)
 
     def test_cluster_selection(self) -> None:
         self.assertEqual(fc.pick_cluster(None, None), self.cluster.name)
