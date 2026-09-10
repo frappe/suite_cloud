@@ -5,6 +5,7 @@ from suite_cloud.cloud_mail.stalwart.connection import ConnectionInfo, JMAPConne
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
 from suite_cloud.cloud_mail.stalwart.directory import Account, Domain, EmailAlias, Group, MailingList
 from suite_cloud.cloud_mail.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
+from suite_cloud.cloud_mail.stalwart.service import CORE_CAPABILITY
 from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
 
 
@@ -193,6 +194,18 @@ class TestStalwartClient(UnitTestCase):
         result = self.client.apply(plan)
         self.assertEqual(result.updated, [])
         self.assertEqual(self.fake.find("MtaRoute", name="egress-x")["authSecret"]["secret"], "rotated")
+
+    def test_get_many_respects_max_objects_in_get(self) -> None:
+        domain_id = self.client.domains.create_id(Domain(name="example.com"))
+        ids = [self.client.accounts.create_id(Account(name=f"u{i}", domain_id=domain_id)) for i in range(5)]
+        self.client.domains.connection.session["capabilities"][CORE_CAPABILITY]["maxObjectsInGet"] = 2
+
+        calls = len(self.fake.calls)
+        objects = self.client.accounts.get_many(ids, properties=["id", "usedDiskQuota"])
+
+        self.assertEqual([o["id"] for o in objects], ids)
+        gets = [args for name, args in self.fake.calls[calls:] if name == "x:Account/get"]
+        self.assertEqual([len(g["ids"]) for g in gets], [2, 2, 1])
 
     def test_unsupported_query_filters_are_refused_by_the_fake(self) -> None:
         self.assertRaises(StalwartRejectedError, self.client.roles.find, {"description": "x"})

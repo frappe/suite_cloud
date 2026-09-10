@@ -217,7 +217,13 @@ class TestDirectoryApi(SiteApiTestCase):
         # Usage is read from the cluster for a single account only; a list would cost one call each.
         self.fake.find("Account", name="alice")["usedDiskQuota"] = 4096
         self.assertEqual(accounts.get_account("alice@acme.com")["used_disk_bytes"], 4096)
-        self.assertIsNone(accounts.list_accounts()["items"][0]["used_disk_bytes"])
+        # A list page fetches usage for all its rows in one cluster call.
+        calls = len(self.fake.calls)
+        self.assertEqual(accounts.list_accounts()["items"][0]["used_disk_bytes"], 4096)
+        self.assertEqual([c[0] for c in self.fake.calls[calls:]], ["x:Account/get"])
+        self.fake.find("Account", name="sales")["usedDiskQuota"] = 512
+        self.assertEqual(groups.list_groups()["items"][0]["used_disk_bytes"], 512)
+        self.assertEqual(groups.get_group("sales@acme.com")["used_disk_bytes"], 512)
         # The property asks the cluster only after the desk form opts in on load.
         doc = frappe.get_doc("Mail Account", "alice@acme.com")
         self.assertIsNone(doc.used_disk_bytes)
@@ -226,7 +232,7 @@ class TestDirectoryApi(SiteApiTestCase):
         # Allotments come in bulk; unknown or foreign addresses are simply absent.
         self.assertEqual(
             accounts.get_quotas(["alice@acme.com", "nobody@acme.com"]),
-            {"alice@acme.com": self.site.default_disk_quota_gb},
+            {"alice@acme.com": {"disk_quota_gb": self.site.default_disk_quota_gb, "used_disk_bytes": 4096}},
         )
         rotated = accounts.rotate_app_password("alice@acme.com")["app_password"]
         self.assertNotEqual(rotated, account["app_password"])

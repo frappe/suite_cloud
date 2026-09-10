@@ -16,6 +16,7 @@ from suite_cloud.cloud_mail.doctype.mail_account.mail_account import (
     validate_password,
 )
 from suite_cloud.cloud_mail.tenancy import sync
+from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
 
 ACCOUNT_PAGE_CAP = 200
 
@@ -31,7 +32,11 @@ def list_accounts(
     )
     accounts = [frappe.get_doc("Mail Account", n) for n in names]
     lists = mailing_lists_by_account(accounts)
-    return {"items": [a.to_api(mailing_lists=lists.get(a.name, [])) for a in accounts], "total": total}
+    usage = used_disk_by_name(accounts)
+    items = [
+        a.to_api(mailing_lists=lists.get(a.name, []), used_disk_bytes=usage.get(a.name)) for a in accounts
+    ]
+    return {"items": items, "total": total}
 
 
 @frappe.whitelist(methods=["GET", "POST"])
@@ -46,10 +51,10 @@ QUOTA_LOOKUP_LIMIT = 500
 @frappe.whitelist(methods=["GET", "POST"])
 @site_api
 def get_quotas(emails: list[str] | str) -> dict:
-    """``{email: allotted GB}`` for the site's accounts among ``emails``, from Suite Cloud alone.
+    """``{email: {disk_quota_gb, used_disk_bytes}}`` for the site's accounts among ``emails``.
 
-    Usage would cost a cluster call per account; the allotment is one query, so a list page can
-    show it for every row.
+    The allotment is one query; usage is one cluster call per ``maxObjectsInGet`` accounts, so a
+    list page shows both for every row.
     """
 
     wanted = [e.strip().lower() for e in as_list(emails) if e and e.strip()][:QUOTA_LOOKUP_LIMIT]
@@ -58,9 +63,12 @@ def get_quotas(emails: list[str] | str) -> dict:
     rows = frappe.get_all(
         "Mail Account",
         filters={"site": current_site().name, "name": ["in", wanted]},
-        fields=["name", "disk_quota_gb"],
+        fields=["name", "disk_quota_gb", "stalwart_id", "cluster"],
     )
-    return {row.name: row.disk_quota_gb for row in rows}
+    usage = used_disk_by_name(rows)
+    return {
+        row.name: {"disk_quota_gb": row.disk_quota_gb, "used_disk_bytes": usage.get(row.name)} for row in rows
+    }
 
 
 @frappe.whitelist(methods=["POST"])

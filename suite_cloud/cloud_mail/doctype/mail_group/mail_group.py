@@ -13,6 +13,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
     get_site_domain,
     validate_email_address,
 )
+from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
 from suite_cloud.utils import utc_iso
 
 
@@ -100,12 +101,17 @@ class MailGroup(Document):
             "Mail Group Member", {"group": self.name, "parenttype": "Mail Account"}, pluck="parent"
         )
 
-    def to_api(self) -> dict:
+    def to_api(self, with_usage: bool = False, used_disk_bytes: int | None = None) -> dict:
+        """``with_usage`` asks the cluster; a list page passes usage fetched for the whole page."""
+
+        if with_usage:
+            used_disk_bytes = used_disk_by_name([self]).get(self.name)
         return {
             "email": self.email,
             "domain": self.domain,
             "description": self.description,
             "disk_quota_gb": flt(self.disk_quota_gb),
+            "used_disk_bytes": used_disk_bytes,
             "aliases": [
                 {"email": a.alias_email, "enabled": bool(a.enabled), "description": a.description}
                 for a in self.aliases

@@ -20,6 +20,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
     get_site_domain,
     validate_email_address,
 )
+from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
 from suite_cloud.utils import utc_iso
 
 CREDENTIAL_DESCRIPTION = "Suite Cloud"
@@ -276,16 +277,16 @@ class MailAccount(Document):
     def fetch_used_disk_bytes(self) -> int | None:
         """One cluster call; None until the account exists there."""
 
-        if not self.stalwart_id:
-            return None
-        account = sync.client_for(self).accounts.get(self.stalwart_id, properties=["usedDiskQuota"])
-        return cint((account or {}).get("usedDiskQuota"))
+        return used_disk_by_name([self]).get(self.name)
 
-    def to_api(self, with_usage: bool = False, mailing_lists: list[str] | None = None) -> dict:
-        """``with_usage`` costs a cluster round trip, so lists leave it out and single reads include it.
-
-        A list page passes ``mailing_lists`` looked up for the whole page in one query.
-        """
+    def to_api(
+        self,
+        with_usage: bool = False,
+        mailing_lists: list[str] | None = None,
+        used_disk_bytes: int | None = None,
+    ) -> dict:
+        """``with_usage`` costs a cluster round trip, so single reads ask for it while a list page
+        passes ``used_disk_bytes`` and ``mailing_lists`` looked up for the whole page at once."""
 
         return {
             "email": self.email,
@@ -294,7 +295,7 @@ class MailAccount(Document):
             "display_name": self.display_name,
             "description": self.description,
             "disk_quota_gb": flt(self.disk_quota_gb),
-            "used_disk_bytes": self.fetch_used_disk_bytes() if with_usage else None,
+            "used_disk_bytes": self.fetch_used_disk_bytes() if with_usage else used_disk_bytes,
             "locale": self.locale,
             "time_zone": self.time_zone,
             "aliases": [
