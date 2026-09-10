@@ -44,7 +44,7 @@ The site-facing API is split the same way: `suite_cloud.api.site` for what any p
 | --- | --- |
 | **DNS Zone** | A domain you own (for example `frappemail.com`) plus the login for the DNS provider that manages it. Suite Cloud publishes server records there. You can have several zones; each cluster picks one. |
 | **Stalwart Store** | Where a cluster keeps its data: a PostgreSQL or MySQL database, an S3 bucket for message bodies, Redis for shared memory, and optionally a search engine. |
-| **Stalwart Cluster** | One mail service with its public hostname (`mail.blr.frappemail.com`), its stores, its admin credentials, an SSH key for its servers and the regions Frappe Cloud may place sites from. |
+| **Stalwart Cluster** | One mail service with its public hostname (`mail.c1.frappemail.com`), its stores, its admin credentials, an SSH key for its servers and the regions Frappe Cloud may place sites from. |
 | **Stalwart Node** | One server (VPS) that runs Stalwart for a cluster. Nodes share the same stores, so any node can serve any user. |
 | **Egress Gateway** and **Egress IP Pool** | Optional extra servers used only for sending. A pool is a set of IP addresses; a domain, a site or a whole cluster can be told to send through it. |
 | **DNS Record** | One record Suite Cloud keeps in a zone (a node's address, the cluster's round-robin entry, the SPF list, and so on). Records are created and removed together with the thing that needs them. |
@@ -86,7 +86,7 @@ Installing creates three roles and one user:
    label is only a namespace: a cluster may have servers in several regions. List the regions
    Frappe Cloud may place sites from, or none to serve every region. Copy the SSH public key.
 5. **First node.** Put that public key on a fresh VPS and set the reverse DNS (PTR) of its IP to the
-   node's hostname. Create a Stalwart Node (`n1.blr.frappemail.com` with its IPv4), click
+   node's hostname. Create a Stalwart Node (`n1.c1.frappemail.com` with its IPv4), click
    **Verify SSH**, then **Provision**. The job installs Stalwart and its CLI, sets up the system
    service and firewall, starts Stalwart once to write the store settings, applies the cluster
    configuration (roles, coordinator, certificate provider, wildcard certificate, system settings),
@@ -104,14 +104,14 @@ again, and **Check Drift** reports what differs from it without changing anythin
 
 ### Sending through dedicated IPs
 
-1. Create an Egress Gateway (`out1.blr.frappemail.com`) on a VPS that already has the extra public
+1. Create an Egress Gateway (`out1.c1.frappemail.com`) on a VPS that already has the extra public
    IPs configured, and provision it.
-2. Create an Egress IP Pool listing those IPs with a hostname for each (`ded1.blr.frappemail.com`,
+2. Create an Egress IP Pool listing those IPs with a hostname for each (`ded1.c1.frappemail.com`,
    with reverse DNS set at the provider).
 3. Assign the pool to a Mail Domain, to a Suite Site, or as the cluster default.
 
 Mail from the matching sender domains is relayed to the gateway over an authenticated, encrypted
-connection and leaves from the pool's addresses. The `spf.blr.frappemail.com` record that customer
+connection and leaves from the pool's addresses. The `spf.c1.frappemail.com` record that customer
 domains include always lists every node and pool address, so SPF stays valid whichever path a
 message takes.
 
