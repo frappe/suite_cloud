@@ -6,9 +6,11 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.api import fc
 from suite_cloud.api.mail import accounts, domains, groups, mailing_lists, meta
 from suite_cloud.api.site import (
+    SiteAddressError,
     SiteAuthError,
     SiteSuspendedError,
     current_site,
+    ping,
     update_site_profile,
 )
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
@@ -112,6 +114,34 @@ class TestSiteResolution(SiteApiTestCase):
         frappe.set_user("Guest")
         frappe.local.request = frappe._dict(headers={"Authorization": f"token {self.site.api_key}:x"})
         self.assertRaises(SiteAuthError, current_site)
+
+    def test_requests_must_come_from_an_allowed_address_when_set(self) -> None:
+        self.site.allowed_ips = "203.0.113.10\n2001:db8::/32\n 10.0.0.0/8 "
+        self.site.save(ignore_permissions=True)  # the fixture request runs as the service user
+        self.assertEqual(self.site.allowed_ips, "203.0.113.10/32\n2001:db8::/32\n10.0.0.0/8")
+        self.assertIn("allowed_ips", self.site.to_api())
+
+        for ip in ("203.0.113.10", "2001:db8:1::5", "10.20.30.40"):
+            self.act_as(self.site)
+            frappe.local.request_ip = ip
+            self.assertEqual(ping()["site"], self.site.name)
+        for ip in ("203.0.113.11", "192.168.1.1", None, "garbage"):
+            self.act_as(self.site)
+            frappe.local.request_ip = ip
+            self.assertRaisesRegex(SiteAddressError, "does not accept requests", ping)
+
+        # Operators acting for the site from the desk are not the site's server.
+        frappe.local.request_ip = "192.168.1.1"
+        frappe.set_user("Administrator")
+        frappe.local.suite_site = None
+        frappe.local.form_dict = frappe._dict(site=self.site.name)
+        self.assertEqual(ping()["site"], self.site.name)
+        # No list means any address.
+        frappe.db.set_value("Suite Site", self.site.name, "allowed_ips", "")
+        frappe.clear_document_cache("Suite Site", self.site.name)
+        self.act_as(self.site)
+        self.assertEqual(ping()["site"], self.site.name)
+        frappe.local.request_ip = None
 
     def test_suspended_site_is_refused(self) -> None:
         self.site.db_set({"enabled": 0, "status": "Suspended"})
@@ -469,6 +499,15 @@ class TestFrappeCloudApi(SiteApiTestCase):
         )
         self.assertRaises(
             frappe.ValidationError, fc.update_site, "new.frappe.test", contact_email="not-an-address"
+        )
+        # Frappe Cloud passes the hosting server's outbound addresses; bad ones are refused.
+        self.assertEqual(
+            fc.update_site("new.frappe.test", allowed_ips=["203.0.113.10", "10.0.0.0/8"])["allowed_ips"],
+            ["203.0.113.10/32", "10.0.0.0/8"],
+        )
+        self.assertEqual(fc.update_site("new.frappe.test", allowed_ips=[])["allowed_ips"], [])
+        self.assertRaisesRegex(
+            frappe.ValidationError, "not an IP", fc.update_site, "new.frappe.test", allowed_ips=["nope"]
         )
         self.assertEqual(result["cluster"], self.cluster.name)
         self.assertEqual(result["jmap_url"], self.cluster.base_url)

@@ -26,6 +26,7 @@
   "access_section",
   "api_key",
   "api_secret",
+  "allowed_ips",
   "column_break_access",
   "user",
   "domain_verification_token"
@@ -172,6 +173,12 @@
    "fieldtype": "Password",
    "hidden": 1,
    "label": "API Secret"
+  },
+  {
+   "description": "One per line: the IPv4 or IPv6 addresses, or CIDR ranges, the site's server sends from, as Frappe Cloud reports them. Set, only requests from these addresses may use the site's key; a leaked key is useless elsewhere. Blank accepts any address.",
+   "fieldname": "allowed_ips",
+   "fieldtype": "Small Text",
+   "label": "Allowed IP Addresses"
   },
   {
    "fieldname": "column_break_access",

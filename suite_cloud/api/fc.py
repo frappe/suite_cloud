@@ -8,6 +8,7 @@ FC stores it in the site's configuration.
 import frappe
 from frappe import _
 
+from suite_cloud.api.site import as_list
 from suite_cloud.utils import child_rows, get_public_url
 
 ROLE = "Frappe Cloud"
@@ -31,7 +32,11 @@ def create_site(
     max_mailing_lists: int | None = None,
     max_disk_gb: float | None = None,
     default_disk_quota_gb: float | None = None,
+    allowed_ips: list[str] | str | None = None,
 ) -> dict:
+    """``allowed_ips`` is the outbound addresses (or CIDR ranges) of the server hosting the site; set,
+    only requests from them may use the site's key."""
+
     require_frappe_cloud()
     site = (site or "").strip().lower()
     if frappe.db.exists("Suite Site", site):
@@ -54,6 +59,7 @@ def create_site(
         "max_mailing_lists": max_mailing_lists,
         "max_disk_gb": max_disk_gb,
         "default_disk_quota_gb": default_disk_quota_gb,
+        "allowed_ips": ips_text(allowed_ips),
     }.items():
         if value is not None:
             doc.set(field, value)
@@ -87,8 +93,10 @@ def update_site(
     max_mailing_lists: int | None = None,
     max_disk_gb: float | None = None,
     default_disk_quota_gb: float | None = None,
+    allowed_ips: list[str] | str | None = None,
 ) -> dict:
-    """Changes the site's display name, contact address or limits; omitted fields stay as they are."""
+    """Changes the site's display name, contact address, limits or allowed addresses; omitted fields
+    stay as they are. An empty ``allowed_ips`` list lifts the address restriction."""
 
     require_frappe_cloud()
     doc = load(site)
@@ -101,6 +109,7 @@ def update_site(
         "max_mailing_lists": max_mailing_lists,
         "max_disk_gb": max_disk_gb,
         "default_disk_quota_gb": default_disk_quota_gb,
+        "allowed_ips": ips_text(allowed_ips),
     }.items():
         if value is not None:
             doc.set(field, value)
@@ -137,6 +146,14 @@ def load(site: str):
     if not frappe.db.exists("Suite Site", site):
         frappe.throw(_("Site {0} not found.").format(site), frappe.DoesNotExistError)
     return frappe.get_doc("Suite Site", site)
+
+
+def ips_text(value: list[str] | str | None) -> str | None:
+    """A list (or JSON or newline text) of addresses as the field stores it; None means unchanged."""
+
+    if value is None:
+        return None
+    return "\n".join(as_list(value))
 
 
 def credentials(doc, secret: str) -> dict:

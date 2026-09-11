@@ -121,9 +121,9 @@ Call these with the API key and secret of a user that has the **Frappe Cloud** r
 
 | Method | What it does |
 | --- | --- |
-| `suite_cloud.api.fc.create_site(site, cluster=None, region=None, fc_reference=None, title=None, contact_email=None, max_domains=None, max_accounts=None, max_groups=None, max_mailing_lists=None, max_disk_gb=None, default_disk_quota_gb=None)` | Registers a site, choosing a cluster by its hostname, by a region it serves (default cluster preferred), or the default; a cluster with no regions serves any region. Returns the mail server URL, the Suite Cloud URL and the site's key and secret. The secret is shown only this once. |
+| `suite_cloud.api.fc.create_site(site, cluster=None, region=None, fc_reference=None, title=None, contact_email=None, max_domains=None, max_accounts=None, max_groups=None, max_mailing_lists=None, max_disk_gb=None, default_disk_quota_gb=None, allowed_ips=None)` | Registers a site, choosing a cluster by its hostname, by a region it serves (default cluster preferred), or the default; a cluster with no regions serves any region. Returns the mail server URL, the Suite Cloud URL and the site's key and secret. The secret is shown only this once. `allowed_ips` is the outbound addresses (or CIDR ranges) of the server hosting the site. |
 | `get_site(site)` | Status, cluster, title, contact email, limits and current usage. |
-| `update_site(site, title=None, contact_email=None, max_domains=None, ...)` | Changes the display name, the address for site-specific notices, or the limits. Omitted fields stay as they are. |
+| `update_site(site, title=None, contact_email=None, max_domains=None, ..., allowed_ips=None)` | Changes the display name, the address for site-specific notices, the limits, or the allowed addresses (an empty list lifts the restriction). Omitted fields stay as they are. |
 | `rotate_site_secret(site)` | Issues a new secret, shown once. |
 | `suspend_site(site)`, `resume_site(site)`, `archive_site(site, delete_data=False)` | Turns a site off, back on, or retires it. |
 
@@ -135,6 +135,9 @@ against the Suite Site record, so the request runs as the shared site service us
 
 Rules that apply everywhere:
 
+- When the Suite Site lists allowed IP addresses, only requests from those addresses may use its
+  key; the rest get a 403. A key copied out of a site's config is then worthless anywhere else.
+  Frappe Cloud passes the hosting server's outbound addresses at registration.
 - Anything that belongs to another site is reported as "not found", never as "forbidden".
 - If the cluster refuses a change, the site gets HTTP 422 with Stalwart's error type.
 - Each site may make 300 requests per minute.

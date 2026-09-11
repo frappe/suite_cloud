@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import ipaddress
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -67,6 +69,7 @@ class SuiteSite(Document):
         if self.contact_email:
             self.contact_email = self.contact_email.strip().lower()
             frappe.utils.validate_email_address(self.contact_email, throw=True)
+        self.allowed_ips = "\n".join(str(n) for n in parse_networks(self.allowed_ips))
 
         self.user = get_config("site_service_user")
         if not self.user:
@@ -243,6 +246,18 @@ class SuiteSite(Document):
     def get_cluster(self) -> Document:
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
 
+    def allows_ip(self, ip: str | None) -> bool:
+        """Whether a request from ``ip`` may use the site's key. No list means any address."""
+
+        networks = parse_networks(self.allowed_ips)
+        if not networks:
+            return True
+        try:
+            address = ipaddress.ip_address((ip or "").strip())
+        except ValueError:
+            return False
+        return any(address in network for network in networks)
+
     def to_api(self) -> dict:
         cluster = self.get_cluster()
         return {
@@ -252,6 +267,7 @@ class SuiteSite(Document):
             "title": self.title,
             "contact_email": self.contact_email,
             "enabled": bool(self.enabled),
+            "allowed_ips": self.allowed_ips.split("\n") if self.allowed_ips else [],
             "jmap_url": cluster.base_url,
             "mail_hostname": cluster.hostname,
             "limits": {
@@ -270,6 +286,21 @@ class SuiteSite(Document):
                 "allocated_disk_gb": self.allocated_disk_gb(),
             },
         }
+
+
+def parse_networks(text: str | None) -> list:
+    """Addresses or CIDR ranges, one per line; a single address is its own /32 or /128."""
+
+    networks = []
+    for line in (text or "").splitlines():
+        value = line.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(value, strict=False))
+        except ValueError:
+            frappe.throw(_("{0} is not an IP address or CIDR range.").format(value))
+    return networks
 
 
 def purge_directory(site: str) -> None:

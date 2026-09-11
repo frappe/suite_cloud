@@ -34,6 +34,10 @@ class SiteSuspendedError(frappe.PermissionError):
     pass
 
 
+class SiteAddressError(frappe.PermissionError):
+    """The key is valid but the request did not come from one of the site's allowed addresses."""
+
+
 class StalwartRejected(frappe.ValidationError):
     """Stalwart refused the change; the type/description are safe to show the caller."""
 
@@ -75,6 +79,9 @@ def _resolve_site():
     site = frappe.get_cached_doc("Suite Site", name)
     if not site.enabled or site.status != "Active":
         raise SiteSuspendedError(_("Site {0} is {1}.").format(site.name, site.status.lower()))
+    if frappe.session.user == service_user and not site.allows_ip(getattr(frappe.local, "request_ip", None)):
+        # A key copied out of a site's config is worthless from anywhere but the site's own servers.
+        raise SiteAddressError(_("Site {0} does not accept requests from this address.").format(site.name))
     return site
 
 
