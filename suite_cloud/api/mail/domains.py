@@ -41,6 +41,7 @@ def create_domain(
     description: str | None = None,
     catch_all_address: str | None = None,
     sub_addressing: bool = True,
+    allow_relaying: bool = False,
     publish_client_discovery_records: bool = False,
 ) -> dict:
     """Adds the domain once its ownership record resolves; until then the error names the record."""
@@ -53,6 +54,7 @@ def create_domain(
             "description": description,
             "catch_all_address": catch_all_address,
             "sub_addressing": int(bool(sub_addressing)),
+            "allow_relaying": int(bool(allow_relaying)),
             "publish_client_discovery_records": int(bool(publish_client_discovery_records)),
         }
     )
@@ -68,6 +70,7 @@ def update_domain(
     description: str | None = None,
     catch_all_address: str | None = None,
     sub_addressing: bool | None = None,
+    allow_relaying: bool | None = None,
     publish_client_discovery_records: bool | None = None,
     enabled: bool | None = None,
 ) -> dict:
@@ -78,6 +81,8 @@ def update_domain(
         doc.catch_all_address = catch_all_address or None
     if sub_addressing is not None:
         doc.sub_addressing = int(bool(sub_addressing))
+    if allow_relaying is not None:
+        doc.allow_relaying = int(bool(allow_relaying))
     if enabled is not None:
         doc.enabled = int(bool(enabled))
     if publish_client_discovery_records is not None:

@@ -15,6 +15,7 @@
   "settings_section",
   "catch_all_address",
   "sub_addressing",
+  "allow_relaying",
   "column_break_settings",
   "publish_client_discovery_records",
   "egress_pool",
@@ -109,6 +110,13 @@
    "fieldname": "sub_addressing",
    "fieldtype": "Check",
    "label": "Sub-addressing"
+  },
+  {
+   "default": "0",
+   "description": "Relay mail for addresses of this domain that have no account here to the domain's MX (split delivery, for domains that keep some mailboxes on another server). Off rejects such mail, or delivers it to the catch-all address.",
+   "fieldname": "allow_relaying",
+   "fieldtype": "Check",
+   "label": "Allow Relaying"
   },
   {
    "fieldname": "column_break_settings",

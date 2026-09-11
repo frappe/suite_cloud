@@ -279,6 +279,17 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(domains.list_domains(), [])
         self.assertEqual(self.fake.all("Domain"), [])
 
+    def test_domain_delivery_settings_reach_the_cluster(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        self.assertFalse(domains.get_domain("acme.com")["allow_relaying"])  # off unless asked for
+        self.assertFalse(self.fake.find("Domain", name="acme.com")["allowRelaying"])
+
+        updated = domains.update_domain("acme.com", allow_relaying=True, sub_addressing=False)
+        self.assertEqual((updated["allow_relaying"], updated["sub_addressing"]), (True, False))
+        live = self.fake.find("Domain", name="acme.com")
+        self.assertEqual((live["allowRelaying"], live["subAddressing"]["@type"]), (True, "Disabled"))
+
     def test_lists_page_and_search_by_name(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")

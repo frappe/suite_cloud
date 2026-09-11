@@ -16,7 +16,14 @@ from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.utils import dkim_algorithms, get_config, utc_iso
 
 # A change to any of these reaches the cluster; is_verified is set by hand only by managers.
-PUSHED_FIELDS = ("description", "catch_all_address", "sub_addressing", "enabled", "is_verified")
+PUSHED_FIELDS = (
+    "description",
+    "catch_all_address",
+    "sub_addressing",
+    "allow_relaying",
+    "enabled",
+    "is_verified",
+)
 
 
 class MailDomain(Document):
@@ -49,6 +56,7 @@ class MailDomain(Document):
         routing_records: DF.Table[MailDomainDNSRecord]
         site: DF.Link
         stalwart_id: DF.Data | None
+        allow_relaying: DF.Check
         sub_addressing: DF.Check
         transport_security_records: DF.Table[MailDomainDNSRecord]
     # end: auto-generated types
@@ -129,6 +137,7 @@ class MailDomain(Document):
             dkim_algorithms=dkim_algorithms(),
             catch_all_address=self.catch_all_address or None,
             sub_addressing=bool(self.sub_addressing),
+            allow_relaying=bool(self.allow_relaying),
             report_address_uri=f"mailto:postmaster@{self.domain_name}",
         )
 
@@ -138,6 +147,7 @@ class MailDomain(Document):
             "isEnabled": self.is_live(),
             "catchAllAddress": self.catch_all_address or None,
             "subAddressing": {"@type": "Enabled" if self.sub_addressing else "Disabled"},
+            "allowRelaying": bool(self.allow_relaying),
         }
 
     # --- DNS ------------------------------------------------------------------------
@@ -276,6 +286,7 @@ class MailDomain(Document):
             "description": self.description,
             "catch_all_address": self.catch_all_address,
             "sub_addressing": bool(self.sub_addressing),
+            "allow_relaying": bool(self.allow_relaying),
             "publish_client_discovery_records": bool(self.publish_client_discovery_records),
             "is_verified": bool(self.is_verified),
             "last_verified_at": utc_iso(self.last_verified_at),

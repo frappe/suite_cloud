@@ -203,6 +203,11 @@ contact email for site-specific notices; the Suite app sends both whenever Suite
 6. Verification is retried every hour, and rotated DKIM selectors are picked up hourly for verified
    domains and daily for all. A temporary DNS failure never turns a working domain off.
 
+A domain carries three delivery settings a site may change: a catch-all address for local parts
+that match no account, sub-addressing (`user+tag@`), and relaying, which makes the cluster forward
+mail for addresses it does not hold to the domain's MX instead of rejecting it, so a domain can
+keep some mailboxes on another server (split delivery).
+
 Records for mail client auto-setup (SRV, autoconfig, MTA-STS) are listed only when the domain has
 `publish_client_discovery_records` turned on, because the cluster has no certificate for customer
 hostnames.

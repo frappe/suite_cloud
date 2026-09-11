@@ -149,11 +149,13 @@ class TestMailDomain(TenancyTestCase):
 
         domain.description = "Main"
         domain.catch_all_address = "Catch@Acme.com"
+        domain.allow_relaying = 1
         domain.publish_client_discovery_records = 1
         domain.save()
         live = self.fake.find("Domain", name="acme.com")
         self.assertEqual(live["description"], "Main")
         self.assertEqual(live["catchAllAddress"], "catch@acme.com")
+        self.assertTrue(live["allowRelaying"])  # split delivery for addresses that live elsewhere
 
         # Turning the discovery flag on lists the certificate-bound records from the stored zone.
         self.assertIn("MTA-STS", [r.category for r in domain.transport_security_records])
