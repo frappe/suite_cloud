@@ -79,8 +79,18 @@ def _resolve_site():
     site = frappe.get_cached_doc("Suite Site", name)
     if not site.enabled or site.status != "Active":
         raise SiteSuspendedError(_("Site {0} is {1}.").format(site.name, site.status.lower()))
-    if frappe.session.user == service_user and not site.allows_ip(getattr(frappe.local, "request_ip", None)):
+    request_ip = getattr(frappe.local, "request_ip", None)
+    if frappe.session.user == service_user and not site.allows_ip(request_ip):
         # A key copied out of a site's config is worthless from anywhere but the site's own servers.
+        # Either the key has leaked or the site moved servers; operators need to know which.
+        frappe.log_error(
+            title=f"[Suite Cloud] {site.name}: request from an address outside its allowed list",
+            message=_("Request from {0} to {1}; allowed: {2}").format(
+                request_ip or _("an unknown address"),
+                getattr(getattr(frappe.local, "request", None), "path", None) or "?",
+                ", ".join(site.to_api()["allowed_ips"]),
+            ),
+        )
         raise SiteAddressError(_("Site {0} does not accept requests from this address.").format(site.name))
     return site
 

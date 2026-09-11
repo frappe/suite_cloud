@@ -125,10 +125,16 @@ class TestSiteResolution(SiteApiTestCase):
             self.act_as(self.site)
             frappe.local.request_ip = ip
             self.assertEqual(ping()["site"], self.site.name)
+        logged = frappe.db.count("Error Log")
         for ip in ("203.0.113.11", "192.168.1.1", None, "garbage"):
             self.act_as(self.site)
             frappe.local.request_ip = ip
             self.assertRaisesRegex(SiteAddressError, "does not accept requests", ping)
+        # Each refusal leaves an Error Log naming the site and the address, for operators to act on.
+        self.assertEqual(frappe.db.count("Error Log") - logged, 4)
+        last = frappe.get_last_doc("Error Log")
+        self.assertIn(f"{self.site.name}: request from an address outside", last.method)
+        self.assertIn("garbage", last.error)
 
         # Operators acting for the site from the desk are not the site's server.
         frappe.local.request_ip = "192.168.1.1"
