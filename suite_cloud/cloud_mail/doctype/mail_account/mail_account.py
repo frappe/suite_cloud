@@ -38,9 +38,9 @@ class MailAccount(QuotaHolder, Document):
 
     if TYPE_CHECKING:
         from frappe.types import DF
-
         from suite_cloud.cloud_mail.doctype.mail_address_alias.mail_address_alias import MailAddressAlias
         from suite_cloud.cloud_mail.doctype.mail_group_member.mail_group_member import MailGroupMember
+        from suite_cloud.cloud_mail.doctype.mail_quota.mail_quota import MailQuota
 
         aliases: DF.Table[MailAddressAlias]
         api_key: DF.Password | None
@@ -54,10 +54,10 @@ class MailAccount(QuotaHolder, Document):
         groups: DF.TableMultiSelect[MailGroupMember]
         locale: DF.Data | None
         new_password: DF.Password | None
+        quotas: DF.Table[MailQuota]
         site: DF.Link | None
         stalwart_id: DF.Data | None
         time_zone: DF.Data | None
-        used_disk_bytes: DF.Int
     # end: auto-generated types
 
     # --- lifecycle --------------------------------------------------------------
