@@ -1,0 +1,133 @@
+name: Suite Cloud CI
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-latest
+
+    # One runner per deployment type. Core covers what every hosted product shares (sites,
+    # zones, settings); each product's tests live in its own module folder and get a runner
+    # of their own, so a Cloud Meet leg is one more row here.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Core
+            tests: suite_cloud/tests
+          - name: Mail
+            tests: suite_cloud/cloud_mail/tests
+
+    services:
+      redis-cache:
+        image: redis:alpine
+        ports:
+          - 13000:6379
+      redis-queue:
+        image: redis:alpine
+        ports:
+          - 11000:6379
+      mariadb:
+        image: mariadb:10.6
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: --health-cmd="mariadb-admin ping" --health-interval=5s --health-timeout=2s --health-retries=3
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          check-latest: true
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/uv
+          key: ${{ runner.os }}-pip-${{ hashFiles('**/pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install MariaDB Client
+        run: |
+          sudo apt update
+          sudo apt-get install -y mariadb-client
+
+      - name: Setup Bench
+        run: |
+          pip install frappe-bench
+          bench init --skip-redis-config-generation --skip-assets --python "$(which python)" ~/frappe-bench
+          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL character_set_server = 'utf8mb4'"
+          mariadb --host 127.0.0.1 --port 3306 -u root -proot -e "SET GLOBAL collation_server = 'utf8mb4_unicode_ci'"
+
+      - name: Install Suite Cloud
+        working-directory: /home/runner/frappe-bench
+        run: |
+          bench get-app suite_cloud "$GITHUB_WORKSPACE" --skip-assets
+          bench setup requirements --dev
+          bench new-site --db-root-password root --admin-password admin test_site
+          bench --site test_site install-app suite_cloud
+        env:
+          CI: "Yes"
+
+      - name: Run ${{ matrix.name }} Tests
+        working-directory: /home/runner/frappe-bench
+        run: |
+          bench --site test_site set-config allow_tests true
+          status=0
+          for file in "$GITHUB_WORKSPACE"/${{ matrix.tests }}/test_*.py; do
+            rel="${file#"$GITHUB_WORKSPACE"/}"
+            module="$(echo "${rel%.py}" | tr / .)"
+            echo "::group::$module"
+            bench --site test_site run-tests --app suite_cloud --module "$module" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
+        env:
+          TYPE: server
+
+  lint:
+    name: Ruff
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Clone
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Install Ruff
+        run: pip install ruff==0.14.10
+
+      - name: Check
+        run: |
+          ruff check .
+          ruff format --check .

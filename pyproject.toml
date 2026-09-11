@@ -3,15 +3,16 @@ name = "suite_cloud"
 authors = [
     { name = "Frappe Technologies Pvt Ltd", email = "developers@frappe.io" },
 ]
-description = "Deploys and manages the infrastructure behind Frappe Suite: Stalwart mail servers today, with clusters, DNS records and Ansible-driven deployments."
+description = "Deploys and manages Stalwart mail clusters for Frappe Suite sites: clusters, nodes, DNS, egress gateways and a per-site directory API."
 readme = "README.md"
 requires-python = ">=3.14,<3.15"
 dynamic = ["version"]
 dependencies = [
-    "paramiko~=5.0.0",  # SSH: Server Job, Mail Server checks, cluster keypairs
     "dnspython~=2.6.1",  # DNS Record verification, hostname lookups
     "dns-lexicon~=3.20.1",  # DNS provider API (Route53, Cloudflare, ...)
-    "ansible-runner~=2.4.1",  # Server Ansible Play
+    "ansible-runner~=2.4.1",  # Server Job playbooks over SSH
+    "cryptography>=42",  # ed25519 SSH keypairs for clusters
+    "PyYAML>=6",  # reading playbooks to pre-create task rows
 ]
 
 [build-system]
@@ -24,7 +25,7 @@ frappe = ">=16.0.0,<18.0.0"
 # Installed from Ubuntu repositories when the app is hosted on Frappe Cloud
 [deploy.dependencies.apt]
 packages = [
-    "ansible",  # ansible-runner drives it for server deployments
+    "ansible",  # ansible-runner drives it for node provisioning
 ]
 
 [tool.ruff]

@@ -1,0 +1,122 @@
+import frappe
+
+from suite_cloud.api.site import current_site, owned, owned_names, site_api
+from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import domain_payloads
+from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_available, validate_domain_name
+from suite_cloud.cloud_mail.tenancy.ownership import ownership_record
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+@site_api
+def list_domains() -> list[dict]:
+    return domain_payloads(owned_names("Mail Domain"))
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+@site_api
+def get_domain(domain: str) -> dict:
+    return owned("Mail Domain", domain).to_api()
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+@site_api
+def check_domain(domain: str) -> dict:
+    """Whether the domain can be added, and the record the site must publish to prove it owns it.
+
+    Nothing is stored: the site shows the record to its admin and calls ``create_domain`` once it
+    is published. The record is the same for every domain the site ever adds.
+    """
+
+    site = current_site()
+    domain = validate_domain_name(domain)
+    assert_domain_available(domain, site.name)
+    return {"domain": domain, "ownership_record": ownership_record(site, domain)}
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def create_domain(
+    domain: str,
+    description: str | None = None,
+    catch_all_address: str | None = None,
+    sub_addressing: bool = True,
+    allow_relaying: bool = False,
+    publish_client_discovery_records: bool = False,
+) -> dict:
+    """Adds the domain once its ownership record resolves; until then the error names the record."""
+
+    doc = frappe.get_doc(
+        {
+            "doctype": "Mail Domain",
+            "domain_name": domain,
+            "site": current_site().name,
+            "description": description,
+            "catch_all_address": catch_all_address,
+            "sub_addressing": int(bool(sub_addressing)),
+            "allow_relaying": int(bool(allow_relaying)),
+            "publish_client_discovery_records": int(bool(publish_client_discovery_records)),
+        }
+    )
+    doc.insert(ignore_permissions=True)
+    frappe.local.response["http_status_code"] = 201
+    return doc.to_api()
+
+
+@frappe.whitelist(methods=["POST", "PUT"])
+@site_api
+def update_domain(
+    domain: str,
+    description: str | None = None,
+    catch_all_address: str | None = None,
+    sub_addressing: bool | None = None,
+    allow_relaying: bool | None = None,
+    publish_client_discovery_records: bool | None = None,
+    enabled: bool | None = None,
+) -> dict:
+    doc = owned("Mail Domain", domain)
+    if description is not None:
+        doc.description = description
+    if catch_all_address is not None:
+        doc.catch_all_address = catch_all_address or None
+    if sub_addressing is not None:
+        doc.sub_addressing = int(bool(sub_addressing))
+    if allow_relaying is not None:
+        doc.allow_relaying = int(bool(allow_relaying))
+    if enabled is not None:
+        doc.enabled = int(bool(enabled))
+    if publish_client_discovery_records is not None:
+        doc.publish_client_discovery_records = int(bool(publish_client_discovery_records))
+    doc.save(ignore_permissions=True)  # a changed discovery flag rebuilds the record tables
+    return doc.to_api()
+
+
+@frappe.whitelist(methods=["POST", "DELETE"])
+@site_api
+def delete_domain(domain: str) -> None:
+    owned("Mail Domain", domain).delete(ignore_permissions=True)
+
+
+@frappe.whitelist(methods=["GET", "POST"])
+@site_api
+def get_dns_records(domain: str) -> dict:
+    return _records(owned("Mail Domain", domain))
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def refresh_dns_records(domain: str) -> dict:
+    """Re-reads the records Stalwart expects (new DKIM selectors after a rotation, for instance)."""
+
+    doc = owned("Mail Domain", domain)
+    doc.refresh_dns_records()
+    return _records(doc)
+
+
+def _records(doc) -> dict:
+    return {"domain": doc.domain_name, "is_verified": bool(doc.is_verified), **doc.records_payload()}
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def verify_dns_records(domain: str) -> dict:
+    return owned("Mail Domain", domain).verify_dns_records()

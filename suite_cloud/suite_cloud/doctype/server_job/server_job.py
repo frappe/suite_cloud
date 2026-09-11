@@ -1,203 +1,271 @@
-# Copyright (c) 2025, Frappe Technologies Pvt. Ltd. and contributors
+# Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-import io
-from uuid import uuid7
+import json
 
 import frappe
-import paramiko
 from frappe import _
 from frappe.model.document import Document
-from frappe.query_builder import Order
 from frappe.utils import cint, now, time_diff_in_seconds
+from frappe.utils.background_jobs import is_job_enqueued
 
+from suite_cloud.provisioning.ansible import PlaybookRun, playbook_path, playbook_task_names
 from suite_cloud.utils import get_config
+
+REDACTED = "***"
 
 
 class ServerJob(Document):
-    def autoname(self) -> None:
-        self.name = str(uuid7())
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+
+        from suite_cloud.suite_cloud.doctype.server_job_task.server_job_task import ServerJobTask
+
+        callback: DF.Data | None
+        changed: DF.Int
+        context: DF.JSON | None
+        duration: DF.Float
+        ended_at: DF.Datetime | None
+        error_log: DF.Code | None
+        failures: DF.Int
+        max_retries: DF.Int
+        ok: DF.Int
+        playbook: DF.Data
+        retries: DF.Int
+        server: DF.DynamicLink
+        server_doctype: DF.Literal["Stalwart Node", "Egress Gateway"]
+        skipped: DF.Int
+        started_at: DF.Datetime | None
+        status: DF.Literal["Pending", "Running", "Success", "Failed"]
+        tasks: DF.Table[ServerJobTask]
+        title: DF.Data
+        unreachable: DF.Int
+        variables: DF.JSON | None
+        variables_builder: DF.Data | None
+    # end: auto-generated types
+
+    # --- lifecycle ------------------------------------------------------------
 
     def validate(self) -> None:
-        self.validate_status()
-        self.validate_server()
-        self.validate_commands()
+        self.status = self.status or "Pending"
+        playbook_path(self.playbook)  # throws when the playbook does not exist
+        if self.is_new() and not self.tasks:
+            for task in playbook_task_names(self.playbook):
+                self.append("tasks", {"task": task, "status": "Pending"})
 
     def after_insert(self) -> None:
+        self.enqueue()
+
+    def enqueue(self) -> None:
         if frappe.flags.do_not_enqueue:
             self.execute()
-        else:
-            frappe.enqueue_doc(
-                self.doctype,
-                self.name,
-                "execute",
-                queue="long",
-                timeout=cint(get_config("server_job_timeout")),
-                enqueue_after_commit=True,
-            )
-
-    def validate_status(self) -> None:
-        """Sets the status to 'Pending' if not set."""
-
-        if not self.status:
-            self.status = "Pending"
-
-    def validate_server(self) -> None:
-        """Validate if the mail server is enabled."""
-
-        if not frappe.db.get_value("Mail Server", self.server, "enabled"):
-            frappe.throw(_("Mail Server {0} is disabled").format(self.server))
-        elif not frappe.db.get_value("Mail Server", self.server, "ssh_verified"):
-            frappe.throw(_("Please verify SSH connection for Mail Server {0}").format(self.server))
-
-    def validate_commands(self) -> None:
-        """Validates that at least one command is provided."""
-
-        if not self.commands:
-            frappe.throw(_("Please add at least one command to execute."))
-
-    def execute(self) -> None:
-        """Executes the commands on the Mail Server via SSH."""
-
-        started_at = now()
-        self._db_set(
-            status="Running",
-            started_at=started_at,
-            ended_at=None,
-            started_after=time_diff_in_seconds(started_at, self.creation),
-            duration=0,
-            success=0,
-            failed=0,
-            error_log=None,
-            commit=True,
-            notify=True,
-        )
-        frappe.db.set_value(
-            "Server Job Command",
-            {"parenttype": self.doctype, "parent": self.name},
-            {
-                "status": "Pending",
-                "started_at": None,
-                "ended_at": None,
-                "duration": 0,
-                "exit_code": 0,
-                "stdout": None,
-                "stderr": None,
-            },
-        )
-
-        kwargs = {}
-        success_count = 0
-        failed_count = 0
-        try:
-            self.validate_server()
-
-            server = frappe.get_doc("Mail Server", self.server)
-            cluster = frappe.get_doc("Mail Cluster", server.cluster)
-            key = paramiko.RSAKey.from_private_key(io.StringIO(cluster.get_password("ssh_private_key")))
-
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            client.connect(
-                hostname=server.hostname, port=server.ssh_port, username=server.ssh_user, pkey=key, timeout=30
-            )
-
-            for command in self.commands:
-                cmd_started_at = now()
-                command._db_set(status="Running", started_at=cmd_started_at, commit=True)
-
-                _stdin, stdout, stderr = client.exec_command(command.command)
-                exit_code = stdout.channel.recv_exit_status()
-
-                cmd_ended_at = now()
-                command._db_set(
-                    status="Success" if exit_code == 0 else "Failed",
-                    ended_at=cmd_ended_at,
-                    exit_code=exit_code,
-                    stdout=stdout.read().decode(),
-                    stderr=stderr.read().decode(),
-                    duration=time_diff_in_seconds(cmd_ended_at, cmd_started_at),
-                    commit=True,
-                )
-
-                if exit_code == 0:
-                    success_count += 1
-                elif not command.ignore_errors:
-                    failed_count += 1
-                    frappe.throw(
-                        _("Command '{0}' failed with exit code {1}").format(
-                            f"{command.command[:20]} ...", exit_code
-                        )
-                    )
-
-            client.close()
-            kwargs["status"] = "Success"
-
-        except Exception:
-            kwargs.update(
-                {
-                    "status": "Failed",
-                    "retries": cint(self.retries) + 1,
-                    "error_log": frappe.get_traceback(with_context=True),
-                }
-            )
-
-        ended_at = now()
-        self._db_set(
-            ended_at=ended_at,
-            duration=time_diff_in_seconds(ended_at, started_at),
-            success=success_count,
-            failed=failed_count,
-            notify=True,
-            **kwargs,
-        )
-
-    @frappe.whitelist()
-    def retry(self) -> None:
-        """Retries a failed job."""
-
-        frappe.only_for("System Manager")
-
-        if self.status != "Failed":
-            frappe.throw(_("Only failed jobs can be retried."))
-
-        self._db_set(status="Pending", notify=True)
+            return
 
         frappe.enqueue_doc(
             self.doctype,
             self.name,
             "execute",
             queue="long",
-            timeout=cint(get_config("server_job_timeout")),
+            timeout=cint(get_config("server_job_timeout")) or 1800,
+            job_id=f"server-job:{self.name}",
+            deduplicate=True,
             enqueue_after_commit=True,
         )
 
-    def _db_set(
-        self,
-        update_modified: bool = True,
-        commit: bool = False,
-        notify: bool = False,
-        **kwargs,
-    ) -> None:
-        """Updates the document with the given key-value pairs."""
+    # --- execution --------------------------------------------------------------
 
-        self.db_set(kwargs, update_modified=update_modified, notify=notify, commit=commit)
+    def execute(self) -> None:
+        """Runs the playbook (blocking; meant for the long queue) and fires the callback."""
+
+        if self.status == "Running" and not self.is_stale():
+            return
+
+        self.mark_running()
+        run = None
+        try:
+            variables = self.build_variables()
+            run = PlaybookRun(self, variables)
+            outcome = run.run()
+        except Exception:
+            # Never with_context: the locals hold the private key, passwords and provider tokens.
+            traceback = frappe.get_traceback()
+            self.mark_finished("Failed", error_log=run.mask(traceback) if run else traceback)
+            self.fire_callback(success=False)
+            return
+
+        self.mark_finished(outcome.status, stats=outcome.stats, error_log=outcome.error_log)
+        self.fire_callback(success=outcome.status == "Success")
+
+    def build_variables(self) -> dict:
+        """Playbook variables come from a builder function so secrets never touch the database."""
+
+        if not self.variables_builder:
+            return {}
+
+        context = json.loads(self.context) if isinstance(self.context, str) else (self.context or {})
+        variables = frappe.get_attr(self.variables_builder)(context)
+        secret_keys = set(variables.pop("__secret_keys__", ()))
+        snapshot = {
+            k: (REDACTED if k in secret_keys else v) for k, v in variables.items() if k != "__secret_values__"
+        }
+        self.db_set("variables", json.dumps(snapshot, indent=2), update_modified=False)
+        return variables
+
+    def get_server(self) -> Document:
+        return frappe.get_doc(self.server_doctype, self.server)
+
+    def fire_callback(self, success: bool) -> None:
+        if not self.callback:
+            return
+
+        method = self.callback if success else f"{self.callback}_failed"
+        try:
+            server = self.get_server()
+        except frappe.DoesNotExistError:
+            return  # the server was deleted while the job ran; nothing left to update
+        if not hasattr(server, method):
+            return
+
+        # The callback's partial work is discarded on failure so the job's Failed state is consistent.
+        frappe.db.savepoint("server_job_callback")
+        try:
+            getattr(server, method)(self)
+        except Exception:
+            try:
+                frappe.db.rollback(save_point="server_job_callback")
+            except Exception:
+                frappe.db.rollback()  # the callback committed and released the savepoint
+            self.log_error(f"Server Job callback {method} failed")
+            if success:
+                self.mark_finished("Failed", error_log=frappe.get_traceback())
+                self.fire_callback(success=False)
+
+    # --- state -----------------------------------------------------------------
+
+    def mark_running(self) -> None:
+        self.db_set(
+            {"status": "Running", "started_at": now(), "ended_at": None, "error_log": None},
+            update_modified=False,
+            commit=should_commit(),
+            notify=True,
+        )
+        self.reload()
+
+    def mark_finished(self, status: str, stats: dict | None = None, error_log: str | None = None) -> None:
+        ended_at = now()
+        values = {
+            "status": status,
+            "ended_at": ended_at,
+            "duration": time_diff_in_seconds(ended_at, self.started_at or ended_at),
+            "error_log": error_log,
+        }
+        if stats:
+            values.update(
+                {k: cint(stats.get(k)) for k in ("ok", "changed", "failures", "unreachable", "skipped")}
+            )
+        if status == "Failed":
+            values["retries"] = cint(self.retries) + 1
+        self.db_set(values, update_modified=False, commit=should_commit(), notify=True)
+        self.reload()
+
+    def is_superseded(self) -> bool:
+        """A newer job for the same server, or a deleted server, makes an automatic retry harmful."""
+
+        if not frappe.db.exists(self.server_doctype, self.server):
+            return True
+        return bool(
+            frappe.db.exists(
+                "Server Job",
+                {
+                    "server_doctype": self.server_doctype,
+                    "server": self.server,
+                    "creation": [">", self.creation],
+                },
+            )
+        )
+
+    def is_stale(self) -> bool:
+        """A job still marked Running after the worker timeout lost its worker (kill, deploy, OOM)."""
+
+        if self.status != "Running" or not self.started_at:
+            return False
+        timeout = cint(get_config("server_job_timeout")) or 1800
+        return time_diff_in_seconds(now(), self.started_at) > timeout
+
+    @frappe.whitelist()
+    def retry(self) -> None:
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        if self.status != "Failed" and not self.is_stale():
+            frappe.throw(_("Only failed (or stale running) jobs can be retried."))
+
+        for task in self.tasks:
+            task.db_set(
+                {
+                    "status": "Pending",
+                    "started_at": None,
+                    "ended_at": None,
+                    "duration": 0,
+                    "stdout": None,
+                    "stderr": None,
+                    "exception": None,
+                    "result": None,
+                },
+                update_modified=False,
+            )
+        self.db_set({"status": "Pending", "error_log": None}, update_modified=False)
+        self.enqueue()
+
+
+def should_commit() -> bool:
+    """Progress is committed as it happens so the desk can follow along; tests keep their rollback."""
+
+    return not frappe.in_test
+
+
+def create_server_job(
+    server: Document,
+    playbook: str,
+    title: str,
+    context: dict | None = None,
+    variables_builder: str | None = None,
+    callback: str | None = None,
+    max_retries: int = 1,
+) -> ServerJob:
+    job = frappe.new_doc("Server Job")
+    job.title = title
+    job.server_doctype = server.doctype
+    job.server = server.name
+    job.playbook = playbook
+    job.context = json.dumps(context or {})
+    job.variables_builder = variables_builder
+    job.callback = callback
+    job.max_retries = max_retries
+    job.insert(ignore_permissions=True)
+    return job
 
 
 def retry_failed_jobs() -> None:
-    """Called by the scheduler to retry failed jobs."""
+    """Cron: retries failed jobs with attempts left, and jobs whose worker vanished."""
 
-    JOB = frappe.qb.DocType("Server Job")
-    jobs = (
-        frappe.qb.from_(JOB)
-        .select(JOB.name)
-        .where((JOB.status == "Failed") & (JOB.retries > 0) & (JOB.retries < JOB.max_retries))
-        .orderby(JOB.creation, order=Order.asc)
-    ).run(pluck="name")
-
-    if not jobs:
-        return
-
-    for job in jobs:
-        doc = frappe.get_doc("Server Job", job)
-        doc.retry()
+    jobs = frappe.get_all(
+        "Server Job",
+        filters={"status": ["in", ["Failed", "Running", "Pending"]]},
+        fields=["name", "status", "retries", "max_retries", "started_at", "creation"],
+    )
+    timeout = cint(get_config("server_job_timeout")) or 1800
+    for row in jobs:
+        job = frappe.get_doc("Server Job", row.name)
+        if job.is_superseded():
+            continue
+        if job.status == "Failed" and job.retries <= job.max_retries:
+            job.retry()
+        elif job.status == "Running" and job.is_stale():
+            job.retry()
+        elif job.status == "Pending" and time_diff_in_seconds(now(), job.creation) > 2 * timeout:
+            if not is_job_enqueued(f"server-job:{job.name}"):
+                job.enqueue()

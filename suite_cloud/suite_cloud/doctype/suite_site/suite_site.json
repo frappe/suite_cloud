@@ -1,0 +1,274 @@
+{
+ "actions": [],
+ "autoname": "field:site_name",
+ "creation": "2026-09-03 12:00:00",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "site_name",
+  "title",
+  "contact_email",
+  "cluster",
+  "fc_reference",
+  "column_break_main",
+  "enabled",
+  "status",
+  "archived_at",
+  "limits_section",
+  "max_domains",
+  "max_accounts",
+  "max_groups",
+  "max_mailing_lists",
+  "column_break_limits",
+  "egress_pool",
+  "max_disk_gb",
+  "default_disk_quota_gb",
+  "access_section",
+  "api_key",
+  "api_secret",
+  "allowed_ips",
+  "column_break_access",
+  "user",
+  "domain_verification_token"
+ ],
+ "fields": [
+  {
+   "description": "The Frappe Cloud site domain, e.g. acme.frappe.cloud. Lowercased on save and used as the record name; it cannot change afterwards.",
+   "fieldname": "site_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Site Name",
+   "reqd": 1,
+   "set_only_once": 1,
+   "unique": 1
+  },
+  {
+   "description": "Display name shown in lists and links, e.g. Acme Corp. Defaults to the site name.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
+  {
+   "description": "Where site-specific notices go, such as downtime or a domain losing verification. Set and updated by Frappe Cloud.",
+   "fieldname": "contact_email",
+   "fieldtype": "Data",
+   "label": "Contact Email",
+   "options": "Email"
+  },
+  {
+   "description": "The Stalwart cluster hosting every mail domain and account of the site. Fixed once the site exists; the cluster must be active at creation.",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "reqd": 1,
+   "search_index": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Frappe Cloud's own identifier for the site, passed at creation. Only for cross-referencing; nothing here depends on it.",
+   "fieldname": "fc_reference",
+   "fieldtype": "Data",
+   "label": "Frappe Cloud Reference"
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Unchecked, the site's API key stops authenticating. Archive clears it and Resume sets it again; Suspend leaves it checked so the site gets a 403 naming the suspension instead of a bare 401.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled"
+  },
+  {
+   "default": "Active",
+   "description": "Active serves the API. Suspended keeps the key valid but answers every request with a 403 naming the suspension. Archived is final and required before deletion.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Active\nSuspended\nArchived",
+   "read_only": 1
+  },
+  {
+   "description": "When the site was archived. Set by the Archive action; the site cannot be resumed after this.",
+   "fieldname": "archived_at",
+   "fieldtype": "Datetime",
+   "label": "Archived At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "limits_section",
+   "fieldtype": "Section Break",
+   "label": "Limits"
+  },
+  {
+   "default": "10",
+   "description": "Mail Domains the site may hold. Adding one beyond the limit fails. 0 means unlimited.",
+   "fieldname": "max_domains",
+   "fieldtype": "Int",
+   "label": "Max Domains"
+  },
+  {
+   "default": "500",
+   "description": "Mail Accounts the site may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
+   "fieldname": "max_accounts",
+   "fieldtype": "Int",
+   "label": "Max Accounts"
+  },
+  {
+   "default": "50",
+   "description": "Mail Groups the site may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
+   "fieldname": "max_groups",
+   "fieldtype": "Int",
+   "label": "Max Groups"
+  },
+  {
+   "default": "50",
+   "description": "Mailing Lists the site may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
+   "fieldname": "max_mailing_lists",
+   "fieldtype": "Int",
+   "label": "Max Mailing Lists"
+  },
+  {
+   "fieldname": "column_break_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Total disk the site may allocate, in gigabytes: the quotas of its accounts and groups together may not exceed it. 0 means unlimited. Every account and group still needs a quota of its own.",
+   "fieldname": "max_disk_gb",
+   "fieldtype": "Float",
+   "label": "Total Disk Quota (GB)"
+  },
+  {
+   "default": "5",
+   "description": "Disk quota given to accounts and groups created without one, in gigabytes. Must be above 0 and within the total disk quota. Existing ones keep their own quota.",
+   "fieldname": "default_disk_quota_gb",
+   "fieldtype": "Float",
+   "label": "Default Disk Quota (GB)"
+  },
+  {
+   "fieldname": "access_section",
+   "fieldtype": "Section Break",
+   "label": "API Access"
+  },
+  {
+   "description": "Sent by the site as Authorization: token key:secret with Frappe-Authorization-Source: Suite Site. Generated at creation and never changes.",
+   "fieldname": "api_key",
+   "fieldtype": "Data",
+   "label": "API Key",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "description": "Stored encrypted and shown once, at creation or after Rotate Secret. Rotating it invalidates the previous secret immediately.",
+   "fieldname": "api_secret",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "API Secret"
+  },
+  {
+   "description": "One per line: the IPv4 or IPv6 addresses, or CIDR ranges, the site's server sends from, as Frappe Cloud reports them. Set, only requests from these addresses may use the site's key; a leaked key is useless elsewhere. Blank accepts any address.",
+   "fieldname": "allowed_ips",
+   "fieldtype": "Small Text",
+   "label": "Allowed IP Addresses"
+  },
+  {
+   "fieldname": "column_break_access",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Requests authenticated with the site's key run as this service user. Taken from Suite Cloud Settings on every save.",
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "Service User",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "description": "Outbound mail of this site's domains leaves through this pool instead of the cluster default. A domain may name its own pool. The pool must belong to the site's cluster.",
+   "fieldname": "egress_pool",
+   "fieldtype": "Link",
+   "label": "Egress Pool",
+   "options": "Egress IP Pool"
+  },
+  {
+   "description": "Proves the site owns a domain before the domain is added: the site publishes a TXT record at the domain's apex with the value frappe-suite-verification= followed by this token. Fixed for the life of the site, so every domain it adds asks for the same record.",
+   "fieldname": "domain_verification_token",
+   "fieldtype": "Data",
+   "label": "Domain Verification Token",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "group": "Directory",
+   "link_doctype": "Mail Domain",
+   "link_fieldname": "site"
+  },
+  {
+   "group": "Directory",
+   "link_doctype": "Mail Account",
+   "link_fieldname": "site"
+  },
+  {
+   "group": "Directory",
+   "link_doctype": "Mail Group",
+   "link_fieldname": "site"
+  },
+  {
+   "group": "Directory",
+   "link_doctype": "Mailing List",
+   "link_fieldname": "site"
+  }
+ ],
+ "modified": "2026-09-08 19:40:00.000000",
+ "modified_by": "Administrator",
+ "module": "Suite Cloud",
+ "name": "Suite Site",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Suite Cloud Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1,
+ "title_field": "title",
+ "show_title_field_in_link": 1
+}

@@ -5,16 +5,21 @@ from typing import Any
 
 import frappe
 from frappe import _
+from frappe.utils import cint
 from frappe.utils.caching import request_cache
 
 CONFIG_KEYS = (
-    "root_domain_name",
     "default_dns_ttl",
+    "public_url",
+    "site_service_user",
     "stalwart_version",
     "stalwart_cli_version",
-    "ansible_play_timeout",
+    "stalwart_download_url_template",
+    "stalwart_cli_download_url_template",
+    "acme_directory_url",
+    "acme_contact_email",
     "server_job_timeout",
-    "server_deployment_timeout",
+    "sign_with_ed25519",
 )
 
 
@@ -28,7 +33,11 @@ def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tup
 
     site_conf = frappe.conf.suite_cloud or {}
     settings = frappe.get_cached_doc("Suite Cloud Settings")
-    config = {field: settings.get(field) or site_conf.get(field) for field in CONFIG_KEYS}
+    config = {}
+    for field in CONFIG_KEYS:
+        value = settings.get(field)
+        # Only an unset value falls through, so a deliberate 0 in settings still wins.
+        config[field] = site_conf.get(field) if value in (None, "") else value
 
     if not key:
         return config
@@ -39,6 +48,41 @@ def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tup
             frappe.throw(_("Suite Cloud config key '{0}' not found").format(k))
 
     return tuple(config[k] for k in keys) if len(keys) > 1 else config[keys[0]]
+
+
+def dkim_algorithms() -> tuple[str, ...]:
+    """The key types Stalwart generates for a domain registered now: RSA always, Ed25519 by choice.
+
+    Read at registration time only; Stalwart keeps the algorithms a domain was created with.
+    """
+
+    from suite_cloud.cloud_mail.stalwart.directory import DKIM_ED25519, DKIM_RSA
+
+    return (DKIM_ED25519, DKIM_RSA) if cint(get_config("sign_with_ed25519")) else (DKIM_RSA,)
+
+
+def get_public_url() -> str:
+    """Returns the URL other systems use to reach this Suite Cloud site."""
+
+    return (get_config("public_url") or frappe.utils.get_url()).rstrip("/")
+
+
+def utc_iso(value) -> str | None:
+    """A stored datetime as an aware UTC string (``2026-09-09T10:00:00Z``) for API payloads.
+
+    Frappe stores naive system-time values; handing them out naive lets a site in another time
+    zone read them as its own local time and show them hours off.
+    """
+
+    if not value:
+        return None
+    from datetime import UTC
+    from zoneinfo import ZoneInfo
+
+    moment = frappe.utils.get_datetime(value)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=ZoneInfo(frappe.utils.get_system_timezone()))
+    return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def password_or_none(doc, field: str) -> str | None:
@@ -126,3 +170,26 @@ def reconnect_on_failure(max_retries: int = 3) -> Callable:
 def is_connection_error(exception: Exception) -> bool:
     operational_error = getattr(frappe.db, "OperationalError", ())
     return frappe.db.is_interface_error(exception) or isinstance(exception, operational_error)
+
+
+def child_rows(doctype: str, parenttype: str, parents: list[str], fields: list[str]) -> dict[str, list]:
+    """``{parent: [rows]}`` for a child table of many parents at once, rows in their saved order.
+
+    A page of documents would otherwise cost one query per document per child table.
+    """
+
+    rows: dict[str, list] = {parent: [] for parent in parents}
+    if not parents:
+        return rows
+    for row in frappe.get_all(
+        doctype,
+        filters={"parenttype": parenttype, "parent": ["in", parents]},
+        fields=["parent", *fields],
+        order_by="parent asc, idx asc",
+    ):
+        rows[row.parent].append(row)
+    return rows
+
+
+def alias_payloads(rows: list) -> list[dict]:
+    return [{"email": r.alias_email, "enabled": bool(r.enabled), "description": r.description} for r in rows]

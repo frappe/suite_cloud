@@ -4,152 +4,73 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "dns_tab",
-  "section_break_hrww",
-  "root_domain_name",
-  "column_break_4ccc",
-  "default_dns_ttl",
-  "dns_provider_section",
-  "dns_provider",
-  "column_break_pntn",
-  "dns_provider_zone_id",
-  "dns_provider_access_key",
-  "dns_provider_access_secret",
-  "dns_provider_key",
-  "dns_provider_secret",
-  "dns_provider_username",
-  "dns_provider_client_ip",
-  "dns_provider_token",
-  "dns_provider_private_zone",
+  "general_tab",
+  "suite_cloud_section",
+  "public_url",
+  "column_break_general",
+  "site_service_user",
+  "jobs_section",
+  "server_job_timeout",
   "stalwart_tab",
+  "versions_section",
   "stalwart_version",
+  "stalwart_download_url_template",
   "column_break_stalwart",
   "stalwart_cli_version",
-  "timeouts_tab",
-  "timeouts_seconds_section",
-  "ansible_play_timeout",
-  "column_break_timeouts_1",
-  "server_job_timeout",
-  "column_break_timeouts_2",
-  "server_deployment_timeout"
+  "stalwart_cli_download_url_template",
+  "dkim_section",
+  "sign_with_ed25519",
+  "certificates_tab",
+  "acme_section",
+  "acme_directory_url",
+  "column_break_acme",
+  "acme_contact_email",
+  "dns_tab",
+  "dns_section",
+  "default_dns_ttl"
  ],
  "fields": [
   {
-   "fieldname": "dns_tab",
+   "fieldname": "general_tab",
    "fieldtype": "Tab Break",
-   "label": "DNS"
+   "label": "General"
   },
   {
-   "fieldname": "section_break_hrww",
-   "fieldtype": "Section Break"
-  },
-  {
-   "description": "The domain name used to create DNS records.",
-   "fieldname": "root_domain_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Root Domain Name",
-   "mandatory_depends_on": "eval: doc.dns_provider",
-   "placeholder": "frappemail.com"
-  },
-  {
-   "fieldname": "column_break_4ccc",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "3600",
-   "fieldname": "default_dns_ttl",
-   "fieldtype": "Int",
-   "label": "Default DNS TTL",
-   "reqd": 1
-  },
-  {
-   "fieldname": "dns_provider_section",
+   "fieldname": "suite_cloud_section",
    "fieldtype": "Section Break",
-   "label": "DNS Provider"
+   "label": "Suite Cloud"
   },
   {
-   "description": "The service provider managing your root domain's DNS records.",
-   "fieldname": "dns_provider",
-   "fieldtype": "Select",
-   "label": "DNS Provider",
-   "options": "\nAmazonRoute53\nDigitalOcean\nCloudflare\nHetzner\nLinode\nNamecheap\nGoDaddy"
+   "description": "Address Frappe Cloud hands to Suite sites so they can reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL.",
+   "fieldname": "public_url",
+   "fieldtype": "Data",
+   "label": "Public URL",
+   "options": "URL"
   },
   {
-   "fieldname": "column_break_pntn",
+   "fieldname": "column_break_general",
    "fieldtype": "Column Break"
   },
   {
-   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\", \"Cloudflare\"].includes(doc.dns_provider)",
-   "description": "Unique identifier for your DNS zone.",
-   "fieldname": "dns_provider_zone_id",
-   "fieldtype": "Data",
-   "label": "Zone ID"
+   "description": "Every request from a Suite site runs as this user. It is created on install and needs no changes.",
+   "fieldname": "site_service_user",
+   "fieldtype": "Link",
+   "label": "Site Service User",
+   "options": "User",
+   "read_only": 1
   },
   {
-   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
-   "description": "Public key used to authenticate API requests.",
-   "fieldname": "dns_provider_access_key",
-   "fieldtype": "Data",
-   "label": "Access Key",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)"
+   "fieldname": "jobs_section",
+   "fieldtype": "Section Break",
+   "label": "Server Jobs"
   },
   {
-   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
-   "description": "Secret key paired with the access key for authentication.",
-   "fieldname": "dns_provider_access_secret",
-   "fieldtype": "Password",
-   "label": "Access Secret",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)",
-   "description": "Key used for authorization with the DNS provider.",
-   "fieldname": "dns_provider_key",
-   "fieldtype": "Data",
-   "label": "Key",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)",
-   "description": "Secret used along with the auth key for secure access.",
-   "fieldname": "dns_provider_secret",
-   "fieldtype": "Password",
-   "label": "Secret",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"GoDaddy\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"Cloudflare\", \"Namecheap\"].includes(doc.dns_provider)",
-   "description": "Account username for the DNS provider.",
-   "fieldname": "dns_provider_username",
-   "fieldtype": "Data",
-   "label": "Username",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)",
-   "description": "IP address whitelisted to make API calls.",
-   "fieldname": "dns_provider_client_ip",
-   "fieldtype": "Data",
-   "label": "Client IP",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"Namecheap\"].includes(doc.dns_provider)"
-  },
-  {
-   "depends_on": "eval: doc.dns_provider && [\"DigitalOcean\", \"Cloudflare\", \"Hetzner\", \"Linode\", \"Namecheap\"].includes(doc.dns_provider)",
-   "description": "The token used to authenticate with your DNS provider.",
-   "fieldname": "dns_provider_token",
-   "fieldtype": "Password",
-   "label": "Token",
-   "mandatory_depends_on": "eval: doc.dns_provider && [\"DigitalOcean\", \"Cloudflare\", \"Hetzner\", \"Linode\", \"Namecheap\"].includes(doc.dns_provider)"
-  },
-  {
-   "default": "0",
-   "depends_on": "eval: doc.dns_provider && [\"AmazonRoute53\"].includes(doc.dns_provider)",
-   "description": "Indicates whether the DNS zone is private.",
-   "fieldname": "dns_provider_private_zone",
-   "fieldtype": "Check",
-   "label": "Private Zone",
-   "options": "0"
+   "default": "1800",
+   "description": "How long an install, bootstrap or upgrade job may run before it is marked failed. Bootstrapping the first node includes waiting for a certificate, so keep this generous. 1800 = 30 minutes.",
+   "fieldname": "server_job_timeout",
+   "fieldtype": "Int",
+   "label": "Server Job Timeout (Seconds)",
+   "reqd": 1
   },
   {
    "fieldname": "stalwart_tab",
@@ -157,10 +78,25 @@
    "label": "Stalwart"
   },
   {
-   "default": "v0.16.16",
+   "fieldname": "versions_section",
+   "fieldtype": "Section Break",
+   "label": "Versions"
+  },
+  {
+   "default": "v0.16.20",
+   "description": "Stalwart release that new clusters install, e.g. v0.16.20. Existing clusters keep their own version until you run Upgrade Nodes on them.",
    "fieldname": "stalwart_version",
    "fieldtype": "Data",
    "label": "Stalwart Version",
+   "reqd": 1
+  },
+  {
+   "default": "https://github.com/stalwartlabs/stalwart/releases/download/{version}/stalwart-{target}.tar.gz",
+   "description": "Where the node downloads the Stalwart archive from. {version} is replaced with the release and {target} with the platform, e.g. x86_64-unknown-linux-gnu.",
+   "fieldname": "stalwart_download_url_template",
+   "fieldtype": "Data",
+   "label": "Stalwart Download URL Template",
+   "length": 255,
    "reqd": 1
   },
   {
@@ -169,57 +105,86 @@
   },
   {
    "default": "v1.0.12",
+   "description": "Release of stalwart-cli installed next to the server, e.g. v1.0.12. Only used on a node while it bootstraps a cluster.",
    "fieldname": "stalwart_cli_version",
    "fieldtype": "Data",
    "label": "Stalwart CLI Version",
    "reqd": 1
   },
   {
-   "fieldname": "timeouts_tab",
-   "fieldtype": "Tab Break",
-   "label": "Timeouts"
+   "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
+   "description": "Where the node downloads the stalwart-cli archive from. Same placeholders as the server URL.",
+   "fieldname": "stalwart_cli_download_url_template",
+   "fieldtype": "Data",
+   "label": "Stalwart CLI Download URL Template",
+   "length": 255,
+   "reqd": 1
   },
   {
-   "collapsible": 1,
-   "collapsible_depends_on": "eval: true",
-   "fieldname": "timeouts_seconds_section",
+   "fieldname": "dkim_section",
    "fieldtype": "Section Break",
-   "label": "Timeouts (Seconds)"
+   "label": "DKIM Signing"
   },
   {
-   "default": "1500",
-   "fieldname": "ansible_play_timeout",
-   "fieldtype": "Int",
-   "label": "Ansible Play Timeout",
+   "default": "0",
+   "description": "Every domain gets an RSA key; check this to add an Ed25519 key as well. Off by default because many receivers still ignore Ed25519 signatures and treat the mail as unsigned. Applies to domains registered on Stalwart after the change, the cluster default domain included; existing domains keep the keys they were created with.",
+   "fieldname": "sign_with_ed25519",
+   "fieldtype": "Check",
+   "label": "Sign with Ed25519 as well as RSA"
+  },
+  {
+   "fieldname": "certificates_tab",
+   "fieldtype": "Tab Break",
+   "label": "Certificates"
+  },
+  {
+   "fieldname": "acme_section",
+   "fieldtype": "Section Break",
+   "label": "Let's Encrypt (ACME)"
+  },
+  {
+   "default": "https://acme-v02.api.letsencrypt.org/directory",
+   "description": "Certificate authority clusters request their TLS certificates from. While testing use https://acme-staging-v02.api.letsencrypt.org/directory to avoid rate limits; staging certificates are not trusted by mail clients.",
+   "fieldname": "acme_directory_url",
+   "fieldtype": "Data",
+   "label": "ACME Directory URL",
+   "length": 255,
    "reqd": 1
   },
   {
-   "fieldname": "column_break_timeouts_1",
+   "fieldname": "column_break_acme",
    "fieldtype": "Column Break"
   },
   {
-   "default": "1500",
-   "fieldname": "server_job_timeout",
-   "fieldtype": "Int",
-   "label": "Server Job Timeout",
-   "reqd": 1
+   "description": "Address the certificate authority writes to about expiring certificates. Used by clusters that do not set their own contact.",
+   "fieldname": "acme_contact_email",
+   "fieldtype": "Data",
+   "label": "ACME Contact Email",
+   "options": "Email"
   },
   {
-   "fieldname": "column_break_timeouts_2",
-   "fieldtype": "Column Break"
+   "fieldname": "dns_tab",
+   "fieldtype": "Tab Break",
+   "label": "DNS"
   },
   {
-   "default": "1500",
-   "fieldname": "server_deployment_timeout",
+   "fieldname": "dns_section",
+   "fieldtype": "Section Break",
+   "label": "Defaults"
+  },
+  {
+   "default": "300",
+   "description": "How long resolvers may cache the records Suite Cloud publishes, used when a DNS Zone sets no TTL of its own. Also suggested to sites for their domain records. 300 keeps node changes quick to roll out.",
+   "fieldname": "default_dns_ttl",
    "fieldtype": "Int",
-   "label": "Server Deployment Timeout",
+   "label": "Default DNS TTL (Seconds)",
    "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-01 12:00:00.000000",
+ "modified": "2026-09-07 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
@@ -232,6 +197,16 @@
    "print": 1,
    "read": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "Suite Cloud Manager",
    "share": 1,
    "write": 1
   }
