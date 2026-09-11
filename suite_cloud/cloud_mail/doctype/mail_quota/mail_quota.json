@@ -10,21 +10,22 @@
  ],
  "fields": [
   {
-   "description": "One of Stalwart's per-account limits. Disk space is set by the Disk Quota field, not here.",
+   "description": "One of Stalwart's per-account limits. Every account and group needs a maxDiskQuota row; the rest are optional.",
    "fieldname": "quota",
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Quota",
-   "options": "maxEmails\nmaxMailboxes\nmaxEmailSubmissions\nmaxEmailIdentities\nmaxParticipantIdentities\nmaxSieveScripts\nmaxPushSubscriptions\nmaxCalendars\nmaxCalendarEvents\nmaxCalendarEventNotifications\nmaxAddressBooks\nmaxContactCards\nmaxFiles\nmaxFolders\nmaxMaskedAddresses\nmaxAppPasswords\nmaxApiKeys\nmaxPublicKeys",
+   "options": "maxDiskQuota\nmaxEmails\nmaxMailboxes\nmaxEmailSubmissions\nmaxEmailIdentities\nmaxParticipantIdentities\nmaxSieveScripts\nmaxPushSubscriptions\nmaxCalendars\nmaxCalendarEvents\nmaxCalendarEventNotifications\nmaxAddressBooks\nmaxContactCards\nmaxFiles\nmaxFolders\nmaxMaskedAddresses\nmaxAppPasswords\nmaxApiKeys\nmaxPublicKeys",
    "reqd": 1
   },
   {
-   "description": "The most the account may hold. Remove the row for no limit.",
+   "description": "The most the account may hold: bytes for maxDiskQuota, a count for the others. Remove an optional row for no limit.",
    "fieldname": "value",
    "fieldtype": "Int",
    "in_list_view": 1,
    "label": "Limit",
-   "reqd": 1
+   "reqd": 1,
+   "length": 20
   }
  ],
  "index_web_pages_for_search": 1,

@@ -5,7 +5,7 @@ import frappe
 from frappe.model.document import Document
 from frappe.utils import flt
 
-from suite_cloud.cloud_mail.stalwart.directory import GB, Group, quotas_payload
+from suite_cloud.cloud_mail.stalwart.directory import Group
 from suite_cloud.cloud_mail.tenancy import quotas, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
@@ -13,11 +13,12 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
     get_site_domain,
     validate_email_address,
 )
+from suite_cloud.cloud_mail.tenancy.quotas import QuotaHolder
 from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
 from suite_cloud.utils import utc_iso
 
 
-class MailGroup(Document):
+class MailGroup(QuotaHolder, Document):
     # begin: auto-generated types
     # This code is auto-generated. Do not modify anything in this block.
 
@@ -31,7 +32,6 @@ class MailGroup(Document):
         aliases: DF.Table[MailAddressAlias]
         cluster: DF.Link | None
         description: DF.Data | None
-        disk_quota_gb: DF.Float
         domain: DF.Link | None
         email: DF.Data
         site: DF.Link | None
@@ -56,10 +56,10 @@ class MailGroup(Document):
         site = frappe.get_cached_doc("Suite Site", self.site)
         if self.is_new():
             site.assert_can_add_group()
+        quotas.validate(self)
         site.validate_quota_of(self)
         assert_address_available(self.email, exclude=(self.doctype, self.name))
         sync.validate_aliases(self)
-        quotas.validate(self)
 
     def after_insert(self) -> None:
         sync.push_create(self, "groups", self.stalwart_payload())
@@ -73,8 +73,8 @@ class MailGroup(Document):
         patch = {}
         if before.description != self.description:
             patch["description"] = self.description
-        if flt(before.disk_quota_gb) != flt(self.disk_quota_gb) or quotas.changed(before, self):
-            patch["quotas"] = quotas_payload(self.disk_quota_bytes(), quotas.as_map(self))
+        if quotas.changed(before, self):
+            patch["quotas"] = self.quota_map()
         if sync.aliases_changed(before, self):
             patch["aliases"] = sync.aliases_payload(self)
         if patch:
@@ -91,12 +91,8 @@ class MailGroup(Document):
             domain_id=sync.domain_stalwart_id(self.domain),
             description=self.description or None,
             aliases=sync.aliases(self),
-            disk_quota_bytes=self.disk_quota_bytes(),
-            quotas=quotas.as_map(self),
+            quotas=self.quota_map(),
         )
-
-    def disk_quota_bytes(self) -> int | None:
-        return int(flt(self.disk_quota_gb) * GB) if flt(self.disk_quota_gb) > 0 else None
 
     def member_emails(self) -> list[str]:
         return frappe.get_all(
@@ -112,8 +108,8 @@ class MailGroup(Document):
             "email": self.email,
             "domain": self.domain,
             "description": self.description,
-            "disk_quota_gb": flt(self.disk_quota_gb),
-            "quotas": quotas.as_map(self),
+            "disk_quota_gb": self.allotted_disk_gb(),
+            "quotas": self.quota_map(),
             "used_disk_bytes": used_disk_bytes,
             "aliases": [
                 {"email": a.alias_email, "enabled": bool(a.enabled), "description": a.description}

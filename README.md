@@ -163,12 +163,15 @@ site may carry a total disk quota; when it does, the quotas of its accounts and 
 not exceed it, and a create or quota increase beyond the remaining room is refused. Domains,
 accounts, groups and lists are counted against the site's other limits the same way.
 
-Stalwart's other per-account limits (messages, mailboxes, Sieve scripts, calendars, contact cards,
-app passwords and so on) are rows on the Mail Account and Mail Group, and travel as `quotas`, an
-object of quota name to limit, on `create_account`, `update_account`, `create_group` and
-`update_group`. On update the object replaces the whole set, so `{}` lifts every such limit.
-`get_account_options` lists the names the cluster accepts. Disk space is never one of them: it has
-its own field so the site total can be validated.
+Every quota an account or group has is a Mail Quota row: Stalwart's `StorageQuota` names with a
+limit. `maxDiskQuota` (bytes) is the one row every account and group must have; it defaults to the
+site's default quota and is what the site's total is checked against. The others (messages,
+mailboxes, Sieve scripts, calendars, contact cards, app passwords and so on) are optional counts.
+The API shows them as `quotas`, an object of name to limit, next to `disk_quota_gb`, the disk row
+in GB. `create_account`, `update_account`, `create_group` and `update_group` take both: `quotas`
+replaces the optional rows (`{}` lifts them all) and keeps the disk row unless it names
+`maxDiskQuota`; `disk_quota_gb` sets the disk row in GB. `get_account_options` lists the optional
+names the cluster accepts.
 
 `create_account` needs a password of at least 8 characters and returns, once, an app password
 minted for the account; the site uses it for that account's mail access. `rotate_app_password`

@@ -12,7 +12,7 @@ from frappe.utils.password import set_encrypted_password
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import get_account_client
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
-from suite_cloud.cloud_mail.stalwart.directory import GB, Account, quotas_payload
+from suite_cloud.cloud_mail.stalwart.directory import Account
 from suite_cloud.cloud_mail.tenancy import quotas, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
@@ -20,6 +20,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
     get_site_domain,
     validate_email_address,
 )
+from suite_cloud.cloud_mail.tenancy.quotas import QuotaHolder
 from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
 from suite_cloud.utils import utc_iso
 
@@ -29,7 +30,7 @@ STORED_CREDENTIALS = {"app_password": "app_passwords", "api_key": "api_keys"}
 MIN_PASSWORD_LENGTH = 8
 
 
-class MailAccount(Document):
+class MailAccount(QuotaHolder, Document):
     # begin: auto-generated types
     # This code is auto-generated. Do not modify anything in this block.
 
@@ -46,7 +47,6 @@ class MailAccount(Document):
         app_password: DF.Password | None
         cluster: DF.Link | None
         description: DF.Data | None
-        disk_quota_gb: DF.Float
         display_name: DF.Data | None
         domain: DF.Link | None
         email: DF.Data
@@ -83,10 +83,10 @@ class MailAccount(Document):
         site = frappe.get_cached_doc("Suite Site", self.site)
         if self.is_new():
             site.assert_can_add_account()
+        quotas.validate(self)
         site.validate_quota_of(self)
         assert_address_available(self.email, exclude=(self.doctype, self.name))
         sync.validate_aliases(self)
-        quotas.validate(self)
         self.validate_groups()
         self.take_password()
 
@@ -131,8 +131,8 @@ class MailAccount(Document):
             patch["locale"] = self.locale
         if before.time_zone != self.time_zone:
             patch["timeZone"] = self.time_zone
-        if flt(before.disk_quota_gb) != flt(self.disk_quota_gb) or quotas.changed(before, self):
-            patch["quotas"] = quotas_payload(self.disk_quota_bytes(), quotas.as_map(self))
+        if quotas.changed(before, self):
+            patch["quotas"] = self.quota_map()
         if sync.aliases_changed(before, self):
             patch["aliases"] = sync.aliases_payload(self)
         if sorted(r.group for r in before.groups) != sorted(r.group for r in self.groups):
@@ -159,12 +159,8 @@ class MailAccount(Document):
             description=self.display_name or None,
             locale=self.locale or "en-US",
             time_zone=self.time_zone or None,
-            disk_quota_bytes=self.disk_quota_bytes(),
-            quotas=quotas.as_map(self),
+            quotas=self.quota_map(),
         )
-
-    def disk_quota_bytes(self) -> int | None:
-        return int(flt(self.disk_quota_gb) * GB) if flt(self.disk_quota_gb) > 0 else None
 
     def push_enabled(self) -> None:
         """Disabled accounts keep receiving mail but lose every other permission via a cluster role."""
@@ -296,8 +292,8 @@ class MailAccount(Document):
             "enabled": bool(self.enabled),
             "display_name": self.display_name,
             "description": self.description,
-            "disk_quota_gb": flt(self.disk_quota_gb),
-            "quotas": quotas.as_map(self),
+            "disk_quota_gb": self.allotted_disk_gb(),
+            "quotas": self.quota_map(),
             "used_disk_bytes": self.fetch_used_disk_bytes() if with_usage else used_disk_bytes,
             "locale": self.locale,
             "time_zone": self.time_zone,

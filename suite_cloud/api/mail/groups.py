@@ -41,11 +41,10 @@ def create_group(
             "email": email,
             "site": current_site().name,
             "description": description,
-            "disk_quota_gb": disk_quota_gb,
-            "quotas": quota_rows.as_rows(quotas),
             "aliases": as_alias_rows(aliases),
         }
     )
+    quota_rows.apply(doc, disk_quota_gb, quotas)
     doc.insert(ignore_permissions=True)
     if member_names:
         _set_members(doc, member_names)
@@ -61,15 +60,13 @@ def update_group(
     disk_quota_gb: float | None = None,
     quotas: dict | str | None = None,
 ) -> dict:
-    """``quotas`` replaces the whole set of other limits; pass ``{}`` to lift them all."""
+    """``quotas`` replaces the optional limits (``{}`` lifts them all); the disk quota stays unless
+    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it."""
 
     doc = owned("Mail Group", email)
     if description is not None:
         doc.description = description
-    if disk_quota_gb is not None:
-        doc.disk_quota_gb = disk_quota_gb
-    if quotas is not None:
-        doc.set("quotas", quota_rows.as_rows(quotas))
+    quota_rows.apply(doc, disk_quota_gb, quotas)
     doc.save(ignore_permissions=True)
     return doc.to_api()
 

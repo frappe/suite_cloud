@@ -64,11 +64,13 @@ def get_quotas(emails: list[str] | str) -> dict:
     rows = frappe.get_all(
         "Mail Account",
         filters={"site": current_site().name, "name": ["in", wanted]},
-        fields=["name", "disk_quota_gb", "stalwart_id", "cluster"],
+        fields=["name", "stalwart_id", "cluster"],
     )
+    allotted = quota_rows.disk_quota_gb_by_name("Mail Account", [row.name for row in rows])
     usage = used_disk_by_name(rows)
     return {
-        row.name: {"disk_quota_gb": row.disk_quota_gb, "used_disk_bytes": usage.get(row.name)} for row in rows
+        row.name: {"disk_quota_gb": allotted.get(row.name, 0), "used_disk_bytes": usage.get(row.name)}
+        for row in rows
     }
 
 
@@ -100,14 +102,13 @@ def create_account(
             "site": site.name,
             "display_name": display_name,
             "description": description,
-            "disk_quota_gb": disk_quota_gb,
-            "quotas": quota_rows.as_rows(quotas),
             "locale": locale or "en-US",
             "time_zone": time_zone,
             "aliases": as_alias_rows(aliases),
             "groups": [{"group": owned("Mail Group", g).name} for g in as_list(groups)],
         }
     )
+    quota_rows.apply(doc, disk_quota_gb, quotas)
     doc.flags.password = password
     doc.insert(ignore_permissions=True)
 
@@ -137,20 +138,19 @@ def update_account(
     locale: str | None = None,
     time_zone: str | None = None,
 ) -> dict:
-    """``quotas`` replaces the whole set of other limits; pass ``{}`` to lift them all."""
+    """``quotas`` replaces the optional limits (``{}`` lifts them all); the disk quota stays unless
+    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it."""
 
     doc = owned("Mail Account", email)
     for field, value in {
         "display_name": display_name,
         "description": description,
-        "disk_quota_gb": disk_quota_gb,
         "locale": locale,
         "time_zone": time_zone,
     }.items():
         if value is not None:
             doc.set(field, value)
-    if quotas is not None:
-        doc.set("quotas", quota_rows.as_rows(quotas))
+    quota_rows.apply(doc, disk_quota_gb, quotas)
     doc.save(ignore_permissions=True)
     return doc.to_api()
 

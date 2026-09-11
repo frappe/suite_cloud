@@ -73,7 +73,7 @@ DISK_QUOTA = "maxDiskQuota"
 def quotas_payload(disk_quota_bytes: int | None, other: dict[str, int] | None = None) -> dict:
     """The full ``quotas`` map: disk space from the quota field, everything else from ``other``."""
 
-    payload = {k: int(v) for k, v in (other or {}).items() if k != DISK_QUOTA and int(v) > 0}
+    payload = {k: int(v) for k, v in (other or {}).items() if int(v) > 0}
     if disk_quota_bytes:
         payload[DISK_QUOTA] = int(disk_quota_bytes)
     return payload

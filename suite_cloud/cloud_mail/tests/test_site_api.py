@@ -279,26 +279,42 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(domains.list_domains(), [])
         self.assertEqual(self.fake.all("Domain"), [])
 
-    def test_other_quotas_travel_as_a_map(self) -> None:
+    def test_quotas_travel_as_a_map_with_disk_always_present(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")
+        default_bytes = int(self.site.default_disk_quota_gb * 1024**3)
         account = accounts.create_account("alice@acme.com", "secret-pw", quotas='{"maxEmails": 1000}')
-        self.assertEqual(account["quotas"], {"maxEmails": 1000})
-        live = self.fake.find("Account", name="alice")
-        self.assertEqual(live["quotas"]["maxEmails"], 1000)
-        self.assertIn("maxDiskQuota", live["quotas"])
+        self.assertEqual(account["quotas"], {"maxEmails": 1000, "maxDiskQuota": default_bytes})
+        self.assertEqual(account["disk_quota_gb"], self.site.default_disk_quota_gb)
+        self.assertEqual(self.fake.find("Account", name="alice")["quotas"]["maxEmails"], 1000)
 
-        updated = accounts.update_account("alice@acme.com", quotas={"maxSieveScripts": 2})
-        self.assertEqual(updated["quotas"], {"maxSieveScripts": 2})  # a full replace
-        self.assertEqual(accounts.update_account("alice@acme.com", quotas={})["quotas"], {})
+        # Replacing the optional rows keeps the disk row; disk_quota_gb changes it in GB.
+        updated = accounts.update_account("alice@acme.com", quotas={"maxSieveScripts": 2}, disk_quota_gb=2)
+        self.assertEqual(updated["quotas"], {"maxSieveScripts": 2, "maxDiskQuota": 2 * 1024**3})
+        self.assertEqual(
+            accounts.update_account("alice@acme.com", quotas={})["quotas"], {"maxDiskQuota": 2 * 1024**3}
+        )
+        # A maxDiskQuota inside the map works too, in bytes, and the site total still applies.
+        updated = accounts.update_account("alice@acme.com", quotas={"maxDiskQuota": 3 * 1024**3})
+        self.assertEqual(updated["disk_quota_gb"], 3)
         self.assertRaises(
             frappe.ValidationError, accounts.update_account, "alice@acme.com", quotas={"maxNope": 1}
         )
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "above 0",
+            accounts.update_account,
+            "alice@acme.com",
+            quotas={"maxDiskQuota": 0},
+        )
+        self.assertEqual(accounts.get_quotas(["alice@acme.com"])["alice@acme.com"]["disk_quota_gb"], 3)
 
         group = groups.create_group("sales@acme.com", quotas={"maxEmails": 50})
-        self.assertEqual(group["quotas"], {"maxEmails": 50})
-        self.assertEqual(groups.update_group("sales@acme.com", quotas={})["quotas"], {})
-        # The options a site may offer come from the cluster's schema, disk space left out.
+        self.assertEqual(group["quotas"], {"maxEmails": 50, "maxDiskQuota": default_bytes})
+        self.assertEqual(
+            groups.update_group("sales@acme.com", quotas={})["quotas"], {"maxDiskQuota": default_bytes}
+        )
+        # The options a site may offer come from the cluster's schema; disk is set through disk_quota_gb.
         options = meta.get_account_options()["quotas"]
         self.assertEqual([o["value"] for o in options], ["maxEmails", "maxSieveScripts"])
 

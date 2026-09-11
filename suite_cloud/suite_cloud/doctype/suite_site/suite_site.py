@@ -7,6 +7,7 @@ from frappe.model.document import Document
 from frappe.query_builder.functions import Sum
 from frappe.utils import cint, flt, now
 
+from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA, GB
 from suite_cloud.utils import get_config
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
@@ -188,28 +189,35 @@ class SuiteSite(Document):
         self.assert_within_limit(self.max_mailing_lists, self.mailing_list_count(), _("mailing lists"))
 
     def allocated_disk_gb(self, exclude: tuple[str, str] | None = None) -> float:
-        """Sum of the quotas of the site's accounts and groups, optionally leaving one document out."""
+        """Sum of the disk quotas of the site's accounts and groups, optionally leaving one out."""
 
-        total = 0.0
+        quota = frappe.qb.DocType("Mail Quota")
+        total = 0
         for doctype in QUOTA_HOLDERS:
-            table = frappe.qb.DocType(doctype)
-            query = frappe.qb.from_(table).select(Sum(table.disk_quota_gb)).where(table.site == self.name)
+            holder = frappe.qb.DocType(doctype)
+            query = (
+                frappe.qb.from_(quota)
+                .join(holder)
+                .on((quota.parent == holder.name) & (quota.parenttype == doctype))
+                .select(Sum(quota.value))
+                .where((holder.site == self.name) & (quota.quota == DISK_QUOTA))
+            )
             if exclude and exclude[0] == doctype:
-                query = query.where(table.name != exclude[1])
-            total += flt(query.run()[0][0])
-        return total
+                query = query.where(holder.name != exclude[1])
+            total += cint(query.run()[0][0])
+        return round(total / GB, 6)
 
     def validate_quota_of(self, doc: Document) -> None:
-        """Accounts and groups: a quota above 0 (defaulting to the site's), within the site's total."""
+        """Accounts and groups: a disk quota above 0 (defaulting to the site's), within the site's total."""
 
-        if doc.is_new() and doc.disk_quota_gb is None:
-            doc.disk_quota_gb = self.default_disk_quota_gb
-        if flt(doc.disk_quota_gb) <= 0:
+        if doc.is_new() and doc.disk_row() is None:
+            doc.set_disk_quota_gb(self.default_disk_quota_gb)
+        if doc.disk_quota_bytes() <= 0:
             frappe.throw(_("Disk Quota must be above 0 GB."))
         before = doc.get_doc_before_save()
-        if doc.is_new() or flt(before.disk_quota_gb) != flt(doc.disk_quota_gb):
+        if doc.is_new() or before.disk_quota_bytes() != doc.disk_quota_bytes():
             exclude = None if doc.is_new() else (doc.doctype, doc.name)
-            self.assert_can_allocate_disk(doc.disk_quota_gb, exclude)
+            self.assert_can_allocate_disk(doc.allotted_disk_gb(), exclude)
 
     def assert_can_allocate_disk(self, quota_gb: float, exclude: tuple[str, str] | None = None) -> None:
         """The site's accounts and groups together may not exceed its total disk quota (0 = unlimited)."""

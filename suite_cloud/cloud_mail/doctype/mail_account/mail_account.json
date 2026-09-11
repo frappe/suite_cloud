@@ -20,7 +20,6 @@
   "app_password",
   "api_key",
   "settings_section",
-  "disk_quota_gb",
   "locale",
   "column_break_settings",
   "time_zone",
@@ -146,12 +145,6 @@
    "label": "Settings"
   },
   {
-   "description": "Mailbox size limit in GB, above 0. Defaults to the site's default quota. Counts against the site's total disk quota.",
-   "fieldname": "disk_quota_gb",
-   "fieldtype": "Float",
-   "label": "Disk Quota (GB)"
-  },
-  {
    "default": "en-US",
    "fieldname": "locale",
    "fieldtype": "Data",
@@ -179,11 +172,10 @@
   {
    "fieldname": "quotas_section",
    "fieldtype": "Section Break",
-   "label": "Other Quotas",
-   "collapsible": 1
+   "label": "Quotas"
   },
   {
-   "description": "Stalwart's other per-account limits (messages, mailboxes, Sieve scripts, calendars and so on). Empty means the cluster's defaults.",
+   "description": "Stalwart's per-account limits. maxDiskQuota (bytes) is required and defaults to the site's default quota; it counts against the site's total disk quota. The others are optional counts.",
    "fieldname": "quotas",
    "fieldtype": "Table",
    "label": "Quotas",
