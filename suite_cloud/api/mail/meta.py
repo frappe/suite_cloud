@@ -2,6 +2,7 @@ import frappe
 
 from suite_cloud.api.site import current_site, site_api
 from suite_cloud.cloud_mail.stalwart import get_client
+from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA
 
 SCHEMA_CACHE_TTL = 3600
 
@@ -23,6 +24,12 @@ def get_account_options() -> dict:
     options = {
         "locales": [_enum_entry(e) for e in enums.get("Locale") or []],
         "time_zones": [_enum_entry(e) for e in enums.get("TimeZone") or []],
+        # Disk space has its own field and validation; the rest can be set as quota rows.
+        "quotas": [
+            _enum_entry(e)
+            for e in enums.get("StorageQuota") or []
+            if (e.get("name") if isinstance(e, dict) else e) != DISK_QUOTA
+        ],
     }
     frappe.cache.set_value(key, options, expires_in_sec=SCHEMA_CACHE_TTL)
     return options

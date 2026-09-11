@@ -12,6 +12,8 @@
   "column_break_main",
   "description",
   "disk_quota_gb",
+  "quotas_section",
+  "quotas",
   "stalwart_id",
   "aliases_section",
   "aliases"
@@ -76,6 +78,19 @@
    "fieldname": "disk_quota_gb",
    "fieldtype": "Float",
    "label": "Disk Quota (GB)"
+  },
+  {
+   "fieldname": "quotas_section",
+   "fieldtype": "Section Break",
+   "label": "Other Quotas",
+   "collapsible": 1
+  },
+  {
+   "description": "Stalwart's other per-account limits (messages, mailboxes, Sieve scripts, calendars and so on). Empty means the cluster's defaults.",
+   "fieldname": "quotas",
+   "fieldtype": "Table",
+   "label": "Quotas",
+   "options": "Mail Quota"
   },
   {
    "fieldname": "stalwart_id",

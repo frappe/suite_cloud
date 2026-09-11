@@ -15,6 +15,7 @@ from suite_cloud.cloud_mail.doctype.mail_account.mail_account import (
     mailing_lists_by_account,
     validate_password,
 )
+from suite_cloud.cloud_mail.tenancy import quotas as quota_rows
 from suite_cloud.cloud_mail.tenancy import sync
 from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
 
@@ -82,6 +83,7 @@ def create_account(
     groups: list[str] | str | None = None,
     mailing_lists: list[str] | str | None = None,
     disk_quota_gb: float | None = None,
+    quotas: dict | str | None = None,
     locale: str | None = None,
     time_zone: str | None = None,
 ) -> dict:
@@ -99,6 +101,7 @@ def create_account(
             "display_name": display_name,
             "description": description,
             "disk_quota_gb": disk_quota_gb,
+            "quotas": quota_rows.as_rows(quotas),
             "locale": locale or "en-US",
             "time_zone": time_zone,
             "aliases": as_alias_rows(aliases),
@@ -130,9 +133,12 @@ def update_account(
     display_name: str | None = None,
     description: str | None = None,
     disk_quota_gb: float | None = None,
+    quotas: dict | str | None = None,
     locale: str | None = None,
     time_zone: str | None = None,
 ) -> dict:
+    """``quotas`` replaces the whole set of other limits; pass ``{}`` to lift them all."""
+
     doc = owned("Mail Account", email)
     for field, value in {
         "display_name": display_name,
@@ -143,6 +149,8 @@ def update_account(
     }.items():
         if value is not None:
             doc.set(field, value)
+    if quotas is not None:
+        doc.set("quotas", quota_rows.as_rows(quotas))
     doc.save(ignore_permissions=True)
     return doc.to_api()
 

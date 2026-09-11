@@ -25,6 +25,8 @@
   "column_break_settings",
   "time_zone",
   "used_disk_bytes",
+  "quotas_section",
+  "quotas",
   "aliases_section",
   "aliases",
   "groups_section",
@@ -173,6 +175,19 @@
    "read_only": 1,
    "description": "Mailbox size read from the cluster when the account is opened; nothing is stored.",
    "is_virtual": 1
+  },
+  {
+   "fieldname": "quotas_section",
+   "fieldtype": "Section Break",
+   "label": "Other Quotas",
+   "collapsible": 1
+  },
+  {
+   "description": "Stalwart's other per-account limits (messages, mailboxes, Sieve scripts, calendars and so on). Empty means the cluster's defaults.",
+   "fieldname": "quotas",
+   "fieldtype": "Table",
+   "label": "Quotas",
+   "options": "Mail Quota"
   },
   {
    "fieldname": "aliases_section",

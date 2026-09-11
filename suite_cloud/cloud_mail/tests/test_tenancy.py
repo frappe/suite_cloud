@@ -405,6 +405,7 @@ class TestMailAccount(TenancyTestCase):
         account.display_name = "Bob"
         account.description = "internal note"
         account.disk_quota_gb = 2
+        account.append("quotas", {"quota": "maxEmails", "value": 5000})
         account.aliases = []
         account.append("aliases", {"alias_email": "robert@acme.com", "enabled": 0})
         account.append("groups", {"group": "sales@acme.com"})
@@ -412,7 +413,13 @@ class TestMailAccount(TenancyTestCase):
 
         live = self.fake.get("Account", account.stalwart_id)
         self.assertEqual(live["description"], "Bob")
-        self.assertEqual(live["quotas"], {"maxDiskQuota": 2 * 1024**3})
+        self.assertEqual(live["quotas"], {"maxDiskQuota": 2 * 1024**3, "maxEmails": 5000})
+        # The whole map travels, so dropping a row lifts that limit on the cluster.
+        account.quotas = []
+        account.save()
+        self.assertEqual(
+            self.fake.get("Account", account.stalwart_id)["quotas"], {"maxDiskQuota": 2 * 1024**3}
+        )
         self.assertEqual(live["aliases"]["0"]["enabled"], False)
         self.assertEqual(live["memberGroupIds"], {self.group.stalwart_id: True})
 
@@ -497,6 +504,33 @@ class TestMailAccount(TenancyTestCase):
         self.site.db_set("max_accounts", 1)
         frappe.clear_document_cache("Suite Site", self.site.name)
         self.assertRaisesRegex(frappe.ValidationError, "limit", self.make_account, "g@acme.com")
+
+    def test_other_quotas_are_known_positive_and_listed_once(self) -> None:
+        self.make_account("quota@acme.com")
+
+        def save_with(rows: list[dict]):
+            account = frappe.get_doc("Mail Account", "quota@acme.com")  # a refused save leaves it stale
+            account.set("quotas", rows)
+            account.save()
+
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "listed twice",
+            save_with,
+            [{"quota": "maxSieveScripts", "value": 3}, {"quota": "maxSieveScripts", "value": 4}],
+        )
+        self.assertRaisesRegex(
+            frappe.ValidationError, "above 0", save_with, [{"quota": "maxEmails", "value": 0}]
+        )
+        # Disk space has its own field and validation.
+        self.assertRaisesRegex(
+            frappe.ValidationError, "not a quota", save_with, [{"quota": "maxDiskQuota", "value": 5}]
+        )
+
+        group = frappe.get_doc("Mail Group", "sales@acme.com")
+        group.append("quotas", {"quota": "maxEmails", "value": 100})
+        group.save()
+        self.assertEqual(self.fake.get("Account", group.stalwart_id)["quotas"]["maxEmails"], 100)
 
     def test_disk_quotas_are_positive_and_within_the_site_total(self) -> None:
         self.assertRaisesRegex(

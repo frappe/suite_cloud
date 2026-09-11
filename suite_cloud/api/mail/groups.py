@@ -3,6 +3,7 @@ from frappe.utils import sbool
 
 from suite_cloud.api.mail import aliases as alias_rows
 from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_page, site_api
+from suite_cloud.cloud_mail.tenancy import quotas as quota_rows
 from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
 
 PAGE_CAP = 500  # the dashboard's largest page
@@ -31,6 +32,7 @@ def create_group(
     aliases: list | str | None = None,
     members: list[str] | str | None = None,
     disk_quota_gb: float | None = None,
+    quotas: dict | str | None = None,
 ) -> dict:
     member_names = [owned("Mail Account", m).name for m in as_list(members)]
     doc = frappe.get_doc(
@@ -40,6 +42,7 @@ def create_group(
             "site": current_site().name,
             "description": description,
             "disk_quota_gb": disk_quota_gb,
+            "quotas": quota_rows.as_rows(quotas),
             "aliases": as_alias_rows(aliases),
         }
     )
@@ -52,12 +55,21 @@ def create_group(
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def update_group(email: str, description: str | None = None, disk_quota_gb: float | None = None) -> dict:
+def update_group(
+    email: str,
+    description: str | None = None,
+    disk_quota_gb: float | None = None,
+    quotas: dict | str | None = None,
+) -> dict:
+    """``quotas`` replaces the whole set of other limits; pass ``{}`` to lift them all."""
+
     doc = owned("Mail Group", email)
     if description is not None:
         doc.description = description
     if disk_quota_gb is not None:
         doc.disk_quota_gb = disk_quota_gb
+    if quotas is not None:
+        doc.set("quotas", quota_rows.as_rows(quotas))
     doc.save(ignore_permissions=True)
     return doc.to_api()
 

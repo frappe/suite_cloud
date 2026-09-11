@@ -4,7 +4,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.api import fc
-from suite_cloud.api.mail import accounts, domains, groups, mailing_lists
+from suite_cloud.api.mail import accounts, domains, groups, mailing_lists, meta
 from suite_cloud.api.site import (
     SiteAuthError,
     SiteSuspendedError,
@@ -278,6 +278,29 @@ class TestDirectoryApi(SiteApiTestCase):
         domains.delete_domain("acme.com")
         self.assertEqual(domains.list_domains(), [])
         self.assertEqual(self.fake.all("Domain"), [])
+
+    def test_other_quotas_travel_as_a_map(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        account = accounts.create_account("alice@acme.com", "secret-pw", quotas='{"maxEmails": 1000}')
+        self.assertEqual(account["quotas"], {"maxEmails": 1000})
+        live = self.fake.find("Account", name="alice")
+        self.assertEqual(live["quotas"]["maxEmails"], 1000)
+        self.assertIn("maxDiskQuota", live["quotas"])
+
+        updated = accounts.update_account("alice@acme.com", quotas={"maxSieveScripts": 2})
+        self.assertEqual(updated["quotas"], {"maxSieveScripts": 2})  # a full replace
+        self.assertEqual(accounts.update_account("alice@acme.com", quotas={})["quotas"], {})
+        self.assertRaises(
+            frappe.ValidationError, accounts.update_account, "alice@acme.com", quotas={"maxNope": 1}
+        )
+
+        group = groups.create_group("sales@acme.com", quotas={"maxEmails": 50})
+        self.assertEqual(group["quotas"], {"maxEmails": 50})
+        self.assertEqual(groups.update_group("sales@acme.com", quotas={})["quotas"], {})
+        # The options a site may offer come from the cluster's schema, disk space left out.
+        options = meta.get_account_options()["quotas"]
+        self.assertEqual([o["value"] for o in options], ["maxEmails", "maxSieveScripts"])
 
     def test_domain_delivery_settings_reach_the_cluster(self) -> None:
         domains.create_domain("acme.com")

@@ -163,6 +163,13 @@ site may carry a total disk quota; when it does, the quotas of its accounts and 
 not exceed it, and a create or quota increase beyond the remaining room is refused. Domains,
 accounts, groups and lists are counted against the site's other limits the same way.
 
+Stalwart's other per-account limits (messages, mailboxes, Sieve scripts, calendars, contact cards,
+app passwords and so on) are rows on the Mail Account and Mail Group, and travel as `quotas`, an
+object of quota name to limit, on `create_account`, `update_account`, `create_group` and
+`update_group`. On update the object replaces the whole set, so `{}` lifts every such limit.
+`get_account_options` lists the names the cluster accepts. Disk space is never one of them: it has
+its own field so the site total can be validated.
+
 `create_account` needs a password of at least 8 characters and returns, once, an app password
 minted for the account; the site uses it for that account's mail access. `rotate_app_password`
 issues a new one and revokes the old one. Suite Cloud keeps the app password encrypted on the Mail

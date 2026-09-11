@@ -12,8 +12,8 @@ from frappe.utils.password import set_encrypted_password
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import get_account_client
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
-from suite_cloud.cloud_mail.stalwart.directory import GB, Account
-from suite_cloud.cloud_mail.tenancy import sync
+from suite_cloud.cloud_mail.stalwart.directory import GB, Account, quotas_payload
+from suite_cloud.cloud_mail.tenancy import quotas, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
     assert_domain_live,
@@ -86,6 +86,7 @@ class MailAccount(Document):
         site.validate_quota_of(self)
         assert_address_available(self.email, exclude=(self.doctype, self.name))
         sync.validate_aliases(self)
+        quotas.validate(self)
         self.validate_groups()
         self.take_password()
 
@@ -130,8 +131,8 @@ class MailAccount(Document):
             patch["locale"] = self.locale
         if before.time_zone != self.time_zone:
             patch["timeZone"] = self.time_zone
-        if flt(before.disk_quota_gb) != flt(self.disk_quota_gb):
-            patch["quotas"] = {"maxDiskQuota": self.disk_quota_bytes()} if self.disk_quota_bytes() else {}
+        if flt(before.disk_quota_gb) != flt(self.disk_quota_gb) or quotas.changed(before, self):
+            patch["quotas"] = quotas_payload(self.disk_quota_bytes(), quotas.as_map(self))
         if sync.aliases_changed(before, self):
             patch["aliases"] = sync.aliases_payload(self)
         if sorted(r.group for r in before.groups) != sorted(r.group for r in self.groups):
@@ -159,6 +160,7 @@ class MailAccount(Document):
             locale=self.locale or "en-US",
             time_zone=self.time_zone or None,
             disk_quota_bytes=self.disk_quota_bytes(),
+            quotas=quotas.as_map(self),
         )
 
     def disk_quota_bytes(self) -> int | None:
@@ -295,6 +297,7 @@ class MailAccount(Document):
             "display_name": self.display_name,
             "description": self.description,
             "disk_quota_gb": flt(self.disk_quota_gb),
+            "quotas": quotas.as_map(self),
             "used_disk_bytes": self.fetch_used_disk_bytes() if with_usage else used_disk_bytes,
             "locale": self.locale,
             "time_zone": self.time_zone,

@@ -54,6 +54,11 @@ SCHEMA = {
         "Locale": [{"id": "en-US", "description": "English (US)"}, {"id": "de-DE", "description": "German"}],
         "TimeZone": [{"id": "UTC"}, {"id": "Asia/Kolkata"}],
         "Permission": [{"id": "authenticate"}, {"id": "emailReceive"}, {"id": "sysAccountGet"}],
+        "StorageQuota": [
+            {"name": "maxEmails", "label": "Maximum number of emails"},
+            {"name": "maxSieveScripts", "label": "Maximum number of Sieve scripts"},
+            {"name": "maxDiskQuota", "label": "Maximum disk space allocated (bytes)"},
+        ],
     }
 }
 

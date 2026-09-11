@@ -44,8 +44,39 @@ def roles_payload(role_ids: list[str] | None) -> dict:
     return {"@type": "User"}
 
 
-def quotas_payload(disk_quota_bytes: int | None) -> dict:
-    return {"maxDiskQuota": int(disk_quota_bytes)} if disk_quota_bytes else {}
+# Stalwart's ``StorageQuota`` enum: what an account or group may hold. Disk space is in bytes,
+# the rest are counts. An absent key means the cluster's default (usually no limit).
+STORAGE_QUOTAS = {
+    "maxDiskQuota": "Maximum disk space allocated (bytes)",
+    "maxEmails": "Maximum number of emails",
+    "maxMailboxes": "Maximum number of mailboxes",
+    "maxEmailSubmissions": "Maximum number of email submissions",
+    "maxEmailIdentities": "Maximum number of email identities",
+    "maxParticipantIdentities": "Maximum number of participant identities",
+    "maxSieveScripts": "Maximum number of Sieve scripts",
+    "maxPushSubscriptions": "Maximum number of push subscriptions",
+    "maxCalendars": "Maximum number of calendars",
+    "maxCalendarEvents": "Maximum number of calendar events",
+    "maxCalendarEventNotifications": "Maximum number of calendar event notifications",
+    "maxAddressBooks": "Maximum number of address books",
+    "maxContactCards": "Maximum number of contact cards",
+    "maxFiles": "Maximum number of files",
+    "maxFolders": "Maximum number of folders",
+    "maxMaskedAddresses": "Maximum number of masked email addresses",
+    "maxAppPasswords": "Maximum number of app passwords",
+    "maxApiKeys": "Maximum number of API keys",
+    "maxPublicKeys": "Maximum number of public keys",
+}
+DISK_QUOTA = "maxDiskQuota"
+
+
+def quotas_payload(disk_quota_bytes: int | None, other: dict[str, int] | None = None) -> dict:
+    """The full ``quotas`` map: disk space from the quota field, everything else from ``other``."""
+
+    payload = {k: int(v) for k, v in (other or {}).items() if k != DISK_QUOTA and int(v) > 0}
+    if disk_quota_bytes:
+        payload[DISK_QUOTA] = int(disk_quota_bytes)
+    return payload
 
 
 @dataclass
@@ -60,6 +91,7 @@ class Account:
     locale: str = DEFAULT_LOCALE
     time_zone: str | None = None
     disk_quota_bytes: int | None = None
+    quotas: dict[str, int] | None = None
 
     def to_dict(self) -> dict:
         credentials = {"0": {"@type": "Password", "secret": self.password}} if self.password else {}
@@ -71,7 +103,7 @@ class Account:
             "memberGroupIds": id_set(self.member_group_ids),
             "roles": roles_payload(self.role_ids),
             "permissions": {"@type": "Inherit"},
-            "quotas": quotas_payload(self.disk_quota_bytes),
+            "quotas": quotas_payload(self.disk_quota_bytes, self.quotas),
             "aliases": indexed(self.aliases),
             "description": self.description,
             "locale": self.locale or DEFAULT_LOCALE,
@@ -89,6 +121,7 @@ class Group:
     description: str | None = None
     aliases: list[EmailAlias] | None = None
     disk_quota_bytes: int | None = None
+    quotas: dict[str, int] | None = None
 
     def to_dict(self) -> dict:
         return {
@@ -96,7 +129,7 @@ class Group:
             "name": self.name,
             "domainId": self.domain_id,
             "permissions": {"@type": "Inherit"},
-            "quotas": quotas_payload(self.disk_quota_bytes),
+            "quotas": quotas_payload(self.disk_quota_bytes, self.quotas),
             "aliases": indexed(self.aliases),
             "description": self.description,
         }
