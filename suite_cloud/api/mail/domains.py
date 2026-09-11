@@ -1,6 +1,7 @@
 import frappe
 
 from suite_cloud.api.site import current_site, owned, owned_names, site_api
+from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import domain_payloads
 from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_available, validate_domain_name
 from suite_cloud.cloud_mail.tenancy.ownership import ownership_record
 
@@ -8,9 +9,7 @@ from suite_cloud.cloud_mail.tenancy.ownership import ownership_record
 @frappe.whitelist(methods=["GET", "POST"])
 @site_api
 def list_domains() -> list[dict]:
-    return [
-        frappe.get_doc("Mail Domain", name).to_api(with_records=False) for name in owned_names("Mail Domain")
-    ]
+    return domain_payloads(owned_names("Mail Domain"))
 
 
 @frappe.whitelist(methods=["GET", "POST"])

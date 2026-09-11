@@ -280,23 +280,52 @@ class MailDomain(Document):
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster or self.get_site().cluster)
 
     def to_api(self, with_records: bool = True) -> dict:
-        payload = {
-            "domain": self.domain_name,
-            "enabled": bool(self.enabled),
-            "description": self.description,
-            "catch_all_address": self.catch_all_address,
-            "sub_addressing": bool(self.sub_addressing),
-            "allow_relaying": bool(self.allow_relaying),
-            "publish_client_discovery_records": bool(self.publish_client_discovery_records),
-            "is_verified": bool(self.is_verified),
-            "last_verified_at": utc_iso(self.last_verified_at),
-            "created_at": utc_iso(self.creation),
-        }
+        payload = domain_payload(self)
         if with_records:
             records = self.records_payload()
             payload["dns_record_groups"] = records["groups"]
             payload["dns_records"] = records["records"]
         return payload
+
+
+def domain_payload(row) -> dict:
+    return {
+        "domain": row.domain_name,
+        "enabled": bool(row.enabled),
+        "description": row.description,
+        "catch_all_address": row.catch_all_address,
+        "sub_addressing": bool(row.sub_addressing),
+        "allow_relaying": bool(row.allow_relaying),
+        "publish_client_discovery_records": bool(row.publish_client_discovery_records),
+        "is_verified": bool(row.is_verified),
+        "last_verified_at": utc_iso(row.last_verified_at),
+        "created_at": utc_iso(row.creation),
+    }
+
+
+DOMAIN_FIELDS = [
+    "name",
+    "domain_name",
+    "enabled",
+    "description",
+    "catch_all_address",
+    "sub_addressing",
+    "allow_relaying",
+    "publish_client_discovery_records",
+    "is_verified",
+    "last_verified_at",
+    "creation",
+]
+
+
+def domain_payloads(names: list[str]) -> list[dict]:
+    """The listing shape of many domains in one query; the five record tables are left unread."""
+
+    if not names:
+        return []
+    rows = frappe.get_all("Mail Domain", filters={"name": ["in", names]}, fields=DOMAIN_FIELDS)
+    by_name = {row.name: row for row in rows}
+    return [domain_payload(by_name[n]) for n in names if n in by_name]
 
 
 def refresh_all_domains() -> None:
@@ -309,14 +338,16 @@ def refresh_all_domains() -> None:
 def refresh_rotating_domains() -> None:
     """Hourly: domains whose keys are mid-rotation change selectors within days."""
 
-    for name in frappe.get_all("Mail Domain", {"stalwart_id": ["is", "set"], "is_verified": 1}, pluck="name"):
-        domain = frappe.get_doc("Mail Domain", name)
+    domains = frappe.get_all(
+        "Mail Domain", {"stalwart_id": ["is", "set"], "is_verified": 1}, ["name", "cluster", "stalwart_id"]
+    )
+    for domain in domains:  # only the cluster and id are needed to ask; the document loads on refresh
         try:
             signatures = sync.client_for(domain).dkim_signatures.get_all_by_domain(domain.stalwart_id)
         except Exception:
             continue
         if any(s.get("stage") in ("pending", "retiring") for s in signatures):
-            _refresh(name)
+            _refresh(domain.name)
 
 
 def verify_unverified_domains() -> None:

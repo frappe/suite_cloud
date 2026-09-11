@@ -3,8 +3,8 @@ from frappe.utils import sbool
 
 from suite_cloud.api.mail import aliases as alias_rows
 from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_page, site_api
+from suite_cloud.cloud_mail.doctype.mail_group.mail_group import group_payloads
 from suite_cloud.cloud_mail.tenancy import quotas as quota_rows
-from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
 
 PAGE_CAP = 500  # the dashboard's largest page
 
@@ -13,9 +13,7 @@ PAGE_CAP = 500  # the dashboard's largest page
 @site_api
 def list_groups(search: str | None = None, start: int = 0, limit: int = 100) -> dict:
     names, total = owned_page("Mail Group", search, start, limit, PAGE_CAP)
-    groups = [frappe.get_doc("Mail Group", name) for name in names]
-    usage = used_disk_by_name(groups)
-    return {"items": [g.to_api(used_disk_bytes=usage.get(g.name)) for g in groups], "total": total}
+    return {"items": group_payloads(names), "total": total}
 
 
 @frappe.whitelist(methods=["GET", "POST"])

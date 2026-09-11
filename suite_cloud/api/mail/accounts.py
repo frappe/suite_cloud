@@ -12,7 +12,7 @@ from suite_cloud.api.site import (
     site_api,
 )
 from suite_cloud.cloud_mail.doctype.mail_account.mail_account import (
-    mailing_lists_by_account,
+    account_payloads,
     validate_password,
 )
 from suite_cloud.cloud_mail.tenancy import quotas as quota_rows
@@ -31,13 +31,7 @@ def list_accounts(
     names, total = owned_page(
         "Mail Account", search, start, limit, ACCOUNT_PAGE_CAP, ("name", "display_name"), filters
     )
-    accounts = [frappe.get_doc("Mail Account", n) for n in names]
-    lists = mailing_lists_by_account(accounts)
-    usage = used_disk_by_name(accounts)
-    items = [
-        a.to_api(mailing_lists=lists.get(a.name, []), used_disk_bytes=usage.get(a.name)) for a in accounts
-    ]
-    return {"items": items, "total": total}
+    return {"items": account_payloads(names), "total": total}
 
 
 @frappe.whitelist(methods=["GET", "POST"])

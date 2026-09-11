@@ -170,3 +170,26 @@ def reconnect_on_failure(max_retries: int = 3) -> Callable:
 def is_connection_error(exception: Exception) -> bool:
     operational_error = getattr(frappe.db, "OperationalError", ())
     return frappe.db.is_interface_error(exception) or isinstance(exception, operational_error)
+
+
+def child_rows(doctype: str, parenttype: str, parents: list[str], fields: list[str]) -> dict[str, list]:
+    """``{parent: [rows]}`` for a child table of many parents at once, rows in their saved order.
+
+    A page of documents would otherwise cost one query per document per child table.
+    """
+
+    rows: dict[str, list] = {parent: [] for parent in parents}
+    if not parents:
+        return rows
+    for row in frappe.get_all(
+        doctype,
+        filters={"parenttype": parenttype, "parent": ["in", parents]},
+        fields=["parent", *fields],
+        order_by="parent asc, idx asc",
+    ):
+        rows[row.parent].append(row)
+    return rows
+
+
+def alias_payloads(rows: list) -> list[dict]:
+    return [{"email": r.alias_email, "enabled": bool(r.enabled), "description": r.description} for r in rows]

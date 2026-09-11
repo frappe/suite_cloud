@@ -8,7 +8,7 @@ FC stores it in the site's configuration.
 import frappe
 from frappe import _
 
-from suite_cloud.utils import get_public_url
+from suite_cloud.utils import child_rows, get_public_url
 
 ROLE = "Frappe Cloud"
 
@@ -147,22 +147,27 @@ def pick_cluster(cluster: str | None, region: str | None) -> str:
     """Named cluster; else one serving the region (default preferred); else the default; else a
     cluster serving every region. A cluster with no regions serves any region."""
 
-    candidates = [
-        frappe.get_doc("Stalwart Cluster", name)
-        for name in frappe.get_all(
-            "Stalwart Cluster",
-            filters={"enabled": 1, "status": "Active"},
-            pluck="name",
-            order_by="is_default desc, creation asc",
-        )
-    ]
+    candidates = frappe.get_all(
+        "Stalwart Cluster",
+        filters={"enabled": 1, "status": "Active"},
+        fields=["name", "is_default"],
+        order_by="is_default desc, creation asc",
+    )
     if cluster:
         if not any(c.name == cluster for c in candidates):
             frappe.throw(_("Cluster {0} is not active.").format(cluster))
         return cluster
 
-    if region:
-        regional = [c for c in candidates if c.regions and c.serves(region)]
+    # The regions each cluster serves, one query for all candidates rather than a document each.
+    regions = child_rows(
+        "Stalwart Cluster Region", "Stalwart Cluster", [c.name for c in candidates], ["region"]
+    )
+    for c in candidates:
+        c.regions = {r.region for r in regions[c.name]}
+    wanted = (region or "").strip().lower()
+
+    if wanted:
+        regional = [c for c in candidates if c.regions and wanted in c.regions]
         if regional:
             return regional[0].name
 

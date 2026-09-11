@@ -3,9 +3,9 @@
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import flt
+from frappe.utils import cint, flt
 
-from suite_cloud.cloud_mail.stalwart.directory import Group
+from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA, GB, Group
 from suite_cloud.cloud_mail.tenancy import quotas, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
@@ -15,7 +15,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
 )
 from suite_cloud.cloud_mail.tenancy.quotas import QuotaHolder
 from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
-from suite_cloud.utils import utc_iso
+from suite_cloud.utils import alias_payloads, child_rows, utc_iso
 
 
 class MailGroup(QuotaHolder, Document):
@@ -104,17 +104,57 @@ class MailGroup(QuotaHolder, Document):
 
         if with_usage:
             used_disk_bytes = used_disk_by_name([self]).get(self.name)
-        return {
-            "email": self.email,
-            "domain": self.domain,
-            "description": self.description,
-            "disk_quota_gb": self.allotted_disk_gb(),
-            "quotas": self.quota_map(),
-            "used_disk_bytes": used_disk_bytes,
-            "aliases": [
-                {"email": a.alias_email, "enabled": bool(a.enabled), "description": a.description}
-                for a in self.aliases
-            ],
-            "members": sorted(self.member_emails()),
-            "created_at": utc_iso(self.creation),
-        }
+        return group_payload(
+            self,
+            aliases=alias_payloads(self.aliases),
+            quotas=self.quota_map(),
+            members=self.member_emails(),
+            used_disk_bytes=used_disk_bytes,
+        )
+
+
+def group_payload(
+    row, aliases: list[dict], quotas: dict[str, int], members: list[str], used_disk_bytes
+) -> dict:
+    return {
+        "email": row.email,
+        "domain": row.domain,
+        "description": row.description,
+        "disk_quota_gb": round(cint(quotas.get(DISK_QUOTA)) / GB, 6),
+        "quotas": quotas,
+        "used_disk_bytes": used_disk_bytes,
+        "aliases": aliases,
+        "members": sorted(members),
+        "created_at": utc_iso(row.creation),
+    }
+
+
+GROUP_FIELDS = ["name", "email", "domain", "site", "cluster", "stalwart_id", "description", "creation"]
+
+
+def group_payloads(names: list[str], with_usage: bool = True) -> list[dict]:
+    """A page of groups in a handful of queries: groups, aliases, quotas, members, one usage call."""
+
+    if not names:
+        return []
+    rows = frappe.get_all("Mail Group", filters={"name": ["in", names]}, fields=GROUP_FIELDS)
+    by_name = {row.name: row for row in rows}
+    rows = [by_name[n] for n in names if n in by_name]
+    aliases = child_rows("Mail Address Alias", "Mail Group", names, ["alias_email", "enabled", "description"])
+    quotas = child_rows("Mail Quota", "Mail Group", names, ["quota", "value"])
+    members: dict[str, list[str]] = {name: [] for name in names}
+    for member in frappe.get_all(
+        "Mail Group Member", {"group": ["in", names], "parenttype": "Mail Account"}, ["group", "parent"]
+    ):
+        members[member.group].append(member.parent)
+    usage = used_disk_by_name(rows) if with_usage else {}
+    return [
+        group_payload(
+            row,
+            aliases=alias_payloads(aliases[row.name]),
+            quotas={q.quota: cint(q.value) for q in quotas[row.name]},
+            members=members[row.name],
+            used_disk_bytes=usage.get(row.name),
+        )
+        for row in rows
+    ]

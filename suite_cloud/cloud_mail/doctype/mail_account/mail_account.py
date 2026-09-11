@@ -12,7 +12,7 @@ from frappe.utils.password import set_encrypted_password
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import get_account_client
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
-from suite_cloud.cloud_mail.stalwart.directory import Account
+from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA, GB, Account
 from suite_cloud.cloud_mail.tenancy import quotas, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
@@ -22,7 +22,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
 )
 from suite_cloud.cloud_mail.tenancy.quotas import QuotaHolder
 from suite_cloud.cloud_mail.tenancy.usage import used_disk_by_name
-from suite_cloud.utils import utc_iso
+from suite_cloud.utils import alias_payloads, child_rows, utc_iso
 
 CREDENTIAL_DESCRIPTION = "Suite Cloud"
 # Stored credentials: (field, service attribute on the account client).
@@ -38,6 +38,7 @@ class MailAccount(QuotaHolder, Document):
 
     if TYPE_CHECKING:
         from frappe.types import DF
+
         from suite_cloud.cloud_mail.doctype.mail_address_alias.mail_address_alias import MailAddressAlias
         from suite_cloud.cloud_mail.doctype.mail_group_member.mail_group_member import MailGroupMember
         from suite_cloud.cloud_mail.doctype.mail_quota.mail_quota import MailQuota
@@ -286,25 +287,14 @@ class MailAccount(QuotaHolder, Document):
         """``with_usage`` costs a cluster round trip, so single reads ask for it while a list page
         passes ``used_disk_bytes`` and ``mailing_lists`` looked up for the whole page at once."""
 
-        return {
-            "email": self.email,
-            "domain": self.domain,
-            "enabled": bool(self.enabled),
-            "display_name": self.display_name,
-            "description": self.description,
-            "disk_quota_gb": self.allotted_disk_gb(),
-            "quotas": self.quota_map(),
-            "used_disk_bytes": self.fetch_used_disk_bytes() if with_usage else used_disk_bytes,
-            "locale": self.locale,
-            "time_zone": self.time_zone,
-            "aliases": [
-                {"email": a.alias_email, "enabled": bool(a.enabled), "description": a.description}
-                for a in self.aliases
-            ],
-            "groups": [g.group for g in self.groups],
-            "mailing_lists": self.mailing_list_names() if mailing_lists is None else mailing_lists,
-            "created_at": utc_iso(self.creation),
-        }
+        return account_payload(
+            self,
+            aliases=alias_payloads(self.aliases),
+            groups=[g.group for g in self.groups],
+            quotas=self.quota_map(),
+            mailing_lists=self.mailing_list_names() if mailing_lists is None else mailing_lists,
+            used_disk_bytes=self.fetch_used_disk_bytes() if with_usage else used_disk_bytes,
+        )
 
     def addresses(self) -> list[str]:
         return [self.email, *[a.alias_email for a in self.aliases]]
@@ -330,21 +320,95 @@ def generate_password() -> str:
     return secrets.token_urlsafe(18)
 
 
-def mailing_lists_by_account(accounts: list[MailAccount]) -> dict[str, list[str]]:
-    """``{account name: [list addresses]}`` for a page of accounts in one query."""
+def account_payload(
+    row,
+    aliases: list[dict],
+    groups: list[str],
+    quotas: dict[str, int],
+    mailing_lists: list[str],
+    used_disk_bytes: int | None,
+) -> dict:
+    """The API shape of an account, from a document or a query row plus its related rows."""
 
-    by_address: dict[str, str] = {}
-    for account in accounts:
-        for address in account.addresses():
-            by_address[address] = account.name
+    return {
+        "email": row.email,
+        "domain": row.domain,
+        "enabled": bool(row.enabled),
+        "display_name": row.display_name,
+        "description": row.description,
+        "disk_quota_gb": round(cint(quotas.get(DISK_QUOTA)) / GB, 6),
+        "quotas": quotas,
+        "used_disk_bytes": used_disk_bytes,
+        "locale": row.locale,
+        "time_zone": row.time_zone,
+        "aliases": aliases,
+        "groups": groups,
+        "mailing_lists": mailing_lists,
+        "created_at": utc_iso(row.creation),
+    }
+
+
+ACCOUNT_FIELDS = [
+    "name",
+    "email",
+    "domain",
+    "site",
+    "cluster",
+    "stalwart_id",
+    "enabled",
+    "display_name",
+    "description",
+    "locale",
+    "time_zone",
+    "creation",
+]
+
+
+def account_payloads(names: list[str], with_usage: bool = True) -> list[dict]:
+    """A page of accounts in a handful of queries, whatever the page size.
+
+    One query each for the accounts, their aliases, groups and quotas, one for the mailing lists
+    that deliver to any of their addresses, and one cluster call for usage.
+    """
+
+    if not names:
+        return []
+    rows = frappe.get_all("Mail Account", filters={"name": ["in", names]}, fields=ACCOUNT_FIELDS)
+    by_name = {row.name: row for row in rows}
+    rows = [by_name[n] for n in names if n in by_name]
+    aliases = child_rows(
+        "Mail Address Alias", "Mail Account", names, ["alias_email", "enabled", "description"]
+    )
+    groups = child_rows("Mail Group Member", "Mail Account", names, ["group"])
+    quotas = child_rows("Mail Quota", "Mail Account", names, ["quota", "value"])
+    addresses = {row.name: [row.email, *[a.alias_email for a in aliases[row.name]]] for row in rows}
+    lists = mailing_lists_by_address(rows[0].site, addresses) if rows else {}
+    usage = used_disk_by_name(rows) if with_usage else {}
+    return [
+        account_payload(
+            row,
+            aliases=alias_payloads(aliases[row.name]),
+            groups=[g.group for g in groups[row.name]],
+            quotas={q.quota: cint(q.value) for q in quotas[row.name]},
+            mailing_lists=lists.get(row.name, []),
+            used_disk_bytes=usage.get(row.name),
+        )
+        for row in rows
+    ]
+
+
+def mailing_lists_by_address(site: str, addresses: dict[str, list[str]]) -> dict[str, list[str]]:
+    """``{account name: [list addresses]}`` given each account's addresses, in one query."""
+
+    by_address = {address: name for name, found in addresses.items() for address in found}
     if not by_address:
         return {}
     rows = frappe.get_all(
         "Mailing List Recipient",
-        {"site": accounts[0].site, "email": ["in", list(by_address)]},
+        {"site": site, "email": ["in", list(by_address)]},
         ["email", "mailing_list"],
     )
-    lists: dict[str, set[str]] = {account.name: set() for account in accounts}
+    lists: dict[str, set[str]] = {name: set() for name in addresses}
     for row in rows:
         lists[by_address[row.email]].add(row.mailing_list)
-    return {name: sorted(names) for name, names in lists.items()}
+    return {name: sorted(found) for name, found in lists.items()}

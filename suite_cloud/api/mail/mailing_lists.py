@@ -5,6 +5,7 @@ from suite_cloud.api.mail import aliases as alias_rows
 from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_page, page_size, site_api
 
 PAGE_CAP = 500  # the dashboard's largest page
+from suite_cloud.cloud_mail.doctype.mailing_list.mailing_list import list_payloads
 from suite_cloud.cloud_mail.tenancy import sync
 
 
@@ -12,7 +13,7 @@ from suite_cloud.cloud_mail.tenancy import sync
 @site_api
 def list_mailing_lists(search: str | None = None, start: int = 0, limit: int = 100) -> dict:
     names, total = owned_page("Mailing List", search, start, limit, PAGE_CAP)
-    return {"items": [frappe.get_doc("Mailing List", name).to_api() for name in names], "total": total}
+    return {"items": list_payloads(names), "total": total}
 
 
 @frappe.whitelist(methods=["GET", "POST"])

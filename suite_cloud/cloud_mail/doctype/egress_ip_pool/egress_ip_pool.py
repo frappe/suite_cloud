@@ -136,15 +136,23 @@ class EgressIPPool(Document):
         return [row for row in self.addresses if row.gateway == gateway]
 
 
-def verify_address_ptr(row: Document) -> bool:
+def verify_address_ptr(row) -> bool:
+    """``row`` is an address row, as a child document or a query row with the same fields."""
+
     ok = verify_ptr_record(row.ip_address, row.ehlo_hostname)
     if ok is None:
         return bool(row.ptr_verified)  # the lookup failed; the last known state stands
-    row.db_set("ptr_verified", cint(ok), update_modified=False)
+    frappe.db.set_value("Egress IP Pool Address", row.name, "ptr_verified", cint(ok), update_modified=False)
+    if isinstance(row, Document):
+        row.ptr_verified = cint(ok)
     return ok
 
 
 def verify_all_ptr_records() -> None:
-    for name in frappe.get_all("Egress IP Pool", pluck="name"):
-        for row in frappe.get_doc("Egress IP Pool", name).addresses:
-            verify_address_ptr(row)
+    rows = frappe.get_all(
+        "Egress IP Pool Address",
+        filters={"parenttype": "Egress IP Pool"},
+        fields=["name", "ip_address", "ehlo_hostname", "ptr_verified"],
+    )
+    for row in rows:
+        verify_address_ptr(row)
