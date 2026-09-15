@@ -477,7 +477,9 @@ def build_gateway_variables(context: dict) -> dict:
         "stalwart_cli_version": get_config("stalwart_cli_version"),
         "stalwart_cli_url_template": get_config("stalwart_cli_download_url_template"),
         "systemd_unit": plan.systemd_unit(),
-        "firewall_ports": [443, *relay_ports],
+        "firewall_ports": [443],
+        "relay_ports": relay_ports,
+        "relay_sources": node_addresses(gateway.get_cluster()),
         "wait_ports": [443, *relay_ports],
         "recovery_port": plan.BOOTSTRAP_PORT,
         "admin_user": gateway.admin_username,
@@ -535,3 +537,14 @@ def check_gateway(gateway: Document) -> bool:
         )
         resync_cluster(gateway.get_cluster())
     return True
+
+
+def node_addresses(cluster: Document) -> list[str]:
+    """Every address a node of the cluster may send from: what a gateway's firewall admits."""
+
+    nodes = frappe.get_all(
+        "Stalwart Node",
+        {"cluster": cluster.name, "status": ["!=", "Disabled"]},
+        ["ipv4_address", "ipv6_address"],
+    )
+    return sorted({ip for node in nodes for ip in (node.ipv4_address, node.ipv6_address) if ip})

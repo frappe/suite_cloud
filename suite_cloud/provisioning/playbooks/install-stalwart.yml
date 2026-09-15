@@ -179,6 +179,15 @@
         proto: tcp
       loop: "{{ firewall_ports }}"
 
+    # A gateway's relay listeners take mail from the cluster's nodes and nobody else.
+    - name: Allow relay ports from the cluster's nodes
+      community.general.ufw:
+        rule: allow
+        from_ip: "{{ item.1 }}"
+        port: "{{ item.0 }}"
+        proto: tcp
+      loop: "{{ (relay_ports | default([])) | product(relay_sources | default([])) | list }}"
+
     - name: Keep the bootstrap and recovery port local
       community.general.ufw:
         rule: allow

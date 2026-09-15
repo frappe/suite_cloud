@@ -13,7 +13,7 @@ from suite_cloud.cloud_mail.stalwart import forget_sessions, get_admin_client, g
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
 from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
-from suite_cloud.utils import get_config
+from suite_cloud.utils import get_config, log_exception, validate_version
 
 LABEL = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 STORE_KINDS = {
@@ -171,7 +171,9 @@ class StalwartCluster(Document):
         return bool(region) and region.strip().lower() in {r.region for r in self.regions}
 
     def apply_defaults(self) -> None:
-        self.stalwart_version = self.stalwart_version or get_config("stalwart_version")
+        self.stalwart_version = validate_version(
+            self.stalwart_version or get_config("stalwart_version"), _("Stalwart Version")
+        )
         self.acme_directory_url = self.acme_directory_url or get_config("acme_directory_url")
         self.acme_contact_email = self.acme_contact_email or get_config("acme_contact_email")
 
@@ -322,4 +324,4 @@ def check_all_clusters() -> None:
         try:
             cluster.check_drift()
         except Exception:
-            cluster.log_error(f"Drift check failed for {name}")
+            log_exception(f"Drift check failed for {name}", cluster)

@@ -1,4 +1,5 @@
 import functools
+import re
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from typing import Any
@@ -101,6 +102,25 @@ def log_error(title: str | None = None, message: str | None = None, **kwargs) ->
     frappe.log_error(title=title, message=message, **kwargs)
 
 
+def log_exception(title: str, doc=None) -> None:
+    """The current exception's traceback, without local variables.
+
+    Frappe's default adds every frame's locals and masks only names that look like secrets; a
+    connection or plan object holding a password would go in whole. The plain traceback carries
+    what is needed to find the fault.
+    """
+
+    prefix = "[Suite Cloud] "
+    if not title.startswith(prefix):
+        title = f"{prefix}{title}"
+    frappe.log_error(
+        title=title,
+        message=frappe.get_traceback(),
+        reference_doctype=doc.doctype if doc is not None else None,
+        reference_name=doc.name if doc is not None else None,
+    )
+
+
 def enqueue_job(
     method: str | Callable, job_id: str | None = None, deduplicate: bool = False, **kwargs
 ) -> None:
@@ -193,3 +213,17 @@ def child_rows(doctype: str, parenttype: str, parents: list[str], fields: list[s
 
 def alias_payloads(rows: list) -> list[dict]:
     return [{"email": r.alias_email, "enabled": bool(r.enabled), "description": r.description} for r in rows]
+
+
+VERSION = re.compile(r"^v?\d+\.\d+\.\d+$")
+
+
+def validate_version(value: str | None, label: str) -> str | None:
+    """A release tag such as v0.16.20; it is interpolated into a download URL, so nothing else."""
+
+    value = (value or "").strip()
+    if not value:
+        return None
+    if not VERSION.match(value):
+        frappe.throw(_("{0} must be a version such as v0.16.20.").format(label))
+    return value

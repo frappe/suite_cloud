@@ -10,7 +10,17 @@ from frappe.utils import cint, now, time_diff_in_seconds
 from frappe.utils.background_jobs import is_job_enqueued
 
 from suite_cloud.provisioning.ansible import PlaybookRun, playbook_path, playbook_task_names
-from suite_cloud.utils import get_config
+from suite_cloud.utils import get_config, log_exception
+
+# Every function a job may run to build its variables, and every method it may call back on its
+# server. A Suite Cloud Manager can create Server Job rows; a free choice here would be a way to
+# run any callable in the bench as the worker.
+VARIABLES_BUILDERS = (
+    "suite_cloud.cloud_mail.cluster.bootstrap.build_node_variables",
+    "suite_cloud.cloud_mail.cluster.bootstrap.build_command_variables",
+    "suite_cloud.cloud_mail.cluster.egress.build_gateway_variables",
+)
+CALLBACKS = ("after_provision", "after_upgrade")
 
 REDACTED = "***"
 
@@ -54,6 +64,11 @@ class ServerJob(Document):
     def validate(self) -> None:
         self.status = self.status or "Pending"
         playbook_path(self.playbook)  # throws when the playbook does not exist
+        # The job row is writable by operators; the code it names must not be their choice.
+        if self.variables_builder and self.variables_builder not in VARIABLES_BUILDERS:
+            frappe.throw(_("{0} is not a known variables builder.").format(self.variables_builder))
+        if self.callback and self.callback not in CALLBACKS:
+            frappe.throw(_("{0} is not a known callback.").format(self.callback))
         if self.is_new() and not self.tasks:
             for task in playbook_task_names(self.playbook):
                 self.append("tasks", {"task": task, "status": "Pending"})
@@ -140,7 +155,7 @@ class ServerJob(Document):
                 frappe.db.rollback(save_point="server_job_callback")
             except Exception:
                 frappe.db.rollback()  # the callback committed and released the savepoint
-            self.log_error(f"Server Job callback {method} failed")
+            log_exception(f"Server Job callback {method} failed", self)
             if success:
                 self.mark_finished("Failed", error_log=frappe.get_traceback())
                 self.fire_callback(success=False)

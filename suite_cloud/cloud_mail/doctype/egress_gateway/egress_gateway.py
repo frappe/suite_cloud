@@ -10,8 +10,8 @@ from suite_cloud.cloud_mail.cluster import dns, egress, naming, plan
 from suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node import validate_ip
 from suite_cloud.cloud_mail.stalwart import get_admin_client, get_client
 from suite_cloud.provisioning.ansible import ping
-from suite_cloud.provisioning.ssh import SSHTarget, validate_ssh_user_field
-from suite_cloud.utils import get_config
+from suite_cloud.provisioning.ssh import SSHTarget, scan_host_keys, validate_ssh_user_field
+from suite_cloud.utils import get_config, log_exception, validate_version
 
 
 class EgressGateway(Document):
@@ -72,12 +72,18 @@ class EgressGateway(Document):
 
         self.base_url = f"https://{self.hostname}"
         self.ipv4_address = validate_ip(self.ipv4_address, 4)
-        if self.has_value_changed("ipv4_address"):
+        if not self.is_new() and (
+            self.has_value_changed("ipv4_address") or self.has_value_changed("ssh_port")
+        ):
+            self.ssh_verified = 0
+            self.ssh_host_keys = None  # a different box answers there; its key is unknown again
+        elif self.has_value_changed("ipv4_address"):
             self.ssh_verified = 0
         self.ssh_user = self.ssh_user or cluster.ssh_user
         self.ssh_port = self.ssh_port or cluster.ssh_port
-        self.stalwart_version = (
-            self.stalwart_version or cluster.stalwart_version or get_config("stalwart_version")
+        self.stalwart_version = validate_version(
+            self.stalwart_version or cluster.stalwart_version or get_config("stalwart_version"),
+            _("Stalwart Version"),
         )
 
     def after_insert(self) -> None:
@@ -133,6 +139,7 @@ class EgressGateway(Document):
             user=self.ssh_user or cluster.ssh_user,
             port=cint(self.ssh_port or cluster.ssh_port),
             private_key=cluster.get_password("ssh_private_key"),
+            host_keys=self.ssh_host_keys,
         )
 
     def set_status(self, status: str, error: str | None = None) -> None:
@@ -151,7 +158,7 @@ class EgressGateway(Document):
             try:
                 dns.sync_pool_records(pool)
             except Exception:
-                self.log_error(f"Pool DNS for {pool.name} could not follow {self.name}")
+                log_exception(f"Pool DNS for {pool.name} could not follow {self.name}", self)
 
     def get_client(self):
         return get_client(self)
@@ -170,6 +177,19 @@ class EgressGateway(Document):
     @frappe.whitelist()
     def verify_ssh(self) -> bool:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        if not self.ssh_host_keys:
+            # First contact: the operator has just put the cluster's key on this box, so the key it
+            # presents now is the one every later connection must match.
+            try:
+                self.db_set(
+                    "ssh_host_keys",
+                    scan_host_keys(self.ipv4_address, cint(self.ssh_port)),
+                    update_modified=False,
+                )
+            except Exception as e:
+                self.db_set({"ssh_verified": 0, "last_error": str(e)}, update_modified=False)
+                frappe.msgprint(_("SSH connection failed: {0}").format(e), indicator="red")
+                return False
         ok, detail = ping(self.ssh_target())
         self.db_set({"ssh_verified": cint(ok), "last_error": None if ok else detail}, update_modified=False)
         return ok
@@ -240,7 +260,7 @@ def poll_pending_gateways() -> None:
             egress.check_gateway(gateway)
         except Exception:
             frappe.db.rollback()
-            gateway.log_error(f"Health check failed for {name}")
+            log_exception(f"Health check failed for {name}", gateway)
             continue
         if not frappe.in_test:
             frappe.db.commit()

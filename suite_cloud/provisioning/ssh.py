@@ -1,5 +1,6 @@
 import os
 import re
+import subprocess
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -15,6 +16,50 @@ class SSHTarget:
     user: str
     port: int
     private_key: str = field(repr=False)
+    host_keys: str | None = None  # known_hosts lines recorded at Verify SSH; None means never verified
+
+
+class UnknownHostError(Exception):
+    """No host key is recorded for the server, so nothing could tell it from an impostor."""
+
+
+KEYSCAN_TIMEOUT = 15
+
+
+def scan_host_keys(host: str, port: int) -> str:
+    """The server's host keys as known_hosts lines, from ssh-keyscan.
+
+    Recorded once, on the first successful Verify SSH (trust on first use, the moment the
+    operator has just put the cluster's key on the box), and required to match afterwards.
+    """
+
+    result = subprocess.run(
+        ["ssh-keyscan", "-T", str(KEYSCAN_TIMEOUT), "-p", str(int(port)), host],
+        capture_output=True,
+        text=True,
+        timeout=KEYSCAN_TIMEOUT + 5,
+        check=False,
+    )
+    lines = [line for line in result.stdout.splitlines() if line and not line.startswith("#")]
+    if not lines:
+        raise UnknownHostError(f"No SSH host key could be read from {host}:{port}")
+    return "\n".join(sorted(lines))
+
+
+@contextmanager
+def known_hosts_file(target: SSHTarget) -> Iterator[str]:
+    """The pinned host keys as a known_hosts file for the duration of a play."""
+
+    if not target.host_keys:
+        raise UnknownHostError(f"{target.host}: verify SSH first so its host key is recorded")
+    fd, path = tempfile.mkstemp(prefix="suite-cloud-", suffix=".known_hosts", dir=scratch_dir())
+    try:
+        with os.fdopen(fd, "w") as f:
+            f.write(target.host_keys.rstrip("\n") + "\n")
+        yield path
+    finally:
+        if os.path.exists(path):
+            os.remove(path)
 
 
 def generate_keypair(comment: str) -> tuple[str, str]:
@@ -36,7 +81,7 @@ def generate_keypair(comment: str) -> tuple[str, str]:
 def private_key_file(private_key: str) -> Iterator[str]:
     """Writes the key to a 0600 temp file for the duration of a play, then removes it."""
 
-    fd, path = tempfile.mkstemp(prefix="suite-cloud-", suffix=".key")
+    fd, path = tempfile.mkstemp(prefix="suite-cloud-", suffix=".key", dir=scratch_dir())
     try:
         with os.fdopen(fd, "w") as f:
             f.write(private_key.rstrip("\n") + "\n")
@@ -45,6 +90,17 @@ def private_key_file(private_key: str) -> Iterator[str]:
     finally:
         if os.path.exists(path):
             os.remove(path)
+
+
+def scratch_dir() -> str:
+    """A 0700 directory of the site for keys and runner data, not the world-readable system temp."""
+
+    import frappe
+
+    path = frappe.get_site_path("private", "provisioning")
+    os.makedirs(path, mode=0o700, exist_ok=True)
+    os.chmod(path, 0o700)
+    return path
 
 
 # A login name and nothing else: the inventory is INI, where a space starts a new variable and a
@@ -72,10 +128,12 @@ def validate_ssh_user_field(doc) -> None:
             frappe.throw(_("SSH User must be a plain login name: lowercase letters, digits, _ and -."))
 
 
-def inventory_line(alias: str, target: SSHTarget, key_path: str) -> str:
+def inventory_line(alias: str, target: SSHTarget, key_path: str, known_hosts_path: str) -> str:
+    """One INI inventory host; the connection is refused unless the host key matches the pinned one."""
+
     user = validate_ssh_user(target.user)
     return (
         f"{alias} ansible_host={target.host} ansible_user={user} ansible_port={int(target.port)} "
         f"ansible_ssh_private_key_file={key_path} "
-        "ansible_ssh_common_args='-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'"
+        f"ansible_ssh_common_args='-o StrictHostKeyChecking=yes -o UserKnownHostsFile={known_hosts_path}'"
     )

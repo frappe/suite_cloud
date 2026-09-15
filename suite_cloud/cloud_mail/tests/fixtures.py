@@ -78,6 +78,7 @@ def remove_cluster(name: str) -> None:
 def make_node(cluster, ipv4: str = "203.0.113.10", **fields):
     """Nodes name themselves n1, n2, ... in creation order."""
 
+    fields.setdefault("ssh_host_keys", f"{ipv4} ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeHostKeyForTests")
     node = frappe.get_doc(
         {"doctype": "Stalwart Node", "cluster": cluster.name, "ipv4_address": ipv4, **fields}
     )

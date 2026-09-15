@@ -18,7 +18,7 @@ from suite_cloud.cloud_mail.tenancy.addresses import (
     validate_email_address,
 )
 from suite_cloud.dns.resolver import verify_dns_record
-from suite_cloud.utils import dkim_algorithms, get_config, utc_iso
+from suite_cloud.utils import dkim_algorithms, get_config, log_exception, utc_iso
 
 # A change to any of these reaches the cluster; is_verified is set by hand only by managers.
 PUSHED_FIELDS = (
@@ -415,7 +415,7 @@ def _run_isolated(name: str, action, label: str) -> None:
         action()
     except Exception:
         frappe.db.rollback()
-        frappe.log_error(title=f"[Suite Cloud] {label} failed for {name}")
+        log_exception(f"{label} failed for {name}")
         return
     if not frappe.in_test:
         frappe.db.commit()

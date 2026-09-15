@@ -106,6 +106,7 @@ class DNSRecord(Document):
 
     @frappe.whitelist()
     def sync_dns_record(self) -> None:
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         self.create_or_update_record_in_dns_provider()
 
     def create_or_update_record_in_dns_provider(self) -> None:
@@ -137,6 +138,8 @@ class DNSRecord(Document):
 
     @frappe.whitelist()
     def verify_dns_record(self, save: bool = False) -> bool:
+        if getattr(frappe.local, "request", None):  # the scheduler calls this too
+            frappe.only_for(("System Manager", "Suite Cloud Manager"))
         verified = verify_dns_record(self.fqdn, self.type, self.value)
         if verified is None:
             frappe.msgprint(

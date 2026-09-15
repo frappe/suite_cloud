@@ -1,6 +1,6 @@
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urljoin
 
@@ -26,8 +26,8 @@ class ConnectionInfo:
 
     url: str
     username: str | None = None
-    password: str | None = None
-    token: str | None = None
+    password: str | None = field(default=None, repr=False)  # never in a traceback's locals
+    token: str | None = field(default=None, repr=False)
     timeout: tuple[float, float] = (15.0, 60.0)
     verify_ssl: bool = True
 

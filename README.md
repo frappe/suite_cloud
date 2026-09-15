@@ -87,7 +87,8 @@ Installing creates three roles and one user:
    Frappe Cloud may place sites from, or none to serve every region. Copy the SSH public key.
 5. **First node.** Put that public key on a fresh VPS and set the reverse DNS (PTR) of its IP to the
    node's hostname. Create a Stalwart Node (`n1.c1.frappemail.com` with its IPv4), click
-   **Verify SSH**, then **Provision**. The job installs Stalwart and its CLI, sets up the system
+   **Verify SSH**, then **Provision**. The first Verify SSH records the server's host keys; every
+   later connection must match them, and a changed address or port asks for a fresh verification. The job installs Stalwart and its CLI, sets up the system
    service and firewall, starts Stalwart once to write the store settings, applies the cluster
    configuration (roles, coordinator, certificate provider, wildcard certificate, system settings),
    and restarts it normally with the temporary admin credential removed.

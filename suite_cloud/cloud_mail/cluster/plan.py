@@ -416,9 +416,14 @@ def _collect_secrets(value, found: list[str]) -> None:
 
 
 def marker(plan: list[dict]) -> str:
-    """Name of the file a node keeps once it applied this exact plan (secrets excluded)."""
+    """Name of the file a node keeps once it applied this exact plan.
 
-    digest = hashlib.sha1(redacted(plan).encode()).hexdigest()[:12]
+    The digest covers the redacted plan and a hash of its secrets, so a rotated password changes
+    the marker and gets applied, while the secrets themselves never appear on the node's disk.
+    """
+
+    secrets = hashlib.sha256("\0".join(secret_strings(plan)).encode()).hexdigest()
+    digest = hashlib.sha1(f"{redacted(plan)}\n{secrets}".encode()).hexdigest()[:12]
     return f".suite-cloud-plan-{digest}"
 
 

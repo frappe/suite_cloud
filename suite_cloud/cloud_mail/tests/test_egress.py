@@ -47,6 +47,7 @@ class TestEgress(IntegrationTestCase):
                 "doctype": "Egress Gateway",
                 "cluster": self.cluster.name,
                 "ipv4_address": "203.0.113.50",
+                "ssh_host_keys": "203.0.113.50 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeHostKeyForTests",
             }
         ).insert()
 

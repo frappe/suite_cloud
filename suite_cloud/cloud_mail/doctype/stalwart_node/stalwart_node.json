@@ -25,6 +25,7 @@
   "ssh_port",
   "column_break_ssh",
   "ssh_verified",
+  "ssh_host_keys",
   "state_section",
   "installed_version",
   "node_id",
@@ -172,6 +173,13 @@
    "fieldname": "ssh_verified",
    "fieldtype": "Check",
    "label": "SSH Verified",
+   "read_only": 1
+  },
+  {
+   "description": "The server's SSH host keys, recorded by Verify SSH on first contact and required to match on every later connection. Cleared when the address or port changes; verify again after reinstalling the server.",
+   "fieldname": "ssh_host_keys",
+   "fieldtype": "Small Text",
+   "label": "SSH Host Keys",
    "read_only": 1
   },
   {

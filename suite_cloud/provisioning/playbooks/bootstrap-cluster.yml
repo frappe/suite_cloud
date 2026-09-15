@@ -75,11 +75,6 @@
             path: /etc/stalwart/config.json
             timeout: 120
 
-        - name: Remove the bootstrap plan
-          file:
-            path: /etc/stalwart/bootstrap.ndjson
-            state: absent
-
         # Stalwart provisions its built-in roles, the default role lists and other defaults only
         # on a normal start; bootstrap and recovery mode skip that step. Without this start the
         # administrator (and every account) would resolve to no permissions at all.
@@ -107,6 +102,12 @@
           systemd:
             name: stalwart
             state: stopped
+      always:
+        # The plan names the store credentials; it must not outlive the play, failed or not.
+        - name: Remove the bootstrap plan
+          file:
+            path: /etc/stalwart/bootstrap.ndjson
+            state: absent
 
     - name: Check whether this cluster plan version was applied
       stat:
@@ -149,16 +150,27 @@
           command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/cluster.ndjson --json
           environment: "{{ cli_env }}"
 
-        - name: Remove the cluster plan
-          file:
-            path: /etc/stalwart/cluster.ndjson
-            state: absent
-
         - name: Record the applied plan version
           copy:
             content: "{{ config_version }}\n"
             dest: "/etc/stalwart/{{ plan_marker }}"
             mode: "0644"
+      always:
+        # Whatever happened, neither the plan (relay and store secrets, DNS token) nor the
+        # recovery credential in the environment stays on the node.
+        - name: Remove the cluster plan
+          file:
+            path: /etc/stalwart/cluster.ndjson
+            state: absent
+
+        - name: Write the runtime environment after the recovery stage
+          no_log: true
+          copy:
+            content: "{{ env_normal }}"
+            dest: /etc/stalwart/stalwart.env
+            owner: stalwart
+            group: stalwart
+            mode: "0600"
 
     - name: Write the runtime environment
       no_log: true

@@ -25,6 +25,20 @@ class TestStalwartCluster(IntegrationTestCase):
     def tearDown(self) -> None:
         frappe.flags.do_not_enqueue = False
 
+    def test_connections_pin_the_host_key_recorded_at_first_contact(self) -> None:
+        from suite_cloud.provisioning.ssh import SSHTarget, UnknownHostError, inventory_line, known_hosts_file
+
+        target = SSHTarget("203.0.113.1", "root", 22, "k", host_keys="203.0.113.1 ssh-ed25519 AAAAtest")
+        with known_hosts_file(target) as path:
+            self.assertEqual(open(path).read(), "203.0.113.1 ssh-ed25519 AAAAtest\n")
+            line = inventory_line("n1", target, "/k", path)
+        self.assertIn("StrictHostKeyChecking=yes", line)
+        self.assertIn(f"UserKnownHostsFile={path}", line)
+        self.assertNotIn("/dev/null", line)
+        # Never verified: nothing to check the server against, so no connection at all.
+        with self.assertRaises(UnknownHostError), known_hosts_file(SSHTarget("203.0.113.1", "root", 22, "k")):
+            pass
+
     def test_ssh_user_is_a_plain_login_name(self) -> None:
         cluster = make_cluster()
         cluster.ssh_user = "root ansible_connection=local"
@@ -35,7 +49,7 @@ class TestStalwartCluster(IntegrationTestCase):
         from suite_cloud.provisioning.ssh import SSHTarget, inventory_line
 
         self.assertRaises(
-            ValueError, inventory_line, "n1", SSHTarget("203.0.113.1", "root\nx", 22, "k"), "/k"
+            ValueError, inventory_line, "n1", SSHTarget("203.0.113.1", "root\nx", 22, "k"), "/k", "/kh"
         )
 
     def test_cluster_derives_zone_url_and_coordinator(self) -> None:

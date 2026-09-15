@@ -1,5 +1,6 @@
 """Node lifecycle: provisioning, bootstrap completion, health, draining and upgrades."""
 
+import re
 from typing import TYPE_CHECKING
 
 import frappe
@@ -10,7 +11,7 @@ from suite_cloud.cloud_mail.cluster import dns, plan
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
 from suite_cloud.cloud_mail.stalwart.errors import StalwartError
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
-from suite_cloud.utils import get_config, log_error
+from suite_cloud.utils import get_config, log_error, log_exception
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -94,8 +95,17 @@ def run_commands(server: Document, commands: list[str], title: str) -> Document:
     )
 
 
+# The only ad-hoc commands a job may run on a server: opening a firewall port. The job's context
+# is stored on a row operators can write, so the shape is checked here, not trusted.
+ALLOWED_COMMANDS = (re.compile(r"^ufw allow \d{1,5}/tcp$"),)
+
+
 def build_command_variables(context: dict) -> dict:
-    return {"commands": list(context.get("commands") or [])}
+    commands = [str(c) for c in context.get("commands") or []]
+    for command in commands:
+        if not any(pattern.match(command) for pattern in ALLOWED_COMMANDS):
+            frappe.throw(_("Command {0} is not one a Server Job may run.").format(command))
+    return {"commands": commands}
 
 
 def build_node_variables(context: dict) -> dict:
@@ -306,7 +316,7 @@ def _set_default_certificate(cluster: Document, client) -> None:
                 client.singleton("SystemSettings").write({"defaultCertificateId": certificate["id"]})
                 return
     except StalwartError:
-        frappe.log_error(title=f"[Suite Cloud] Could not pick a default certificate for {cluster.name}")
+        log_exception(f"Could not pick a default certificate for {cluster.name}", cluster)
 
 
 # --- draining / removal -----------------------------------------------------------------------
@@ -339,4 +349,4 @@ def forget_node(node: Document) -> None:
         if registry := client.cluster_nodes.find_by_hostname(node.hostname):
             client.cluster_nodes.delete(registry["id"])
     except StalwartError:
-        frappe.log_error(title=f"[Suite Cloud] Could not remove {node.hostname} from the cluster registry")
+        log_exception(f"Could not remove {node.hostname} from the cluster registry", node)

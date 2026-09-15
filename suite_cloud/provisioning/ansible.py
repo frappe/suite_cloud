@@ -15,7 +15,13 @@ import yaml
 from frappe import _
 from frappe.utils import now, time_diff_in_seconds
 
-from suite_cloud.provisioning.ssh import SSHTarget, inventory_line, private_key_file
+from suite_cloud.provisioning.ssh import (
+    SSHTarget,
+    inventory_line,
+    known_hosts_file,
+    private_key_file,
+    scratch_dir,
+)
 from suite_cloud.utils import reconnect_on_failure
 
 if TYPE_CHECKING:
@@ -23,7 +29,7 @@ if TYPE_CHECKING:
 
 PLAYBOOKS_DIR = os.path.join(os.path.dirname(__file__), "playbooks")
 FINAL_TASK_STATUSES = ("Success", "Failed", "Unreachable", "Skipped")
-RUNNER_ENV = {"ANSIBLE_HOST_KEY_CHECKING": "False", "ANSIBLE_RETRY_FILES_ENABLED": "False"}
+RUNNER_ENV = {"ANSIBLE_HOST_KEY_CHECKING": "True", "ANSIBLE_RETRY_FILES_ENABLED": "False"}
 
 
 def playbook_path(playbook: str) -> str:
@@ -71,7 +77,7 @@ class RunOutcome:
 def private_data_dir() -> Iterator[str]:
     """ansible-runner writes extravars (our secrets) into its data dir; it must not outlive the run."""
 
-    path = tempfile.mkdtemp(prefix="suite-cloud-run-")
+    path = tempfile.mkdtemp(prefix="suite-cloud-run-", dir=scratch_dir())
     try:
         yield path
     finally:
@@ -81,12 +87,16 @@ def private_data_dir() -> Iterator[str]:
 def ping(target: SSHTarget) -> tuple[bool, str]:
     """Checks SSH access with Ansible's ping module (no playbook needed)."""
 
-    with private_key_file(target.private_key) as key_path, private_data_dir() as data_dir:
+    with (
+        private_key_file(target.private_key) as key_path,
+        known_hosts_file(target) as known_hosts,
+        private_data_dir() as data_dir,
+    ):
         runner = ansible_runner.run(
             private_data_dir=data_dir,
             module="ping",
             host_pattern="all",
-            inventory=inventory_line("target", target, key_path),
+            inventory=inventory_line("target", target, key_path, known_hosts),
             envvars=RUNNER_ENV,
             quiet=True,
         )
@@ -126,11 +136,15 @@ class PlaybookRun:
         target = server.ssh_target()
         alias = server.name
         stats: dict = {}
-        with private_key_file(target.private_key) as key_path, private_data_dir() as data_dir:
+        with (
+            private_key_file(target.private_key) as key_path,
+            known_hosts_file(target) as known_hosts,
+            private_data_dir() as data_dir,
+        ):
             runner = ansible_runner.run(
                 private_data_dir=data_dir,
                 playbook=playbook_path(self.job.playbook),
-                inventory=inventory_line(alias, target, key_path),
+                inventory=inventory_line(alias, target, key_path, known_hosts),
                 extravars=self.variables,
                 envvars=RUNNER_ENV,
                 event_handler=self.handle_event,

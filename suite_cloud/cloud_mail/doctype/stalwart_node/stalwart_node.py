@@ -11,7 +11,8 @@ from frappe.utils import cint, now
 from suite_cloud.cloud_mail.cluster import bootstrap, dns, naming
 from suite_cloud.dns.resolver import verify_ptr_record
 from suite_cloud.provisioning.ansible import ping
-from suite_cloud.provisioning.ssh import SSHTarget, validate_ssh_user_field
+from suite_cloud.provisioning.ssh import SSHTarget, scan_host_keys, validate_ssh_user_field
+from suite_cloud.utils import log_exception
 
 REMOVABLE_STATUSES = ("Pending", "Failed", "Disabled")
 
@@ -72,7 +73,12 @@ class StalwartNode(Document):
         if self.is_new():
             self.status = "Pending"
 
-        if self.has_value_changed("ipv4_address") or self.has_value_changed("ipv6_address"):
+        if not self.is_new() and (
+            self.has_value_changed("ipv4_address") or self.has_value_changed("ssh_port")
+        ):
+            self.ssh_verified = 0
+            self.ssh_host_keys = None  # a different box answers there; its key is unknown again
+        elif self.has_value_changed("ipv4_address") or self.has_value_changed("ipv6_address"):
             self.ssh_verified = 0
 
     def validate_single_node(self, cluster: Document) -> None:
@@ -133,6 +139,7 @@ class StalwartNode(Document):
             user=self.ssh_user or cluster.ssh_user,
             port=cint(self.ssh_port or cluster.ssh_port),
             private_key=cluster.get_password("ssh_private_key"),
+            host_keys=self.ssh_host_keys,
         )
 
     def set_status(self, status: str, error: str | None = None) -> None:
@@ -146,6 +153,19 @@ class StalwartNode(Document):
     @frappe.whitelist()
     def verify_ssh(self) -> bool:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        if not self.ssh_host_keys:
+            # First contact: the operator has just put the cluster's key on this box, so the key it
+            # presents now is the one every later connection must match.
+            try:
+                self.db_set(
+                    "ssh_host_keys",
+                    scan_host_keys(self.ipv4_address, cint(self.ssh_port)),
+                    update_modified=False,
+                )
+            except Exception as e:
+                self.db_set({"ssh_verified": 0, "last_error": str(e)}, update_modified=False)
+                frappe.msgprint(_("SSH connection failed: {0}").format(e), indicator="red")
+                return False
         ok, detail = ping(self.ssh_target())
         self.db_set({"ssh_verified": cint(ok), "last_error": None if ok else detail}, update_modified=False)
         if ok:
@@ -230,7 +250,7 @@ def poll_pending_nodes() -> None:
             bootstrap.check_node(node)
         except Exception:
             frappe.db.rollback()
-            node.log_error(f"Health check failed for {name}")
+            log_exception(f"Health check failed for {name}", node)
             continue
         if not frappe.in_test:
             frappe.db.commit()
