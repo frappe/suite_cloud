@@ -1,0 +1,139 @@
+{
+ "actions": [],
+ "autoname": "field:email",
+ "creation": "2026-09-03 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "email",
+  "domain",
+  "site",
+  "cluster",
+  "column_break_main",
+  "description",
+  "stalwart_id",
+  "aliases_section",
+  "aliases"
+ ],
+ "fields": [
+  {
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1,
+   "set_only_once": 1,
+   "unique": 1,
+   "description": "The list's address, e.g. news@acme.com. Mail sent to it is delivered to every enabled recipient. Its domain must be a Mail Domain of the site. Cannot change after saving."
+  },
+  {
+   "fieldname": "domain",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Domain",
+   "options": "Mail Domain",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "Mail Domain the address belongs to. Derived from the email."
+  },
+  {
+   "fetch_from": "domain.site",
+   "fieldname": "site",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Site",
+   "options": "Suite Site",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "Suite site that owns the list. Derived from the domain; the site's mailing list limit applies."
+  },
+  {
+   "fetch_from": "domain.cluster",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "Cluster the list lives on. Derived from the site."
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Description",
+   "description": "What the list is for, e.g. Product news. Shown on the cluster as the list's name."
+  },
+  {
+   "fieldname": "stalwart_id",
+   "fieldtype": "Data",
+   "label": "Stalwart ID",
+   "no_copy": 1,
+   "read_only": 1,
+   "description": "Id of the list on the cluster. Set when it is created there."
+  },
+  {
+   "fieldname": "aliases_section",
+   "fieldtype": "Section Break",
+   "label": "Aliases"
+  },
+  {
+   "fieldname": "aliases",
+   "fieldtype": "Table",
+   "label": "Aliases",
+   "options": "Mail Address Alias",
+   "description": "Other addresses that reach the list. Each must be unique across the cluster and under one of the site's domains."
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "group": "Recipients",
+   "link_doctype": "Mailing List Recipient",
+   "link_fieldname": "mailing_list"
+  }
+ ],
+ "modified": "2026-09-08 16:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "Mailing List",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Suite Cloud Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

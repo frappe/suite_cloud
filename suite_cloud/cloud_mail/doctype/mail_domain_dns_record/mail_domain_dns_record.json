@@ -1,0 +1,148 @@
+{
+ "actions": [],
+ "creation": "2026-09-03 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "record_section",
+  "record_type",
+  "host",
+  "value",
+  "column_break_record",
+  "category",
+  "priority",
+  "weight",
+  "port",
+  "ttl",
+  "verification_section",
+  "is_verified",
+  "is_mandatory",
+  "column_break_verification",
+  "last_checked_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "record_section",
+   "fieldtype": "Section Break",
+   "label": "Record"
+  },
+  {
+   "columns": 1,
+   "description": "The DNS record type to create at the provider.",
+   "fieldname": "record_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Type",
+   "options": "MX\nTXT\nCNAME\nSRV",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "description": "The name to create, relative to the domain; @ is the domain itself. Providers that want the full name get host, a dot and the domain.",
+   "fieldname": "host",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Host",
+   "read_only": 1
+  },
+  {
+   "columns": 5,
+   "description": "What the record must hold. For MX and SRV it is the target hostname alone; priority, weight and port are their own fields. A long TXT value is shown as one string even where the provider splits it into chunks.",
+   "fieldname": "value",
+   "fieldtype": "Text",
+   "in_list_view": 1,
+   "label": "Value",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_record",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 1,
+   "description": "The protocol the record serves. The table the row sits in is its group.",
+   "fieldname": "category",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Category",
+   "options": "MX\nSPF\nDKIM\nDMARC\nMTA-STS\nTLS-RPT\nSRV\nAutoconfig\nAutodiscover\nUA Auto Config",
+   "read_only": 1
+  },
+  {
+   "description": "MX and SRV use it: lower is preferred. Zero for every other type.",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "label": "Priority",
+   "read_only": 1
+  },
+  {
+   "description": "SRV only: how load is shared among records of the same priority. Zero for every other type.",
+   "fieldname": "weight",
+   "fieldtype": "Int",
+   "label": "Weight",
+   "read_only": 1
+  },
+  {
+   "description": "SRV only: the port the service listens on at the target named in Value. Zero for every other type.",
+   "fieldname": "port",
+   "fieldtype": "Int",
+   "label": "Port",
+   "read_only": 1
+  },
+  {
+   "description": "How long resolvers may cache the record, in seconds. A suggestion from the zone file or the Suite Cloud default; providers often apply their own.",
+   "fieldname": "ttl",
+   "fieldtype": "Int",
+   "label": "TTL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "verification_section",
+   "fieldtype": "Section Break",
+   "label": "Verification"
+  },
+  {
+   "columns": 1,
+   "default": "0",
+   "description": "Set when the record resolved to the expected value on public resolvers at the last check. Kept across refreshes while the value stays the same.",
+   "fieldname": "is_verified",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Verified",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Set on the rows that decide whether the domain is verified: the Email Authentication group.",
+   "fieldname": "is_mandatory",
+   "fieldtype": "Check",
+   "label": "Mandatory",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_verification",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "When the record was last resolved. Empty until the first verification; a lookup that could not be resolved leaves it unchanged.",
+   "fieldname": "last_checked_at",
+   "fieldtype": "Datetime",
+   "label": "Last Checked At",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-07 13:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "Mail Domain DNS Record",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
