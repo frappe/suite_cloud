@@ -11,6 +11,7 @@ from suite_cloud.cloud_mail.stalwart.directory import MailingList as StalwartMai
 from suite_cloud.cloud_mail.tenancy import sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
+    assert_addresses_deliverable,
     assert_domain_live,
     get_site_domain,
     validate_email_address,
@@ -120,18 +121,23 @@ class MailingList(Document):
 
     def add_recipients(self, emails: list[str], push: bool = True) -> list[str]:
         """Adds the addresses not yet on the list and pushes them in one patch. Returns the added ones.
-        ``push=False`` records addresses the cluster already delivers to (adoption).
 
-        Rows are written in bulk: a batch of thousands must not cost a document insert each. The
-        checks the row's controller would run happen here instead.
+        Rows are written in bulk: a batch of thousands must not cost a document insert each, nor
+        a read of the whole list. The checks the row's controller would run happen here instead.
+        ``push=False`` records addresses the cluster already delivers to (adoption).
         """
 
-        wanted = [validate_email_address(e) for e in emails]
+        wanted = list(dict.fromkeys(validate_email_address(e) for e in emails))
         if self.email in wanted:
             frappe.throw(_("A mailing list cannot be its own recipient."))
-        existing = set(self.recipient_emails(enabled_only=False))
-        added = [email for email in dict.fromkeys(wanted) if email not in existing]
-        if added:
+        assert_addresses_deliverable(self.site, wanted)
+        existing = set(
+            frappe.get_all(
+                "Mailing List Recipient", {"mailing_list": self.name, "email": ["in", wanted]}, pluck="email"
+            )
+        )
+        candidates = [email for email in wanted if email not in existing]
+        if candidates:
             stamp, user = now(), frappe.session.user
             frappe.db.bulk_insert(
                 "Mailing List Recipient",
@@ -148,15 +154,26 @@ class MailingList(Document):
                         user,
                         user,
                     )
-                    for email in added
+                    for email in candidates
                 ),
+                ignore_duplicates=True,  # a concurrent import may have landed some rows meanwhile
             )
+        # What this call actually added is what is on the list now and was not before.
+        present = set(
+            frappe.get_all(
+                "Mailing List Recipient",
+                {"mailing_list": self.name, "email": ["in", candidates or [""]]},
+                pluck="email",
+            )
+        )
+        added = [email for email in candidates if email in present]
         if push:
             self.push_recipient_changes(added=added)
         return added
 
     def remove_recipients(self, emails: list[str]) -> list[str]:
-        """Removes the addresses that are on the list and pushes them in one patch. Returns the removed ones."""
+        """Removes the addresses that are on the list and pushes the enabled ones in one patch.
+        Returns every address removed."""
 
         wanted = {validate_email_address(e) for e in emails}
         rows = frappe.get_all(
@@ -166,9 +183,8 @@ class MailingList(Document):
         )
         if rows:
             frappe.db.delete("Mailing List Recipient", {"name": ["in", [row.name for row in rows]]})
-        removed = [row.email for row in rows if row.enabled]
-        self.push_recipient_changes(removed=removed)
-        return removed
+        self.push_recipient_changes(removed=[row.email for row in rows if row.enabled])
+        return [row.email for row in rows]
 
     def set_recipients(self, emails: list[str]) -> None:
         """Makes the list exactly ``emails``: a full replace, meant for small lists."""

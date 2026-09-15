@@ -1,8 +1,17 @@
 import frappe
-from frappe.utils import sbool
+from frappe.utils import cint, sbool
 
 from suite_cloud.api.mail import aliases as alias_rows
-from suite_cloud.api.site import as_alias_rows, as_list, current_site, owned, owned_page, page_size, site_api
+from suite_cloud.api.site import (
+    RECIPIENT_BATCH,
+    as_alias_rows,
+    as_list,
+    current_site,
+    owned,
+    owned_page,
+    page_size,
+    site_api,
+)
 
 PAGE_CAP = 500  # the dashboard's largest page
 from suite_cloud.cloud_mail.doctype.mailing_list.mailing_list import list_payloads
@@ -42,7 +51,7 @@ def create_mailing_list(
     doc.insert(ignore_permissions=True)
     if recipients:
         try:
-            doc.add_recipients(as_list(recipients))
+            doc.add_recipients(as_list(recipients, RECIPIENT_BATCH))
         except Exception:
             sync.push_destroy(doc, "mailing_lists")  # the row rolls back; the cluster list must too
             raise
@@ -102,12 +111,12 @@ def list_recipients(email: str, search: str | None = None, start: int = 0, limit
         filters=filters,
         fields=["email", "enabled"],
         order_by="email asc",
-        limit_start=int(start),
+        limit_start=max(cint(start), 0),
         limit_page_length=page_size(limit, 1000),
     )
     return {
         "items": [{"email": r.email, "enabled": bool(r.enabled)} for r in rows],
-        "total": frappe.db.count("Mailing List Recipient", {"mailing_list": doc.name}),
+        "total": frappe.db.count("Mailing List Recipient", filters),
     }
 
 
@@ -117,7 +126,10 @@ def add_recipients(email: str, recipients: list[str] | str | None = None) -> dic
     """Adds up to 5000 addresses per call; ones already on the list are skipped."""
 
     doc = owned("Mailing List", email)
-    return {"added": doc.add_recipients(as_list(recipients)[:5000]), "recipient_count": doc.recipient_count()}
+    return {
+        "added": doc.add_recipients(as_list(recipients, RECIPIENT_BATCH)),
+        "recipient_count": doc.recipient_count(),
+    }
 
 
 @frappe.whitelist(methods=["POST", "DELETE"])
@@ -125,7 +137,7 @@ def add_recipients(email: str, recipients: list[str] | str | None = None) -> dic
 def remove_recipients(email: str, recipients: list[str] | str | None = None) -> dict:
     doc = owned("Mailing List", email)
     return {
-        "removed": doc.remove_recipients(as_list(recipients)[:5000]),
+        "removed": doc.remove_recipients(as_list(recipients, RECIPIENT_BATCH)),
         "recipient_count": doc.recipient_count(),
     }
 
@@ -136,7 +148,7 @@ def set_recipients(email: str, recipients: list[str] | str | None = None) -> dic
     """Full replace, for small lists; large lists should add and remove incrementally."""
 
     doc = owned("Mailing List", email)
-    doc.set_recipients(as_list(recipients))
+    doc.set_recipients(as_list(recipients, RECIPIENT_BATCH))
     return doc.to_api()
 
 

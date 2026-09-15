@@ -1,8 +1,10 @@
 import frappe
+from frappe import _
+from frappe.utils import sbool
 
 from suite_cloud.api.site import current_site, owned, owned_names, site_api
 from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import domain_payloads
-from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_available, validate_domain_name
+from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_not_reserved, validate_domain_name
 from suite_cloud.cloud_mail.tenancy.ownership import ownership_record
 
 
@@ -29,7 +31,11 @@ def check_domain(domain: str) -> dict:
 
     site = current_site()
     domain = validate_domain_name(domain)
-    assert_domain_available(domain, site.name)
+    if frappe.db.get_value("Mail Domain", domain, "site") == site.name:
+        frappe.throw(
+            _("Domain {0} is already added to this site.").format(domain), frappe.DuplicateEntryError
+        )
+    assert_domain_not_reserved(domain)  # whether another site holds it is told only to a proven owner
     return {"domain": domain, "ownership_record": ownership_record(site, domain)}
 
 
@@ -52,9 +58,9 @@ def create_domain(
             "site": current_site().name,
             "description": description,
             "catch_all_address": catch_all_address,
-            "sub_addressing": int(bool(sub_addressing)),
-            "allow_relaying": int(bool(allow_relaying)),
-            "publish_client_discovery_records": int(bool(publish_client_discovery_records)),
+            "sub_addressing": int(sbool(sub_addressing)),
+            "allow_relaying": int(sbool(allow_relaying)),
+            "publish_client_discovery_records": int(sbool(publish_client_discovery_records)),
         }
     )
     doc.insert(ignore_permissions=True)
@@ -79,13 +85,13 @@ def update_domain(
     if catch_all_address is not None:
         doc.catch_all_address = catch_all_address or None
     if sub_addressing is not None:
-        doc.sub_addressing = int(bool(sub_addressing))
+        doc.sub_addressing = int(sbool(sub_addressing))
     if allow_relaying is not None:
-        doc.allow_relaying = int(bool(allow_relaying))
+        doc.allow_relaying = int(sbool(allow_relaying))
     if enabled is not None:
-        doc.enabled = int(bool(enabled))
+        doc.enabled = int(sbool(enabled))
     if publish_client_discovery_records is not None:
-        doc.publish_client_discovery_records = int(bool(publish_client_discovery_records))
+        doc.publish_client_discovery_records = int(sbool(publish_client_discovery_records))
     doc.save(ignore_permissions=True)  # a changed discovery flag rebuilds the record tables
     return doc.to_api()
 

@@ -81,9 +81,31 @@ def assert_domain_available(domain_name: str, site: str) -> None:
     if owner:
         # Neutral on purpose: another site holding the name is not this site's business.
         frappe.throw(_("Domain {0} is not available.").format(domain_name), frappe.DuplicateEntryError)
+    assert_domain_not_reserved(domain_name)
+
+
+def assert_domain_not_reserved(domain_name: str) -> None:
     for zone in frappe.get_all("DNS Zone", pluck="name"):
         if domain_name == zone or domain_name.endswith(f".{zone}"):
             frappe.throw(_("{0} is reserved for the mail infrastructure.").format(domain_name))
+
+
+def assert_addresses_deliverable(site: str, emails: list[str]) -> None:
+    """Addresses a site may route mail to: its own, or ones outside the platform.
+
+    An address under a domain that another site holds is refused as if it did not exist: a list
+    or catch-all pointing at it would inject mail into that site's mailboxes, unseen by it.
+    """
+
+    domains = {e.split("@", 1)[1] for e in emails if "@" in e}
+    if not domains:
+        return
+    foreign = frappe.get_all(
+        "Mail Domain", {"name": ["in", list(domains)], "site": ["!=", site]}, pluck="name"
+    )
+    if foreign:
+        offending = sorted(e for e in emails if e.split("@", 1)[1] in set(foreign))
+        frappe.throw(_("Address {0} is not available.").format(offending[0]), frappe.DoesNotExistError)
 
 
 def assert_address_available(email: str, exclude: tuple[str, str] | None = None) -> None:

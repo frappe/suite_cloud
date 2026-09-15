@@ -11,7 +11,12 @@ from suite_cloud.cloud_mail.cluster import egress
 from suite_cloud.cloud_mail.cluster.zone import GROUPS, build_domain_records, group_summaries
 from suite_cloud.cloud_mail.stalwart.directory import Domain
 from suite_cloud.cloud_mail.tenancy import ownership, sync
-from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_available, validate_domain_name
+from suite_cloud.cloud_mail.tenancy.addresses import (
+    assert_addresses_deliverable,
+    assert_domain_available,
+    validate_domain_name,
+    validate_email_address,
+)
 from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.utils import dkim_algorithms, get_config, utc_iso
 
@@ -73,12 +78,15 @@ class MailDomain(Document):
         site = self.get_site()
         self.cluster = site.cluster
         if self.is_new() and not self.flags.adopting:
-            assert_domain_available(self.domain_name, self.site)
-            site.assert_can_add_domain()
+            # Proof of control comes first: only someone who controls the domain's DNS learns
+            # whether another site already holds it.
             if ownership.required():
                 ownership.assert_ownership(site, self.domain_name)
+            assert_domain_available(self.domain_name, self.site)
+            site.assert_can_add_domain()
         if self.catch_all_address:
-            self.catch_all_address = self.catch_all_address.strip().lower()
+            self.catch_all_address = validate_email_address(self.catch_all_address)
+            assert_addresses_deliverable(self.site, [self.catch_all_address])
         if (
             self.egress_pool
             and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
@@ -348,8 +356,9 @@ def refresh_rotating_domains() -> None:
             signatures = sync.client_for(domain).dkim_signatures.get_all_by_domain(domain.stalwart_id)
         except Exception:
             continue
-        rotating = any(s.get("stage") in ("pending", "retiring") for s in signatures)
-        published = {s.get("selector") for s in signatures if s.get("stage") in ("active", "pending")}
+        stages = {s.get("selector"): str(s.get("stage") or "").lower() for s in signatures}
+        rotating = any(stage in ("pending", "retiring") for stage in stages.values())
+        published = {selector for selector, stage in stages.items() if stage in ("active", "pending")}
         if rotating or not published <= stored.get(domain.name, set()):
             _refresh(domain.name)
 

@@ -1,8 +1,11 @@
+from contextlib import suppress
+
 import frappe
 from frappe.utils import sbool
 
 from suite_cloud.api.mail import aliases
 from suite_cloud.api.site import (
+    MEMBERSHIP_CAP,
     as_alias_rows,
     as_list,
     current_site,
@@ -63,7 +66,7 @@ def get_quotas(emails: list[str] | str) -> dict:
     allotted = quota_rows.disk_quota_gb_by_name("Mail Account", [row.name for row in rows])
     usage = used_disk_by_name(rows)
     return {
-        row.name: {"disk_quota_gb": allotted.get(row.name, 0), "used_disk_bytes": usage.get(row.name)}
+        row.name: {"disk_quota_gb": allotted.get(row.name), "used_disk_bytes": usage.get(row.name)}
         for row in rows
     }
 
@@ -88,7 +91,7 @@ def create_account(
     site = current_site()
     # Everything the account depends on is resolved first: a refusal after the insert would leave
     # the Stalwart account behind while the database change rolls back.
-    lists = [owned("Mailing List", email_) for email_ in as_list(mailing_lists)]
+    lists = [owned("Mailing List", email_) for email_ in as_list(mailing_lists, MEMBERSHIP_CAP)]
     doc = frappe.get_doc(
         {
             "doctype": "Mail Account",
@@ -99,7 +102,7 @@ def create_account(
             "locale": locale or "en-US",
             "time_zone": time_zone,
             "aliases": as_alias_rows(aliases),
-            "groups": [{"group": owned("Mail Group", g).name} for g in as_list(groups)],
+            "groups": [{"group": owned("Mail Group", g).name} for g in as_list(groups, MEMBERSHIP_CAP)],
         }
     )
     quota_rows.apply(doc, disk_quota_gb, quotas)
@@ -108,10 +111,15 @@ def create_account(
 
     # The list memberships are separate cluster calls after the insert: if one fails the row
     # rolls back, so the cluster account must go too or a retry meets "already exists".
+    joined = []
     try:
         for mailing_list in lists:
             mailing_list.add_recipients([doc.email])
+            joined.append(mailing_list)
     except Exception:
+        for mailing_list in joined:  # the lists that took the address must let it go again
+            with suppress(Exception):
+                mailing_list.remove_recipients([doc.email])
         sync.push_destroy(doc, "accounts")
         raise
 
@@ -153,7 +161,7 @@ def update_account(
 @site_api
 def set_account_enabled(email: str, enabled: bool) -> dict:
     doc = owned("Mail Account", email)
-    doc.set_enabled(bool(enabled))
+    doc.set_enabled(sbool(enabled))
     return doc.to_api()
 
 
@@ -210,7 +218,7 @@ def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
 @site_api
 def set_groups(email: str, groups: list[str] | str | None = None) -> dict:
     doc = owned("Mail Account", email)
-    doc.set("groups", [{"group": owned("Mail Group", g).name} for g in as_list(groups)])
+    doc.set("groups", [{"group": owned("Mail Group", g).name} for g in as_list(groups, MEMBERSHIP_CAP)])
     doc.save(ignore_permissions=True)
     return doc.to_api()
 

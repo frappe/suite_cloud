@@ -125,16 +125,24 @@ class TestSiteResolution(SiteApiTestCase):
             self.act_as(self.site)
             frappe.local.request_ip = ip
             self.assertEqual(ping()["site"], self.site.name)
-        logged = frappe.db.count("Error Log")
+        for key in frappe.cache.get_keys("suite_cloud:refused:*"):
+            frappe.cache.delete_value(key)
+        mock_log = patch("suite_cloud.api.site.frappe.log_error").start()
+        self.addCleanup(patch.stopall)
         for ip in ("203.0.113.11", "192.168.1.1", None, "garbage"):
             self.act_as(self.site)
             frappe.local.request_ip = ip
             self.assertRaisesRegex(SiteAddressError, "does not accept requests", ping)
-        # Each refusal leaves an Error Log naming the site and the address, for operators to act on.
-        self.assertEqual(frappe.db.count("Error Log") - logged, 4)
-        last = frappe.get_last_doc("Error Log")
-        self.assertIn(f"{self.site.name}: request from an address outside", last.method)
-        self.assertIn("garbage", last.error)
+        # Each refusal leaves an Error Log naming the site and the address, for operators to act
+        # on; it is written on the side (deferred) so the refusal's own rollback keeps it, and a
+        # flood from one address is logged once per window.
+        frappe.local.request_ip = "192.168.1.1"
+        self.act_as(self.site)
+        self.assertRaisesRegex(SiteAddressError, "does not accept requests", ping)
+        logged = [m for m in mock_log.call_args_list if "outside its allowed list" in m.kwargs["title"]]
+        self.assertEqual(len(logged), 4)
+        self.assertIn("garbage", logged[3].kwargs["message"])
+        self.assertTrue(all(m.kwargs["defer_insert"] for m in logged))
 
         # Operators acting for the site from the desk are not the site's server.
         frappe.local.request_ip = "192.168.1.1"
@@ -175,6 +183,23 @@ class TestDomainOwnership(SiteApiTestCase):
         self.act_as(self.other)
         self.assertNotEqual(domains.check_domain("acme.com")["ownership_record"]["value"], record["value"])
 
+    def test_check_domain_does_not_tell_who_holds_a_domain(self) -> None:
+        # Another site holds taken.com; asking about it only yields the record to publish.
+        self.act_as(self.other)
+        domains.create_domain("taken.com")
+        self.act_as(self.site)
+        answer = domains.check_domain("taken.com")
+        self.assertEqual(answer["ownership_record"]["fqdn"], "taken.com")
+        # Only a proven owner learns that it is not available; without the record the answer
+        # is the same as for any unproven domain.
+        with patch("suite_cloud.cloud_mail.tenancy.ownership.verify_ownership", return_value=False):
+            self.assertRaisesRegex(
+                frappe.ValidationError, "Publish a TXT record", domains.create_domain, "taken.com"
+            )
+        self.assertRaisesRegex(
+            frappe.DuplicateEntryError, "not available", domains.create_domain, "taken.com"
+        )
+
     def test_domain_is_added_only_once_its_record_resolves(self) -> None:
         target = "suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record"
         with patch(target, return_value=False):
@@ -193,8 +218,13 @@ class TestDomainOwnership(SiteApiTestCase):
         )
         self.assertRaisesRegex(frappe.DuplicateEntryError, "already added", domains.check_domain, "acme.com")
         self.act_as(self.other)
-        self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", domains.check_domain, "acme.com")
-        self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", domains.create_domain, "acme.com")
+        self.assertEqual(
+            domains.check_domain("acme.com")["domain"], "acme.com"
+        )  # tells the other site nothing
+        with patch(target, return_value=True):
+            self.assertRaisesRegex(
+                frappe.DuplicateEntryError, "not available", domains.create_domain, "acme.com"
+            )
 
     def test_operators_add_domains_without_the_record(self) -> None:
         target = "suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record"

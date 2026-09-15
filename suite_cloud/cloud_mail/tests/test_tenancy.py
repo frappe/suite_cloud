@@ -281,6 +281,42 @@ class TestMailDomain(TenancyTestCase):
         make_site(self.cluster, "other.frappe.test")
         self.assertRaisesRegex(frappe.ValidationError, "also serves", adopt_directory, self.site.name)
 
+    def test_mail_never_routes_into_another_sites_domain(self) -> None:
+        domain = self.make_domain()
+        other = make_site(self.cluster, "other.frappe.test")
+        theirs = frappe.get_doc(
+            {"doctype": "Mail Domain", "domain_name": "other.com", "site": other.name, "is_verified": 1}
+        )
+        theirs.insert()
+
+        mailing_list = frappe.get_doc(
+            {"doctype": "Mailing List", "email": "all@acme.com", "site": self.site.name}
+        )
+        mailing_list.insert()
+        # External addresses and the site's own are fine; an address under another site's domain is not.
+        self.assertEqual(mailing_list.add_recipients(["ext@example.org"]), ["ext@example.org"])
+        self.assertRaisesRegex(
+            frappe.DoesNotExistError,
+            "not available",
+            mailing_list.add_recipients,
+            ["ceo@other.com", "x@example.org"],
+        )
+        self.assertEqual(mailing_list.recipient_emails(), ["ext@example.org"])
+        row = frappe.get_doc(
+            {"doctype": "Mailing List Recipient", "mailing_list": mailing_list.name, "email": "hr@other.com"}
+        )
+        self.assertRaisesRegex(frappe.DoesNotExistError, "not available", row.insert)
+
+        domain.catch_all_address = "inbox@other.com"
+        self.assertRaisesRegex(frappe.DoesNotExistError, "not available", domain.save)
+        domain.reload()
+        domain.catch_all_address = "not an address"
+        self.assertRaisesRegex(frappe.ValidationError, "not a valid email", domain.save)
+        domain.reload()
+        domain.catch_all_address = "Inbox@Acme.com"
+        domain.save()
+        self.assertEqual(domain.catch_all_address, "inbox@acme.com")
+
     def test_hourly_refresh_only_touches_domains_that_need_it(self) -> None:
         from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import refresh_rotating_domains
 
@@ -615,6 +651,7 @@ class TestMailAccount(TenancyTestCase):
         second = account.rotate_app_password()
         self.assertNotEqual(first, second)
         self.assertEqual(frappe.get_doc("Mail Account", account.name).show_app_password(), second)
+        frappe.db.after_commit.run()  # the old credential goes only once the new one is committed
         stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
         self.assertEqual(
             [c["description"] for c in stored.values() if c["description"] == "Suite Cloud"], ["Suite Cloud"]
@@ -623,7 +660,9 @@ class TestMailAccount(TenancyTestCase):
         key = account.rotate_api_key()
         self.assertTrue(key.startswith("apikey-"))
         self.assertIn(key, self.fake.tokens)
+        frappe.db.after_commit.run()
         self.assertNotEqual(account.rotate_api_key(), key)
+        frappe.db.after_commit.run()
         keys = self.fake.objects[f"ApiKey:{account.stalwart_id}"]
         self.assertEqual(len(keys), 1)
 

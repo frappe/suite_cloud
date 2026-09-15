@@ -24,6 +24,9 @@ from suite_cloud.utils import get_config
 OWNED_DOCTYPES = {"Mail Domain", "Mail Account", "Mail Group", "Mailing List"}
 MANAGER_ROLES = ("System Manager", "Suite Cloud Manager")
 RATE_LIMIT = 300  # requests per site per minute
+ALIAS_CAP = 100  # aliases on one object; more than that is a list, not an account
+MEMBERSHIP_CAP = 500  # groups or members named in one request
+RECIPIENT_BATCH = 5000  # recipients added or removed in one request
 
 
 class SiteAuthError(frappe.AuthenticationError):
@@ -73,24 +76,19 @@ def _resolve_site():
     else:
         name = None
 
+    request_ip = getattr(frappe.local, "request_ip", None)
     if not name or not frappe.db.exists("Suite Site", name):
+        throttle(f"address:{request_ip or 'unknown'}")  # guessing keys is paced like everything else
         raise SiteAuthError(_("Site authentication failed."))
 
     site = frappe.get_cached_doc("Suite Site", name)
+    throttle(f"site:{site.name}")  # counted before any refusal, so refusals cannot be free
     if not site.enabled or site.status != "Active":
         raise SiteSuspendedError(_("Site {0} is {1}.").format(site.name, site.status.lower()))
-    request_ip = getattr(frappe.local, "request_ip", None)
     if frappe.session.user == service_user and not site.allows_ip(request_ip):
         # A key copied out of a site's config is worthless from anywhere but the site's own servers.
         # Either the key has leaked or the site moved servers; operators need to know which.
-        frappe.log_error(
-            title=f"[Suite Cloud] {site.name}: request from an address outside its allowed list",
-            message=_("Request from {0} to {1}; allowed: {2}").format(
-                request_ip or _("an unknown address"),
-                getattr(getattr(frappe.local, "request", None), "path", None) or "?",
-                ", ".join(site.to_api()["allowed_ips"]),
-            ),
-        )
+        log_refusal_once(site.name, request_ip, ", ".join((site.allowed_ips or "").split("\n")))
         raise SiteAddressError(_("Site {0} does not accept requests from this address.").format(site.name))
     return site
 
@@ -107,14 +105,14 @@ def _api_key_from_header() -> str | None:
     return None
 
 
-def throttle(site) -> None:
-    """A fixed one-minute window per site, counted in Redis."""
+def throttle(subject: str) -> None:
+    """A fixed one-minute window per subject (a site, or an address that failed to authenticate)."""
 
     if not getattr(frappe.local, "request", None):
         return
 
     window = frappe.utils.now_datetime().strftime("%Y%m%d%H%M")
-    key = frappe.cache.make_key(f"suite_cloud:ratelimit:{site.name}:{window}")
+    key = frappe.cache.make_key(f"suite_cloud:ratelimit:{subject}:{window}")
     count = frappe.cache.incr(key)
     if count == 1:
         frappe.cache.expire(key, 90)
@@ -124,12 +122,31 @@ def throttle(site) -> None:
         )
 
 
+def log_refusal_once(site_name: str, request_ip: str | None, allowed: str) -> None:
+    """One Error Log per site and address per ten minutes: a flood must not drown the signal,
+    and the row is inserted on the side so the refusal's rollback cannot discard it."""
+
+    key = f"suite_cloud:refused:{site_name}:{request_ip or 'unknown'}"
+    if frappe.cache.get_value(key):
+        return
+    frappe.cache.set_value(key, 1, expires_in_sec=600)
+    frappe.log_error(
+        title=f"[Suite Cloud] {site_name}: request from an address outside its allowed list",
+        message=_("Request from {0} to {1}; allowed: {2}").format(
+            request_ip or _("an unknown address"),
+            getattr(getattr(frappe.local, "request", None), "path", None) or "?",
+            allowed,
+        ),
+        defer_insert=True,
+    )
+
+
 def site_api(fn: Callable) -> Callable:
     """Resolves the site, throttles, and turns Stalwart errors into API-shaped exceptions."""
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-        throttle(current_site())
+        current_site()  # resolves and throttles once per request
         try:
             return fn(*args, **kwargs)
         except StalwartRejectedError as e:
@@ -223,8 +240,10 @@ def as_alias_rows(value: Any) -> list[dict]:
 
     if isinstance(value, str) and value.strip().startswith("["):
         value = frappe.parse_json(value)
+    if isinstance(value, list) and len(value) > ALIAS_CAP:
+        frappe.throw(_("At most {0} aliases per request.").format(ALIAS_CAP))
     rows = []
-    for item in as_list(value) if not isinstance(value, list) else value:
+    for item in as_list(value, ALIAS_CAP) if not isinstance(value, list) else value:
         if isinstance(item, dict):
             email = str(item.get("email") or item.get("alias_email") or "").strip()
             if not email:
@@ -251,9 +270,16 @@ def page_size(limit: Any, cap: int) -> int:
     return max(1, min(wanted, cap))
 
 
-def as_list(value: Any) -> list[str]:
-    """Accepts a JSON list, a comma/newline separated string or None."""
+def as_list(value: Any, cap: int | None = None) -> list[str]:
+    """Accepts a JSON list, a comma/newline separated string or None; ``cap`` bounds one request."""
 
+    items = _as_list(value)
+    if cap is not None and len(items) > cap:
+        frappe.throw(_("At most {0} entries per request.").format(cap))
+    return items
+
+
+def _as_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):

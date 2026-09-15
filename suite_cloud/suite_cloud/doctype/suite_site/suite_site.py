@@ -80,6 +80,13 @@ class SuiteSite(Document):
             cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
             if not cluster.enabled or cluster.status != "Active":
                 frappe.throw(_("Cluster {0} is not active.").format(self.cluster))
+        elif self.has_value_changed("cluster") and self.directory_size():
+            # Ids and mailboxes live on the old cluster; moving them is a migration, not a field edit.
+            frappe.throw(
+                _("Site {0} has a directory on cluster {1}; it cannot be moved.").format(
+                    self.name, self.get_doc_before_save().cluster
+                )
+            )
 
         if (
             self.egress_pool
@@ -189,15 +196,19 @@ class SuiteSite(Document):
         return frappe.db.count("Mailing List", {"site": self.name})
 
     def assert_can_add_domain(self) -> None:
+        self.lock()
         self.assert_within_limit(self.max_domains, self.domain_count(), _("domains"))
 
     def assert_can_add_account(self) -> None:
+        self.lock()
         self.assert_within_limit(self.max_accounts, self.account_count(), _("accounts"))
 
     def assert_can_add_group(self) -> None:
+        self.lock()
         self.assert_within_limit(self.max_groups, self.group_count(), _("groups"))
 
     def assert_can_add_mailing_list(self) -> None:
+        self.lock()
         self.assert_within_limit(self.max_mailing_lists, self.mailing_list_count(), _("mailing lists"))
 
     def allocated_disk_gb(self, exclude: tuple[str, str] | None = None) -> float:
@@ -238,6 +249,7 @@ class SuiteSite(Document):
 
         if not flt(self.max_disk_gb):
             return
+        self.lock()
         allocated = self.allocated_disk_gb(exclude)
         if allocated + flt(quota_gb) > flt(self.max_disk_gb):
             frappe.throw(
@@ -245,6 +257,15 @@ class SuiteSite(Document):
                     self.name, round(flt(self.max_disk_gb) - allocated, 2), self.max_disk_gb, quota_gb
                 )
             )
+
+    def directory_size(self) -> int:
+        return sum(frappe.db.count(doctype, {"site": self.name}) for doctype in DIRECTORY_DOCTYPES)
+
+    def lock(self) -> None:
+        """Serialises this site's limit checks: two requests must not both see room for the last slot."""
+
+        if frappe.db.exists("Suite Site", self.name):
+            frappe.db.get_value("Suite Site", self.name, "name", for_update=True)
 
     def assert_within_limit(self, limit: int, current: int, what: str) -> None:
         """A limit of 0 means unlimited."""

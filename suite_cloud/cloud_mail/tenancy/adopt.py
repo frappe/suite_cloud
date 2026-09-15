@@ -25,11 +25,20 @@ def adopt_directory(site_name: str) -> dict:
 
     site = frappe.get_doc("Suite Site", site_name)
     cluster = site.get_cluster()
-    others = frappe.get_all("Suite Site", {"cluster": cluster.name, "name": ["!=", site.name]}, pluck="name")
+    others = set(
+        frappe.get_all("Suite Site", {"cluster": cluster.name, "name": ["!=", site.name]}, pluck="name")
+    )
+    for doctype in ("Mail Domain", "Mail Account", "Mail Group", "Mailing List"):
+        # Rows left by a site that moved or was removed still say whose the cluster's objects are.
+        others.update(
+            frappe.get_all(
+                doctype, {"cluster": cluster.name, "site": ["!=", site.name]}, pluck="site", distinct=True
+            )
+        )
     if others:
         frappe.throw(
             _("Cluster {0} also serves {1}; adoption needs a cluster with this one site.").format(
-                cluster.name, ", ".join(others)
+                cluster.name, ", ".join(sorted(others))
             )
         )
 
@@ -173,7 +182,8 @@ def _adopt_mailing_lists(site, client, domains, report: Report) -> None:
         if frappe.db.exists("Mailing List", email):
             report.skip("Mailing List", email, _("already exists"))
             continue
-        doc = _insert(
+        recipients = list(live.get("recipients") or {})
+        _insert(
             report,
             "Mailing List",
             email,
@@ -185,13 +195,12 @@ def _adopt_mailing_lists(site, client, domains, report: Report) -> None:
                 "description": live.get("description"),
                 "aliases": _alias_rows(live, domains),
             },
+            after=lambda doc: doc.add_recipients(recipients, push=False),
         )
-        if doc is not None:
-            doc.add_recipients(list(live.get("recipients") or {}), push=False)
 
 
-def _insert(report: Report, doctype: str, name: str, data: dict):
-    """One object per savepoint: a refusal rolls back only that object and is reported."""
+def _insert(report: Report, doctype: str, name: str, data: dict, after=None):
+    """One object per savepoint, ``after`` included: a refusal rolls back only that object."""
 
     frappe.db.savepoint(SAVEPOINT)
     try:
@@ -199,6 +208,8 @@ def _insert(report: Report, doctype: str, name: str, data: dict):
         doc.flags.adopting = True  # the cluster already holds it: no push, no limits
         doc.flags.skip_push = True
         doc.insert(ignore_permissions=True)
+        if after is not None:
+            after(doc)
     except Exception as e:
         frappe.db.rollback(save_point=SAVEPOINT)
         report.skip(doctype, name, str(e))

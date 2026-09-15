@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from suite_cloud.cloud_mail.tenancy.addresses import validate_email_address
+from suite_cloud.cloud_mail.tenancy.addresses import assert_addresses_deliverable, validate_email_address
 
 
 class MailingListRecipient(Document):
@@ -32,6 +32,7 @@ class MailingListRecipient(Document):
         self.site = mailing_list.site
         if self.email == mailing_list.email:
             frappe.throw(_("A mailing list cannot be its own recipient."))
+        assert_addresses_deliverable(self.site, [self.email])
         if self.is_new() and frappe.db.exists(
             "Mailing List Recipient", {"mailing_list": self.mailing_list, "email": self.email}
         ):

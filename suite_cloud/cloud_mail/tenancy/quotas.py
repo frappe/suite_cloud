@@ -65,6 +65,8 @@ def apply(doc: Document, disk_quota_gb: float | None, quotas: Any) -> None:
     """API input: ``quotas`` replaces the optional rows (the disk row stays unless it names one),
     ``disk_quota_gb`` sets the disk row and wins over a ``maxDiskQuota`` inside ``quotas``."""
 
+    if isinstance(quotas, str) and not quotas.strip():
+        quotas = None  # a form field left empty is not a request to lift every limit
     if quotas is not None:
         wanted = as_map(quotas)
         disk = doc.disk_row()

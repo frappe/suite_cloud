@@ -237,7 +237,9 @@ class MailAccount(QuotaHolder, Document):
         _, secret = service.create_secret(Credential(description=CREDENTIAL_DESCRIPTION))
         self.store_secret(field, secret)
         if old_ids:
-            service.delete(old_ids)
+            # Only once the new secret is committed: a rollback after this point would otherwise
+            # leave the stored secret pointing at a credential that no longer exists.
+            frappe.db.after_commit.add(lambda: service.delete(old_ids))
         return secret
 
     def store_secret(self, field: str, secret: str) -> None:
