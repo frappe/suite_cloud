@@ -102,6 +102,19 @@ Day-to-day buttons: **Drain** takes a node out of DNS before maintenance, **Upgr
 new Stalwart version out one node at a time, **Sync Config** pushes the generated configuration
 again, and **Check Drift** reports what differs from it without changing anything.
 
+### Adopting a server that already has a directory
+
+A Stalwart that a Suite site administered directly, before Suite Cloud, holds domains, accounts,
+groups and lists that Suite Cloud never created. Register it as a cluster, create the Suite Site
+for it, then use **Adopt Directory** on the Suite Site (or run
+`suite_cloud.cloud_mail.tenancy.adopt.adopt_directory` with the site name). Every object on the
+cluster is recorded with the id it already has, and nothing is pushed back. The cluster must serve
+that one site, since nothing on it says which site an object belongs to; an object whose record
+already exists anywhere is skipped, and each object imports on its own, so one that cannot (an
+alias on a domain the site does not own, say) is reported while the rest go in. Adopted domains
+are marked verified; adopted accounts and groups keep the cluster's quotas, which are not checked
+against the site's limits. Passwords and app passwords stay on the cluster and keep working.
+
 ### Sending through dedicated IPs
 
 1. Create an Egress Gateway (`out1.c1.frappemail.com`) on a VPS that already has the extra public

@@ -76,13 +76,13 @@ class MailAccount(QuotaHolder, Document):
         self.domain = domain.name
         self.site = domain.site
         self.cluster = domain.cluster
-        if self.is_new():
+        if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
 
         site = frappe.get_cached_doc("Suite Site", self.site)
-        if self.is_new():
+        if self.is_new() and not self.flags.adopting:
             site.assert_can_add_account()
         quotas.validate(self)
         site.validate_quota_of(self)
@@ -109,6 +109,8 @@ class MailAccount(QuotaHolder, Document):
                 frappe.throw(_("Group {0} belongs to another site.").format(row.group))
 
     def after_insert(self) -> None:
+        if self.flags.skip_push:  # adopted: the cluster has it, credentials and all
+            return
         sync.push_create(self, "accounts", self.stalwart_payload(self.flags.password))
         try:
             self.mint_credential("app_password")

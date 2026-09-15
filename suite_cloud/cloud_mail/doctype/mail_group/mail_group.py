@@ -51,10 +51,10 @@ class MailGroup(QuotaHolder, Document):
         self.domain = domain.name
         self.site = domain.site
         self.cluster = domain.cluster
-        if self.is_new():
+        if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
         site = frappe.get_cached_doc("Suite Site", self.site)
-        if self.is_new():
+        if self.is_new() and not self.flags.adopting:
             site.assert_can_add_group()
         quotas.validate(self)
         site.validate_quota_of(self)
@@ -62,6 +62,8 @@ class MailGroup(QuotaHolder, Document):
         sync.validate_aliases(self)
 
     def after_insert(self) -> None:
+        if self.flags.skip_push:  # adopted
+            return
         sync.push_create(self, "groups", self.stalwart_payload())
 
     def on_update(self) -> None:

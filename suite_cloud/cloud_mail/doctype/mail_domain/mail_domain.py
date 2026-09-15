@@ -72,7 +72,7 @@ class MailDomain(Document):
         self.domain_name = validate_domain_name(self.domain_name)
         site = self.get_site()
         self.cluster = site.cluster
-        if self.is_new():
+        if self.is_new() and not self.flags.adopting:
             assert_domain_available(self.domain_name, self.site)
             site.assert_can_add_domain()
             if ownership.required():
@@ -93,6 +93,9 @@ class MailDomain(Document):
 
     def after_insert(self) -> None:
         payload = self.stalwart_payload()
+        if self.flags.skip_push:  # adopted: the cluster has it; only read what it publishes
+            self.refresh_dns_records()
+            return
         sync.push_create(self, "domains", payload)
         try:
             self.refresh_dns_records(expected_dkim_keys=len(payload.dkim_algorithms))

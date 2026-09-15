@@ -65,14 +65,15 @@ class MailingList(Document):
         self.domain = domain.name
         self.site = domain.site
         self.cluster = domain.cluster
-        if self.is_new():
+        if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
-        if self.is_new():
             frappe.get_cached_doc("Suite Site", self.site).assert_can_add_mailing_list()
         assert_address_available(self.email, exclude=(self.doctype, self.name))
         sync.validate_aliases(self)
 
     def after_insert(self) -> None:
+        if self.flags.skip_push:  # adopted
+            return
         sync.push_create(self, "mailing_lists", self.stalwart_payload())
 
     def on_update(self) -> None:
@@ -117,8 +118,9 @@ class MailingList(Document):
             filters["enabled"] = 1
         return frappe.get_all("Mailing List Recipient", filters, pluck="email", order_by="email asc")
 
-    def add_recipients(self, emails: list[str]) -> list[str]:
+    def add_recipients(self, emails: list[str], push: bool = True) -> list[str]:
         """Adds the addresses not yet on the list and pushes them in one patch. Returns the added ones.
+        ``push=False`` records addresses the cluster already delivers to (adoption).
 
         Rows are written in bulk: a batch of thousands must not cost a document insert each. The
         checks the row's controller would run happen here instead.
@@ -149,7 +151,8 @@ class MailingList(Document):
                     for email in added
                 ),
             )
-        self.push_recipient_changes(added=added)
+        if push:
+            self.push_recipient_changes(added=added)
         return added
 
     def remove_recipients(self, emails: list[str]) -> list[str]:

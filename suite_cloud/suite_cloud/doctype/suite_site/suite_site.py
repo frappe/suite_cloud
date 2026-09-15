@@ -108,6 +108,15 @@ class SuiteSite(Document):
         return secret
 
     @frappe.whitelist()
+    def adopt_directory(self) -> dict:
+        """Records the domains, accounts, groups and lists the cluster already holds for this site."""
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        from suite_cloud.cloud_mail.tenancy.adopt import adopt_directory
+
+        return adopt_directory(self.name)
+
+    @frappe.whitelist()
     def rotate_secret(self) -> str:
         """Returns the new secret once; it is stored encrypted and never shown again."""
 
@@ -217,6 +226,8 @@ class SuiteSite(Document):
             doc.set_disk_quota_gb(self.default_disk_quota_gb)
         if doc.disk_quota_bytes() <= 0:
             frappe.throw(_("Disk Quota must be above 0 GB."))
+        if doc.flags.adopting:
+            return  # the cluster already grants it; the operator sizes the site's total afterwards
         before = doc.get_doc_before_save()
         if doc.is_new() or before.disk_quota_bytes() != doc.disk_quota_bytes():
             exclude = None if doc.is_new() else (doc.doctype, doc.name)

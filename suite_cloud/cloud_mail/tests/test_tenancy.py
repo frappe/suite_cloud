@@ -144,6 +144,143 @@ class TestMailDomain(TenancyTestCase):
         self.assertEqual(api["dns_records"][0]["group"], "authentication_records")
         self.assertFalse(domain.is_verified)
 
+    def test_adoption_records_what_the_cluster_holds_without_pushing(self) -> None:
+        from suite_cloud.cloud_mail.tenancy.adopt import adopt_directory
+
+        gb = 1024**3
+        domain_id = self.fake._add(
+            "Domain",
+            {
+                "name": "legacy.com",
+                "isEnabled": True,
+                "description": "Legacy",
+                "subAddressing": {"@type": "Disabled"},
+                "allowRelaying": True,
+                "catchAllAddress": "inbox@legacy.com",
+            },
+        )
+        self.fake._add(
+            "DkimSignature", {"domainId": domain_id, "selector": "v1-rsa-20260101", "stage": "active"}
+        )
+        group_id = self.fake._add(
+            "Account",
+            {
+                "@type": "Group",
+                "name": "team",
+                "domainId": domain_id,
+                "description": "Team",
+                "quotas": {"maxDiskQuota": 2 * gb},
+                "aliases": {"0": {"name": "crew", "domainId": domain_id, "enabled": True}},
+            },
+        )
+        disabled_role = self.fake.find("Role", description=DISABLED_ROLE_DESCRIPTION)["id"]
+        self.fake._add(
+            "Account",
+            {
+                "@type": "User",
+                "name": "alice",
+                "domainId": domain_id,
+                "description": "Alice",
+                "locale": "de-DE",
+                "timeZone": "Europe/Berlin",
+                "quotas": {"maxDiskQuota": gb, "maxEmails": 500},
+                "aliases": {
+                    "0": {"name": "ally", "domainId": domain_id, "enabled": False, "description": "old"}
+                },
+                "memberGroupIds": {group_id: True},
+                "roles": {"@type": "User"},
+            },
+        )
+        self.fake._add(
+            "Account",
+            {
+                "@type": "User",
+                "name": "bob",
+                "domainId": domain_id,
+                "roles": {"@type": "Custom", "roleIds": {disabled_role: True}},
+            },
+        )
+        self.fake._add("Account", {"@type": "User", "name": "admin", "roles": {"@type": "Admin"}})
+        self.fake._add(
+            "MailingList",
+            {
+                "name": "all",
+                "domainId": domain_id,
+                "recipients": {"alice@legacy.com": True, "ext@example.org": True},
+            },
+        )
+
+        calls = len(self.fake.calls)
+        report = adopt_directory(self.site.name)
+
+        self.assertEqual(
+            report["adopted"],
+            {
+                "Mail Domain": ["legacy.com"],
+                "Mail Group": ["team@legacy.com"],
+                "Mail Account": ["alice@legacy.com", "bob@legacy.com"],
+                "Mailing List": ["all@legacy.com"],
+            },
+        )
+        self.assertEqual(report["skipped"], {})
+        # Reads only: the cluster already has everything.
+        self.assertEqual([c[0] for c in self.fake.calls[calls:] if c[0].endswith("/set")], [])
+
+        domain = frappe.get_doc("Mail Domain", "legacy.com")
+        self.assertEqual(
+            (
+                domain.stalwart_id,
+                domain.enabled,
+                domain.is_verified,
+                domain.sub_addressing,
+                domain.allow_relaying,
+            ),
+            (domain_id, 1, 1, 0, 1),
+        )
+        self.assertEqual(domain.catch_all_address, "inbox@legacy.com")
+        self.assertTrue(domain.authentication_records)  # the published zone was read in
+        group = frappe.get_doc("Mail Group", "team@legacy.com")
+        self.assertEqual((group.stalwart_id, group.allotted_disk_gb()), (group_id, 2))
+        self.assertEqual([a.alias_email for a in group.aliases], ["crew@legacy.com"])
+        alice = frappe.get_doc("Mail Account", "alice@legacy.com")
+        self.assertEqual(
+            (alice.display_name, alice.locale, alice.time_zone, alice.enabled),
+            ("Alice", "de-DE", "Europe/Berlin", 1),
+        )
+        self.assertEqual(alice.quota_map(), {"maxDiskQuota": gb, "maxEmails": 500})
+        self.assertEqual(
+            [(a.alias_email, a.enabled, a.description) for a in alice.aliases],
+            [("ally@legacy.com", 0, "old")],
+        )
+        self.assertEqual([g.group for g in alice.groups], ["team@legacy.com"])
+        bob = frappe.get_doc("Mail Account", "bob@legacy.com")
+        self.assertEqual((bob.enabled, bob.allotted_disk_gb()), (0, self.site.default_disk_quota_gb))
+        self.assertEqual(
+            frappe.get_doc("Mailing List", "all@legacy.com").recipient_emails(),
+            ["alice@legacy.com", "ext@example.org"],
+        )
+        self.assertFalse(frappe.db.exists("Mail Account", "admin@legacy.com"))
+
+        # A second run finds everything already recorded.
+        again = adopt_directory(self.site.name)
+        self.assertEqual(again["adopted"], {})
+        self.assertEqual(
+            {dt: [r[0] for r in rows] for dt, rows in again["skipped"].items()},
+            {
+                "Mail Domain": ["legacy.com"],
+                "Mail Group": ["team@legacy.com"],
+                "Mail Account": ["alice@legacy.com", "bob@legacy.com"],
+                "Mailing List": ["all@legacy.com"],
+            },
+        )
+        self.assertTrue(
+            all(reason == "already exists" for rows in again["skipped"].values() for _, reason in rows)
+        )
+
+        # A cluster shared with another site cannot be adopted: nothing says whose objects they are.
+        make_site(self.cluster, "other.frappe.test")
+        self.assertRaisesRegex(frappe.ValidationError, "also serves", adopt_directory, self.site.name)
+
     def test_hourly_refresh_only_touches_domains_that_need_it(self) -> None:
         from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import refresh_rotating_domains
 
