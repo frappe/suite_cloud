@@ -328,26 +328,43 @@ def domain_payloads(names: list[str]) -> list[dict]:
     return [domain_payload(by_name[n]) for n in names if n in by_name]
 
 
-def refresh_all_domains() -> None:
-    """Daily: pick up rotated DKIM selectors and any zone changes."""
-
-    for name in frappe.get_all("Mail Domain", {"stalwart_id": ["is", "set"]}, pluck="name"):
-        _refresh(name)
-
-
 def refresh_rotating_domains() -> None:
-    """Hourly: domains whose keys are mid-rotation change selectors within days."""
+    """Hourly: re-read the zone of domains whose DKIM keys are rotating or not all stored yet.
+
+    Stalwart rotates keys on its own, and a key still generating when the domain was created can
+    be missing from the stored records. Asking for the signatures is one cheap call per domain;
+    only domains that need it pay for the zone refresh.
+    """
 
     domains = frappe.get_all(
-        "Mail Domain", {"stalwart_id": ["is", "set"], "is_verified": 1}, ["name", "cluster", "stalwart_id"]
+        "Mail Domain", {"stalwart_id": ["is", "set"], "enabled": 1}, ["name", "cluster", "stalwart_id"]
     )
+    stored = stored_dkim_selectors([d.name for d in domains])
     for domain in domains:  # only the cluster and id are needed to ask; the document loads on refresh
         try:
             signatures = sync.client_for(domain).dkim_signatures.get_all_by_domain(domain.stalwart_id)
         except Exception:
             continue
-        if any(s.get("stage") in ("pending", "retiring") for s in signatures):
+        rotating = any(s.get("stage") in ("pending", "retiring") for s in signatures)
+        published = {s.get("selector") for s in signatures if s.get("stage") in ("active", "pending")}
+        if rotating or not published <= stored.get(domain.name, set()):
             _refresh(domain.name)
+
+
+def stored_dkim_selectors(names: list[str]) -> dict[str, set[str]]:
+    """``{domain: selectors}`` from the stored DKIM rows, whose host is ``<selector>._domainkey``."""
+
+    selectors: dict[str, set[str]] = {}
+    if not names:
+        return selectors
+    rows = frappe.get_all(
+        "Mail Domain DNS Record",
+        {"parenttype": "Mail Domain", "parent": ["in", names], "category": "DKIM"},
+        ["parent", "host"],
+    )
+    for row in rows:
+        selectors.setdefault(row.parent, set()).add(row.host.split("._domainkey", 1)[0])
+    return selectors
 
 
 def verify_unverified_domains() -> None:

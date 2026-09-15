@@ -144,6 +144,37 @@ class TestMailDomain(TenancyTestCase):
         self.assertEqual(api["dns_records"][0]["group"], "authentication_records")
         self.assertFalse(domain.is_verified)
 
+    def test_hourly_refresh_only_touches_domains_that_need_it(self) -> None:
+        from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import refresh_rotating_domains
+
+        domain = self.make_domain()
+        selectors = sorted(
+            r.host.split("._domainkey")[0] for r in domain.authentication_records if r.category == "DKIM"
+        )
+        self.assertTrue(selectors)
+
+        calls = len(self.fake.calls)
+        refresh_rotating_domains()  # every key stored and active: one signatures query, no zone read
+        self.assertEqual(
+            [c[0] for c in self.fake.calls[calls:]], ["x:DkimSignature/query", "x:DkimSignature/get"]
+        )
+
+        # A key that was still generating at creation is missing from the stored rows.
+        frappe.db.delete("Mail Domain DNS Record", {"parent": domain.name, "category": "DKIM"})
+        refresh_rotating_domains()
+        domain.reload()
+        restored = sorted(
+            r.host.split("._domainkey")[0] for r in domain.authentication_records if r.category == "DKIM"
+        )
+        self.assertEqual(restored, selectors)
+
+        # A rotation in progress refreshes too.
+        signature = self.fake.find("DkimSignature", domainId=domain.stalwart_id)
+        signature["stage"] = "retiring"
+        calls = len(self.fake.calls)
+        refresh_rotating_domains()
+        self.assertIn("x:Domain/get", [c[0] for c in self.fake.calls[calls:]])
+
     def test_domain_updates_push_and_refresh_keeps_verification(self) -> None:
         domain = self.make_domain()
         domain.routing_records[0].is_verified = 1

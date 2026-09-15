@@ -213,8 +213,8 @@ contact email for site-specific notices; the Suite app sends both whenever Suite
 5. A domain is **active** when it is enabled and verified; only then does Stalwart accept mail for
    it, and only then may the site create accounts, groups and lists on it. Disabling a domain drops
    its verification on purpose, so enabling it again needs a fresh check.
-6. Verification is retried every hour, and rotated DKIM selectors are picked up hourly for verified
-   domains and daily for all. A temporary DNS failure never turns a working domain off.
+6. Verification is retried every hour, and rotated or late DKIM selectors are picked up hourly.
+   A temporary DNS failure never turns a working domain off.
 
 A domain carries three delivery settings a site may change: a catch-all address for local parts
 that match no account, sub-addressing (`user+tag@`), and relaying, which makes the cluster forward
@@ -242,8 +242,8 @@ On a development site that talks to a cluster with a staging certificate, set
 | When | What |
 | --- | --- |
 | Every 5 minutes | Retry failed Server Jobs; poll nodes that are provisioning or draining. |
-| Hourly | Verify unverified domains; refresh DNS records of domains whose DKIM keys are rotating. |
-| Daily | Verify every DNS Record in the zones; refresh every domain's records; check every cluster for configuration drift; check the PTR records of nodes and pool addresses. |
+| Hourly | Verify unverified domains; refresh the DNS records of domains whose DKIM keys are rotating or not all stored yet. |
+| Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses. |
 
 ## Development
 
