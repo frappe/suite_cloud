@@ -15,6 +15,12 @@ frappe.ui.form.on('Mail Domain', {
 		if (frm.doc.__islocal) return
 		frm.add_custom_button(__('Refresh DNS Records'), () => frm.events.call(frm, 'refresh_dns_records', __('Reading zone...')))
 		frm.add_custom_button(__('Verify DNS Records'), () => frm.events.call(frm, 'verify_dns_records', __('Resolving...')))
+		frm.add_custom_button(__('Replace DKIM Keys'), () =>
+			frappe.confirm(
+				__('Generate new DKIM keys for this domain? The owner must publish the new records; the domain goes offline at the next hourly check until they resolve.'),
+				() => frm.events.call(frm, 'replace_dkim_keys', __('Replacing keys...')),
+			),
+		)
 		if (!frm.doc.is_verified) {
 			frm.dashboard.add_comment(__('Publish the Email Authentication records at the domain\'s DNS provider, then verify.'), 'yellow', true)
 		}

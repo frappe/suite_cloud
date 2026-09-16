@@ -6,7 +6,7 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import forget_sessions
 from suite_cloud.cloud_mail.tenancy.addresses import get_site_domain
-from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
+from suite_cloud.cloud_mail.tests.fake_stalwart import FakeError, FakeStalwart
 from suite_cloud.cloud_mail.tests.fixtures import (
     activate_cluster,
     clear_request_cache,
@@ -115,14 +115,17 @@ class TestMailDomain(TenancyTestCase):
         live = self.fake.find("Domain", name="acme.com")
         self.assertEqual(domain.stalwart_id, live["id"])
         # RSA only unless the setting opts into Ed25519: many receivers ignore Ed25519 signatures.
+        # Stalwart generates and holds the key, under a fixed selector, and never rotates it.
         self.assertEqual(live["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
+        self.assertEqual(live["dkimManagement"]["selectorTemplate"], "frappemail-{algorithm}")
+        self.assertGreater(live["dkimManagement"]["rotateAfter"], 50 * 365 * 24 * 60 * 60 * 1000)
         self.assertEqual(live["dnsManagement"], {"@type": "Manual"})
         self.assertEqual(live["reportAddressUri"], "mailto:postmaster@acme.com")
 
         # Rows land in the table of their group; authentication rows are the mandatory ones.
         auth = [(r.category, r.host, r.is_mandatory) for r in domain.authentication_records]
         self.assertEqual(
-            auth, [("SPF", "@", 1), ("DKIM", "v1-rsa-20260101._domainkey", 1), ("DMARC", "_dmarc", 1)]
+            auth, [("SPF", "@", 1), ("DKIM", "frappemail-rsa._domainkey", 1), ("DMARC", "_dmarc", 1)]
         )
         spf = domain.authentication_records[0]
         self.assertEqual(spf.value, f"v=spf1 include:spf.{self.cluster.default_domain} -all")
@@ -516,6 +519,69 @@ class TestMailDomain(TenancyTestCase):
         doc = frappe.get_doc({"doctype": "Mail Domain", "domain_name": "acme.com", "site": other.name})
         self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", doc.insert)
 
+    def test_replace_dkim_keys_keeps_the_selector_and_drops_verification(self) -> None:
+        domain = self.make_domain()
+        for row in domain.dns_rows():
+            row.is_verified = 1
+        domain.save_records()
+        before = self.fake.find("DkimSignature", domainId=domain.stalwart_id)
+        old_value = next(r.value for r in domain.authentication_records if r.category == "DKIM")
+
+        calls = len(self.fake.calls)
+        domain.replace_dkim_keys()
+
+        # The old key is gone and a new one signs under the same selector, via manual management
+        # and back: Stalwart generates nothing for a domain whose keys merely vanished.
+        after = self.fake.find("DkimSignature", domainId=domain.stalwart_id)
+        self.assertNotEqual(before["id"], after["id"])
+        self.assertEqual((after["selector"], after["stage"]), ("frappemail-rsa", "active"))
+        management = [
+            a["update"][domain.stalwart_id]["dkimManagement"]["@type"]
+            for name, a in self.fake.calls[calls:]
+            if name == "x:Domain/set" and a.get("update")
+        ]
+        self.assertEqual(management, ["Manual", "Automatic"])
+        domain.reload()
+        dkim_row = next(r for r in domain.authentication_records if r.category == "DKIM")
+        self.assertEqual(dkim_row.host, "frappemail-rsa._domainkey")
+        self.assertNotEqual(dkim_row.value, old_value)
+        self.assertFalse(dkim_row.is_verified)  # the owner has to publish the new value
+        self.assertTrue(domain.authentication_records[0].is_verified)  # SPF keeps its state
+        self.assertTrue(domain.is_verified)  # liveness only changes on a verification run
+
+    def test_replacement_cut_short_reports_a_keyless_domain_and_reruns(self) -> None:
+        from suite_cloud.cloud_mail.stalwart.errors import StalwartKeylessDomainError
+
+        domain = self.make_domain()
+        real_set = FakeStalwart._set
+        refusals = []
+
+        def refuse_automatic(fake, type, args, account_id, refs):
+            wanted = [p.get("dkimManagement", {}).get("@type") for p in (args.get("update") or {}).values()]
+            if type == "Domain" and "Automatic" in wanted and len(refusals) < 3:
+                refusals.append(1)
+                raise FakeError("serverFail", "busy")
+            return real_set(fake, type, args, account_id, refs)
+
+        # Both attempts refused: the old keys are gone, the operator is told, the domain is manual.
+        with patch.object(FakeStalwart, "_set", refuse_automatic):
+            self.assertRaisesRegex(
+                StalwartKeylessDomainError, "run Replace DKIM Keys again", domain.replace_dkim_keys
+            )
+        live = self.fake.find("Domain", name="acme.com")
+        self.assertEqual(live["dkimManagement"], {"@type": "Manual"})
+        self.assertEqual([s for s in self.fake.all("DkimSignature") if s["domainId"] == live["id"]], [])
+        self.assertEqual(len(refusals), 2)
+
+        # A second run skips the manual switch, survives one more refusal and regenerates the key.
+        with patch.object(FakeStalwart, "_set", refuse_automatic):
+            domain.replace_dkim_keys()
+        self.assertEqual(len(refusals), 3)
+        live = self.fake.find("Domain", name="acme.com")
+        self.assertEqual(live["dkimManagement"]["@type"], "Automatic")
+        signatures = [s["selector"] for s in self.fake.all("DkimSignature") if s["domainId"] == live["id"]]
+        self.assertEqual(signatures, ["frappemail-rsa"])
+
     def test_domain_creation_waits_for_dkim_keys_still_being_generated(self) -> None:
         # Stalwart generates the RSA key after the domain exists; the first zone read misses it.
         real_zone_file = FakeStalwart._zone_file
@@ -537,7 +603,7 @@ class TestMailDomain(TenancyTestCase):
         sleep.assert_called_once()
         self.assertEqual(
             [r.host for r in domain.authentication_records if r.category == "DKIM"],
-            ["v1-rsa-20260101._domainkey"],
+            ["frappemail-rsa._domainkey"],
         )
         self.assertIn("_domainkey", domain.dns_zone_file)
 
@@ -552,7 +618,7 @@ class TestMailDomain(TenancyTestCase):
             live["dkimManagement"]["algorithms"], {"Dkim1Ed25519Sha256": True, "Dkim1RsaSha256": True}
         )
         selectors = sorted(r.host for r in after.authentication_records if r.category == "DKIM")
-        self.assertEqual(selectors, ["v1-ed25519-20260101._domainkey", "v1-rsa-20260101._domainkey"])
+        self.assertEqual(selectors, ["frappemail-ed25519._domainkey", "frappemail-rsa._domainkey"])
 
         # The earlier domain keeps the keys it was created with; a save does not push algorithms.
         before.description = "renamed"

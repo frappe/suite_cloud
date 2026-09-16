@@ -13,7 +13,7 @@ from suite_cloud.cloud_mail.stalwart import forget_sessions, get_admin_client, g
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
 from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
-from suite_cloud.utils import get_config, log_exception, validate_version
+from suite_cloud.utils import dkim_algorithms, get_config, log_exception, validate_version
 
 LABEL = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 STORE_KINDS = {
@@ -302,6 +302,23 @@ class StalwartCluster(Document):
         forget_sessions(self)
         if old:
             client.api_keys.delete(old["id"])
+
+    @frappe.whitelist()
+    def replace_dkim_keys(self) -> None:
+        """Emergency replacement of the default domain's keys after a leak, same selectors.
+
+        Reports and notifications leave from that domain. With a DNS provider on the zone
+        Stalwart publishes the new records itself; without one they must be published by hand.
+        """
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        client = self.get_client()
+        domain = client.domains.find_by_name(self.default_domain)
+        if not domain:
+            frappe.throw(
+                _("The cluster does not hold its default domain {0} yet.").format(self.default_domain)
+            )
+        client.domains.replace_dkim_keys(domain["id"], dkim_algorithms())
 
     @frappe.whitelist()
     def show_admin_password(self) -> str:

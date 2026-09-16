@@ -127,7 +127,7 @@
   },
   {
    "default": "0",
-   "description": "Every domain gets an RSA key; check this to add an Ed25519 key as well. Off by default because many receivers still ignore Ed25519 signatures and treat the mail as unsigned. Applies to domains registered on Stalwart after the change, the cluster default domain included; existing domains keep the keys they were created with.",
+   "description": "Every domain gets an RSA key (selector frappemail-rsa); check this to add an Ed25519 key as well (selector frappemail-ed25519). Off by default because many receivers still ignore Ed25519 signatures and treat the mail as unsigned. Keys are generated and held by the cluster and never rotate. Applies to domains registered on Stalwart after the change, the cluster default domain included; existing domains keep the keys they were created with.",
    "fieldname": "sign_with_ed25519",
    "fieldtype": "Check",
    "label": "Sign with Ed25519 as well as RSA"

@@ -31,6 +31,7 @@ frappe.ui.form.on('Stalwart Cluster', {
 			frm.add_custom_button(__('Check Drift'), () => frm.trigger('check_drift'), __('Configuration'))
 			frm.add_custom_button(__('Reconcile Directory'), () => frm.trigger('reconcile_directory'), __('Configuration'))
 			frm.add_custom_button(__('Rotate API Key'), () => frm.trigger('rotate_api_key'), __('Access'))
+			frm.add_custom_button(__('Replace DKIM Keys'), () => frm.trigger('replace_dkim_keys'), __('Access'))
 			frm.add_custom_button(__('Upgrade Nodes'), () => frm.trigger('upgrade_nodes'), __('Nodes'))
 		}
 		if (frm.doc.status === 'Bootstrapping') {
@@ -123,6 +124,12 @@ frappe.ui.form.on('Stalwart Cluster', {
 	rotate_api_key(frm) {
 		frappe.confirm(__('Mint a new Stalwart API key and revoke the current one?'), () => {
 			frm.events.call(frm, 'rotate_api_key', {}, __('Rotating API key...'))
+		})
+	},
+
+	replace_dkim_keys(frm) {
+		frappe.confirm(__('Generate new DKIM keys for {0}? Without a DNS provider on the zone the new records must be published by hand.', [frm.doc.default_domain]), () => {
+			frm.events.call(frm, 'replace_dkim_keys', {}, __('Replacing keys...'))
 		})
 	},
 

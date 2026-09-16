@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from typing import ClassVar
 
+from suite_cloud.cloud_mail.stalwart.errors import StalwartError, StalwartKeylessDomainError
 from suite_cloud.cloud_mail.stalwart.service import ManagementService, id_set, indexed
 
 # Stalwart locales are BCP 47 tags (en-US), not POSIX names (en_US).
@@ -13,8 +14,13 @@ DKIM_ED25519 = "Dkim1Ed25519Sha256"
 DKIM_RSA = "Dkim1RsaSha256"
 # Stalwart's own default when a domain is created without naming its algorithms.
 DKIM_ALGORITHMS = (DKIM_ED25519, DKIM_RSA)
-DKIM_SELECTOR_TEMPLATE = "v{version}-{algorithm}-{date-%Y%m%d}"
+# One fixed selector per key type: frappemail-rsa and frappemail-ed25519. A template is shared by
+# every key of a domain, so the algorithm has to be part of it; nothing else varies.
+DKIM_SELECTOR_TEMPLATE = "frappemail-{algorithm}"
 DAY_MS = 24 * 60 * 60 * 1000
+# Keys are never rotated: a rotation would ask every domain owner to publish a new selector.
+# Stalwart only rotates domains under automatic DNS management anyway; this pins the rest.
+DKIM_ROTATE_AFTER_MS = 100 * 365 * DAY_MS
 DKIM_KEY_WAIT_SECONDS = 15
 DKIM_KEY_POLL_SECONDS = 0.5
 GB = 1024**3
@@ -166,7 +172,8 @@ class Domain:
 
 
 def dkim_management_payload(algorithms: tuple[str, ...] | None) -> dict:
-    """Automatic DKIM: Stalwart generates and rotates keys; Manual when no algorithm is wanted."""
+    """Automatic DKIM: Stalwart generates and holds the keys, under fixed selectors and without
+    rotation; Manual when no algorithm is wanted."""
 
     if not algorithms:
         return {"@type": "Manual"}
@@ -175,7 +182,8 @@ def dkim_management_payload(algorithms: tuple[str, ...] | None) -> dict:
         "@type": "Automatic",
         "algorithms": id_set(algorithms),
         "selectorTemplate": DKIM_SELECTOR_TEMPLATE,
-        "rotateAfter": 90 * DAY_MS,
+        "rotateAfter": DKIM_ROTATE_AFTER_MS,
+        # Stalwart's defaults, stated so a sync sees the live object as equal.
         "retireAfter": 7 * DAY_MS,
         "deleteAfter": 30 * DAY_MS,
     }
@@ -312,6 +320,40 @@ class DomainService(ManagementService):
             if count_dkim_selectors(zone_file) >= expected_dkim_keys or time.monotonic() >= deadline:
                 return zone_file
             time.sleep(DKIM_KEY_POLL_SECONDS)
+
+    def replace_dkim_keys(self, domain_id: str, algorithms: tuple[str, ...]) -> None:
+        """Deletes every key of the domain and has Stalwart generate fresh ones, same selectors.
+
+        For a leaked signing key. Stalwart generates keys when a domain comes under automatic
+        management, not when its signatures vanish (checked on v0.16.20), so the domain is taken
+        through manual management and back. The policy is set anew on the way, so a domain
+        created under another template lands on the fixed selectors too.
+
+        Three requests with no transaction around them, ordered so that nothing is lost before
+        the first succeeds and a run cut short anywhere can be repeated: a domain already under
+        manual management skips straight to the delete, and the step that generates the new keys
+        is tried twice before the domain is reported keyless.
+        """
+
+        live = self.get(domain_id, properties=["id", "dkimManagement"]) or {}
+        if (live.get("dkimManagement") or {}).get("@type") != "Manual":
+            self.update(domain_id, {"dkimManagement": {"@type": "Manual"}})  # the old keys still sign
+        dkim = DkimSignatureService(self.connection)
+        if signature_ids := [s["id"] for s in dkim.get_all_by_domain(domain_id)]:
+            dkim.delete(signature_ids)
+
+        failure = None
+        for _attempt in range(2):
+            try:
+                self.update(domain_id, {"dkimManagement": dkim_management_payload(algorithms)})
+                return
+            except StalwartError as e:
+                failure = e
+        raise StalwartKeylessDomainError(
+            f"The keys were deleted but new ones could not be requested ({failure}); "
+            "run Replace DKIM Keys again to recover the domain.",
+            self.type,
+        ) from failure
 
     def delete(self, ids: str | list[str]) -> None:
         """Deletes domains, first removing the DKIM signatures that would block the delete."""

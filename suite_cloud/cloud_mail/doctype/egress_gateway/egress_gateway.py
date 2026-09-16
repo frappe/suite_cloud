@@ -11,7 +11,7 @@ from suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node import validate_
 from suite_cloud.cloud_mail.stalwart import get_admin_client, get_client
 from suite_cloud.provisioning.ansible import ping
 from suite_cloud.provisioning.ssh import SSHTarget, scan_host_keys, validate_ssh_user_field
-from suite_cloud.utils import get_config, log_exception, validate_version
+from suite_cloud.utils import dkim_algorithms, get_config, log_exception, validate_version
 
 
 class EgressGateway(Document):
@@ -235,6 +235,17 @@ class EgressGateway(Document):
     def upgrade(self) -> str:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         return egress.upgrade_gateway(self).name
+
+    @frappe.whitelist()
+    def replace_dkim_keys(self) -> None:
+        """Emergency replacement of the gateway domain's keys after a leak, same selectors."""
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        client = self.get_client()
+        domain = client.domains.find_by_name(self.hostname)
+        if not domain:
+            frappe.throw(_("The gateway does not hold its domain {0} yet.").format(self.hostname))
+        client.domains.replace_dkim_keys(domain["id"], dkim_algorithms())
 
     # --- Server Job callbacks ---------------------------------------------------------
 

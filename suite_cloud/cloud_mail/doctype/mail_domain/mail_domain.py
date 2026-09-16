@@ -161,6 +161,21 @@ class MailDomain(Document):
             "allowRelaying": bool(self.allow_relaying),
         }
 
+    @frappe.whitelist()
+    def replace_dkim_keys(self) -> None:
+        """Emergency replacement after a leaked key: new keys under the same selectors.
+
+        The owner republishes the DKIM records with the new values. Their rows lose their
+        verification, so the hourly check takes the domain offline until the new records resolve;
+        mail signed with the old keys stops verifying as soon as they do.
+        """
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        self.assert_saved()
+        algorithms = dkim_algorithms()
+        sync.client_for(self).domains.replace_dkim_keys(self.stalwart_id, algorithms)
+        self.refresh_dns_records(expected_dkim_keys=len(algorithms))
+
     # --- DNS ------------------------------------------------------------------------
 
     @frappe.whitelist()
@@ -230,9 +245,10 @@ class MailDomain(Document):
     def compute_is_verified(self) -> bool:
         """SPF and DMARC must verify, plus at least one DKIM selector.
 
-        Stalwart rotates DKIM keys; the retiring selector keeps signatures valid while the owner
-        publishes the new one, so a single verified selector is enough to stay live. MX is the
-        owner's choice: a domain may send through the cluster and keep receiving elsewhere.
+        A message passes DKIM when any one of its signatures verifies, so one published selector
+        is enough for mail to flow; the rows of the others stay flagged until they are published
+        too. MX is the owner's choice: a domain may send through the cluster and keep receiving
+        elsewhere.
         """
 
         rows = self.authentication_records
@@ -340,11 +356,12 @@ def domain_payloads(names: list[str]) -> list[dict]:
 
 
 def refresh_rotating_domains() -> None:
-    """Hourly: re-read the zone of domains whose DKIM keys are rotating or not all stored yet.
+    """Hourly: re-read the zone of domains whose DKIM keys are not all stored yet, or rotating.
 
-    Stalwart rotates keys on its own, and a key still generating when the domain was created can
-    be missing from the stored records. Asking for the signatures is one cheap call per domain;
-    only domains that need it pay for the zone refresh.
+    A key still generating when the domain was created can be missing from the stored records.
+    Keys are not meant to rotate (see ``dkim_management_payload``), but a domain in a rotation
+    stage is refreshed too rather than left with a selector it never published. Asking for the
+    signatures is one cheap call per domain; only domains that need it pay for the zone refresh.
     """
 
     domains = frappe.get_all(

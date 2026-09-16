@@ -50,6 +50,12 @@ class StalwartRejectedError(StalwartError):
         super().__init__(detail, object_type)
 
 
+class StalwartKeylessDomainError(StalwartError):
+    """A key replacement left the domain without DKIM keys; running it again recovers it."""
+
+    kind = "keyless domain"
+
+
 class StalwartUnauthorizedError(StalwartError):
     """Our credentials were refused: a configuration problem on the Suite Cloud side."""
 

@@ -27,6 +27,14 @@ frappe.ui.form.on('Egress Gateway', {
 		if (frm.doc.status === 'Active') {
 			frm.add_custom_button(__('Sync Config'), () => frm.events.call(frm, 'sync_config', __('Syncing...')), __('Actions'))
 			frm.add_custom_button(__('Upgrade'), () => frm.events.call(frm, 'upgrade', __('Queueing...')), __('Actions'))
+			frm.add_custom_button(
+				__('Replace DKIM Keys'),
+				() =>
+					frappe.confirm(__('Generate new DKIM keys for {0}? Without a DNS provider on the zone the new records must be published by hand.', [frm.doc.hostname]), () =>
+						frm.events.call(frm, 'replace_dkim_keys', __('Replacing keys...')),
+					),
+				__('Actions'),
+			)
 		}
 		if (frappe.session.user === 'Administrator') {
 			frm.add_custom_button(__('Show Admin Password'), () => frm.trigger('show_admin_password'), __('Access'))

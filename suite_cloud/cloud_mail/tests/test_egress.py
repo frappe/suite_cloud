@@ -52,12 +52,13 @@ class TestEgress(IntegrationTestCase):
         ).insert()
 
     def tearDown(self) -> None:
-        for doctype in ("Mail Domain",):
-            for name in frappe.get_all(doctype, pluck="name"):
-                frappe.delete_doc(doctype, name, force=True, ignore_permissions=True, ignore_on_trash=True)
+        # Only the fixture cluster's documents: deleting anyone else's pushes to a live server.
+        mine = {"cluster": self.cluster.name}
+        for name in frappe.get_all("Mail Domain", mine, pluck="name"):
+            frappe.delete_doc("Mail Domain", name, force=True, ignore_permissions=True, ignore_on_trash=True)
         frappe.db.set_value("Stalwart Cluster", self.cluster.name, "default_egress_pool", None)
         frappe.db.set_value("Suite Site", self.site.name, "egress_pool", None)
-        for name in frappe.get_all("Egress IP Pool", pluck="name"):
+        for name in frappe.get_all("Egress IP Pool", mine, pluck="name"):
             frappe.delete_doc(
                 "Egress IP Pool", name, force=True, ignore_permissions=True, ignore_on_trash=True
             )
