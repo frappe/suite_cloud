@@ -320,6 +320,21 @@ class DomainService(ManagementService):
                 return zone_file
             time.sleep(DKIM_KEY_POLL_SECONDS)
 
+    def replace_dkim_keys(self, domain_id: str, algorithms: tuple[str, ...]) -> None:
+        """Deletes every key of the domain and has Stalwart generate fresh ones, same selectors.
+
+        For a leaked signing key. Stalwart generates keys when a domain comes under automatic
+        management, not when its signatures vanish (checked on v0.16.20), so the domain is taken
+        through manual management and back. The policy is set anew on the way, so a domain
+        created under another template lands on the fixed selectors too.
+        """
+
+        dkim = DkimSignatureService(self.connection)
+        if signature_ids := [s["id"] for s in dkim.get_all_by_domain(domain_id)]:
+            dkim.delete(signature_ids)
+        self.update(domain_id, {"dkimManagement": {"@type": "Manual"}})
+        self.update(domain_id, {"dkimManagement": dkim_management_payload(algorithms)})
+
     def delete(self, ids: str | list[str]) -> None:
         """Deletes domains, first removing the DKIM signatures that would block the delete."""
 

@@ -289,6 +289,16 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertEqual(
                 frappe.get_doc("Stalwart Cluster", cluster.name).check_drift()["differences"], []
             )
+            # The default domain's keys can be replaced after a leak, under the same selector.
+            default = fake.find("Domain", name=cluster.default_domain)
+            before = fake.find("DkimSignature", domainId=default["id"])
+            frappe.get_doc("Stalwart Cluster", cluster.name).replace_dkim_keys()
+            after = fake.find("DkimSignature", domainId=default["id"])
+            self.assertNotEqual(before["id"], after["id"])
+            self.assertEqual(after["selector"], "frappemail-rsa")
+            self.assertEqual(
+                fake.find("Domain", name=cluster.default_domain)["dkimManagement"]["@type"], "Automatic"
+            )
             self.assertTrue(
                 plan.same_value(
                     {"acmeProviderId": "x", "secret": "hidden"}, {"acmeProviderId": "#acme", "secret": "s"}

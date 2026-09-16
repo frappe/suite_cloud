@@ -519,6 +519,36 @@ class TestMailDomain(TenancyTestCase):
         doc = frappe.get_doc({"doctype": "Mail Domain", "domain_name": "acme.com", "site": other.name})
         self.assertRaisesRegex(frappe.DuplicateEntryError, "not available", doc.insert)
 
+    def test_replace_dkim_keys_keeps_the_selector_and_drops_verification(self) -> None:
+        domain = self.make_domain()
+        for row in domain.dns_rows():
+            row.is_verified = 1
+        domain.save_records()
+        before = self.fake.find("DkimSignature", domainId=domain.stalwart_id)
+        old_value = next(r.value for r in domain.authentication_records if r.category == "DKIM")
+
+        calls = len(self.fake.calls)
+        domain.replace_dkim_keys()
+
+        # The old key is gone and a new one signs under the same selector, via manual management
+        # and back: Stalwart generates nothing for a domain whose keys merely vanished.
+        after = self.fake.find("DkimSignature", domainId=domain.stalwart_id)
+        self.assertNotEqual(before["id"], after["id"])
+        self.assertEqual((after["selector"], after["stage"]), ("frappemail-rsa", "active"))
+        management = [
+            a["update"][domain.stalwart_id]["dkimManagement"]["@type"]
+            for name, a in self.fake.calls[calls:]
+            if name == "x:Domain/set" and a.get("update")
+        ]
+        self.assertEqual(management, ["Manual", "Automatic"])
+        domain.reload()
+        dkim_row = next(r for r in domain.authentication_records if r.category == "DKIM")
+        self.assertEqual(dkim_row.host, "frappemail-rsa._domainkey")
+        self.assertNotEqual(dkim_row.value, old_value)
+        self.assertFalse(dkim_row.is_verified)  # the owner has to publish the new value
+        self.assertTrue(domain.authentication_records[0].is_verified)  # SPF keeps its state
+        self.assertTrue(domain.is_verified)  # liveness only changes on a verification run
+
     def test_domain_creation_waits_for_dkim_keys_still_being_generated(self) -> None:
         # Stalwart generates the RSA key after the domain exists; the first zone read misses it.
         real_zone_file = FakeStalwart._zone_file

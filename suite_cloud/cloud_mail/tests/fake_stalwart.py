@@ -277,10 +277,15 @@ class FakeStalwart:
             try:
                 patch_ = resolve_creation_refs(patch_, refs)
                 self._check_references(patch_)
+                was_manual = dkim_management_type(collection[id]) != "Automatic"
                 collection[id] = apply_patch(collection[id], patch_)
             except FakeError as e:
                 result.setdefault("notUpdated", {})[id] = {"type": e.type, "description": e.description}
                 continue
+            if type == "Domain" and was_manual and dkim_management_type(collection[id]) == "Automatic":
+                # Stalwart generates keys when a domain comes under automatic management, not when
+                # its signatures are deleted or its policy is re-sent (checked on v0.16.20).
+                self._generate_dkim_keys(collection[id])
             self._server_set(type, collection[id])
             result["updated"][id] = None
 
@@ -318,23 +323,28 @@ class FakeStalwart:
         self._check_unique(type, payload)
         obj = {**payload, "id": self._new_id(type), "createdAt": "2026-01-01T00:00:00Z"}
         if type == "Domain":
-            # Automatic DKIM management: Stalwart generates one key per algorithm on creation,
-            # both kinds when the payload names none, named by the selector template.
-            management = payload.get("dkimManagement")
-            for algorithm in dkim_key_types(management):
-                self._add(
-                    "DkimSignature",
-                    {
-                        "domainId": obj["id"],
-                        "selector": dkim_selector(management, algorithm),
-                        "stage": "active",
-                    },
-                )
+            self._generate_dkim_keys(obj)
         self._server_set(type, obj)
         collection[obj["id"]] = obj
         if type == "ApiKey" and account_id:
             self.tokens[obj["secret"]] = account_id  # a minted key authenticates like any token
         return json.loads(json.dumps(obj))
+
+    def _generate_dkim_keys(self, domain: dict) -> None:
+        """Automatic DKIM management: one key per algorithm, named by the selector template, both
+        kinds when the policy names none. Every key gets a public key of its own."""
+
+        management = domain.get("dkimManagement")
+        for algorithm in dkim_key_types(management):
+            signature_id = self._add(
+                "DkimSignature",
+                {
+                    "domainId": domain["id"],
+                    "selector": dkim_selector(management, algorithm),
+                    "stage": "active",
+                },
+            )
+            self.objects["DkimSignature"][signature_id]["publicKey"] = f"MIIBIjANBg{signature_id}"
 
     def _check_unique(self, type: str, payload: dict) -> None:
         if type == "Domain" and self.find("Domain", name=payload.get("name")):
@@ -367,12 +377,13 @@ class FakeStalwart:
         for signature in self.all("DkimSignature"):
             if signature["domainId"] == domain["id"]:
                 owner = f"{signature['selector']}._domainkey.{name}."
+                key = signature.get("publicKey") or "MIIBIjANBg"
                 if "ed25519" in signature["selector"]:
-                    lines.append(f'{owner} 3600 IN TXT "v=DKIM1; k=ed25519; p=MCowBQYDK2VwAyEAabc"')
+                    lines.append(f'{owner} 3600 IN TXT "v=DKIM1; k=ed25519; p={key}"')
                 else:
                     # Stalwart splits the long RSA key over a parenthesised group of quoted chunks.
                     lines.append(f"{owner} 3600 IN TXT (")
-                    lines.append('    "v=DKIM1; k=rsa; p=MIIBIjANBg"')
+                    lines.append(f'    "v=DKIM1; k=rsa; p={key}"')
                     lines.append('    "kqhkiG9w0BAQEFAAOCAQ8A"')
                     lines.append(")")
         lines.append(f'_dmarc.{name}. 3600 IN TXT "v=DMARC1; p=reject; rua=mailto:postmaster@{name}"')
@@ -408,6 +419,10 @@ class FakeAdapter(BaseAdapter):
 
     def close(self) -> None:
         pass
+
+
+def dkim_management_type(domain: dict) -> str:
+    return (domain.get("dkimManagement") or {}).get("@type") or "Automatic"
 
 
 def dkim_selector(management: dict | None, algorithm: str) -> str:

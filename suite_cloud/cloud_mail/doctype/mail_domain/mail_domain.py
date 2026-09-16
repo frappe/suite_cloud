@@ -161,6 +161,21 @@ class MailDomain(Document):
             "allowRelaying": bool(self.allow_relaying),
         }
 
+    @frappe.whitelist()
+    def replace_dkim_keys(self) -> None:
+        """Emergency replacement after a leaked key: new keys under the same selectors.
+
+        The owner republishes the DKIM records with the new values. Their rows lose their
+        verification, so the hourly check takes the domain offline until the new records resolve;
+        mail signed with the old keys stops verifying as soon as they do.
+        """
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        self.assert_saved()
+        algorithms = dkim_algorithms()
+        sync.client_for(self).domains.replace_dkim_keys(self.stalwart_id, algorithms)
+        self.refresh_dns_records(expected_dkim_keys=len(algorithms))
+
     # --- DNS ------------------------------------------------------------------------
 
     @frappe.whitelist()

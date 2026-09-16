@@ -222,7 +222,10 @@ contact email for site-specific notices; the Suite app sends both whenever Suite
    generated for the domain, and DMARC and TLS reporting records. The rows come from Stalwart's
    `dnsZoneFile`, with SPF rewritten so egress gateways are covered. Stalwart generates and holds
    the keys; they use fixed selectors, `frappemail-rsa` and `frappemail-ed25519`, and never rotate,
-   so the records an owner publishes stay valid for the life of the domain.
+   so the records an owner publishes stay valid for the life of the domain. Should a key leak,
+   **Replace DKIM Keys** on the Mail Domain (and on a cluster or gateway, for their own domains)
+   generates new keys under the same selectors; the owner republishes the records, and the domain
+   is offline from the next hourly check until they resolve.
 4. The owner publishes them. `verify_dns_records` checks on public resolvers; once SPF, DMARC and
    at least one DKIM selector resolve, the domain is verified. MX is optional: a domain may use the
    cluster for sending only.
