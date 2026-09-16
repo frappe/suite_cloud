@@ -155,7 +155,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "When the record rows were last rebuilt from the cluster's zone file. Refreshed daily, and hourly while a DKIM key rotates.",
+   "description": "When the record rows were last rebuilt from the cluster's zone file, by the Refresh DNS Records action or the hourly check for keys the cluster was still generating.",
    "fieldname": "last_refreshed_at",
    "fieldtype": "Datetime",
    "label": "Records Refreshed At",

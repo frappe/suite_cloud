@@ -219,16 +219,18 @@ contact email for site-specific notices; the Suite app sends both whenever Suite
    cluster, disabled.
 3. `get_dns_records` lists what the owner must publish next: an MX record pointing at the
    cluster, an SPF record of the form `v=spf1 include:spf.<zone> -all`, the DKIM keys Stalwart
-   generates and rotates, and DMARC and TLS reporting records. The rows come from Stalwart's
-   `dnsZoneFile`, with SPF rewritten so egress gateways are covered.
+   generated for the domain, and DMARC and TLS reporting records. The rows come from Stalwart's
+   `dnsZoneFile`, with SPF rewritten so egress gateways are covered. Stalwart generates and holds
+   the keys; they use fixed selectors, `frappemail-rsa` and `frappemail-ed25519`, and never rotate,
+   so the records an owner publishes stay valid for the life of the domain.
 4. The owner publishes them. `verify_dns_records` checks on public resolvers; once SPF, DMARC and
    at least one DKIM selector resolve, the domain is verified. MX is optional: a domain may use the
    cluster for sending only.
 5. A domain is **active** when it is enabled and verified; only then does Stalwart accept mail for
    it, and only then may the site create accounts, groups and lists on it. Disabling a domain drops
    its verification on purpose, so enabling it again needs a fresh check.
-6. Verification is retried every hour, and rotated or late DKIM selectors are picked up hourly.
-   A temporary DNS failure never turns a working domain off.
+6. Verification is retried every hour, and a DKIM key the cluster was still generating when the
+   records were read is picked up hourly. A temporary DNS failure never turns a working domain off.
 
 A domain carries three delivery settings a site may change: a catch-all address for local parts
 that match no account, sub-addressing (`user+tag@`), and relaying, which makes the cluster forward
@@ -256,7 +258,7 @@ On a development site that talks to a cluster with a staging certificate, set
 | When | What |
 | --- | --- |
 | Every 5 minutes | Retry failed Server Jobs; poll nodes that are provisioning or draining. |
-| Hourly | Verify unverified domains; refresh the DNS records of domains whose DKIM keys are rotating or not all stored yet. |
+| Hourly | Verify unverified domains; refresh the DNS records of domains whose DKIM keys are not all stored yet. |
 | Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses. |
 
 ## Development

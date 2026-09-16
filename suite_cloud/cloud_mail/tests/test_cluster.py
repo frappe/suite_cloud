@@ -391,6 +391,7 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(domain["dnsManagement"], {"@type": "Manual"})
         self.assertEqual(domain["dkimManagement"]["@type"], "Automatic")
         self.assertEqual(domain["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
+        self.assertEqual(domain["dkimManagement"]["selectorTemplate"], "frappemail-{algorithm}")
 
         configure_settings(sign_with_ed25519=1)
         self.addCleanup(configure_settings, sign_with_ed25519=0)

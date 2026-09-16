@@ -319,11 +319,16 @@ class FakeStalwart:
         obj = {**payload, "id": self._new_id(type), "createdAt": "2026-01-01T00:00:00Z"}
         if type == "Domain":
             # Automatic DKIM management: Stalwart generates one key per algorithm on creation,
-            # both kinds when the payload names none.
-            for algorithm in dkim_key_types(payload.get("dkimManagement")):
+            # both kinds when the payload names none, named by the selector template.
+            management = payload.get("dkimManagement")
+            for algorithm in dkim_key_types(management):
                 self._add(
                     "DkimSignature",
-                    {"domainId": obj["id"], "selector": f"v1-{algorithm}-20260101", "stage": "active"},
+                    {
+                        "domainId": obj["id"],
+                        "selector": dkim_selector(management, algorithm),
+                        "stage": "active",
+                    },
                 )
         self._server_set(type, obj)
         collection[obj["id"]] = obj
@@ -403,6 +408,14 @@ class FakeAdapter(BaseAdapter):
 
     def close(self) -> None:
         pass
+
+
+def dkim_selector(management: dict | None, algorithm: str) -> str:
+    """The selector template rendered the way Stalwart does for a key generated on 2026-01-01."""
+
+    template = (management or {}).get("selectorTemplate") or "v{version}-{algorithm}-{date-%Y%m%d}"
+    rendered = template.replace("{version}", "1").replace("{algorithm}", algorithm)
+    return re.sub(r"\{date-[^}]*\}", "20260101", rendered)
 
 
 def dkim_key_types(management: dict | None) -> list[str]:

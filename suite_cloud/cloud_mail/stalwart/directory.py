@@ -13,8 +13,13 @@ DKIM_ED25519 = "Dkim1Ed25519Sha256"
 DKIM_RSA = "Dkim1RsaSha256"
 # Stalwart's own default when a domain is created without naming its algorithms.
 DKIM_ALGORITHMS = (DKIM_ED25519, DKIM_RSA)
-DKIM_SELECTOR_TEMPLATE = "v{version}-{algorithm}-{date-%Y%m%d}"
+# One fixed selector per key type: frappemail-rsa and frappemail-ed25519. A template is shared by
+# every key of a domain, so the algorithm has to be part of it; nothing else varies.
+DKIM_SELECTOR_TEMPLATE = "frappemail-{algorithm}"
 DAY_MS = 24 * 60 * 60 * 1000
+# Keys are never rotated: a rotation would ask every domain owner to publish a new selector.
+# Stalwart only rotates domains under automatic DNS management anyway; this pins the rest.
+DKIM_ROTATE_AFTER_MS = 100 * 365 * DAY_MS
 DKIM_KEY_WAIT_SECONDS = 15
 DKIM_KEY_POLL_SECONDS = 0.5
 GB = 1024**3
@@ -166,7 +171,8 @@ class Domain:
 
 
 def dkim_management_payload(algorithms: tuple[str, ...] | None) -> dict:
-    """Automatic DKIM: Stalwart generates and rotates keys; Manual when no algorithm is wanted."""
+    """Automatic DKIM: Stalwart generates and holds the keys, under fixed selectors and without
+    rotation; Manual when no algorithm is wanted."""
 
     if not algorithms:
         return {"@type": "Manual"}
@@ -175,7 +181,8 @@ def dkim_management_payload(algorithms: tuple[str, ...] | None) -> dict:
         "@type": "Automatic",
         "algorithms": id_set(algorithms),
         "selectorTemplate": DKIM_SELECTOR_TEMPLATE,
-        "rotateAfter": 90 * DAY_MS,
+        "rotateAfter": DKIM_ROTATE_AFTER_MS,
+        # Stalwart's defaults, stated so a sync sees the live object as equal.
         "retireAfter": 7 * DAY_MS,
         "deleteAfter": 30 * DAY_MS,
     }

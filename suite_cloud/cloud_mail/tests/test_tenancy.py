@@ -115,14 +115,17 @@ class TestMailDomain(TenancyTestCase):
         live = self.fake.find("Domain", name="acme.com")
         self.assertEqual(domain.stalwart_id, live["id"])
         # RSA only unless the setting opts into Ed25519: many receivers ignore Ed25519 signatures.
+        # Stalwart generates and holds the key, under a fixed selector, and never rotates it.
         self.assertEqual(live["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
+        self.assertEqual(live["dkimManagement"]["selectorTemplate"], "frappemail-{algorithm}")
+        self.assertGreater(live["dkimManagement"]["rotateAfter"], 50 * 365 * 24 * 60 * 60 * 1000)
         self.assertEqual(live["dnsManagement"], {"@type": "Manual"})
         self.assertEqual(live["reportAddressUri"], "mailto:postmaster@acme.com")
 
         # Rows land in the table of their group; authentication rows are the mandatory ones.
         auth = [(r.category, r.host, r.is_mandatory) for r in domain.authentication_records]
         self.assertEqual(
-            auth, [("SPF", "@", 1), ("DKIM", "v1-rsa-20260101._domainkey", 1), ("DMARC", "_dmarc", 1)]
+            auth, [("SPF", "@", 1), ("DKIM", "frappemail-rsa._domainkey", 1), ("DMARC", "_dmarc", 1)]
         )
         spf = domain.authentication_records[0]
         self.assertEqual(spf.value, f"v=spf1 include:spf.{self.cluster.default_domain} -all")
@@ -537,7 +540,7 @@ class TestMailDomain(TenancyTestCase):
         sleep.assert_called_once()
         self.assertEqual(
             [r.host for r in domain.authentication_records if r.category == "DKIM"],
-            ["v1-rsa-20260101._domainkey"],
+            ["frappemail-rsa._domainkey"],
         )
         self.assertIn("_domainkey", domain.dns_zone_file)
 
@@ -552,7 +555,7 @@ class TestMailDomain(TenancyTestCase):
             live["dkimManagement"]["algorithms"], {"Dkim1Ed25519Sha256": True, "Dkim1RsaSha256": True}
         )
         selectors = sorted(r.host for r in after.authentication_records if r.category == "DKIM")
-        self.assertEqual(selectors, ["v1-ed25519-20260101._domainkey", "v1-rsa-20260101._domainkey"])
+        self.assertEqual(selectors, ["frappemail-ed25519._domainkey", "frappemail-rsa._domainkey"])
 
         # The earlier domain keeps the keys it was created with; a save does not push algorithms.
         before.description = "renamed"
