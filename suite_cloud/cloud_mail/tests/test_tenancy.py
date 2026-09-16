@@ -6,7 +6,7 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import forget_sessions
 from suite_cloud.cloud_mail.tenancy.addresses import get_site_domain
-from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
+from suite_cloud.cloud_mail.tests.fake_stalwart import FakeError, FakeStalwart
 from suite_cloud.cloud_mail.tests.fixtures import (
     activate_cluster,
     clear_request_cache,
@@ -548,6 +548,39 @@ class TestMailDomain(TenancyTestCase):
         self.assertFalse(dkim_row.is_verified)  # the owner has to publish the new value
         self.assertTrue(domain.authentication_records[0].is_verified)  # SPF keeps its state
         self.assertTrue(domain.is_verified)  # liveness only changes on a verification run
+
+    def test_replacement_cut_short_reports_a_keyless_domain_and_reruns(self) -> None:
+        from suite_cloud.cloud_mail.stalwart.errors import StalwartKeylessDomainError
+
+        domain = self.make_domain()
+        real_set = FakeStalwart._set
+        refusals = []
+
+        def refuse_automatic(fake, type, args, account_id, refs):
+            wanted = [p.get("dkimManagement", {}).get("@type") for p in (args.get("update") or {}).values()]
+            if type == "Domain" and "Automatic" in wanted and len(refusals) < 3:
+                refusals.append(1)
+                raise FakeError("serverFail", "busy")
+            return real_set(fake, type, args, account_id, refs)
+
+        # Both attempts refused: the old keys are gone, the operator is told, the domain is manual.
+        with patch.object(FakeStalwart, "_set", refuse_automatic):
+            self.assertRaisesRegex(
+                StalwartKeylessDomainError, "run Replace DKIM Keys again", domain.replace_dkim_keys
+            )
+        live = self.fake.find("Domain", name="acme.com")
+        self.assertEqual(live["dkimManagement"], {"@type": "Manual"})
+        self.assertEqual([s for s in self.fake.all("DkimSignature") if s["domainId"] == live["id"]], [])
+        self.assertEqual(len(refusals), 2)
+
+        # A second run skips the manual switch, survives one more refusal and regenerates the key.
+        with patch.object(FakeStalwart, "_set", refuse_automatic):
+            domain.replace_dkim_keys()
+        self.assertEqual(len(refusals), 3)
+        live = self.fake.find("Domain", name="acme.com")
+        self.assertEqual(live["dkimManagement"]["@type"], "Automatic")
+        signatures = [s["selector"] for s in self.fake.all("DkimSignature") if s["domainId"] == live["id"]]
+        self.assertEqual(signatures, ["frappemail-rsa"])
 
     def test_domain_creation_waits_for_dkim_keys_still_being_generated(self) -> None:
         # Stalwart generates the RSA key after the domain exists; the first zone read misses it.
