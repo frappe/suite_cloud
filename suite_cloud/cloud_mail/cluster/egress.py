@@ -14,6 +14,7 @@ from frappe import _
 from frappe.utils import add_to_date, get_datetime, now
 
 from suite_cloud.cloud_mail.cluster import dns, plan
+from suite_cloud.cloud_mail.stalwart import has_credentials
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
 from suite_cloud.cloud_mail.stalwart.directory import dkim_management_payload
 from suite_cloud.cloud_mail.stalwart.errors import StalwartError
@@ -162,7 +163,7 @@ def expression_rules(expression: dict) -> list[dict]:
 
 
 def current_route_expression(cluster: Document) -> dict:
-    if cluster.status != "Active" or not cluster.get_password("api_key", raise_exception=False):
+    if cluster.status != "Active" or not has_credentials(cluster):
         return {}
     try:
         return (
@@ -225,7 +226,7 @@ def resync_cluster_job(cluster: str) -> None:
 
 
 def resync_cluster(cluster: Document) -> None:
-    if cluster.status == "Active" and cluster.get_password("api_key", raise_exception=False):
+    if cluster.status == "Active" and has_credentials(cluster):
         cluster.push_config()
 
 

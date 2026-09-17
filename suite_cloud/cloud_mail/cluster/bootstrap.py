@@ -8,6 +8,7 @@ from frappe import _
 from frappe.utils import add_to_date, get_datetime, now
 
 from suite_cloud.cloud_mail.cluster import dns, plan
+from suite_cloud.cloud_mail.stalwart import has_credentials
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
 from suite_cloud.cloud_mail.stalwart.errors import StalwartError
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
@@ -342,7 +343,7 @@ def forget_node(node: Document) -> None:
     """Removes the node's registry lease when the cluster is reachable (best effort)."""
 
     cluster = node.get_cluster()
-    if cluster.status != "Active" or not cluster.get_password("api_key", raise_exception=False):
+    if cluster.status != "Active" or not has_credentials(cluster):
         return
     try:
         client = cluster.get_client()
