@@ -60,6 +60,7 @@ class MailDomain(Document):
         publish_client_discovery_records: DF.Check
         routing_records: DF.Table[MailDomainDNSRecord]
         site: DF.Link
+        skip_scheduled_verification: DF.Check
         stalwart_id: DF.Data | None
         allow_relaying: DF.Check
         sub_addressing: DF.Check
@@ -399,26 +400,27 @@ def stored_dkim_selectors(names: list[str]) -> dict[str, set[str]]:
 def verify_unverified_domains() -> None:
     """Hourly: unverified domains, plus verified ones with a mandatory row still unverified (rotations)."""
 
+    for name in domains_due_for_verification():
+        _run_isolated(
+            name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
+        )
+
+
+def domains_due_for_verification() -> list[str]:
+    """The domains the hourly check resolves; ``skip_scheduled_verification`` keeps one out of it."""
+
     # Disabled domains stay unverified on purpose: verification resumes once they are enabled.
-    names = set(
-        frappe.get_all(
-            "Mail Domain", {"is_verified": 0, "enabled": 1, "stalwart_id": ["is", "set"]}, pluck="name"
-        )
+    due = {"enabled": 1, "stalwart_id": ["is", "set"], "skip_scheduled_verification": 0}
+    names = set(frappe.get_all("Mail Domain", {**due, "is_verified": 0}, pluck="name"))
+    unverified_rows = frappe.get_all(
+        "Mail Domain DNS Record",
+        {"is_mandatory": 1, "is_verified": 0, "parenttype": "Mail Domain"},
+        pluck="parent",
+        distinct=True,
     )
-    names.update(
-        frappe.get_all(
-            "Mail Domain DNS Record",
-            {"is_mandatory": 1, "is_verified": 0, "parenttype": "Mail Domain"},
-            pluck="parent",
-            distinct=True,
-        )
-    )
-    for name in sorted(names):
-        stalwart_id, enabled = frappe.db.get_value("Mail Domain", name, ["stalwart_id", "enabled"])
-        if stalwart_id and enabled:
-            _run_isolated(
-                name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
-            )
+    if unverified_rows:
+        names.update(frappe.get_all("Mail Domain", {**due, "name": ["in", unverified_rows]}, pluck="name"))
+    return sorted(names)
 
 
 def _refresh(name: str) -> None:

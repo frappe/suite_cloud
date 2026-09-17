@@ -21,6 +21,7 @@
   "egress_pool",
   "dns_section",
   "is_verified",
+  "skip_scheduled_verification",
   "last_verified_at",
   "column_break_dns",
   "last_refreshed_at",
@@ -136,11 +137,19 @@
   },
   {
    "default": "0",
-   "description": "Set by Verify DNS Records when SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled. A System Manager or Suite Cloud Manager can set it by hand; the hourly check re-verifies domains that are unchecked.",
+   "description": "Set by Verify DNS Records when SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled. A System Manager or Suite Cloud Manager can set it by hand; the hourly check re-verifies domains that are unchecked, and checked ones with a mandatory record still unresolved, which unchecks a domain verified by hand unless Skip Scheduled Verification is on.",
    "fieldname": "is_verified",
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Verified",
+   "permlevel": 1
+  },
+  {
+   "default": "0",
+   "description": "Checked, the hourly check leaves this domain alone, so Verified stays as it was last set, by hand or by the action. Verify DNS Records still resolves the records on demand.",
+   "fieldname": "skip_scheduled_verification",
+   "fieldtype": "Check",
+   "label": "Skip Scheduled Verification",
    "permlevel": 1
   },
   {
@@ -246,7 +255,7 @@
    "link_fieldname": "domain"
   }
  ],
- "modified": "2026-09-08 14:00:00.000000",
+ "modified": "2026-09-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cloud Mail",
  "name": "Mail Domain",

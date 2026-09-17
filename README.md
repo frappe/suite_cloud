@@ -234,6 +234,8 @@ contact email for site-specific notices; the Suite app sends both whenever Suite
    its verification on purpose, so enabling it again needs a fresh check.
 6. Verification is retried every hour, and a DKIM key the cluster was still generating when the
    records were read is picked up hourly. A temporary DNS failure never turns a working domain off.
+   **Skip Scheduled Verification** on the Mail Domain keeps a domain out of the hourly check, so
+   one a manager verified by hand stays verified; **Verify DNS Records** still runs on demand.
 
 A domain carries three delivery settings a site may change: a catch-all address for local parts
 that match no account, sub-addressing (`user+tag@`), and relaying, which makes the cluster forward
@@ -261,7 +263,7 @@ On a development site that talks to a cluster with a staging certificate, set
 | When | What |
 | --- | --- |
 | Every 5 minutes | Retry failed Server Jobs; poll nodes that are provisioning or draining. |
-| Hourly | Verify unverified domains; refresh the DNS records of domains whose DKIM keys are not all stored yet. |
+| Hourly | Verify unverified domains, except those set to skip it; refresh the DNS records of domains whose DKIM keys are not all stored yet. |
 | Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses. |
 
 ## Development
