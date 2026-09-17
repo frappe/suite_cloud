@@ -322,6 +322,24 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertNotEqual(cluster.get_password("api_key"), old_key)
             self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
 
+    def test_client_falls_back_to_the_admin_password_without_an_api_key(self) -> None:
+        from suite_cloud.cloud_mail.stalwart import forget_sessions, has_credentials
+        from suite_cloud.cloud_mail.tests.fake_stalwart import FakeStalwart
+        from suite_cloud.cloud_mail.tests.fixtures import clear_request_cache
+
+        cluster = make_cluster()
+        cluster.db_set("status", "Active")
+        fake = FakeStalwart(base_url=cluster.base_url, admin_password=cluster.get_password("admin_password"))
+        fake.add_cluster_node("n1.example.test", node_id=7)
+        with fake.install():
+            forget_sessions(cluster)
+            clear_request_cache()
+            self.assertIsNone(cluster.get_password("api_key", raise_exception=False))
+            self.assertTrue(has_credentials(cluster))
+            self.assertEqual(
+                cluster.get_client().cluster_nodes.find_by_hostname("n1.example.test")["nodeId"], 7
+            )
+
     def test_retried_bootstrap_recovers_a_failed_cluster(self) -> None:
         from suite_cloud.cloud_mail.cluster import bootstrap
 

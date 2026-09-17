@@ -1,8 +1,9 @@
 """Stalwart 0.16 management client (JMAP dialect ``urn:stalwart:jmap``).
 
-``get_client`` speaks to a cluster or egress gateway with its stored API key; the admin and
-account clients exist only for the two things a Bearer token cannot do: minting API keys and
-creating app passwords inside a member's account (master-user login ``account%admin``).
+``get_client`` speaks to a cluster or egress gateway with its stored API key, or with the admin
+password until a key is minted; the admin and account clients exist only for the two things a
+Bearer token cannot do: minting API keys and creating app passwords inside a member's account
+(master-user login ``account%admin``).
 """
 
 import hashlib
@@ -21,19 +22,44 @@ DEFAULT_TIMEOUT = (15.0, 60.0)
 
 
 def get_client(target: Document, timeout: tuple[float, float] = DEFAULT_TIMEOUT) -> StalwartClient:
-    """Returns the management client for a Stalwart Cluster or Egress Gateway document."""
+    """Returns the management client for a Stalwart Cluster or Egress Gateway document.
+
+    Prefers the stored API key; without one it falls back to the admin password so a target
+    whose key was lost or never minted stays manageable.
+    """
 
     token = target.get_password("api_key", raise_exception=False)
-    if not token:
+    password = target.get_password("admin_password", raise_exception=False)
+    if token:
+        info = ConnectionInfo(target.base_url, token=token, timeout=timeout, verify_ssl=verify_tls())
+    elif password:
+        info = ConnectionInfo(
+            target.base_url,
+            username=target.admin_username,
+            password=password,
+            timeout=timeout,
+            verify_ssl=verify_tls(),
+        )
+    else:
         frappe.throw(
-            frappe._("{0} {1} has no Stalwart API key yet; it is minted when bootstrap finishes.").format(
+            frappe._("{0} {1} has neither a Stalwart API key nor an admin password.").format(
                 target.doctype, target.name
             )
         )
 
-    info = ConnectionInfo(target.base_url, token=token, timeout=timeout, verify_ssl=verify_tls())
-    store = session_store(f"{target.doctype}:{target.name}:{hashlib.sha1(token.encode()).hexdigest()}")
+    # Cached sessions are keyed on the credential so a rotated key or password never reuses one.
+    secret = hashlib.sha1((token or password).encode()).hexdigest()
+    store = session_store(f"{target.doctype}:{target.name}:{secret}")
     return StalwartClient(JMAPConnection(info, session_store=store))
+
+
+def has_credentials(target: Document) -> bool:
+    """Whether ``get_client`` can authenticate against the target at all."""
+
+    return bool(
+        target.get_password("api_key", raise_exception=False)
+        or target.get_password("admin_password", raise_exception=False)
+    )
 
 
 def get_admin_client(target: Document, timeout: tuple[float, float] = DEFAULT_TIMEOUT) -> StalwartClient:
