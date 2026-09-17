@@ -508,6 +508,25 @@ class TestMailDomain(TenancyTestCase):
         domain.routing_records[0].is_verified = 0
         self.assertTrue(domain.compute_is_verified())
 
+    def test_hourly_verification_leaves_a_skipped_domain_alone(self) -> None:
+        from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import domains_due_for_verification
+
+        # Verified by hand with no record resolved: the hourly check would take it offline again.
+        by_hand = self.make_domain()
+        unverified = self.make_domain("other.com", is_verified=0)
+        self.assertLessEqual({by_hand.name, unverified.name}, set(domains_due_for_verification()))
+
+        for domain in (by_hand, unverified):
+            domain.skip_scheduled_verification = 1
+            domain.save()
+        self.assertFalse({by_hand.name, unverified.name} & set(domains_due_for_verification()))
+
+        # The action is not the schedule: it still resolves the records of a skipped domain.
+        with patch(
+            "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.verify_dns_record", return_value=False
+        ):
+            self.assertFalse(by_hand.verify_dns_records()["is_verified"])
+
     def test_reserved_names_cover_every_cluster_zone(self) -> None:
         self.assertRaisesRegex(
             frappe.ValidationError, "reserved", self.make_domain, "mail.other.example.test"
