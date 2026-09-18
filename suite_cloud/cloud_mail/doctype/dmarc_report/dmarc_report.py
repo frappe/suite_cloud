@@ -11,6 +11,7 @@ does and reads it through the site API without ever touching the cluster.
 
 import json
 from datetime import UTC
+from uuid import uuid7
 from zoneinfo import ZoneInfo
 
 import frappe
@@ -63,6 +64,9 @@ class DMARCReport(Document):
         subdomain_policy: DF.Data | None
         total_messages: DF.Int
     # end: auto-generated types
+
+    def autoname(self) -> None:
+        self.name = str(uuid7())
 
     @classmethod
     def from_stalwart(cls, cluster_name: str, obj: dict) -> DMARCReport:

@@ -80,7 +80,7 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual(self.fetch(), 3)
         self.assertEqual(self.fetch(), 0)  # already stored: nothing is asked for again
 
-        doc = frappe.get_doc("DMARC Report", f"{self.cluster.name}-{acme}")
+        doc = frappe.get_doc("DMARC Report", {"cluster": self.cluster.name, "stalwart_id": acme})
         self.assertEqual((doc.domain, doc.site, doc.policy_domain), ("acme.com", self.site.name, "acme.com"))
         self.assertEqual((doc.total_messages, doc.passed_messages, doc.failed_messages), (5, 3, 2))
         self.assertEqual((doc.dkim_passed_messages, doc.spf_passed_messages), (3, 3))

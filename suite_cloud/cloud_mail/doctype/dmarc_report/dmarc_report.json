@@ -1,6 +1,5 @@
 {
  "actions": [],
- "autoname": "format:{cluster}-{stalwart_id}",
  "creation": "2026-09-18 12:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -290,7 +289,6 @@
  "modified_by": "Administrator",
  "module": "Cloud Mail",
  "name": "DMARC Report",
- "naming_rule": "Expression",
  "owner": "Administrator",
  "permissions": [
   {
