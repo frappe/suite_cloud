@@ -1,7 +1,8 @@
+from datetime import datetime
 from unittest.mock import patch
 
 import frappe
-from frappe.utils import add_days, now_datetime
+from frappe.utils import add_days
 
 from suite_cloud.api.mail import dmarc, domains
 from suite_cloud.cloud_mail.doctype.dmarc_report import dmarc_report
@@ -60,9 +61,22 @@ def record(source_ip: str, count: int, dkim: str = "pass", spf: str = "pass") ->
     }
 
 
+# The fixtures cover 16-17 September 2026; the clock is frozen the day after, so the summary
+# windows and the retention cutoffs mean the same thing whenever the tests run.
+NOW = datetime(2026, 9, 18, 12, 0, 0)
+CLOCKS = (
+    "suite_cloud.api.mail.dmarc.now_datetime",
+    "suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report.now_datetime",
+)
+
+
 class TestDmarcReports(SiteApiTestCase):
     def setUp(self) -> None:
         super().setUp()
+        for clock in CLOCKS:
+            frozen = patch(clock, return_value=NOW)
+            frozen.start()
+            self.addCleanup(frozen.stop)
         domains.create_domain("acme.com")
         self.act_as(self.other)
         domains.create_domain("other.com")
@@ -157,7 +171,7 @@ class TestDmarcReports(SiteApiTestCase):
             "DMARC Report",
             {"policy_domain": "acme.com", "org_name": "yahoo.com"},
             "date_range_end",
-            add_days(now_datetime(), -60),
+            add_days(NOW, -60),
         )
 
         summary = dmarc.get_dmarc_summary(days=30)
@@ -217,10 +231,10 @@ class TestDmarcReports(SiteApiTestCase):
         kept = self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
         gone = self.fake._add("DmarcExternalReport", stalwart_report("other.com"))
         self.fetch()
-        old = add_days(now_datetime(), -366)
+        old = add_days(NOW, -366)
         for stalwart_id in (kept, gone):
             frappe.db.set_value("DMARC Report", {"stalwart_id": stalwart_id}, "date_range_end", old)
-        frappe.db.set_value("DMARC Report", {"stalwart_id": gone}, "expires_at", add_days(now_datetime(), -1))
+        frappe.db.set_value("DMARC Report", {"stalwart_id": gone}, "expires_at", add_days(NOW, -1))
         dmarc_report.prune_expired_reports()
         self.assertEqual(
             frappe.get_all("DMARC Report", {"cluster": self.cluster.name}, pluck="stalwart_id"), [kept]
@@ -232,9 +246,7 @@ class TestDmarcReports(SiteApiTestCase):
     def test_a_negative_retention_never_prunes_the_future(self) -> None:
         self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
         self.fetch()
-        frappe.db.set_value(
-            "DMARC Report", {"cluster": self.cluster.name}, "expires_at", add_days(now_datetime(), -1)
-        )
+        frappe.db.set_value("DMARC Report", {"cluster": self.cluster.name}, "expires_at", add_days(NOW, -1))
         with patch("suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report.get_config", return_value=-30):
             dmarc_report.prune_expired_reports()
         self.assertEqual(len(self.report_names()), 1)
