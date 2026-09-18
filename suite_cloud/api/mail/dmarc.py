@@ -25,9 +25,13 @@ def list_dmarc_reports(
     start: int = 0,
     limit: int = 50,
 ) -> dict:
-    """Newest period first; ``since``/``until`` bound the period a report covers."""
+    """Newest period first; ``since``/``until`` bound the period a report covers.
 
-    filters: dict = {}
+    A report that counted no messages says nothing about the domain and is left out, here and
+    in the summary; ``get_dmarc_report`` still answers for it by name.
+    """
+
+    filters: dict = {"total_messages": [">", 0]}
     if domain:
         filters["policy_domain"] = owned("Mail Domain", domain).name
     if since:
@@ -109,6 +113,7 @@ class ReportScope:
             .join(record)
             .on((record.parent == report.name) & (record.parenttype == "DMARC Report"))
             .where((report.site == self.site) & (report.date_range_end >= self.since))
+            .where(report.total_messages > 0)
             .groupby(group)
             .select(
                 Count(report.name).distinct().as_("reports"),

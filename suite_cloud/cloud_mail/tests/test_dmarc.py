@@ -118,10 +118,18 @@ class TestDmarcReports(SiteApiTestCase):
             stalwart_report("acme.com", org="yahoo.com", records=[record("203.0.113.5", 10)]),
         )
         self.fake._add("DmarcExternalReport", stalwart_report("other.com"))
+        # Counted nothing: stored for the record, but neither listed nor summed for the site.
+        empty = self.fake._add(
+            "DmarcExternalReport", stalwart_report("acme.com", org="empty.org", records=[])
+        )
         self.fetch()
 
         listing = dmarc.list_dmarc_reports()
         self.assertEqual(listing["total"], 2)
+        self.assertNotIn("empty.org", [r["reporter"] for r in listing["items"]])
+        self.assertEqual(dmarc.get_dmarc_summary(days=30)["totals"]["reports"], 2)
+        stored = frappe.db.get_value("DMARC Report", {"cluster": self.cluster.name, "stalwart_id": empty})
+        self.assertEqual(dmarc.get_dmarc_report(stored)["totals"]["messages"], 0)
         self.assertEqual({r["policy_domain"] for r in listing["items"]}, {"acme.com"})
         self.assertEqual(
             listing["items"][0]["totals"],
