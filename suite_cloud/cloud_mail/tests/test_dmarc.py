@@ -228,3 +228,16 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual(self.record_count(), 2)
         del self.fake.objects["DmarcExternalReport"][gone]  # as Stalwart did on expiry
         self.assertEqual(self.fetch(), 0)
+
+    def test_a_negative_retention_never_prunes_the_future(self) -> None:
+        self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
+        self.fetch()
+        frappe.db.set_value(
+            "DMARC Report", {"cluster": self.cluster.name}, "expires_at", add_days(now_datetime(), -1)
+        )
+        with patch("suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report.get_config", return_value=-30):
+            dmarc_report.prune_expired_reports()
+        self.assertEqual(len(self.report_names()), 1)
+        settings = frappe.get_doc("Suite Cloud Settings")
+        settings.dmarc_report_retention_days = 0
+        self.assertRaises(frappe.ValidationError, settings.save, ignore_permissions=True)

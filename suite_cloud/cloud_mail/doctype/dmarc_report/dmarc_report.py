@@ -168,11 +168,25 @@ def prune_expired_reports() -> None:
     lists it would look new to the next fetch and come straight back.
     """
 
-    days = cint(get_config("dmarc_report_retention_days")) or 365
+    days = retention_days()
     expired = {"date_range_end": ["<", add_days(now_datetime(), -days)]}
     names = frappe.get_all("DMARC Report", {**expired, "expires_at": ["<", now_datetime()]}, pluck="name")
     names += frappe.get_all("DMARC Report", {**expired, "expires_at": ["is", "not set"]}, pluck="name")
     delete_reports(names)
+
+
+DEFAULT_RETENTION_DAYS = 365
+
+
+def retention_days() -> int:
+    """The configured retention; a missing or negative value falls back to the default.
+
+    Settings refuse a value under one day, but site_config is not validated, and a negative
+    number would move the cutoff into the future and delete the whole history.
+    """
+
+    days = cint(get_config("dmarc_report_retention_days"))
+    return days if days > 0 else DEFAULT_RETENTION_DAYS
 
 
 def detach_reports_for_domain(domain: str) -> None:
