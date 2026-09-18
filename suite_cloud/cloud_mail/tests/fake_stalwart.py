@@ -247,6 +247,11 @@ class FakeStalwart:
         if unsupported:
             raise FakeError("unsupportedFilter", f"{type} cannot filter on {sorted(unsupported)}")
         objects = [o for o in self._collection(type, account_id).values() if matches(o, filter)]
+        for comparator in reversed(args.get("sort") or []):
+            objects.sort(
+                key=lambda o: o.get(comparator["property"]) or "",
+                reverse=not comparator.get("isAscending", True),
+            )
         objects = objects[int(args.get("position") or 0) :]
         if limit := args.get("limit"):
             objects = objects[:limit]

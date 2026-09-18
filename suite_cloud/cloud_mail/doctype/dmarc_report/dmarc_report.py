@@ -146,7 +146,8 @@ def fetch_reports(cluster: Document) -> int:
 
     service = get_client(cluster).dmarc_reports
     stored = set(frappe.get_all("DMARC Report", {"cluster": cluster.name}, pluck="stalwart_id"))
-    new_ids = [id for id in service.iter_ids() if id not in stored]
+    # Deduplicated: an id the cluster lists twice must be stored once, not logged as a failure.
+    new_ids = list(dict.fromkeys(id for id in service.iter_ids() if id not in stored))
     added = 0
     for obj in service.get_many(new_ids):
         try:

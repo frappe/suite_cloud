@@ -144,11 +144,18 @@ class ManagementService:
         return result.get("ids") or []
 
     def iter_ids(self, filter: dict | None = None, page_size: int = 500) -> Iterator[str]:
-        """Every matching id, one query page at a time; for collections too big for one answer."""
+        """Every matching id, one query page at a time; for collections too big for one answer.
 
+        Pages are cut by position, which only lines up between requests under a total order:
+        unsorted, Stalwart answered overlapping pages that repeated some ids and never returned
+        others. Sorting on the id itself is the one order every type supports.
+        """
+
+        sort = [{"property": "id", "isAscending": True}]
         position = 0
         while True:
-            ids = self._invoke("query", filter=filter, position=position, limit=page_size).get("ids") or []
+            args = {"filter": filter, "sort": sort, "position": position, "limit": page_size}
+            ids = self._invoke("query", **args).get("ids") or []
             yield from ids
             if len(ids) < page_size:
                 return

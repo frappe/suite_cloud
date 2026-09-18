@@ -1,8 +1,11 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.utils import add_days, now_datetime
 
 from suite_cloud.api.mail import dmarc, domains
 from suite_cloud.cloud_mail.doctype.dmarc_report import dmarc_report
+from suite_cloud.cloud_mail.tenancy import sync
 from suite_cloud.cloud_mail.tests.test_site_api import SiteApiTestCase
 
 
@@ -66,12 +69,18 @@ class TestDmarcReports(SiteApiTestCase):
         self.act_as(self.site)
 
     def tearDown(self) -> None:
-        frappe.db.delete("DMARC Report Record")
-        frappe.db.delete("DMARC Report")
+        dmarc_report.delete_reports(self.report_names())
         super().tearDown()
 
     def fetch(self) -> int:
         return dmarc_report.fetch_reports(self.cluster)
+
+    def report_names(self) -> list[str]:
+        return frappe.get_all("DMARC Report", {"cluster": self.cluster.name}, pluck="name")
+
+    def record_count(self) -> int:
+        names = self.report_names()
+        return frappe.db.count("DMARC Report Record", {"parent": ["in", names]}) if names else 0
 
     def test_fetch_stores_new_reports_once_and_attributes_them(self) -> None:
         acme = self.fake._add("DmarcExternalReport", stalwart_report("Acme.com."))
@@ -90,6 +99,18 @@ class TestDmarcReports(SiteApiTestCase):
         # A report about a domain no site holds is kept for operators, attributed to nobody.
         stray = frappe.db.get_value("DMARC Report", {"policy_domain": "nobody.example"}, ["site", "domain"])
         self.assertEqual(stray, (None, None))
+
+    def test_fetch_pages_the_cluster_s_ids_in_a_stable_order(self) -> None:
+        ids = {self.fake._add("DmarcExternalReport", stalwart_report("acme.com")) for _ in range(7)}
+        service = sync.client_for(frappe.get_doc("Mail Domain", "acme.com")).dmarc_reports
+        paged = list(service.iter_ids(page_size=3))
+        self.assertEqual((len(paged), set(paged)), (7, ids))
+        self.assertEqual(paged, sorted(paged))
+        # A cluster that lists an id twice (overlapping pages) stores it once and logs nothing.
+        errors_before = frappe.db.count("Error Log")
+        with patch.object(type(service), "iter_ids", return_value=iter([*sorted(ids), *sorted(ids)])):
+            self.assertEqual(self.fetch(), 7)
+        self.assertEqual((len(self.report_names()), frappe.db.count("Error Log")), (7, errors_before))
 
     def test_site_api_shows_only_the_site_s_reports(self) -> None:
         self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
@@ -176,12 +197,14 @@ class TestDmarcReports(SiteApiTestCase):
         self.fake._add("DmarcExternalReport", stalwart_report("other.com"))
         self.fetch()
         domains.delete_domain("acme.com")
-        self.assertEqual(frappe.get_all("DMARC Report", pluck="policy_domain"), ["other.com"])
-        self.assertEqual(frappe.db.count("DMARC Report Record"), 2)  # only the other domain's rows remain
+        self.assertEqual(
+            frappe.get_all("DMARC Report", {"cluster": self.cluster.name}, pluck="policy_domain"),
+            ["other.com"],
+        )
+        self.assertEqual(self.record_count(), 2)  # only the other domain's rows remain
 
         frappe.db.set_value(
             "DMARC Report", {"policy_domain": "other.com"}, "date_range_end", add_days(now_datetime(), -366)
         )
         dmarc_report.prune_expired_reports()
-        self.assertEqual(frappe.db.count("DMARC Report"), 0)
-        self.assertEqual(frappe.db.count("DMARC Report Record"), 0)
+        self.assertEqual((self.report_names(), self.record_count()), ([], 0))
