@@ -22,10 +22,12 @@ def list_dmarc_reports(
     search: str | None = None,
     since: str | None = None,
     until: str | None = None,
+    days: int | None = None,
     start: int = 0,
     limit: int = 50,
 ) -> dict:
-    """Newest period first; ``since``/``until`` bound the period a report covers.
+    """Newest period first; ``since``/``until`` bound the period a report covers, and ``days``
+    keeps the reports whose period ended within the last so many days, as the summary counts.
 
     A report that counted no messages says nothing about the domain and is left out, here and
     in the summary; ``get_dmarc_report`` still answers for it by name.
@@ -34,6 +36,8 @@ def list_dmarc_reports(
     filters: dict = {"total_messages": [">", 0]}
     if domain:
         filters["policy_domain"] = owned("Mail Domain", domain).name
+    if cint(days):
+        filters["date_range_end"] = [">=", summary_window(days)[0]]
     if since:
         filters["date_range_end"] = [">=", get_datetime(since)]
     if until:
@@ -65,9 +69,7 @@ def get_dmarc_report(report: str) -> dict:
 def get_dmarc_summary(domain: str | None = None, days: int = 30) -> dict:
     """Totals over the reports whose period ended in the last ``days``, by domain, source and reporter."""
 
-    days = min(max(cint(days), 1), SUMMARY_MAX_DAYS)
-    until = now_datetime()
-    since = add_days(until, -days)
+    since, until = summary_window(days)
     scope = ReportScope(current_site().name, owned("Mail Domain", domain).name if domain else None, since)
     return {
         "since": utc_iso(since),
@@ -77,6 +79,15 @@ def get_dmarc_summary(domain: str | None = None, days: int = 30) -> dict:
         "sources": scope.by_source(),
         "reporters": scope.by_reporter(),
     }
+
+
+def summary_window(days) -> tuple:
+    """``(since, until)``: the last ``days`` days up to now, clamped to at least one and at most
+    ``SUMMARY_MAX_DAYS``."""
+
+    days = min(max(cint(days), 1), SUMMARY_MAX_DAYS)
+    until = now_datetime()
+    return add_days(until, -days), until
 
 
 class ReportScope:
