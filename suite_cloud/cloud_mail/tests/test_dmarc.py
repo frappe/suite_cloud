@@ -125,6 +125,20 @@ class TestDmarcReports(SiteApiTestCase):
             self.assertEqual(self.fetch(), 7)
         self.assertEqual((len(self.report_names()), frappe.db.count("Error Log")), (7, errors_before))
 
+    def test_a_malformed_report_is_skipped_without_losing_the_rest(self) -> None:
+        self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
+        broken = self.fake._add(
+            "DmarcExternalReport", {"report": {"policyDomain": "acme.com", "records": {"0": 1}}}
+        )
+        self.fake._add("DmarcExternalReport", stalwart_report("acme.com", org="yahoo.com"))
+        errors_before = frappe.db.count("Error Log")
+        self.assertEqual(self.fetch(), 2)
+        self.assertEqual(len(self.report_names()), 2)
+        self.assertEqual(frappe.db.count("Error Log"), errors_before + 1)
+        self.assertIn(
+            broken, frappe.db.get_value("Error Log", {"name": ["!=", ""]}, "method", order_by="creation desc")
+        )
+
     def test_site_api_shows_only_the_site_s_reports(self) -> None:
         self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
         self.fake._add(

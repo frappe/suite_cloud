@@ -121,7 +121,11 @@ def on_doctype_update() -> None:
 
 
 def fetch_all_clusters() -> None:
-    """Hourly: copies the reports each active cluster holds that are not stored yet."""
+    """Hourly: copies the reports each active cluster holds that are not stored yet.
+
+    One transaction per cluster: a cluster that fails rolls its own work back and is logged,
+    while the ones already fetched stay committed.
+    """
 
     clusters = frappe.get_all("Stalwart Cluster", {"enabled": 1, "status": "Active"}, pluck="name")
     for name in clusters:
@@ -133,14 +137,17 @@ def fetch_all_clusters() -> None:
         except Exception:
             frappe.db.rollback()
             log_exception(f"DMARC report fetch failed for cluster {name}")
+            continue
+        if not frappe.in_test:
+            frappe.db.commit()
 
 
 def fetch_reports(cluster: Document) -> int:
     """Stores the cluster's reports that are new here; returns how many were added.
 
     Ids are the only thing asked of the cluster up front, so an hourly run on a cluster with
-    nothing new costs one query. Each report is its own transaction: a malformed one is logged
-    and skipped without losing the rest.
+    nothing new costs one query. The caller owns the transaction; a malformed report is rolled
+    back to its savepoint, logged and skipped without losing the rest.
     """
 
     service = get_client(cluster).dmarc_reports
@@ -149,16 +156,18 @@ def fetch_reports(cluster: Document) -> int:
     new_ids = list(dict.fromkeys(id for id in service.iter_ids() if id not in stored))
     added = 0
     for obj in service.get_many(new_ids):
+        frappe.db.savepoint(SAVEPOINT)
         try:
             DMARCReport.from_stalwart(cluster.name, obj).insert(ignore_permissions=True)
         except Exception:
-            frappe.db.rollback()
+            frappe.db.rollback(save_point=SAVEPOINT)
             log_exception(f"DMARC report {obj.get('id')} on {cluster.name} could not be stored")
             continue
         added += 1
-        if not frappe.in_test:
-            frappe.db.commit()
     return added
+
+
+SAVEPOINT = "dmarc_report"
 
 
 def prune_expired_reports() -> None:
