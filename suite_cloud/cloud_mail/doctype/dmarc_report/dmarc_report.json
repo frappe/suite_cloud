@@ -54,7 +54,7 @@
    "in_standard_filter": 1,
    "reqd": 1,
    "read_only": 1,
-   "description": "The domain the report is about, as the reporter names it."
+   "description": "The domain the report is about, as the reporter names it: the one whose DMARC record was evaluated."
   },
   {
    "fieldname": "domain",
@@ -63,7 +63,7 @@
    "options": "Mail Domain",
    "in_standard_filter": 1,
    "read_only": 1,
-   "description": "Left empty when no site holds the domain (the cluster's own domain, for instance)."
+   "description": "The Mail Domain that carries the policy domain. Left empty when no site holds it (the cluster's own domain, for instance)."
   },
   {
    "fieldname": "site",
@@ -72,7 +72,8 @@
    "options": "Suite Site",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The site that held the domain when the report was fetched; the site API shows the report to this site only."
   },
   {
    "fieldname": "cluster",
@@ -81,14 +82,16 @@
    "options": "Stalwart Cluster",
    "reqd": 1,
    "in_standard_filter": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The cluster that intercepted the report. Stalwart parses reports mailed to postmaster@ and keeps them for a month."
   },
   {
    "fieldname": "stalwart_id",
    "fieldtype": "Data",
    "label": "Stalwart ID",
    "reqd": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The id of the DmarcExternalReport object on the cluster; with the cluster it says whether a report is stored already."
   },
   {
    "fieldname": "column_break_report",
@@ -100,46 +103,53 @@
    "label": "Reporter",
    "in_list_view": 1,
    "reqd": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The organisation that evaluated the mail and sent the report, such as google.com."
   },
   {
    "fieldname": "reporter_email",
    "fieldtype": "Data",
    "label": "Reporter Email",
    "options": "Email",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Where the reporter takes questions about the report."
   },
   {
    "fieldname": "extra_contact_info",
    "fieldtype": "Data",
    "label": "Reporter Contact",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Any further contact detail the reporter added."
   },
   {
    "fieldname": "report_id",
    "fieldtype": "Data",
    "label": "Report ID",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The reporter's own id for the report; the same report resent carries the same id."
   },
   {
    "fieldname": "date_range_begin",
    "fieldtype": "Datetime",
    "label": "Range Begins",
    "in_list_view": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The start of the period the report covers, usually one day."
   },
   {
    "fieldname": "date_range_end",
    "fieldtype": "Datetime",
    "label": "Range Ends",
    "in_list_view": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The end of the period the report covers."
   },
   {
    "fieldname": "received_at",
    "fieldtype": "Datetime",
    "label": "Received At",
-   "read_only": 1
+   "read_only": 1,
+   "description": "When the cluster received the report."
   },
   {
    "fieldname": "expires_at",
@@ -158,7 +168,8 @@
    "fieldtype": "Int",
    "label": "Messages",
    "in_list_view": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "Messages the reporter saw from this domain in the period, summed over the records."
   },
   {
    "fieldname": "passed_messages",
@@ -166,14 +177,15 @@
    "label": "Passed DMARC",
    "in_list_view": 1,
    "read_only": 1,
-   "description": "Messages that passed by aligned DKIM or aligned SPF."
+   "description": "Messages that passed DMARC: aligned DKIM or aligned SPF verified."
   },
   {
    "fieldname": "failed_messages",
    "fieldtype": "Int",
    "label": "Failed DMARC",
    "in_list_view": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "Messages that failed both aligned checks; the published policy decided their fate."
   },
   {
    "fieldname": "column_break_totals",
@@ -183,13 +195,15 @@
    "fieldname": "dkim_passed_messages",
    "fieldtype": "Int",
    "label": "Passed DKIM",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Messages with a verified, aligned DKIM signature."
   },
   {
    "fieldname": "spf_passed_messages",
    "fieldtype": "Int",
    "label": "Passed SPF",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Messages whose envelope sender passed an aligned SPF check."
   },
   {
    "fieldname": "policy_section",
@@ -201,19 +215,22 @@
    "fieldname": "policy",
    "fieldtype": "Data",
    "label": "Policy (p)",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The p tag the reporter read: none, quarantine or reject."
   },
   {
    "fieldname": "subdomain_policy",
    "fieldtype": "Data",
    "label": "Subdomain Policy (sp)",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The sp tag: the policy for subdomains, when it differs from p."
   },
   {
    "fieldname": "percentage",
    "fieldtype": "Int",
    "label": "Percentage (pct)",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The pct tag: the share of failing messages the policy was applied to."
   },
   {
    "fieldname": "column_break_policy",
@@ -223,19 +240,22 @@
    "fieldname": "adkim",
    "fieldtype": "Data",
    "label": "DKIM Alignment (adkim)",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The adkim tag: whether DKIM alignment was relaxed or strict."
   },
   {
    "fieldname": "aspf",
    "fieldtype": "Data",
    "label": "SPF Alignment (aspf)",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The aspf tag: whether SPF alignment was relaxed or strict."
   },
   {
    "fieldname": "errors",
    "fieldtype": "Small Text",
    "label": "Reporter Errors",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Remarks the reporter added, such as a DNS lookup it could not complete."
   },
   {
    "fieldname": "records_section",
@@ -247,7 +267,8 @@
    "fieldtype": "Table",
    "label": "Records",
    "options": "DMARC Report Record",
-   "read_only": 1
+   "read_only": 1,
+   "description": "One row per source IP and result combination, as the reporter grouped the messages."
   },
   {
    "fieldname": "raw_section",
@@ -259,7 +280,8 @@
    "fieldname": "report",
    "fieldtype": "JSON",
    "label": "Report",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The report exactly as the cluster parsed it, for anything the fields above leave out."
   }
  ],
  "in_create": 1,

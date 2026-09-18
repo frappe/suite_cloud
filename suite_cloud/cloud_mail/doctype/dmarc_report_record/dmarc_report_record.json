@@ -26,7 +26,8 @@
    "label": "Source IP",
    "in_list_view": 1,
    "columns": 2,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The address the messages were sent from, as the reporter saw it."
   },
   {
    "fieldname": "message_count",
@@ -34,7 +35,8 @@
    "label": "Messages",
    "in_list_view": 1,
    "columns": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "How many messages from this source shared these results."
   },
   {
    "fieldname": "disposition",
@@ -60,7 +62,8 @@
    "label": "SPF",
    "in_list_view": 1,
    "columns": 1,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The aligned SPF result the receiver evaluated for the DMARC check."
   },
   {
    "fieldname": "column_break_results",
@@ -72,25 +75,29 @@
    "label": "Header From",
    "in_list_view": 1,
    "columns": 2,
-   "read_only": 1
+   "read_only": 1,
+   "description": "The domain in the From header, which is what DMARC aligns against."
   },
   {
    "fieldname": "envelope_from",
    "fieldtype": "Data",
    "label": "Envelope From",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The domain of the SMTP MAIL FROM, which SPF checks."
   },
   {
    "fieldname": "envelope_to",
    "fieldtype": "Data",
    "label": "Envelope To",
-   "read_only": 1
+   "read_only": 1,
+   "description": "The domain the messages were addressed to, when the reporter includes it."
   },
   {
    "fieldname": "override_reasons",
    "fieldtype": "Small Text",
    "label": "Policy Override Reasons",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Why the receiver applied a different disposition than the policy asked for, one reason per line."
   },
   {
    "fieldname": "details_section",
@@ -102,13 +109,15 @@
    "fieldname": "dkim_results",
    "fieldtype": "JSON",
    "label": "DKIM Results",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Every DKIM signature the receiver checked, with its domain, selector and result."
   },
   {
    "fieldname": "spf_results",
    "fieldtype": "JSON",
    "label": "SPF Results",
-   "read_only": 1
+   "read_only": 1,
+   "description": "Every SPF check the receiver made, with its domain, scope and result."
   }
  ],
  "istable": 1,
