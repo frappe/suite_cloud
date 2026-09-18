@@ -90,15 +90,14 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual(self.fetch(), 0)  # already stored: nothing is asked for again
 
         doc = frappe.get_doc("DMARC Report", {"cluster": self.cluster.name, "stalwart_id": acme})
-        self.assertEqual((doc.domain, doc.site, doc.policy_domain), ("acme.com", self.site.name, "acme.com"))
+        self.assertEqual((doc.site, doc.policy_domain), (self.site.name, "acme.com"))
         self.assertEqual((doc.total_messages, doc.passed_messages, doc.failed_messages), (5, 3, 2))
         self.assertEqual((doc.dkim_passed_messages, doc.spf_passed_messages), (3, 3))
         self.assertEqual((doc.policy, doc.percentage, doc.adkim), ("reject", 100, "relaxed"))
         self.assertEqual(len(doc.records), 2)
         self.assertEqual(doc.records[1].override_reasons, "local_policy: allowlisted")
         # A report about a domain no site holds is kept for operators, attributed to nobody.
-        stray = frappe.db.get_value("DMARC Report", {"policy_domain": "nobody.example"}, ["site", "domain"])
-        self.assertEqual(stray, (None, None))
+        self.assertIsNone(frappe.db.get_value("DMARC Report", {"policy_domain": "nobody.example"}, "site"))
 
     def test_fetch_pages_the_cluster_s_ids_in_a_stable_order(self) -> None:
         ids = {self.fake._add("DmarcExternalReport", stalwart_report("acme.com")) for _ in range(7)}

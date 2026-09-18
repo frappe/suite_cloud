@@ -257,7 +257,7 @@
   {
    "group": "Reports",
    "link_doctype": "DMARC Report",
-   "link_fieldname": "domain"
+   "link_fieldname": "policy_domain"
   }
  ],
  "modified": "2026-09-17 12:00:00.000000",

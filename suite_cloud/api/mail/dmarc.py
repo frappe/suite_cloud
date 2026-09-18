@@ -29,7 +29,7 @@ def list_dmarc_reports(
 
     filters: dict = {}
     if domain:
-        filters["domain"] = owned("Mail Domain", domain).name
+        filters["policy_domain"] = owned("Mail Domain", domain).name
     if since:
         filters["date_range_end"] = [">=", get_datetime(since)]
     if until:
@@ -121,7 +121,7 @@ class ReportScope:
         if key:
             query = query.select(group.as_(key))
         if self.domain:
-            query = query.where(report.domain == self.domain)
+            query = query.where(report.policy_domain == self.domain)
         return query
 
     def _rows(self, query) -> list[dict]:

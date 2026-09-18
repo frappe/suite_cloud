@@ -6,7 +6,6 @@
  "field_order": [
   "report_section",
   "policy_domain",
-  "domain",
   "site",
   "cluster",
   "stalwart_id",
@@ -53,17 +52,7 @@
    "in_standard_filter": 1,
    "reqd": 1,
    "read_only": 1,
-   "description": "The domain the report is about, as the reporter names it: the one whose DMARC record was evaluated.",
-   "search_index": 1
-  },
-  {
-   "fieldname": "domain",
-   "fieldtype": "Link",
-   "label": "Mail Domain",
-   "options": "Mail Domain",
-   "in_standard_filter": 1,
-   "read_only": 1,
-   "description": "The Mail Domain that carries the policy domain. Left empty when no site holds it (the cluster's own domain, for instance).",
+   "description": "The domain the report is about, as the reporter names it. It is the Mail Domain's name whenever a site holds the domain.",
    "search_index": 1
   },
   {

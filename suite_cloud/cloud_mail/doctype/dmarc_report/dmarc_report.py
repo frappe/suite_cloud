@@ -43,7 +43,6 @@ class DMARCReport(Document):
         date_range_begin: DF.Datetime | None
         date_range_end: DF.Datetime | None
         dkim_passed_messages: DF.Int
-        domain: DF.Link | None
         errors: DF.SmallText | None
         expires_at: DF.Datetime | None
         extra_contact_info: DF.Data | None
@@ -74,7 +73,8 @@ class DMARCReport(Document):
 
         report = obj.get("report") or {}
         policy_domain = normalize_domain(report.get("policyDomain"))
-        owner = frappe.db.get_value("Mail Domain", policy_domain, ["name", "site"], as_dict=True)
+        # A Mail Domain is named by its domain, so the report's own domain says who holds it.
+        site = frappe.db.get_value("Mail Domain", policy_domain, "site") if policy_domain else None
         records = [record_row(r) for r in as_list(report.get("records"))]
         doc = frappe.new_doc("DMARC Report")
         doc.update(
@@ -82,8 +82,7 @@ class DMARCReport(Document):
                 "cluster": cluster_name,
                 "stalwart_id": obj["id"],
                 "policy_domain": policy_domain,
-                "domain": owner.name if owner else None,
-                "site": owner.site if owner else None,
+                "site": site,
                 "org_name": report.get("orgName") or sender_address(obj.get("from")) or "unknown",
                 "reporter_email": report.get("email") or sender_address(obj.get("from")),
                 "extra_contact_info": report.get("extraContactInfo"),
@@ -174,7 +173,7 @@ def prune_expired_reports() -> None:
 def delete_reports_for_domain(domain: str) -> None:
     """Called when a Mail Domain goes: its history must not surface for whoever adds it next."""
 
-    delete_reports(frappe.get_all("DMARC Report", {"domain": domain}, pluck="name"))
+    delete_reports(frappe.get_all("DMARC Report", {"policy_domain": domain}, pluck="name"))
 
 
 def delete_reports(names: list[str]) -> None:
@@ -190,7 +189,6 @@ def delete_reports(names: list[str]) -> None:
 def report_payload(row) -> dict:
     return {
         "name": row.name,
-        "domain": row.domain,
         "policy_domain": row.policy_domain,
         "reporter": row.org_name,
         "reporter_email": row.reporter_email,
@@ -218,7 +216,6 @@ def report_payload(row) -> dict:
 
 REPORT_FIELDS = [
     "name",
-    "domain",
     "policy_domain",
     "org_name",
     "reporter_email",
