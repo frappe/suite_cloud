@@ -411,3 +411,14 @@ class RoleService(ManagementService):
     def find_by_description(self, description: str) -> dict | None:
         # Role/query only documents a text filter; roles are few, so match locally.
         return self.find_local(description=description)
+
+
+class DmarcReportService(ManagementService):
+    """DMARC aggregate reports other receivers sent about the cluster's domains.
+
+    Stalwart intercepts them on arrival (``ReportSettings.inboundReportAddresses``, ``postmaster@*``
+    by default), parses them and keeps them for ``DataRetention.holdMtaReportsFor``; the object
+    carries the whole parsed report, so nothing here ever reads mail.
+    """
+
+    type = "DmarcExternalReport"

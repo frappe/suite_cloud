@@ -143,6 +143,17 @@ class ManagementService:
         result = self._invoke("query", filter=filter, limit=limit)
         return result.get("ids") or []
 
+    def iter_ids(self, filter: dict | None = None, page_size: int = 500) -> Iterator[str]:
+        """Every matching id, one query page at a time; for collections too big for one answer."""
+
+        position = 0
+        while True:
+            ids = self._invoke("query", filter=filter, position=position, limit=page_size).get("ids") or []
+            yield from ids
+            if len(ids) < page_size:
+                return
+            position += len(ids)
+
     # --- write --------------------------------------------------------------
 
     def create(self, payload: Any) -> dict:

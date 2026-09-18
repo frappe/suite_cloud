@@ -51,6 +51,7 @@ The site-facing API is split the same way: `suite_cloud.api.site` for what any p
 | **Server Job** | One run of an install or update script on a node or gateway, with the result of every step. Secrets are looked up when the job runs and never stored in it. |
 | **Suite Site** | A Frappe Suite site: which cluster it uses, its API key and secret, its title and contact email, its limits (domains, accounts, groups, lists, total disk) and the token its domains are verified with. |
 | **Mail Domain, Mail Account, Mail Group, Mailing List** | The mail directory of a site. Saving one of these pushes it to the cluster in the same step, so the records and the cluster never drift apart. Each carries the id Stalwart gave it. |
+| **DMARC Report** | One DMARC aggregate report another receiver sent about a domain, copied hourly from the cluster that intercepted it (Stalwart parses reports mailed to `postmaster@`). Attributed to the site that holds the domain, kept for the configured retention, and read by sites through the API. |
 | **Suite Cloud Settings** | Defaults: DNS time-to-live, Stalwart version and download URLs, certificate settings, the public URL of this Suite Cloud, job timeout. |
 
 ## Install
@@ -167,6 +168,7 @@ Rules that apply everywhere:
 | `suite_cloud.api.mail.groups` | `list_groups(search, start, limit)`, `get_group`, `create_group`, `update_group`, `set_group_aliases`, `add_group_alias`, `remove_group_alias`, `set_group_alias_enabled`, `set_group_members`, `delete_group` |
 | `suite_cloud.api.mail.mailing_lists` | `list_mailing_lists(search, start, limit)`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `add_mailing_list_alias`, `remove_mailing_list_alias`, `set_mailing_list_alias_enabled`, `list_recipients`, `add_recipients`, `remove_recipients`, `set_recipients`, `delete_mailing_list` |
 | `suite_cloud.api.mail.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
+| `suite_cloud.api.mail.dmarc` | `list_dmarc_reports(domain, search, since, until, start, limit)`, `get_dmarc_report(report)` (with the per-source records), `get_dmarc_summary(domain, days)` (totals by domain, source IP and reporter) |
 
 Listings answer `{"items": [...], "total": n}`. `search` matches the address, and the display
 name or description; `limit` is capped (200 accounts, 500 groups or lists per page). Account and
@@ -263,8 +265,8 @@ On a development site that talks to a cluster with a staging certificate, set
 | When | What |
 | --- | --- |
 | Every 5 minutes | Retry failed Server Jobs; poll nodes that are provisioning or draining. |
-| Hourly | Verify unverified domains, except those set to skip it; refresh the DNS records of domains whose DKIM keys are not all stored yet. |
-| Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses. |
+| Hourly | Verify unverified domains, except those set to skip it; refresh the DNS records of domains whose DKIM keys are not all stored yet; copy the DMARC reports each cluster received since the last run. |
+| Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses; drop DMARC reports older than the retention. |
 
 ## Development
 

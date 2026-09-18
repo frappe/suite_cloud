@@ -1,0 +1,301 @@
+{
+ "actions": [],
+ "autoname": "format:{cluster}-{stalwart_id}",
+ "creation": "2026-09-18 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "report_section",
+  "policy_domain",
+  "domain",
+  "site",
+  "cluster",
+  "stalwart_id",
+  "column_break_report",
+  "org_name",
+  "reporter_email",
+  "extra_contact_info",
+  "report_id",
+  "date_range_begin",
+  "date_range_end",
+  "received_at",
+  "expires_at",
+  "totals_section",
+  "total_messages",
+  "passed_messages",
+  "failed_messages",
+  "column_break_totals",
+  "dkim_passed_messages",
+  "spf_passed_messages",
+  "policy_section",
+  "policy",
+  "subdomain_policy",
+  "percentage",
+  "column_break_policy",
+  "adkim",
+  "aspf",
+  "errors",
+  "records_section",
+  "records",
+  "raw_section",
+  "report"
+ ],
+ "fields": [
+  {
+   "fieldname": "report_section",
+   "fieldtype": "Section Break",
+   "label": "Report"
+  },
+  {
+   "fieldname": "policy_domain",
+   "fieldtype": "Data",
+   "label": "Domain",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1,
+   "read_only": 1,
+   "description": "The domain the report is about, as the reporter names it."
+  },
+  {
+   "fieldname": "domain",
+   "fieldtype": "Link",
+   "label": "Mail Domain",
+   "options": "Mail Domain",
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "description": "Left empty when no site holds the domain (the cluster's own domain, for instance)."
+  },
+  {
+   "fieldname": "site",
+   "fieldtype": "Link",
+   "label": "Suite Site",
+   "options": "Suite Site",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "label": "Stalwart Cluster",
+   "options": "Stalwart Cluster",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "stalwart_id",
+   "fieldtype": "Data",
+   "label": "Stalwart ID",
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_report",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "org_name",
+   "fieldtype": "Data",
+   "label": "Reporter",
+   "in_list_view": 1,
+   "reqd": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "reporter_email",
+   "fieldtype": "Data",
+   "label": "Reporter Email",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "extra_contact_info",
+   "fieldtype": "Data",
+   "label": "Reporter Contact",
+   "read_only": 1
+  },
+  {
+   "fieldname": "report_id",
+   "fieldtype": "Data",
+   "label": "Report ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "date_range_begin",
+   "fieldtype": "Datetime",
+   "label": "Range Begins",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "date_range_end",
+   "fieldtype": "Datetime",
+   "label": "Range Ends",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "received_at",
+   "fieldtype": "Datetime",
+   "label": "Received At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "expires_at",
+   "fieldtype": "Datetime",
+   "label": "Expires On Cluster",
+   "read_only": 1,
+   "description": "When Stalwart drops its copy; the report stays here until the retention in Suite Cloud Settings runs out."
+  },
+  {
+   "fieldname": "totals_section",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_messages",
+   "fieldtype": "Int",
+   "label": "Messages",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "passed_messages",
+   "fieldtype": "Int",
+   "label": "Passed DMARC",
+   "in_list_view": 1,
+   "read_only": 1,
+   "description": "Messages that passed by aligned DKIM or aligned SPF."
+  },
+  {
+   "fieldname": "failed_messages",
+   "fieldtype": "Int",
+   "label": "Failed DMARC",
+   "in_list_view": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dkim_passed_messages",
+   "fieldtype": "Int",
+   "label": "Passed DKIM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "spf_passed_messages",
+   "fieldtype": "Int",
+   "label": "Passed SPF",
+   "read_only": 1
+  },
+  {
+   "fieldname": "policy_section",
+   "fieldtype": "Section Break",
+   "label": "Published Policy",
+   "description": "The DMARC record as the reporter read it when it evaluated the messages."
+  },
+  {
+   "fieldname": "policy",
+   "fieldtype": "Data",
+   "label": "Policy (p)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "subdomain_policy",
+   "fieldtype": "Data",
+   "label": "Subdomain Policy (sp)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "percentage",
+   "fieldtype": "Int",
+   "label": "Percentage (pct)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_policy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "adkim",
+   "fieldtype": "Data",
+   "label": "DKIM Alignment (adkim)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "aspf",
+   "fieldtype": "Data",
+   "label": "SPF Alignment (aspf)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "errors",
+   "fieldtype": "Small Text",
+   "label": "Reporter Errors",
+   "read_only": 1
+  },
+  {
+   "fieldname": "records_section",
+   "fieldtype": "Section Break",
+   "label": "Records"
+  },
+  {
+   "fieldname": "records",
+   "fieldtype": "Table",
+   "label": "Records",
+   "options": "DMARC Report Record",
+   "read_only": 1
+  },
+  {
+   "fieldname": "raw_section",
+   "fieldtype": "Section Break",
+   "label": "Raw Report",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "report",
+   "fieldtype": "JSON",
+   "label": "Report",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-09-18 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "DMARC Report",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "role": "System Manager"
+  },
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "role": "Suite Cloud Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "policy_domain,org_name,report_id,site",
+ "sort_field": "date_range_end",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "policy_domain"
+}

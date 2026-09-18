@@ -1,0 +1,126 @@
+{
+ "actions": [],
+ "creation": "2026-09-18 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "source_ip",
+  "message_count",
+  "disposition",
+  "dkim",
+  "spf",
+  "column_break_results",
+  "header_from",
+  "envelope_from",
+  "envelope_to",
+  "override_reasons",
+  "details_section",
+  "dkim_results",
+  "spf_results"
+ ],
+ "fields": [
+  {
+   "fieldname": "source_ip",
+   "fieldtype": "Data",
+   "label": "Source IP",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "message_count",
+   "fieldtype": "Int",
+   "label": "Messages",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "disposition",
+   "fieldtype": "Data",
+   "label": "Disposition",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1,
+   "description": "What the receiver did with the messages: none, quarantine or reject."
+  },
+  {
+   "fieldname": "dkim",
+   "fieldtype": "Data",
+   "label": "DKIM",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1,
+   "description": "The aligned DKIM result the receiver evaluated for the DMARC check."
+  },
+  {
+   "fieldname": "spf",
+   "fieldtype": "Data",
+   "label": "SPF",
+   "in_list_view": 1,
+   "columns": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_results",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "header_from",
+   "fieldtype": "Data",
+   "label": "Header From",
+   "in_list_view": 1,
+   "columns": 2,
+   "read_only": 1
+  },
+  {
+   "fieldname": "envelope_from",
+   "fieldtype": "Data",
+   "label": "Envelope From",
+   "read_only": 1
+  },
+  {
+   "fieldname": "envelope_to",
+   "fieldtype": "Data",
+   "label": "Envelope To",
+   "read_only": 1
+  },
+  {
+   "fieldname": "override_reasons",
+   "fieldtype": "Small Text",
+   "label": "Policy Override Reasons",
+   "read_only": 1
+  },
+  {
+   "fieldname": "details_section",
+   "fieldtype": "Section Break",
+   "label": "Authentication Details",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "dkim_results",
+   "fieldtype": "JSON",
+   "label": "DKIM Results",
+   "read_only": 1
+  },
+  {
+   "fieldname": "spf_results",
+   "fieldtype": "JSON",
+   "label": "SPF Results",
+   "read_only": 1
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-18 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "DMARC Report Record",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

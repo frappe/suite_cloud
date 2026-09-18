@@ -209,6 +209,7 @@ def owned_page(
     cap: int,
     search_fields: tuple[str, ...] = ("name", "description"),
     filters: dict | None = None,
+    order_by: str = "name asc",
 ) -> tuple[list[str], int]:
     """One page of the site's document names by name, plus how many match in all."""
 
@@ -225,7 +226,7 @@ def owned_page(
         filters=filters,
         or_filters=or_filters,
         pluck="name",
-        order_by="name asc",
+        order_by=order_by,
         limit_start=max(cint(start), 0),
         limit_page_length=page_size(limit, cap),
     )
