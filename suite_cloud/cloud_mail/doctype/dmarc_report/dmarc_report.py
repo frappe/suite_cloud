@@ -108,6 +108,12 @@ class DMARCReport(Document):
         return payload
 
 
+def on_doctype_update() -> None:
+    # A report is one object on one cluster; the pair is what the fetch dedups on, and two runs
+    # racing each other must not store it twice.
+    frappe.db.add_unique("DMARC Report", ["cluster", "stalwart_id"])
+
+
 # --- scheduled ------------------------------------------------------------------------
 
 
