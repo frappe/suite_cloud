@@ -53,7 +53,8 @@
    "in_standard_filter": 1,
    "reqd": 1,
    "read_only": 1,
-   "description": "The domain the report is about, as the reporter names it: the one whose DMARC record was evaluated."
+   "description": "The domain the report is about, as the reporter names it: the one whose DMARC record was evaluated.",
+   "search_index": 1
   },
   {
    "fieldname": "domain",
@@ -62,7 +63,8 @@
    "options": "Mail Domain",
    "in_standard_filter": 1,
    "read_only": 1,
-   "description": "The Mail Domain that carries the policy domain. Left empty when no site holds it (the cluster's own domain, for instance)."
+   "description": "The Mail Domain that carries the policy domain. Left empty when no site holds it (the cluster's own domain, for instance).",
+   "search_index": 1
   },
   {
    "fieldname": "site",
@@ -72,7 +74,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "read_only": 1,
-   "description": "The site that held the domain when the report was fetched; the site API shows the report to this site only."
+   "description": "The site that held the domain when the report was fetched; the site API shows the report to this site only.",
+   "search_index": 1
   },
   {
    "fieldname": "cluster",
@@ -141,7 +144,8 @@
    "label": "Range Ends",
    "in_list_view": 1,
    "read_only": 1,
-   "description": "The end of the period the report covers."
+   "description": "The end of the period the report covers.",
+   "search_index": 1
   },
   {
    "fieldname": "received_at",

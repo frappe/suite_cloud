@@ -27,7 +27,8 @@
    "in_list_view": 1,
    "columns": 2,
    "read_only": 1,
-   "description": "The address the messages were sent from, as the reporter saw it."
+   "description": "The address the messages were sent from, as the reporter saw it.",
+   "search_index": 1
   },
   {
    "fieldname": "message_count",
