@@ -452,6 +452,11 @@
    "group": "DNS",
    "link_doctype": "DNS Record",
    "link_fieldname": "managed_by"
+  },
+  {
+   "group": "Reports",
+   "link_doctype": "DMARC Report",
+   "link_fieldname": "cluster"
   }
  ],
  "modified": "2026-09-08 21:10:00.000000",

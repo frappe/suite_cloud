@@ -230,6 +230,11 @@
    "group": "Directory",
    "link_doctype": "Mailing List",
    "link_fieldname": "site"
+  },
+  {
+   "group": "Reports",
+   "link_doctype": "DMARC Report",
+   "link_fieldname": "site"
   }
  ],
  "modified": "2026-09-08 19:40:00.000000",
