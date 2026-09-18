@@ -199,19 +199,32 @@ class TestDmarcReports(SiteApiTestCase):
             },
         )
 
-    def test_reports_go_with_the_domain_and_with_retention(self) -> None:
-        self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
+    def test_a_deleted_domain_s_reports_stay_stored_but_unattributed(self) -> None:
+        acme = self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
         self.fake._add("DmarcExternalReport", stalwart_report("other.com"))
         self.fetch()
         domains.delete_domain("acme.com")
-        self.assertEqual(
-            frappe.get_all("DMARC Report", {"cluster": self.cluster.name}, pluck="policy_domain"),
-            ["other.com"],
-        )
-        self.assertEqual(self.record_count(), 2)  # only the other domain's rows remain
+        self.assertIsNone(frappe.db.get_value("DMARC Report", {"stalwart_id": acme}, "site"))
+        self.assertEqual(dmarc.list_dmarc_reports()["total"], 0)
+        # The cluster still lists the report; registering the domain elsewhere must not revive
+        # the previous holder's history for the new one.
+        self.act_as(self.other)
+        domains.create_domain("acme.com")
+        self.assertEqual(self.fetch(), 0)
+        self.assertEqual(dmarc.list_dmarc_reports(domain="acme.com")["total"], 0)
 
-        frappe.db.set_value(
-            "DMARC Report", {"policy_domain": "other.com"}, "date_range_end", add_days(now_datetime(), -366)
-        )
+    def test_prune_waits_for_the_cluster_to_drop_its_copy(self) -> None:
+        kept = self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
+        gone = self.fake._add("DmarcExternalReport", stalwart_report("other.com"))
+        self.fetch()
+        old = add_days(now_datetime(), -366)
+        for stalwart_id in (kept, gone):
+            frappe.db.set_value("DMARC Report", {"stalwart_id": stalwart_id}, "date_range_end", old)
+        frappe.db.set_value("DMARC Report", {"stalwart_id": gone}, "expires_at", add_days(now_datetime(), -1))
         dmarc_report.prune_expired_reports()
-        self.assertEqual((self.report_names(), self.record_count()), ([], 0))
+        self.assertEqual(
+            frappe.get_all("DMARC Report", {"cluster": self.cluster.name}, pluck="stalwart_id"), [kept]
+        )
+        self.assertEqual(self.record_count(), 2)
+        del self.fake.objects["DmarcExternalReport"][gone]  # as Stalwart did on expiry
+        self.assertEqual(self.fetch(), 0)

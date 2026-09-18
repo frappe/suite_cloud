@@ -162,18 +162,27 @@ def fetch_reports(cluster: Document) -> int:
 
 
 def prune_expired_reports() -> None:
-    """Daily: drops reports whose period ended longer ago than the configured retention."""
+    """Daily: drops reports whose period ended longer ago than the configured retention.
+
+    Only once the cluster has dropped its copy too: a report deleted here while Stalwart still
+    lists it would look new to the next fetch and come straight back.
+    """
 
     days = cint(get_config("dmarc_report_retention_days")) or 365
-    cutoff = add_days(now_datetime(), -days)
-    names = frappe.get_all("DMARC Report", {"date_range_end": ["<", cutoff]}, pluck="name")
+    expired = {"date_range_end": ["<", add_days(now_datetime(), -days)]}
+    names = frappe.get_all("DMARC Report", {**expired, "expires_at": ["<", now_datetime()]}, pluck="name")
+    names += frappe.get_all("DMARC Report", {**expired, "expires_at": ["is", "not set"]}, pluck="name")
     delete_reports(names)
 
 
-def delete_reports_for_domain(domain: str) -> None:
-    """Called when a Mail Domain goes: its history must not surface for whoever adds it next."""
+def detach_reports_for_domain(domain: str) -> None:
+    """Called when a Mail Domain goes: its history must not surface for whoever adds it next.
 
-    delete_reports(frappe.get_all("DMARC Report", {"policy_domain": domain}, pluck="name"))
+    The reports stay, unattributed, rather than being deleted: the cluster may still list them,
+    and a deleted report would be fetched again and attributed to the domain's next holder.
+    """
+
+    frappe.db.set_value("DMARC Report", {"policy_domain": domain, "site": ["is", "set"]}, "site", None)
 
 
 def delete_reports(names: list[str]) -> None:
