@@ -131,6 +131,54 @@ class TestDmarcReports(SiteApiTestCase):
             self.assertEqual(self.fetch(), 7)
         self.assertEqual((len(self.report_names()), frappe.db.count("Error Log")), (7, errors_before))
 
+    def test_a_page_holds_up_to_five_hundred_reports(self) -> None:
+        self.seed_reports(501)
+        page = dmarc.list_dmarc_reports(limit=500)
+        self.assertEqual((len(page["items"]), page["total"]), (500, 501))
+        self.assertEqual(len(dmarc.list_dmarc_reports(limit=501)["items"]), 500)  # the cap, not the ask
+        self.assertEqual(len(dmarc.list_dmarc_reports(start=500, limit=500)["items"]), 1)
+
+    def seed_reports(self, count: int) -> None:
+        """Bare stored reports, written in one statement: what the listing pages, minus the fetch."""
+
+        stamp = NOW.strftime("%Y-%m-%d %H:%M:%S")
+        fields = [
+            "name",
+            "creation",
+            "modified",
+            "owner",
+            "modified_by",
+            "docstatus",
+            "idx",
+            "cluster",
+            "stalwart_id",
+            "policy_domain",
+            "site",
+            "org_name",
+            "total_messages",
+            "date_range_end",
+        ]
+        rows = [
+            [
+                f"seed-{i:04d}",
+                stamp,
+                stamp,
+                "Administrator",
+                "Administrator",
+                0,
+                0,
+                self.cluster.name,
+                f"seed{i}",
+                "acme.com",
+                self.site.name,
+                "seed.test",
+                1,
+                stamp,
+            ]
+            for i in range(count)
+        ]
+        frappe.db.bulk_insert("DMARC Report", fields=fields, values=rows)
+
     def test_a_long_subject_does_not_fail_the_report(self) -> None:
         subject = "Report Domain: acme.com Submitter: " + "x" * 200
         stored = self.fake._add("DmarcExternalReport", {**stalwart_report("acme.com"), "subject": subject})
@@ -177,7 +225,6 @@ class TestDmarcReports(SiteApiTestCase):
         )
         self.assertEqual(listing["items"][0]["date_range_end"], "2026-09-17T00:00:00Z")
         self.assertEqual(dmarc.list_dmarc_reports(domain="acme.com", search="yahoo")["total"], 1)
-        self.assertEqual(len(dmarc.list_dmarc_reports(limit=500)["items"]), 2)  # 500 is a valid page
         self.assertEqual(dmarc.list_dmarc_reports(since="2026-09-18")["total"], 0)
         self.assertRaises(frappe.DoesNotExistError, dmarc.list_dmarc_reports, domain="other.com")
 
