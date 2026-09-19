@@ -131,6 +131,12 @@ class TestDmarcReports(SiteApiTestCase):
             self.assertEqual(self.fetch(), 7)
         self.assertEqual((len(self.report_names()), frappe.db.count("Error Log")), (7, errors_before))
 
+    def test_a_long_subject_does_not_fail_the_report(self) -> None:
+        subject = "Report Domain: acme.com Submitter: " + "x" * 200
+        stored = self.fake._add("DmarcExternalReport", {**stalwart_report("acme.com"), "subject": subject})
+        self.assertEqual(self.fetch(), 1)
+        self.assertEqual(frappe.db.get_value("DMARC Report", {"stalwart_id": stored}, "subject"), subject)
+
     def test_a_malformed_report_is_skipped_without_losing_the_rest(self) -> None:
         self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
         broken = self.fake._add(

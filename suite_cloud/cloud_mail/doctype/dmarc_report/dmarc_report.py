@@ -45,7 +45,7 @@ class DMARCReport(Document):
         dkim_passed_messages: DF.Int
         errors: DF.SmallText | None
         expires_at: DF.Datetime | None
-        extra_contact_info: DF.Data | None
+        extra_contact_info: DF.SmallText | None
         failed_messages: DF.Int
         org_name: DF.Data
         passed_messages: DF.Int
@@ -62,7 +62,7 @@ class DMARCReport(Document):
         spf_passed_messages: DF.Int
         stalwart_id: DF.Data
         subdomain_policy: DF.Data | None
-        subject: DF.Data | None
+        subject: DF.SmallText | None
         testing_mode: DF.Check
         total_messages: DF.Int
     # end: auto-generated types

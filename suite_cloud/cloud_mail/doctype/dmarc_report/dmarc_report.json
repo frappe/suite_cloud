@@ -110,14 +110,14 @@
   },
   {
    "fieldname": "subject",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Subject",
    "description": "The subject line of the message that carried the report.",
    "read_only": 1
   },
   {
    "fieldname": "extra_contact_info",
-   "fieldtype": "Data",
+   "fieldtype": "Small Text",
    "label": "Reporter Contact",
    "read_only": 1,
    "description": "Any further contact detail the reporter added."
