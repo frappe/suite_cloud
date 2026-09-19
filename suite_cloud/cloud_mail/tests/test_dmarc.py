@@ -33,12 +33,13 @@ def stalwart_report(
             "policyAspf": "relaxed",
             "policyDisposition": "reject",
             "policySubdomainDisposition": "reject",
-            "policyTestingMode": 100,
+            "policyTestingMode": False,
             "records": {str(i): r for i, r in enumerate(records)},
             **fields,
         },
         "from": {"email": f"noreply-dmarc@{org}"},
         "subject": f"Report domain: {domain}",
+        "to": {f"postmaster@{domain}": True},
         "receivedAt": "2026-09-17T06:00:00Z",
         "expiresAt": "2026-10-17T06:00:00Z",
     }
@@ -57,7 +58,7 @@ def record(source_ip: str, count: int, dkim: str = "pass", spf: str = "pass") ->
         "spfResults": {"0": {"domain": "acme.com", "scope": "mfrom", "result": spf}},
         "policyOverrideReasons": {}
         if dkim == "pass"
-        else {"0": {"type": "local_policy", "comment": "allowlisted"}},
+        else {"0": {"overrideType": "LocalPolicy", "comment": "allowlisted"}},
     }
 
 
@@ -107,9 +108,14 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual((doc.site, doc.policy_domain), (self.site.name, "acme.com"))
         self.assertEqual((doc.total_messages, doc.passed_messages, doc.failed_messages), (5, 3, 2))
         self.assertEqual((doc.dkim_passed_messages, doc.spf_passed_messages), (3, 3))
-        self.assertEqual((doc.policy, doc.percentage, doc.adkim), ("reject", 100, "relaxed"))
+        self.assertEqual((doc.policy, doc.testing_mode, doc.adkim), ("reject", 0, "relaxed"))
+        self.assertEqual(
+            (doc.subject, doc.sent_to, doc.report_version),
+            ("Report domain: Acme.com.", "postmaster@Acme.com.", 1.0),
+        )
+        self.assertEqual(frappe.parse_json(doc.report)["id"], acme)  # the whole object, envelope included
         self.assertEqual(len(doc.records), 2)
-        self.assertEqual(doc.records[1].override_reasons, "local_policy: allowlisted")
+        self.assertEqual(doc.records[1].override_reasons, "LocalPolicy: allowlisted")
         # A report about a domain no site holds is kept for operators, attributed to nobody.
         self.assertIsNone(frappe.db.get_value("DMARC Report", {"policy_domain": "nobody.example"}, "site"))
 

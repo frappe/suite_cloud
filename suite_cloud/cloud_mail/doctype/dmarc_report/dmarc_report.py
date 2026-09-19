@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 
 import frappe
 from frappe.model.document import Document
-from frappe.utils import add_days, cint, get_datetime, get_system_timezone, now_datetime
+from frappe.utils import add_days, cint, flt, get_datetime, get_system_timezone, now_datetime
 
 from suite_cloud.cloud_mail.stalwart import get_client, has_credentials
 from suite_cloud.utils import get_config, log_exception, utc_iso
@@ -49,18 +49,21 @@ class DMARCReport(Document):
         failed_messages: DF.Int
         org_name: DF.Data
         passed_messages: DF.Int
-        percentage: DF.Int
         policy: DF.Data | None
         policy_domain: DF.Data
         received_at: DF.Datetime | None
         records: DF.Table[DMARCReportRecord]
         report: DF.JSON | None
         report_id: DF.Data | None
+        report_version: DF.Float
         reporter_email: DF.Data | None
+        sent_to: DF.SmallText | None
         site: DF.Link | None
         spf_passed_messages: DF.Int
         stalwart_id: DF.Data
         subdomain_policy: DF.Data | None
+        subject: DF.Data | None
+        testing_mode: DF.Check
         total_messages: DF.Int
     # end: auto-generated types
 
@@ -87,17 +90,20 @@ class DMARCReport(Document):
                 "reporter_email": report.get("email") or sender_address(obj.get("from")),
                 "extra_contact_info": report.get("extraContactInfo"),
                 "report_id": report.get("reportId"),
+                "report_version": flt(report.get("version")),
+                "subject": obj.get("subject"),
+                "sent_to": "\n".join(as_list(obj.get("to"))) or None,
                 "date_range_begin": local_datetime(report.get("dateRangeBegin")),
                 "date_range_end": local_datetime(report.get("dateRangeEnd")),
                 "received_at": local_datetime(obj.get("receivedAt")),
                 "expires_at": local_datetime(obj.get("expiresAt")),
                 "policy": report.get("policyDisposition"),
                 "subdomain_policy": report.get("policySubdomainDisposition"),
-                "percentage": cint(report.get("policyTestingMode")),
+                "testing_mode": int(bool(report.get("policyTestingMode"))),
                 "adkim": report.get("policyAdkim"),
                 "aspf": report.get("policyAspf"),
                 "errors": "\n".join(str(e) for e in as_list(report.get("errors"))) or None,
-                "report": json.dumps(report),
+                "report": json.dumps(obj),
                 **totals(records),
             }
         )
@@ -225,13 +231,16 @@ def report_payload(row) -> dict:
         "reporter": row.org_name,
         "reporter_email": row.reporter_email,
         "report_id": row.report_id,
+        "version": flt(row.report_version),
+        "subject": row.subject,
+        "to": (row.sent_to or "").split("\n") if row.sent_to else [],
         "date_range_begin": utc_iso(row.date_range_begin),
         "date_range_end": utc_iso(row.date_range_end),
         "received_at": utc_iso(row.received_at),
         "policy": {
             "p": row.policy,
             "sp": row.subdomain_policy,
-            "pct": cint(row.percentage),
+            "testing_mode": bool(row.testing_mode),
             "adkim": row.adkim,
             "aspf": row.aspf,
         },
@@ -252,12 +261,15 @@ REPORT_FIELDS = [
     "org_name",
     "reporter_email",
     "report_id",
+    "report_version",
+    "subject",
+    "sent_to",
     "date_range_begin",
     "date_range_end",
     "received_at",
     "policy",
     "subdomain_policy",
-    "percentage",
+    "testing_mode",
     "adkim",
     "aspf",
     "total_messages",
@@ -300,7 +312,7 @@ def record_payload(row) -> dict:
 
 def record_row(record: dict) -> dict:
     reasons = [
-        f"{r.get('type') or ''}: {r.get('comment') or ''}".strip(": ")
+        f"{r.get('overrideType') or ''}: {r.get('comment') or ''}".strip(": ")
         for r in as_list(record.get("policyOverrideReasons"))
     ]
     return {
@@ -334,9 +346,12 @@ def totals(records: list[dict]) -> dict:
 
 
 def as_list(value) -> list:
-    """Stalwart encodes lists as ``{"0": item, "1": item}``; a JSON list is accepted as well."""
+    """Stalwart encodes lists as ``{"0": item, "1": item}`` and sets as ``{item: true}``; a JSON
+    list is accepted as well."""
 
     if isinstance(value, dict):
+        if all(v is True for v in value.values()):
+            return list(value)
         return [value[k] for k in sorted(value, key=lambda k: cint(k))]
     return list(value or [])
 

@@ -12,12 +12,15 @@
   "column_break_report",
   "org_name",
   "reporter_email",
+  "subject",
   "extra_contact_info",
   "report_id",
+  "report_version",
   "date_range_begin",
   "date_range_end",
   "received_at",
   "expires_at",
+  "sent_to",
   "totals_section",
   "total_messages",
   "passed_messages",
@@ -28,7 +31,7 @@
   "policy_section",
   "policy",
   "subdomain_policy",
-  "percentage",
+  "testing_mode",
   "column_break_policy",
   "adkim",
   "aspf",
@@ -106,6 +109,13 @@
    "description": "Where the reporter takes questions about the report."
   },
   {
+   "fieldname": "subject",
+   "fieldtype": "Data",
+   "label": "Subject",
+   "description": "The subject line of the message that carried the report.",
+   "read_only": 1
+  },
+  {
    "fieldname": "extra_contact_info",
    "fieldtype": "Data",
    "label": "Reporter Contact",
@@ -118,6 +128,13 @@
    "label": "Report ID",
    "read_only": 1,
    "description": "The reporter's own id for the report; the same report resent carries the same id."
+  },
+  {
+   "fieldname": "report_version",
+   "fieldtype": "Float",
+   "label": "Report Version",
+   "description": "The version of the aggregate report format the reporter used.",
+   "read_only": 1
   },
   {
    "fieldname": "date_range_begin",
@@ -149,6 +166,13 @@
    "label": "Expires On Cluster",
    "read_only": 1,
    "description": "When Stalwart drops its copy; the report stays here until the retention in Suite Cloud Settings runs out."
+  },
+  {
+   "fieldname": "sent_to",
+   "fieldtype": "Small Text",
+   "label": "Sent To",
+   "description": "The addresses the reporter mailed the report to, one per line; postmaster@ of the domain, normally.",
+   "read_only": 1
   },
   {
    "fieldname": "totals_section",
@@ -218,11 +242,11 @@
    "description": "The sp tag: the policy for subdomains, when it differs from p."
   },
   {
-   "fieldname": "percentage",
-   "fieldtype": "Int",
-   "label": "Percentage (pct)",
-   "read_only": 1,
-   "description": "The pct tag: the share of failing messages the policy was applied to."
+   "fieldname": "testing_mode",
+   "fieldtype": "Check",
+   "label": "Testing Mode",
+   "description": "Whether the reporter found the policy in testing mode, that is applied to only part of the failing mail.",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_policy",
@@ -271,9 +295,9 @@
   {
    "fieldname": "report",
    "fieldtype": "JSON",
-   "label": "Report",
+   "label": "Stalwart Object",
    "read_only": 1,
-   "description": "The report exactly as the cluster parsed it, for anything the fields above leave out."
+   "description": "The DmarcExternalReport object exactly as the cluster answered it, for anything the fields above leave out."
   }
  ],
  "in_create": 1,
