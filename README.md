@@ -171,7 +171,7 @@ Rules that apply everywhere:
 | `suite_cloud.api.mail.dmarc` | `list_dmarc_reports(domain, search, since, until, start, limit, days=)`, `get_dmarc_report(report)` (with the per-source records), `get_dmarc_summary(domain, days)` (totals by domain, source IP and reporter) |
 
 Listings answer `{"items": [...], "total": n}`. `search` matches the address, and the display
-name or description; `limit` is capped (200 accounts, 500 groups or lists per page). Account and
+name or description; `limit` is capped (200 accounts, 500 groups, lists or DMARC reports per page). Account and
 group rows carry `used_disk_bytes`, fetched for the whole page in one cluster call
 (`x:Account/get` in batches of the session's `maxObjectsInGet`), and `get_quotas` answers the
 allotment and usage for up to 500 addresses at once. A single `get_account` or `get_group` asks

@@ -177,6 +177,7 @@ class TestDmarcReports(SiteApiTestCase):
         )
         self.assertEqual(listing["items"][0]["date_range_end"], "2026-09-17T00:00:00Z")
         self.assertEqual(dmarc.list_dmarc_reports(domain="acme.com", search="yahoo")["total"], 1)
+        self.assertEqual(len(dmarc.list_dmarc_reports(limit=500)["items"]), 2)  # 500 is a valid page
         self.assertEqual(dmarc.list_dmarc_reports(since="2026-09-18")["total"], 0)
         self.assertRaises(frappe.DoesNotExistError, dmarc.list_dmarc_reports, domain="other.com")
 

@@ -10,7 +10,7 @@ from suite_cloud.api.site import current_site, owned, owned_page, site_api
 from suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report import PASS, report_payloads
 from suite_cloud.utils import utc_iso
 
-REPORT_PAGE_CAP = 200
+REPORT_PAGE_CAP = 500  # the dashboard offers pages of up to 500; a listing row carries no records
 SUMMARY_MAX_DAYS = 400
 TOP_SOURCES = 20
 
