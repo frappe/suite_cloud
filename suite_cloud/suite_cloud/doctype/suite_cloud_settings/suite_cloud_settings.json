@@ -82,7 +82,7 @@
    "fieldname": "dmarc_report_retention_days",
    "fieldtype": "Int",
    "label": "DMARC Report Retention (Days)",
-   "default": "365",
+   "default": "90",
    "reqd": 1,
    "description": "How long fetched DMARC reports are kept. Stalwart drops its own copy after 30 days, so this is the only history a site sees."
   },

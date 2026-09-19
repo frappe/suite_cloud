@@ -190,7 +190,7 @@ def prune_expired_reports() -> None:
     delete_reports(names)
 
 
-DEFAULT_RETENTION_DAYS = 365
+DEFAULT_RETENTION_DAYS = 90
 
 
 def retention_days() -> int:
