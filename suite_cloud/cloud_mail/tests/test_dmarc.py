@@ -228,6 +228,10 @@ class TestDmarcReports(SiteApiTestCase):
         # The listing takes the same window, so a page and its summary describe the same reports.
         self.assertEqual(dmarc.list_dmarc_reports(days=30)["total"], 1)
         self.assertEqual(dmarc.list_dmarc_reports(days=90)["total"], 2)
+        # No window at all: whatever the retention still holds, for a retention longer than any period.
+        self.assertEqual(dmarc.list_dmarc_reports(days=0)["total"], 2)
+        everything = dmarc.get_dmarc_summary(days=0)
+        self.assertEqual((everything["since"], everything["totals"]["messages"]), (None, 15))
         # The whole year takes the older report in; the other site's report never counts.
         self.assertEqual(dmarc.get_dmarc_summary(days=90)["totals"]["messages"], 15)
         self.assertEqual(

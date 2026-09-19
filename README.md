@@ -168,7 +168,7 @@ Rules that apply everywhere:
 | `suite_cloud.api.mail.groups` | `list_groups(search, start, limit)`, `get_group`, `create_group`, `update_group`, `set_group_aliases`, `add_group_alias`, `remove_group_alias`, `set_group_alias_enabled`, `set_group_members`, `delete_group` |
 | `suite_cloud.api.mail.mailing_lists` | `list_mailing_lists(search, start, limit)`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `add_mailing_list_alias`, `remove_mailing_list_alias`, `set_mailing_list_alias_enabled`, `list_recipients`, `add_recipients`, `remove_recipients`, `set_recipients`, `delete_mailing_list` |
 | `suite_cloud.api.mail.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
-| `suite_cloud.api.mail.dmarc` | `list_dmarc_reports(domain, search, since, until, start, limit, days=)`, `get_dmarc_report(report)` (with the per-source records), `get_dmarc_summary(domain, days)` (totals by domain, source IP and reporter) |
+| `suite_cloud.api.mail.dmarc` | `list_dmarc_reports(domain, search, since, until, start, limit, days=)`, `get_dmarc_report(report)` (with the per-source records), `get_dmarc_summary(domain, days)` (totals by domain, source IP and reporter; `days` 0 covers everything held) |
 
 Listings answer `{"items": [...], "total": n}`. `search` matches the address, and the display
 name or description; `limit` is capped (200 accounts, 500 groups, lists or DMARC reports per page). Account and

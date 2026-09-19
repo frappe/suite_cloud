@@ -11,7 +11,6 @@ from suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report import PASS, repor
 from suite_cloud.utils import utc_iso
 
 REPORT_PAGE_CAP = 500  # the dashboard offers pages of up to 500; a listing row carries no records
-SUMMARY_MAX_DAYS = 400
 TOP_SOURCES = 20
 
 
@@ -28,7 +27,8 @@ def list_dmarc_reports(
     days: int | None = None,
 ) -> dict:
     """Newest period first; ``since``/``until`` bound the period a report covers, and ``days``
-    keeps the reports whose period ended within the last so many days, as the summary counts.
+    keeps the reports whose period ended within the last so many days, as the summary counts;
+    without it (or with 0) everything still held is listed.
 
     A report that counted no messages says nothing about the domain and is left out, here and
     in the summary; ``get_dmarc_report`` still answers for it by name.
@@ -37,8 +37,8 @@ def list_dmarc_reports(
     filters: dict = {"total_messages": [">", 0]}
     if domain:
         filters["policy_domain"] = owned("Mail Domain", domain).name
-    if cint(days):
-        filters["date_range_end"] = [">=", summary_window(days)[0]]
+    if since_days := summary_window(days)[0]:
+        filters["date_range_end"] = [">=", since_days]
     if since:
         filters["date_range_end"] = [">=", get_datetime(since)]
     if until:
@@ -68,12 +68,13 @@ def get_dmarc_report(report: str) -> dict:
 @frappe.whitelist(methods=["GET", "POST"])
 @site_api
 def get_dmarc_summary(domain: str | None = None, days: int = 30) -> dict:
-    """Totals over the reports whose period ended in the last ``days``, by domain, source and reporter."""
+    """Totals over the reports whose period ended in the last ``days``, by domain, source and
+    reporter; ``days`` of 0 counts everything still held, however long the retention is."""
 
     since, until = summary_window(days)
     scope = ReportScope(current_site().name, owned("Mail Domain", domain).name if domain else None, since)
     return {
-        "since": utc_iso(since),
+        "since": utc_iso(since) if since else None,
         "until": utc_iso(until),
         "totals": scope.totals(),
         "domains": scope.by_domain(),
@@ -83,12 +84,12 @@ def get_dmarc_summary(domain: str | None = None, days: int = 30) -> dict:
 
 
 def summary_window(days) -> tuple:
-    """``(since, until)``: the last ``days`` days up to now, clamped to at least one and at most
-    ``SUMMARY_MAX_DAYS``."""
+    """``(since, until)``: the last ``days`` days up to now; ``since`` is None for 0 or unset,
+    which means everything the retention still holds."""
 
-    days = min(max(cint(days), 1), SUMMARY_MAX_DAYS)
     until = now_datetime()
-    return add_days(until, -days), until
+    days = cint(days)
+    return (add_days(until, -days) if days > 0 else None), until
 
 
 class ReportScope:
@@ -124,8 +125,7 @@ class ReportScope:
             frappe.qb.from_(report)
             .join(record)
             .on((record.parent == report.name) & (record.parenttype == "DMARC Report"))
-            .where((report.site == self.site) & (report.date_range_end >= self.since))
-            .where(report.total_messages > 0)
+            .where((report.site == self.site) & (report.total_messages > 0))
             .groupby(group)
             .select(
                 Count(report.name).distinct().as_("reports"),
@@ -137,6 +137,8 @@ class ReportScope:
         )
         if key:
             query = query.select(group.as_(key))
+        if self.since:
+            query = query.where(report.date_range_end >= self.since)
         if self.domain:
             query = query.where(report.policy_domain == self.domain)
         return query
