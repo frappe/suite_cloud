@@ -22,9 +22,10 @@ def list_dmarc_reports(
     search: str | None = None,
     since: str | None = None,
     until: str | None = None,
-    days: int | None = None,
     start: int = 0,
     limit: int = 50,
+    *,
+    days: int | None = None,
 ) -> dict:
     """Newest period first; ``since``/``until`` bound the period a report covers, and ``days``
     keeps the reports whose period ended within the last so many days, as the summary counts.
