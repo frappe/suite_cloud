@@ -4,23 +4,27 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "report_section",
+  "domain_section",
   "policy_domain",
   "site",
+  "column_break_domain",
   "cluster",
   "stalwart_id",
-  "column_break_report",
+  "reporter_section",
   "org_name",
   "reporter_email",
-  "subject",
   "extra_contact_info",
+  "column_break_reporter",
   "report_id",
   "report_version",
+  "subject",
+  "sent_to",
+  "period_section",
   "date_range_begin",
   "date_range_end",
+  "column_break_period",
   "received_at",
   "expires_at",
-  "sent_to",
   "totals_section",
   "total_messages",
   "passed_messages",
@@ -38,14 +42,14 @@
   "errors",
   "records_section",
   "records",
-  "raw_section",
+  "stalwart_section",
   "report"
  ],
  "fields": [
   {
-   "fieldname": "report_section",
+   "fieldname": "domain_section",
    "fieldtype": "Section Break",
-   "label": "Report"
+   "label": "Domain"
   },
   {
    "fieldname": "policy_domain",
@@ -70,6 +74,10 @@
    "search_index": 1
   },
   {
+   "fieldname": "column_break_domain",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "cluster",
    "fieldtype": "Link",
    "label": "Stalwart Cluster",
@@ -88,8 +96,9 @@
    "description": "The id of the DmarcExternalReport object on the cluster; with the cluster it says whether a report is stored already."
   },
   {
-   "fieldname": "column_break_report",
-   "fieldtype": "Column Break"
+   "fieldname": "reporter_section",
+   "fieldtype": "Section Break",
+   "label": "Reporter"
   },
   {
    "fieldname": "org_name",
@@ -109,18 +118,15 @@
    "description": "Where the reporter takes questions about the report."
   },
   {
-   "fieldname": "subject",
-   "fieldtype": "Small Text",
-   "label": "Subject",
-   "description": "The subject line of the message that carried the report.",
-   "read_only": 1
-  },
-  {
    "fieldname": "extra_contact_info",
    "fieldtype": "Small Text",
    "label": "Reporter Contact",
    "read_only": 1,
    "description": "Any further contact detail the reporter added."
+  },
+  {
+   "fieldname": "column_break_reporter",
+   "fieldtype": "Column Break"
   },
   {
    "fieldname": "report_id",
@@ -135,6 +141,25 @@
    "label": "Report Version",
    "description": "The version of the aggregate report format the reporter used.",
    "read_only": 1
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "label": "Subject",
+   "description": "The subject line of the message that carried the report.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sent_to",
+   "fieldtype": "Small Text",
+   "label": "Sent To",
+   "description": "The addresses the reporter mailed the report to, one per line; postmaster@ of the domain, normally.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "period_section",
+   "fieldtype": "Section Break",
+   "label": "Period"
   },
   {
    "fieldname": "date_range_begin",
@@ -154,6 +179,10 @@
    "search_index": 1
   },
   {
+   "fieldname": "column_break_period",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "received_at",
    "fieldtype": "Datetime",
    "label": "Received At",
@@ -166,13 +195,6 @@
    "label": "Expires On Cluster",
    "read_only": 1,
    "description": "When Stalwart drops its copy; the report stays here until the retention in Suite Cloud Settings runs out."
-  },
-  {
-   "fieldname": "sent_to",
-   "fieldtype": "Small Text",
-   "label": "Sent To",
-   "description": "The addresses the reporter mailed the report to, one per line; postmaster@ of the domain, normally.",
-   "read_only": 1
   },
   {
    "fieldname": "totals_section",
@@ -287,9 +309,9 @@
    "description": "One row per source IP and result combination, as the reporter grouped the messages."
   },
   {
-   "fieldname": "raw_section",
+   "fieldname": "stalwart_section",
    "fieldtype": "Section Break",
-   "label": "Raw Report",
+   "label": "Stalwart Object",
    "collapsible": 1
   },
   {
