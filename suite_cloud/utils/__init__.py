@@ -21,6 +21,7 @@ CONFIG_KEYS = (
     "acme_contact_email",
     "server_job_timeout",
     "sign_with_ed25519",
+    "dmarc_report_retention_days",
 )
 
 

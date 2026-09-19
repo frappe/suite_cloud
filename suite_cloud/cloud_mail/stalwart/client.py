@@ -13,6 +13,7 @@ from suite_cloud.cloud_mail.stalwart.credentials import ApiKeyService, AppPasswo
 from suite_cloud.cloud_mail.stalwart.directory import (
     AccountService,
     DkimSignatureService,
+    DmarcReportService,
     DomainService,
     GroupService,
     MailingListService,
@@ -42,6 +43,10 @@ class StalwartClient:
     @cached_property
     def dkim_signatures(self) -> DkimSignatureService:
         return DkimSignatureService(self.connection)
+
+    @cached_property
+    def dmarc_reports(self) -> DmarcReportService:
+        return DmarcReportService(self.connection)
 
     @cached_property
     def mailing_lists(self) -> MailingListService:

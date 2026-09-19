@@ -11,6 +11,8 @@
   "site_service_user",
   "jobs_section",
   "server_job_timeout",
+  "column_break_jobs",
+  "dmarc_report_retention_days",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -71,6 +73,17 @@
    "fieldtype": "Int",
    "label": "Server Job Timeout (Seconds)",
    "reqd": 1
+  },
+  {
+   "fieldname": "column_break_jobs",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dmarc_report_retention_days",
+   "fieldtype": "Int",
+   "label": "DMARC Report Retention (Days)",
+   "default": "90",
+   "description": "How long fetched DMARC reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees."
   },
   {
    "fieldname": "stalwart_tab",

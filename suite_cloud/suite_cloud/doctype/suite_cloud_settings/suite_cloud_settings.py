@@ -1,9 +1,12 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import frappe
 from frappe import _
 from frappe.model.document import Document
+from frappe.utils import cint
 
+from suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report import DEFAULT_RETENTION_DAYS
 from suite_cloud.utils import validate_version
 
 
@@ -34,3 +37,9 @@ class SuiteCloudSettings(Document):
             self.public_url = self.public_url.strip().rstrip("/")
         self.stalwart_version = validate_version(self.stalwart_version, _("Stalwart Version"))
         self.stalwart_cli_version = validate_version(self.stalwart_cli_version, _("Stalwart CLI Version"))
+        # A site set up before the field existed has it empty: the default applies rather than a
+        # refusal to save anything else. An explicit value under a day is still a mistake.
+        if self.dmarc_report_retention_days in (None, ""):
+            self.dmarc_report_retention_days = DEFAULT_RETENTION_DAYS
+        elif cint(self.dmarc_report_retention_days) < 1:
+            frappe.throw(_("DMARC Report Retention must be at least one day."))

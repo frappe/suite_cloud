@@ -1,0 +1,360 @@
+{
+ "actions": [],
+ "creation": "2026-09-18 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "domain_section",
+  "policy_domain",
+  "site",
+  "column_break_domain",
+  "cluster",
+  "stalwart_id",
+  "reporter_section",
+  "org_name",
+  "reporter_email",
+  "extra_contact_info",
+  "column_break_reporter",
+  "report_id",
+  "report_version",
+  "subject",
+  "sent_to",
+  "period_section",
+  "date_range_begin",
+  "date_range_end",
+  "column_break_period",
+  "received_at",
+  "expires_at",
+  "totals_section",
+  "total_messages",
+  "passed_messages",
+  "failed_messages",
+  "column_break_totals",
+  "dkim_passed_messages",
+  "spf_passed_messages",
+  "policy_section",
+  "policy",
+  "subdomain_policy",
+  "testing_mode",
+  "column_break_policy",
+  "adkim",
+  "aspf",
+  "errors",
+  "records_section",
+  "records",
+  "stalwart_section",
+  "report"
+ ],
+ "fields": [
+  {
+   "fieldname": "domain_section",
+   "fieldtype": "Section Break",
+   "label": "Domain"
+  },
+  {
+   "fieldname": "policy_domain",
+   "fieldtype": "Data",
+   "label": "Domain",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "reqd": 1,
+   "read_only": 1,
+   "description": "The domain the report is about, as the reporter names it. It is the Mail Domain's name whenever a site holds the domain.",
+   "search_index": 1
+  },
+  {
+   "fieldname": "site",
+   "fieldtype": "Link",
+   "label": "Suite Site",
+   "options": "Suite Site",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "description": "The site that held the domain when the report was fetched; the site API shows the report to this site only.",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_domain",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "label": "Stalwart Cluster",
+   "options": "Stalwart Cluster",
+   "reqd": 1,
+   "in_standard_filter": 1,
+   "read_only": 1,
+   "description": "The cluster that intercepted the report. Stalwart parses reports mailed to postmaster@ and keeps them for a month."
+  },
+  {
+   "fieldname": "stalwart_id",
+   "fieldtype": "Data",
+   "label": "Stalwart ID",
+   "reqd": 1,
+   "read_only": 1,
+   "description": "The id of the DmarcExternalReport object on the cluster; with the cluster it says whether a report is stored already."
+  },
+  {
+   "fieldname": "reporter_section",
+   "fieldtype": "Section Break",
+   "label": "Reporter"
+  },
+  {
+   "fieldname": "org_name",
+   "fieldtype": "Data",
+   "label": "Reporter",
+   "in_list_view": 1,
+   "reqd": 1,
+   "read_only": 1,
+   "description": "The organisation that evaluated the mail and sent the report, such as google.com."
+  },
+  {
+   "fieldname": "reporter_email",
+   "fieldtype": "Data",
+   "label": "Reporter Email",
+   "options": "Email",
+   "read_only": 1,
+   "description": "Where the reporter takes questions about the report."
+  },
+  {
+   "fieldname": "extra_contact_info",
+   "fieldtype": "Small Text",
+   "label": "Reporter Contact",
+   "read_only": 1,
+   "description": "Any further contact detail the reporter added."
+  },
+  {
+   "fieldname": "column_break_reporter",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "report_id",
+   "fieldtype": "Data",
+   "label": "Report ID",
+   "read_only": 1,
+   "description": "The reporter's own id for the report; the same report resent carries the same id."
+  },
+  {
+   "fieldname": "report_version",
+   "fieldtype": "Float",
+   "label": "Report Version",
+   "description": "The version of the aggregate report format the reporter used.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "label": "Subject",
+   "description": "The subject line of the message that carried the report.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "sent_to",
+   "fieldtype": "Small Text",
+   "label": "Sent To",
+   "description": "The addresses the reporter mailed the report to, one per line; postmaster@ of the domain, normally.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "period_section",
+   "fieldtype": "Section Break",
+   "label": "Period"
+  },
+  {
+   "fieldname": "date_range_begin",
+   "fieldtype": "Datetime",
+   "label": "Range Begins",
+   "in_list_view": 1,
+   "read_only": 1,
+   "description": "The start of the period the report covers, usually one day."
+  },
+  {
+   "fieldname": "date_range_end",
+   "fieldtype": "Datetime",
+   "label": "Range Ends",
+   "in_list_view": 1,
+   "read_only": 1,
+   "description": "The end of the period the report covers.",
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_period",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "received_at",
+   "fieldtype": "Datetime",
+   "label": "Received At",
+   "read_only": 1,
+   "description": "When the cluster received the report."
+  },
+  {
+   "fieldname": "expires_at",
+   "fieldtype": "Datetime",
+   "label": "Expires On Cluster",
+   "read_only": 1,
+   "description": "When Stalwart drops its copy; the report stays here until the retention in Suite Cloud Settings runs out."
+  },
+  {
+   "fieldname": "totals_section",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "fieldname": "total_messages",
+   "fieldtype": "Int",
+   "label": "Messages",
+   "in_list_view": 1,
+   "read_only": 1,
+   "description": "Messages the reporter saw from this domain in the period, summed over the records."
+  },
+  {
+   "fieldname": "passed_messages",
+   "fieldtype": "Int",
+   "label": "Passed DMARC",
+   "in_list_view": 1,
+   "read_only": 1,
+   "description": "Messages that passed DMARC: aligned DKIM or aligned SPF verified."
+  },
+  {
+   "fieldname": "failed_messages",
+   "fieldtype": "Int",
+   "label": "Failed DMARC",
+   "in_list_view": 1,
+   "read_only": 1,
+   "description": "Messages that failed both aligned checks; the published policy decided their fate."
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "dkim_passed_messages",
+   "fieldtype": "Int",
+   "label": "Passed DKIM",
+   "read_only": 1,
+   "description": "Messages with a verified, aligned DKIM signature."
+  },
+  {
+   "fieldname": "spf_passed_messages",
+   "fieldtype": "Int",
+   "label": "Passed SPF",
+   "read_only": 1,
+   "description": "Messages whose envelope sender passed an aligned SPF check."
+  },
+  {
+   "fieldname": "policy_section",
+   "fieldtype": "Section Break",
+   "label": "Published Policy",
+   "description": "The DMARC record as the reporter read it when it evaluated the messages."
+  },
+  {
+   "fieldname": "policy",
+   "fieldtype": "Data",
+   "label": "Policy (p)",
+   "read_only": 1,
+   "description": "The p tag the reporter read: none, quarantine or reject."
+  },
+  {
+   "fieldname": "subdomain_policy",
+   "fieldtype": "Data",
+   "label": "Subdomain Policy (sp)",
+   "read_only": 1,
+   "description": "The sp tag: the policy for subdomains, when it differs from p."
+  },
+  {
+   "fieldname": "testing_mode",
+   "fieldtype": "Check",
+   "label": "Testing Mode",
+   "description": "Whether the reporter found the policy in testing mode, that is applied to only part of the failing mail.",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_policy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "adkim",
+   "fieldtype": "Data",
+   "label": "DKIM Alignment (adkim)",
+   "read_only": 1,
+   "description": "The adkim tag: whether DKIM alignment was relaxed or strict."
+  },
+  {
+   "fieldname": "aspf",
+   "fieldtype": "Data",
+   "label": "SPF Alignment (aspf)",
+   "read_only": 1,
+   "description": "The aspf tag: whether SPF alignment was relaxed or strict."
+  },
+  {
+   "fieldname": "errors",
+   "fieldtype": "Small Text",
+   "label": "Reporter Errors",
+   "read_only": 1,
+   "description": "Remarks the reporter added, such as a DNS lookup it could not complete."
+  },
+  {
+   "fieldname": "records_section",
+   "fieldtype": "Section Break",
+   "label": "Records"
+  },
+  {
+   "fieldname": "records",
+   "fieldtype": "Table",
+   "label": "Records",
+   "options": "DMARC Report Record",
+   "read_only": 1,
+   "description": "One row per source IP and result combination, as the reporter grouped the messages."
+  },
+  {
+   "fieldname": "stalwart_section",
+   "fieldtype": "Section Break",
+   "label": "Stalwart Object",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "report",
+   "fieldtype": "JSON",
+   "label": "Stalwart Object",
+   "read_only": 1,
+   "description": "The DmarcExternalReport object exactly as the cluster answered it, for anything the fields above leave out."
+  }
+ ],
+ "in_create": 1,
+ "links": [],
+ "modified": "2026-09-18 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "DMARC Report",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "role": "System Manager"
+  },
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "share": 1,
+   "role": "Suite Cloud Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "policy_domain,org_name,report_id,site",
+ "sort_field": "date_range_end",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "policy_domain"
+}

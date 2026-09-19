@@ -46,6 +46,13 @@ QUERY_FILTERS = {
     "DkimSignature": {"domainId", "memberTenantId"},
     "Role": {"text"},
     "Tenant": {"text"},
+    "DmarcExternalReport": {
+        "domain",
+        "totalFailedSessions",
+        "totalSuccessfulSessions",
+        "expiresAt",
+        "memberTenantId",
+    },
 }
 REFERENCES = {"domainId": "Domain", "memberGroupIds": "Account", "roleIds": "Role"}
 
@@ -240,6 +247,12 @@ class FakeStalwart:
         if unsupported:
             raise FakeError("unsupportedFilter", f"{type} cannot filter on {sorted(unsupported)}")
         objects = [o for o in self._collection(type, account_id).values() if matches(o, filter)]
+        for comparator in reversed(args.get("sort") or []):
+            objects.sort(
+                key=lambda o: o.get(comparator["property"]) or "",
+                reverse=not comparator.get("isAscending", True),
+            )
+        objects = objects[int(args.get("position") or 0) :]
         if limit := args.get("limit"):
             objects = objects[:limit]
         return {"accountId": account_id, "ids": [o["id"] for o in objects], "total": len(objects)}
@@ -458,6 +471,9 @@ def matches(obj: dict, filter: dict) -> bool:
         if key == "text":
             haystack = " ".join(str(obj.get(k) or "") for k in ("name", "description", "emailAddress"))
             if str(value).lower() not in haystack.lower():
+                return False
+        elif key == "domain" and "report" in obj:
+            if (obj["report"].get("policyDomain") or "").lower() != str(value).lower():
                 return False
         elif isinstance(obj.get(key), dict):
             if value not in obj[key]:
