@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint
 
-from suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report import DEFAULT_RETENTION_DAYS
+from suite_cloud.cloud_mail.reports import DEFAULT_RETENTION_DAYS
 from suite_cloud.utils import validate_version
 
 
