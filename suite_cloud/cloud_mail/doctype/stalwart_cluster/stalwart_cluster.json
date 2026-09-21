@@ -457,9 +457,14 @@
    "group": "Reports",
    "link_doctype": "DMARC Report",
    "link_fieldname": "cluster"
+  },
+  {
+   "group": "Reports",
+   "link_doctype": "TLS Report",
+   "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-09-08 21:10:00.000000",
+ "modified": "2026-09-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cloud Mail",
  "name": "Stalwart Cluster",

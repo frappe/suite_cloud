@@ -80,6 +80,18 @@
   },
   {
    "child": 0,
+   "collapsible": 1,
+   "icon": "lock",
+   "indent": 0,
+   "keep_closed": 0,
+   "label": "TLS Reports",
+   "link_to": "TLS Report",
+   "link_type": "DocType",
+   "show_arrow": 0,
+   "type": "Link"
+  },
+  {
+   "child": 0,
    "collapsible": 0,
    "indent": 0,
    "keep_closed": 0,
@@ -205,7 +217,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-04 12:00:01.000000",
+ "modified": "2026-09-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud",

@@ -10,6 +10,7 @@ from suite_cloud.cloud_mail.cluster import dns as cluster_dns
 from suite_cloud.cloud_mail.cluster import egress
 from suite_cloud.cloud_mail.cluster.zone import GROUPS, build_domain_records, group_summaries
 from suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report import DMARC_REPORTS
+from suite_cloud.cloud_mail.doctype.tls_report.tls_report import TLS_REPORTS
 from suite_cloud.cloud_mail.stalwart.directory import Domain
 from suite_cloud.cloud_mail.tenancy import ownership, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
@@ -129,7 +130,8 @@ class MailDomain(Document):
         alias_filters = {"alias_email": ["like", f"%@{self.domain_name}"]}
         if alias := frappe.db.get_value("Mail Address Alias", alias_filters, "parent"):
             frappe.throw(_("Remove the aliases on {0} first (e.g. on {1}).").format(self.domain_name, alias))
-        DMARC_REPORTS.detach_domain(self.name)
+        for reports in (DMARC_REPORTS, TLS_REPORTS):
+            reports.detach_domain(self.name)
         sync.push_destroy(self, "domains")
 
     def after_delete(self) -> None:

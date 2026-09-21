@@ -22,6 +22,7 @@ CONFIG_KEYS = (
     "server_job_timeout",
     "sign_with_ed25519",
     "dmarc_report_retention_days",
+    "tls_report_retention_days",
 )
 
 

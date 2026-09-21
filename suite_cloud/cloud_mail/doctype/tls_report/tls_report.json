@@ -1,0 +1,302 @@
+{
+ "actions": [],
+ "creation": "2026-09-21 11:14:18.841038",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "domain_section",
+  "policy_domain",
+  "site",
+  "column_break_domain",
+  "cluster",
+  "stalwart_id",
+  "reporter_section",
+  "org_name",
+  "reporter_email",
+  "contact_info",
+  "column_break_reporter",
+  "report_id",
+  "subject",
+  "sent_to",
+  "period_section",
+  "date_range_begin",
+  "date_range_end",
+  "column_break_period",
+  "received_at",
+  "expires_at",
+  "totals_section",
+  "total_sessions",
+  "successful_sessions",
+  "failed_sessions",
+  "column_break_totals",
+  "policy_types",
+  "policies_section",
+  "policies",
+  "failures_section",
+  "failures",
+  "stalwart_section",
+  "report"
+ ],
+ "fields": [
+  {
+   "fieldname": "domain_section",
+   "fieldtype": "Section Break",
+   "label": "Domain"
+  },
+  {
+   "description": "The domain the report is about, as the reporter names it in its policies. It is the Mail Domain's name whenever a site holds the domain.",
+   "fieldname": "policy_domain",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Domain",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "The site that held the domain when the report was fetched; the site API shows the report to this site only.",
+   "fieldname": "site",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Suite Site",
+   "options": "Suite Site",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_domain",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The cluster that intercepted the report. Stalwart parses reports mailed to postmaster@ and keeps them for a month.",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Stalwart Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "The id of the TlsExternalReport object on the cluster; with the cluster it says whether a report is stored already.",
+   "fieldname": "stalwart_id",
+   "fieldtype": "Data",
+   "label": "Stalwart ID",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "reporter_section",
+   "fieldtype": "Section Break",
+   "label": "Reporter"
+  },
+  {
+   "description": "The organisation whose servers delivered mail to the domain and sent the report, such as Google Inc.",
+   "fieldname": "org_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Reporter",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "The address the report was mailed from.",
+   "fieldname": "reporter_email",
+   "fieldtype": "Data",
+   "label": "Reporter Email",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "description": "How the reporter asks to be reached about the report, often a mailto: address.",
+   "fieldname": "contact_info",
+   "fieldtype": "Small Text",
+   "label": "Reporter Contact",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_reporter",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The reporter's own id for the report; the same report resent carries the same id.",
+   "fieldname": "report_id",
+   "fieldtype": "Data",
+   "label": "Report ID",
+   "read_only": 1
+  },
+  {
+   "description": "The subject line of the message that carried the report.",
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "label": "Subject",
+   "read_only": 1
+  },
+  {
+   "description": "The addresses the reporter mailed the report to, one per line; postmaster@ of the domain, normally.",
+   "fieldname": "sent_to",
+   "fieldtype": "Small Text",
+   "label": "Sent To",
+   "read_only": 1
+  },
+  {
+   "fieldname": "period_section",
+   "fieldtype": "Section Break",
+   "label": "Period"
+  },
+  {
+   "description": "The start of the period the report covers, usually one day.",
+   "fieldname": "date_range_begin",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Range Begins",
+   "read_only": 1
+  },
+  {
+   "description": "The end of the period the report covers.",
+   "fieldname": "date_range_end",
+   "fieldtype": "Datetime",
+   "in_list_view": 1,
+   "label": "Range Ends",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_period",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "When the cluster received the report.",
+   "fieldname": "received_at",
+   "fieldtype": "Datetime",
+   "label": "Received At",
+   "read_only": 1
+  },
+  {
+   "description": "When Stalwart drops its copy; the report stays here until the retention in Suite Cloud Settings runs out.",
+   "fieldname": "expires_at",
+   "fieldtype": "Datetime",
+   "label": "Expires On Cluster",
+   "read_only": 1
+  },
+  {
+   "fieldname": "totals_section",
+   "fieldtype": "Section Break",
+   "label": "Totals"
+  },
+  {
+   "description": "Connections the reporter's servers made to the domain's MX hosts in the period, summed over the policies.",
+   "fieldname": "total_sessions",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sessions",
+   "read_only": 1
+  },
+  {
+   "description": "Connections that negotiated TLS the way the policy asks for.",
+   "fieldname": "successful_sessions",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Successful",
+   "read_only": 1
+  },
+  {
+   "description": "Connections that could not; the failures below say why.",
+   "fieldname": "failed_sessions",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Failed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totals",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The kinds of policy the reporter applied, comma-separated: sts (MTA-STS), tlsa (DANE) or no-policy-found.",
+   "fieldname": "policy_types",
+   "fieldtype": "Data",
+   "label": "Policy Types",
+   "read_only": 1
+  },
+  {
+   "fieldname": "policies_section",
+   "fieldtype": "Section Break",
+   "label": "Policies"
+  },
+  {
+   "description": "One row per policy the reporter evaluated, with the sessions it counted under it.",
+   "fieldname": "policies",
+   "fieldtype": "Table",
+   "label": "Policies",
+   "options": "TLS Report Policy",
+   "read_only": 1
+  },
+  {
+   "fieldname": "failures_section",
+   "fieldtype": "Section Break",
+   "label": "Failures"
+  },
+  {
+   "description": "One row per kind of failure and receiving host, as the reporter grouped the failed sessions.",
+   "fieldname": "failures",
+   "fieldtype": "Table",
+   "label": "Failures",
+   "options": "TLS Report Failure",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "stalwart_section",
+   "fieldtype": "Section Break",
+   "label": "Stalwart Object"
+  },
+  {
+   "description": "The TlsExternalReport object exactly as the cluster answered it, for anything the fields above leave out.",
+   "fieldname": "report",
+   "fieldtype": "JSON",
+   "label": "Stalwart Object",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "in_create": 1,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-21 11:14:48.299806",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "TLS Report",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1
+  },
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Suite Cloud Manager",
+   "share": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "search_fields": "policy_domain,org_name,report_id,site",
+ "sort_field": "date_range_end",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "policy_domain"
+}

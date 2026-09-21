@@ -1,0 +1,89 @@
+{
+ "actions": [],
+ "creation": "2026-09-21 11:14:18.539164",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "policy_type",
+  "policy_domain",
+  "successful_sessions",
+  "failed_sessions",
+  "column_break_policy",
+  "mx_hosts",
+  "policy_strings"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "description": "The policy the sender applied: sts (MTA-STS), tlsa (DANE) or no-policy-found when the domain publishes neither.",
+   "fieldname": "policy_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Policy Type",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "description": "The domain the policy is published for.",
+   "fieldname": "policy_domain",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Policy Domain",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "Connections that negotiated TLS the way the policy asks for.",
+   "fieldname": "successful_sessions",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Successful Sessions",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "Connections that could not negotiate TLS the way the policy asks for.",
+   "fieldname": "failed_sessions",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Failed Sessions",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_policy",
+   "fieldtype": "Column Break"
+  },
+  {
+   "columns": 2,
+   "description": "The MX host patterns the policy covers, one per line; MTA-STS policies list them.",
+   "fieldname": "mx_hosts",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "MX Hosts",
+   "read_only": 1
+  },
+  {
+   "description": "The policy as the sender retrieved it, one string per line: the lines of the MTA-STS policy file or the TLSA records.",
+   "fieldname": "policy_strings",
+   "fieldtype": "Small Text",
+   "label": "Policy",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-21 11:14:48.149316",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "TLS Report Policy",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -1,0 +1,122 @@
+{
+ "actions": [],
+ "creation": "2026-09-21 11:14:18.788603",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "result_type",
+  "failed_sessions",
+  "receiving_mx_hostname",
+  "receiving_ip",
+  "sending_mta_ip",
+  "column_break_failure",
+  "policy_type",
+  "policy_domain",
+  "receiving_mx_helo",
+  "failure_reason_code",
+  "additional_information"
+ ],
+ "fields": [
+  {
+   "columns": 2,
+   "description": "Why the sessions failed, as RFC 8460 names it, such as certificate-expired or starttls-not-supported.",
+   "fieldname": "result_type",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Result Type",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "How many sessions failed this way.",
+   "fieldname": "failed_sessions",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Failed Sessions",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "description": "The MX host the sender tried to deliver to.",
+   "fieldname": "receiving_mx_hostname",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Receiving MX",
+   "length": 255,
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "description": "The address of that MX host.",
+   "fieldname": "receiving_ip",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Receiving IP",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "description": "The address of the sender's server that saw the failure.",
+   "fieldname": "sending_mta_ip",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Sending MTA IP",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_failure",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The type of the policy the failure was counted under.",
+   "fieldname": "policy_type",
+   "fieldtype": "Data",
+   "label": "Policy Type",
+   "read_only": 1
+  },
+  {
+   "description": "The domain of the policy the failure was counted under.",
+   "fieldname": "policy_domain",
+   "fieldtype": "Data",
+   "label": "Policy Domain",
+   "read_only": 1
+  },
+  {
+   "description": "The name the MX host greeted the sender with, when the sender recorded it.",
+   "fieldname": "receiving_mx_helo",
+   "fieldtype": "Small Text",
+   "label": "Receiving MX HELO",
+   "read_only": 1
+  },
+  {
+   "description": "The sender's own error text for the failure, such as its TLS library's code.",
+   "fieldname": "failure_reason_code",
+   "fieldtype": "Small Text",
+   "label": "Failure Reason",
+   "read_only": 1
+  },
+  {
+   "description": "Any further detail the sender added, often a link that explains the failure.",
+   "fieldname": "additional_information",
+   "fieldtype": "Small Text",
+   "label": "Additional Information",
+   "read_only": 1
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-21 11:14:48.250568",
+ "modified_by": "Administrator",
+ "module": "Cloud Mail",
+ "name": "TLS Report Failure",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

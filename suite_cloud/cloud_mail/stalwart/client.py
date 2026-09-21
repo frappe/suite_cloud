@@ -18,6 +18,7 @@ from suite_cloud.cloud_mail.stalwart.directory import (
     GroupService,
     MailingListService,
     RoleService,
+    TlsReportService,
 )
 from suite_cloud.cloud_mail.stalwart.service import ManagementService, SingletonService
 
@@ -55,6 +56,10 @@ class StalwartClient:
     @cached_property
     def roles(self) -> RoleService:
         return RoleService(self.connection)
+
+    @cached_property
+    def tls_reports(self) -> TlsReportService:
+        return TlsReportService(self.connection)
 
     @cached_property
     def app_passwords(self) -> AppPasswordService:
