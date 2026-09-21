@@ -227,10 +227,15 @@ class TestTlsReports(SiteApiTestCase):
         )
         other_report = frappe.db.get_value("TLS Report", {"policy_domain": "other.com"})
         self.assertRaises(frappe.DoesNotExistError, tls.get_tls_report, other_report)
-        # The id is a string: Frappe refuses a filter in its place, and a string is matched as is.
-        # By keyword, as a request passes it; the type check cannot see through site_api by position.
+        # Ids, domains and searches are strings: Frappe refuses a filter in their place, and a
+        # string is matched as is. By keyword, as a request passes them; the type check cannot see
+        # through site_api by position.
         self.assertRaises(frappe.FrappeTypeError, tls.get_tls_report, report=["like", "%"])
         self.assertRaises(frappe.DoesNotExistError, tls.get_tls_report, report='["like", "%"]')
+        self.assertRaises(frappe.FrappeTypeError, tls.list_tls_reports, domain=["!=", ""])
+        self.assertRaises(frappe.FrappeTypeError, tls.list_tls_reports, search=["like", "%"])
+        self.assertRaises(frappe.FrappeTypeError, tls.list_tls_reports, since=[">", "2000-01-01"])
+        self.assertRaises(frappe.FrappeTypeError, tls.get_tls_summary, domain={"name": ["!=", ""]})
 
     def test_summary_totals_sessions_and_ranks_failures(self) -> None:
         self.add(stalwart_report("acme.com"))
