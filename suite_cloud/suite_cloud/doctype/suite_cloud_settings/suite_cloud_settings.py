@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint
 
-from suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report import DEFAULT_RETENTION_DAYS
+from suite_cloud.cloud_mail.reports import DEFAULT_RETENTION_DAYS
 from suite_cloud.utils import validate_version
 
 
@@ -37,9 +37,13 @@ class SuiteCloudSettings(Document):
             self.public_url = self.public_url.strip().rstrip("/")
         self.stalwart_version = validate_version(self.stalwart_version, _("Stalwart Version"))
         self.stalwart_cli_version = validate_version(self.stalwart_cli_version, _("Stalwart CLI Version"))
-        # A site set up before the field existed has it empty: the default applies rather than a
+        self.validate_report_retention()
+
+    def validate_report_retention(self) -> None:
+        # A site set up before a field existed has it empty: the default applies rather than a
         # refusal to save anything else. An explicit value under a day is still a mistake.
-        if self.dmarc_report_retention_days in (None, ""):
-            self.dmarc_report_retention_days = DEFAULT_RETENTION_DAYS
-        elif cint(self.dmarc_report_retention_days) < 1:
-            frappe.throw(_("DMARC Report Retention must be at least one day."))
+        for field in ("dmarc_report_retention_days", "tls_report_retention_days"):
+            if self.get(field) in (None, ""):
+                self.set(field, DEFAULT_RETENTION_DAYS)
+            elif cint(self.get(field)) < 1:
+                frappe.throw(_("{0} must be at least one day.").format(_(self.meta.get_label(field))))

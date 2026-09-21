@@ -13,6 +13,7 @@
   "server_job_timeout",
   "column_break_jobs",
   "dmarc_report_retention_days",
+  "tls_report_retention_days",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -84,6 +85,13 @@
    "label": "DMARC Report Retention (Days)",
    "default": "90",
    "description": "How long fetched DMARC reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees."
+  },
+  {
+   "fieldname": "tls_report_retention_days",
+   "fieldtype": "Int",
+   "label": "TLS Report Retention (Days)",
+   "default": "90",
+   "description": "How long fetched TLS reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees."
   },
   {
    "fieldname": "stalwart_tab",
@@ -197,7 +205,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-07 11:00:00.000000",
+ "modified": "2026-09-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

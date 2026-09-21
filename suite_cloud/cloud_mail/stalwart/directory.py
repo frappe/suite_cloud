@@ -422,3 +422,12 @@ class DmarcReportService(ManagementService):
     """
 
     type = "DmarcExternalReport"
+
+
+class TlsReportService(ManagementService):
+    """TLS aggregate reports (RFC 8460) other senders sent about delivering to the cluster's domains.
+
+    Intercepted, parsed and kept the same way as the DMARC reports.
+    """
+
+    type = "TlsExternalReport"
