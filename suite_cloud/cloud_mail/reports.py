@@ -120,22 +120,50 @@ class ReceivedReports:
         frappe.db.delete(self.doctype, {"name": ["in", names]})
 
 
-def envelope_fields(cluster_name: str, obj: dict, policy_domain: str) -> dict:
+def envelope_fields(cluster_name: str, obj: dict, policy_domain: str, attributable: bool = True) -> dict:
     """The fields every received report shares: where it came from, whose domain it is about,
-    the message that carried it and the whole object as the cluster answered it."""
+    the message that carried it and the whole object as the cluster answered it.
 
+    ``attributable`` False keeps the report from every site, for one whose content names more
+    than one domain.
+    """
+
+    recipients = [str(address) for address in as_list(obj.get("to"))]
     return {
         "cluster": cluster_name,
         "stalwart_id": obj["id"],
         "policy_domain": policy_domain,
-        # A Mail Domain is named by its domain, so the report's own domain says who holds it.
-        "site": frappe.db.get_value("Mail Domain", policy_domain, "site") if policy_domain else None,
+        "site": report_site(policy_domain, recipients) if attributable else None,
         "subject": obj.get("subject"),
-        "sent_to": "\n".join(as_list(obj.get("to"))) or None,
+        "sent_to": "\n".join(recipients) or None,
         "received_at": local_datetime(obj.get("receivedAt")),
         "expires_at": local_datetime(obj.get("expiresAt")),
         "report": json.dumps(obj),
     }
+
+
+def report_site(policy_domain: str, recipients: list[str]) -> str | None:
+    """The site that holds the report's domain, if the report was also addressed to one of that
+    site's domains; otherwise the report is kept for operators and shown to no site.
+
+    The domain comes from the report body, which the sender writes. A genuine reporter mails
+    the address the domain's own DMARC or TLS-RPT record names (postmaster@ of the domain), so
+    a report naming one tenant's domain but addressed to another's must not reach either.
+    Stalwart keeps the To header, not the envelope, so this sorts genuine reports rather than
+    authenticating them: reports are unauthenticated by design, and a forged one can always be
+    mailed to the domain's own postmaster@.
+    """
+
+    # A Mail Domain is named by its domain, so the report's own domain says who holds it.
+    site = frappe.db.get_value("Mail Domain", policy_domain, "site") if policy_domain else None
+    addressed = {normalize_domain(r.rpartition("@")[2]) for r in recipients if "@" in r}
+    if (
+        site
+        and addressed
+        and frappe.db.exists("Mail Domain", {"name": ["in", list(addressed)], "site": site})
+    ):
+        return site
+    return None
 
 
 def envelope_payload(row) -> dict:

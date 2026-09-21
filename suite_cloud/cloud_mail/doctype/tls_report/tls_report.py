@@ -88,10 +88,11 @@ class TLSReport(Document):
         report = obj.get("report") or {}
         policies = as_list(report.get("policies"))
         policy_rows = [policy_row(p) for p in policies]
+        domains = policy_domains(policy_rows)
         doc = frappe.new_doc("TLS Report")
         doc.update(
             {
-                **envelope_fields(cluster_name, obj, report_domain(policy_rows)),
+                **envelope_fields(cluster_name, obj, domains[0] if domains else "", len(domains) == 1),
                 "org_name": report.get("organizationName") or sender_address(obj.get("from")) or "unknown",
                 "reporter_email": sender_address(obj.get("from")),
                 "contact_info": report.get("contactInfo"),
@@ -220,14 +221,16 @@ def failure_payload(row) -> dict:
 # --- parsing ----------------------------------------------------------------------------
 
 
-def report_domain(policy_rows: list[dict]) -> str:
-    """The domain the report is about.
+def policy_domains(policy_rows: list[dict]) -> list[str]:
+    """Every domain the report's policies name, the first one first.
 
-    A sender mails a report to the address in one domain's TLS-RPT record, so its policies all
-    name that domain (or several policies of it, such as MTA-STS beside DANE).
+    A sender mails a report to the address in one domain's TLS-RPT record, so its policies
+    normally name that one domain (several policies of it, such as MTA-STS beside DANE). A report
+    naming more is stored under the first but shown to no site: whichever site held that domain
+    would otherwise see the other domains' results.
     """
 
-    return next((r["policy_domain"] for r in policy_rows if r["policy_domain"]), "")
+    return list(dict.fromkeys(r["policy_domain"] for r in policy_rows if r["policy_domain"]))
 
 
 def policy_row(policy: dict) -> dict:

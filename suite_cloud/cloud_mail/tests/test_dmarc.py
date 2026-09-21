@@ -116,6 +116,16 @@ class TestDmarcReports(SiteApiTestCase):
         # A report about a domain no site holds is kept for operators, attributed to nobody.
         self.assertIsNone(frappe.db.get_value("DMARC Report", {"policy_domain": "nobody.example"}, "site"))
 
+    def test_a_report_addressed_to_another_site_s_domain_reaches_neither(self) -> None:
+        stored = self.fake._add(
+            "DmarcExternalReport", {**stalwart_report("acme.com"), "to": {"postmaster@other.com": True}}
+        )
+        self.assertEqual(self.fetch(), 1)
+        self.assertIsNone(frappe.db.get_value("DMARC Report", {"stalwart_id": stored}, "site"))
+        self.assertEqual(dmarc.list_dmarc_reports()["total"], 0)
+        self.act_as(self.other)
+        self.assertEqual(dmarc.list_dmarc_reports()["total"], 0)
+
     def test_fetch_pages_the_cluster_s_ids_in_a_stable_order(self) -> None:
         ids = {self.fake._add("DmarcExternalReport", stalwart_report("acme.com")) for _ in range(7)}
         service = sync.client_for(frappe.get_doc("Mail Domain", "acme.com")).dmarc_reports

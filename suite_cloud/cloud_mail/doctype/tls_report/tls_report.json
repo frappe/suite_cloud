@@ -55,7 +55,7 @@
    "search_index": 1
   },
   {
-   "description": "The site that held the domain when the report was fetched; the site API shows the report to this site only.",
+   "description": "The site that held the domain when the report was fetched, set only if the report was also addressed to one of its domains; the site API shows the report to this site only.",
    "fieldname": "site",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -265,7 +265,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-21 11:14:48.299806",
+ "modified": "2026-09-21 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Cloud Mail",
  "name": "TLS Report",

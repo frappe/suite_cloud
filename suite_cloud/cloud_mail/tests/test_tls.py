@@ -151,6 +151,30 @@ class TestTlsReports(SiteApiTestCase):
         # Without an organisation name the report is credited to the address that sent it.
         self.assertEqual(doc.org_name, "noreply-smtp-tls-reporting@google.com")
 
+    def test_a_report_reaches_a_site_only_through_its_addressee_and_a_single_domain(self) -> None:
+        domains.create_domain("acme.net")  # a second domain of the same site
+        misaddressed = self.add({**stalwart_report("acme.com"), "to": {"postmaster@other.com": True}})
+        unaddressed = self.add({**stalwart_report("acme.com"), "to": {}})
+        mixed = self.add(
+            stalwart_report(
+                "acme.com",
+                policies=[policy("acme.com", 5), policy("other.com", 7, [failure("certificateExpired", 1)])],
+            )
+        )
+        central = self.add({**stalwart_report("acme.com"), "to": {"postmaster@acme.net": True}})
+        self.assertEqual(self.fetch(), 4)
+
+        def site_of(stalwart_id: str) -> str | None:
+            return frappe.db.get_value("TLS Report", self.stored(stalwart_id), "site")
+
+        self.assertEqual([site_of(i) for i in (misaddressed, unaddressed, mixed)], [None, None, None])
+        self.assertEqual(site_of(central), self.site.name)  # addressed to another of its own domains
+        # Kept for operators under its first domain; neither site lists the mixed report.
+        self.assertEqual(frappe.db.get_value("TLS Report", self.stored(mixed), "policy_domain"), "acme.com")
+        self.assertEqual(tls.list_tls_reports()["total"], 1)
+        self.act_as(self.other)
+        self.assertEqual(tls.list_tls_reports()["total"], 0)
+
     def test_a_malformed_report_is_skipped_without_losing_the_rest(self) -> None:
         self.add(stalwart_report("acme.com"))
         broken = self.add({"report": {"policies": {"0": 1}}})
