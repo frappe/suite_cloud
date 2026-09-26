@@ -278,10 +278,12 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Bootstrapping")
 
             fake.add_cluster_node(node.hostname, node_id=7)
-            # A key minted for an earlier, since wiped data store is replaced rather than trusted.
-            stale = frappe.get_doc("Stalwart Cluster", cluster.name)
-            stale.api_key = "minted-for-an-earlier-data-store"
-            stale.save(ignore_permissions=True)
+            # The first attempt minted a key. A re-bootstrapped data store forgets it, and the stored
+            # key is then replaced rather than trusted.
+            first_key = frappe.get_doc("Stalwart Cluster", cluster.name).get_password("api_key")
+            self.assertIn(first_key, fake.tokens)
+            fake.objects["ApiKey:" + fake.admin_id].clear()
+            fake.tokens.clear()
             self.assertTrue(bootstrap.finish_bootstrap(frappe.get_doc("Stalwart Cluster", cluster.name)))
 
             cluster.reload()
@@ -316,6 +318,7 @@ class TestStalwartCluster(IntegrationTestCase):
                 )
             )
             self.assertIn(cluster.get_password("api_key"), fake.tokens)
+            self.assertNotEqual(cluster.get_password("api_key"), first_key)
             self.assertEqual(fake.singletons["SystemSettings"]["defaultCertificateId"], "cert1")
             self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
 
