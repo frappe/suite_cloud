@@ -49,7 +49,7 @@ def verify_ptr_record(ip_address: str, expected_hostname: str) -> bool | None:
 
     try:
         name = dns.reversename.from_address(ip_address)
-    except dns.exception.SyntaxError, ValueError:
+    except (dns.exception.SyntaxError, ValueError):
         return None
 
     expected = expected_hostname.rstrip(".").lower()
@@ -76,7 +76,7 @@ def answers_from_each_resolver(name: str | dns.name.Name, type: str) -> Iterator
         resolver.lifetime = LOOKUP_TIMEOUT
         try:
             answer = resolver.resolve(name, type)
-        except dns.resolver.NXDOMAIN, dns.resolver.NoAnswer:
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
             yield []
             continue
         except dns.exception.DNSException:
