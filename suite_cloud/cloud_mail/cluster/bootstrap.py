@@ -300,15 +300,15 @@ def ensure_api_key(target: Document, admin) -> None:
     """Mints the management key for a cluster or gateway unless the stored one still works.
 
     A stored key can be dead: a re-bootstrapped data store never saw it, and a re-run of the
-    recovery-stage plan replaces the admin's credentials, keys included. Earlier keys under
-    Suite Cloud's description are removed so only one stays.
+    recovery-stage plan replaces the admin's credentials, keys included.
+
+    No other key is deleted here. The cron, the job callback and the form buttons can run this
+    at once, and one run could delete the key another has just minted and is about to store.
+    Minting only adds keys, so whichever is stored works; the extras have secrets nobody kept.
     """
 
     if _api_key_works(target):
         return
-    for stale in admin.api_keys.get_all():
-        if stale.get("description") == plan.API_KEY_DESCRIPTION:
-            admin.api_keys.delete(stale["id"])
     _, secret = admin.api_keys.create_secret(
         Credential(description=plan.API_KEY_DESCRIPTION, permissions=plan.api_key_permissions())
     )
