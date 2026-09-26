@@ -175,6 +175,15 @@ class StalwartNode(Document):
         return ok
 
     @frappe.whitelist()
+    def reset_ssh_host_keys(self) -> None:
+        """Forgets the pinned host keys after the server was reinstalled; Verify SSH records the new ones."""
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        self.db_set({"ssh_host_keys": None, "ssh_verified": 0}, update_modified=False)
+        # The next Verify SSH trusts whatever answers, so record who dropped the pin and when.
+        self.add_comment("Info", _("Reset the SSH host keys."))
+
+    @frappe.whitelist()
     def provision(self) -> str:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if not self.ssh_verified:
