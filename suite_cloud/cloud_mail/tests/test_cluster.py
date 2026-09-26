@@ -278,11 +278,16 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Bootstrapping")
 
             fake.add_cluster_node(node.hostname, node_id=7)
+            # A key minted for an earlier, since wiped data store is replaced rather than trusted.
+            stale = frappe.get_doc("Stalwart Cluster", cluster.name)
+            stale.api_key = "minted-for-an-earlier-data-store"
+            stale.save(ignore_permissions=True)
             self.assertTrue(bootstrap.finish_bootstrap(frappe.get_doc("Stalwart Cluster", cluster.name)))
 
             cluster.reload()
             node.reload()
             self.assertEqual((cluster.status, node.status, node.node_id), ("Active", "Active", 7))
+            self.assertIn(cluster.get_password("api_key"), fake.tokens)
             # Activation pushes the full plan: the disabled-accounts role appears only now.
             self.assertTrue(fake.find("Role", description="suite-disabled"))
             # Refs resolve to ids and secrets are never echoed: neither may count as drift.

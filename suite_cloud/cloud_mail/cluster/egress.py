@@ -15,7 +15,6 @@ from frappe.utils import add_to_date, get_datetime, now
 
 from suite_cloud.cloud_mail.cluster import dns, plan
 from suite_cloud.cloud_mail.stalwart import has_credentials
-from suite_cloud.cloud_mail.stalwart.credentials import Credential
 from suite_cloud.cloud_mail.stalwart.directory import dkim_management_payload
 from suite_cloud.cloud_mail.stalwart.errors import StalwartError
 from suite_cloud.utils import dkim_algorithms
@@ -516,16 +515,12 @@ def after_gateway_provision(gateway: Document, job: Document) -> None:
 def check_gateway(gateway: Document) -> bool:
     """Activates a provisioned gateway once its certificate is live; then wires the cluster to it."""
 
+    from suite_cloud.cloud_mail.cluster.bootstrap import ensure_api_key
+
     if gateway.status not in ("Provisioned", "Active"):
         return False
     try:
-        admin = gateway.get_admin_client()
-        if not gateway.get_password("api_key", raise_exception=False):
-            _, secret = admin.api_keys.create_secret(
-                Credential(description=plan.API_KEY_DESCRIPTION, permissions=plan.api_key_permissions())
-            )
-            gateway.api_key = secret
-            gateway.save(ignore_permissions=True)
+        ensure_api_key(gateway, gateway.get_admin_client())
     except StalwartError as e:
         started = get_datetime(gateway.provisioned_at or now())
         expired = get_datetime(now()) > add_to_date(started, minutes=GATEWAY_DEADLINE_MINUTES)
