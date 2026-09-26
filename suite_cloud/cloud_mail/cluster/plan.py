@@ -4,8 +4,8 @@ Two plans exist. The bootstrap plan is applied once on the first node in bootstr
 only names the stores and hostnames (Stalwart provisions everything else with defaults).
 The cluster plan holds the objects Suite Cloud manages afterwards (roles, coordinator, ACME,
 DNS provider, DNS resolver, default domain, system settings, spam rules source, licences) and is
-re-applied on every sync. Its cluster roles and SpamSettings are also the defaults plan, applied
-before the first normal start.
+re-applied on every sync. Its cluster roles, DNS resolver and SpamSettings are also the defaults
+plan, applied before the first normal start.
 """
 
 import hashlib
@@ -168,7 +168,6 @@ def cluster_plan(cluster: Document) -> list[dict]:
         {"@type": "update", "object": "Coordinator", "value": {"@type": cluster.coordinator or "Disabled"}},
         *defaults_plan(),
         tracer_operation(),
-        dns_resolver_operation(),
     ]
 
     dns_server = dns_server_object(cluster)
@@ -321,15 +320,17 @@ def recovery_plan(cluster: Document) -> list[dict]:
 
 
 def defaults_plan() -> list[dict]:
-    """Applied in recovery mode before the first normal start, which needs both.
+    """Applied in recovery mode before the first normal start, which needs all of it.
 
-    That start names the node's cluster role (Stalwart fails the start when it is missing) and
-    imports the spam rules. Neither is an object Stalwart counts before inserting its own
-    defaults, so creating them early suppresses nothing.
+    That start names the node's cluster role (Stalwart fails the start when it is missing),
+    checks its resolver for DNSSEC (and turns DANE off when it cannot validate) and imports the
+    spam rules. None is an object Stalwart counts before inserting its own defaults, so creating
+    them early suppresses nothing.
     """
 
     return [
         {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
+        dns_resolver_operation(),
         *spam_settings_operations(),
     ]
 

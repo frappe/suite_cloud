@@ -295,7 +295,7 @@ only on a normal start that finds no Role objects, so the recovery-stage plan cr
 bootstrap's admin password is never disclosed, so the recovery-stage plan sets it; the first
 normal start fails without the cluster role it names and imports the spam filter rules once,
 from the latest release unless told otherwise, so a short recovery stage before it creates the
-roles and pins the release the server supports; and Stalwart queries
+roles, points DNS at Unbound and pins the release the server supports; and Stalwart queries
 all its DNS servers by measured speed rather than in order, so nodes resolve through a local
 Unbound only (a public fallback would answer too, and blocklists refuse public resolvers).
 

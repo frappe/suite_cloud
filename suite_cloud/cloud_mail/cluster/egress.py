@@ -362,7 +362,6 @@ def gateway_plan(gateway: Document) -> list[dict]:
         )
     operations.extend(gateway_defaults_plan())
     operations.append(plan.tracer_operation())
-    operations.append(plan.dns_resolver_operation())
     operations.append(
         {
             "@type": "update",
@@ -385,7 +384,7 @@ def gateway_recovery_plan(gateway: Document) -> list[dict]:
 
 
 def gateway_defaults_plan() -> list[dict]:
-    """The gateway's cluster role and spam rules pin, in place before its first normal start."""
+    """The gateway's cluster role, resolver and spam rules pin, in place before its first normal start."""
 
     role = {
         "name": GATEWAY_ROLE,
@@ -401,6 +400,7 @@ def gateway_defaults_plan() -> list[dict]:
     # Plan labels are one namespace: "egress" already names the domain.
     return [
         {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": {"gateway-role": role}},
+        plan.dns_resolver_operation(),
         *plan.spam_settings_operations(),
     ]
 
