@@ -40,8 +40,10 @@ def serves_clients(node: Document) -> bool:
 
 def provision_node(node: Document) -> Document:
     cluster = node.get_cluster()
-    if cluster.status == "Failed" or (
-        cluster.status == "Pending" and not _has_other_bootstrap_node(cluster, node)
+    if (
+        cluster.status == "Failed"
+        or (cluster.status == "Pending" and not _has_other_bootstrap_node(cluster, node))
+        or _holds_the_only_data_store(cluster, node)
     ):
         if not serves_clients(node):
             frappe.throw(_("The first node must serve clients; pick the full or frontend role."))
@@ -69,6 +71,14 @@ def provision_node(node: Document) -> Document:
 
 def _has_other_bootstrap_node(cluster: Document, node: Document) -> bool:
     return bool(cluster.bootstrap_node and cluster.bootstrap_node != node.name)
+
+
+def _holds_the_only_data_store(cluster: Document, node: Document) -> bool:
+    """A single-node cluster's embedded store lives on its node, so provisioning that node again
+    may start from an empty store. Joining (configure-node.yml) would leave it unset; bootstrapping
+    again sets it up and skips whatever is already in place."""
+
+    return bool(cluster.single_node) and cluster.status == "Active" and cluster.bootstrap_node == node.name
 
 
 def upgrade_node(node: Document) -> Document:

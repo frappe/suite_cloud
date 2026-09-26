@@ -67,6 +67,11 @@ class TestServerJob(IntegrationTestCase):
         self.assertLess(
             names.index("Check that Unbound validates DNSSEC"), names.index("Install the Stalwart binary")
         )
+        # A fresh bootstrap always gets the cluster plan, whatever an earlier data store left.
+        self.assertLess(
+            names.index("Forget cluster plans applied to an earlier data store"),
+            names.index("Check whether this cluster plan version was applied"),
+        )
         # The spam rules are pinned before the first normal start imports them.
         self.assertLess(
             names.index("Apply the defaults plan"),

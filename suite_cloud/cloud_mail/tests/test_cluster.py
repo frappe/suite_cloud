@@ -348,6 +348,28 @@ class TestStalwartCluster(IntegrationTestCase):
                 cluster.get_client().cluster_nodes.find_by_hostname("n1.example.test")["nodeId"], 7
             )
 
+    def test_reprovisioning_the_node_of_a_single_node_cluster_bootstraps_again(self) -> None:
+        from suite_cloud.cloud_mail.cluster import bootstrap
+
+        # Its embedded store lives on the node, so the node may come back empty.
+        solo = make_cluster(name="solo", hostname=f"mail.solo.{ROOT_DOMAIN}", multi_node=False)
+        # A shared store outlives any node: the node only rejoins.
+        shared = make_cluster()
+        for cluster, ip in ((solo, "203.0.113.1"), (shared, "203.0.113.10")):
+            node = make_node(cluster, ip)
+            node.db_set("is_bootstrap_node", 1)
+            cluster.db_set({"status": "Active", "bootstrap_node": node.name})
+
+        target = "suite_cloud.cloud_mail.cluster.bootstrap.create_server_job"
+        with patch(target) as create:
+            bootstrap.provision_node(frappe.get_doc("Stalwart Node", solo.bootstrap_node))
+            bootstrap.provision_node(frappe.get_doc("Stalwart Node", shared.bootstrap_node))
+        self.assertEqual(
+            [c.args[1] for c in create.call_args_list], ["bootstrap-cluster.yml", "configure-node.yml"]
+        )
+        self.assertEqual(frappe.db.get_value("Stalwart Cluster", solo.name, "status"), "Bootstrapping")
+        self.assertEqual(frappe.db.get_value("Stalwart Cluster", shared.name, "status"), "Active")
+
     def test_retried_bootstrap_recovers_a_failed_cluster(self) -> None:
         from suite_cloud.cloud_mail.cluster import bootstrap
 

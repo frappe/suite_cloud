@@ -19,6 +19,12 @@
     - name: Bootstrap the data store
       when: not config_file.stat.exists
       block:
+        # A marker left from an earlier data store would skip the cluster plan (domain, ACME, admin
+        # password) for this one; every bootstrap is followed by the recovery stage.
+        - name: Forget cluster plans applied to an earlier data store
+          command: find /etc/stalwart -maxdepth 1 -name ".suite-cloud-plan-*" -delete
+          changed_when: false
+
         - name: Write the bootstrap environment
           no_log: true
           copy:
@@ -245,13 +251,15 @@
       loop: "{{ wait_ports }}"
 
     # Stalwart starts even when stored objects fail to load: it logs and skips them, so the job
-    # would pass. It opens its listeners only after logging, so this start's errors are in the
-    # journal by now. The journal drops the details; this start's lines in the log file have them.
+    # would pass. It opens its listeners only after logging, so this start's errors are in the log
+    # files by now. Those are read, not the journal, which gets nothing until a Journal tracer is
+    # configured (an empty data store has none).
     - name: Check the start for configuration errors
       shell: |
-        journalctl --no-pager -o cat _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value stalwart)" \
-          | grep -qxE 'Object validation error|Configuration build error' || exit 0
         since=$(date -u -d "$(systemctl show -p ActiveEnterTimestamp --value stalwart)" +%Y-%m-%dT%H:%M:%SZ)
-        grep -hE 'registry\.(validation-error|build-error)' /var/log/stalwart/stalwart.* | awk -v since="$since" '$1 >= since'
+        errors=$(grep -hE 'registry\.(validation-error|build-error)' /var/log/stalwart/stalwart* \
+          | awk -v since="$since" '$1 >= since')
+        [ -z "$errors" ] && exit 0
+        echo "$errors" | tail -n 20
         exit 1
       changed_when: false
