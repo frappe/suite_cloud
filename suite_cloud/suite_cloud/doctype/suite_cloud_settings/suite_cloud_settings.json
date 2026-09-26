@@ -18,6 +18,7 @@
   "versions_section",
   "stalwart_version",
   "stalwart_download_url_template",
+  "spam_filter_rules_version",
   "column_break_stalwart",
   "stalwart_cli_version",
   "stalwart_cli_download_url_template",
@@ -121,6 +122,13 @@
    "reqd": 1
   },
   {
+   "default": "v3.0.1",
+   "description": "Release of Stalwart's spam filter rules a cluster imports on its first start, e.g. v3.0.1. Newer rules can use expression functions an older server lacks, so change it together with the Stalwart Version. Empty imports the latest release.",
+   "fieldname": "spam_filter_rules_version",
+   "fieldtype": "Data",
+   "label": "Spam Filter Rules Version"
+  },
+  {
    "fieldname": "column_break_stalwart",
    "fieldtype": "Column Break"
   },
@@ -205,7 +213,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-21 12:00:00.000000",
+ "modified": "2026-09-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

@@ -310,11 +310,18 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Bootstrapping")
 
             fake.add_cluster_node(node.hostname, node_id=7)
+            # The first attempt minted a key. A re-bootstrapped data store forgets it, and the stored
+            # key is then replaced rather than trusted.
+            first_key = frappe.get_doc("Stalwart Cluster", cluster.name).get_password("api_key")
+            self.assertIn(first_key, fake.tokens)
+            fake.objects["ApiKey:" + fake.admin_id].clear()
+            fake.tokens.clear()
             self.assertTrue(bootstrap.finish_bootstrap(frappe.get_doc("Stalwart Cluster", cluster.name)))
 
             cluster.reload()
             node.reload()
             self.assertEqual((cluster.status, node.status, node.node_id), ("Active", "Active", 7))
+            self.assertIn(cluster.get_password("api_key"), fake.tokens)
             # Activation pushes the full plan: the disabled-accounts role appears only now.
             self.assertTrue(fake.find("Role", description="suite-disabled"))
             # Refs resolve to ids and secrets are never echoed: neither may count as drift.
@@ -343,6 +350,7 @@ class TestStalwartCluster(IntegrationTestCase):
                 )
             )
             self.assertIn(cluster.get_password("api_key"), fake.tokens)
+            self.assertNotEqual(cluster.get_password("api_key"), first_key)
             self.assertEqual(fake.singletons["SystemSettings"]["defaultCertificateId"], "cert1")
             self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
 
@@ -371,6 +379,28 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertEqual(
                 cluster.get_client().cluster_nodes.find_by_hostname("n1.example.test")["nodeId"], 7
             )
+
+    def test_reprovisioning_the_node_of_a_single_node_cluster_bootstraps_again(self) -> None:
+        from suite_cloud.cloud_mail.cluster import bootstrap
+
+        # Its embedded store lives on the node, so the node may come back empty.
+        solo = make_cluster(name="solo", hostname=f"mail.solo.{ROOT_DOMAIN}", multi_node=False)
+        # A shared store outlives any node: the node only rejoins.
+        shared = make_cluster()
+        for cluster, ip in ((solo, "203.0.113.1"), (shared, "203.0.113.10")):
+            node = make_node(cluster, ip)
+            node.db_set("is_bootstrap_node", 1)
+            cluster.db_set({"status": "Active", "bootstrap_node": node.name})
+
+        target = "suite_cloud.cloud_mail.cluster.bootstrap.create_server_job"
+        with patch(target) as create:
+            bootstrap.provision_node(frappe.get_doc("Stalwart Node", solo.bootstrap_node))
+            bootstrap.provision_node(frappe.get_doc("Stalwart Node", shared.bootstrap_node))
+        self.assertEqual(
+            [c.args[1] for c in create.call_args_list], ["bootstrap-cluster.yml", "configure-node.yml"]
+        )
+        self.assertEqual(frappe.db.get_value("Stalwart Cluster", solo.name, "status"), "Bootstrapping")
+        self.assertEqual(frappe.db.get_value("Stalwart Cluster", shared.name, "status"), "Active")
 
     def test_retried_bootstrap_recovers_a_failed_cluster(self) -> None:
         from suite_cloud.cloud_mail.cluster import bootstrap
@@ -452,6 +482,31 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(domain["dkimManagement"]["@type"], "Automatic")
         self.assertEqual(domain["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
         self.assertEqual(domain["dkimManagement"]["selectorTemplate"], "frappemail-{algorithm}")
+        self.assertEqual(
+            operations["DnsResolver"]["value"],
+            {
+                "@type": "Custom",
+                "servers": {
+                    "0": {"address": "127.0.0.1", "port": 53, "protocol": "udp"},
+                    "1": {"address": "127.0.0.1", "port": 53, "protocol": "tcp"},
+                },
+            },
+        )
+        self.assertEqual(
+            operations["SpamSettings"]["value"]["spamFilterRulesUrl"],
+            "https://github.com/stalwartlabs/spam-filter/releases/download/v3.0.1/spam-filter-rules.json.gz",
+        )
+        # The first normal start names a cluster role and checks its resolver for DNSSEC, so both
+        # come before it with the pin.
+        self.assertEqual(
+            plan.defaults_plan(),
+            [operations["ClusterRole"], operations["DnsResolver"], operations["SpamSettings"]],
+        )
+
+        configure_settings(spam_filter_rules_version="")
+        self.addCleanup(configure_settings)
+        # Stalwart's own default: the latest release
+        self.assertEqual([op["object"] for op in plan.defaults_plan()], ["ClusterRole", "DnsResolver"])
 
         configure_settings(sign_with_ed25519=1)
         self.addCleanup(configure_settings, sign_with_ed25519=0)

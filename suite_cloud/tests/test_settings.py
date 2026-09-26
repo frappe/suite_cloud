@@ -37,6 +37,20 @@ class TestSuiteCloudSettings(IntegrationTestCase):
     def test_unknown_config_key_throws(self) -> None:
         self.assertRaises(frappe.ValidationError, get_config, "root_domain_name")
 
+    def test_spam_rules_pin_is_backfilled_for_existing_sites(self) -> None:
+        from suite_cloud.patches.v1_0 import pin_spam_filter_rules_version as patch
+
+        default = frappe.get_meta(patch.SETTINGS).get_field(patch.FIELD).default
+        self.assertTrue(default)
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, "")  # a site saved before the field
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), default)
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, "v3.0.0")
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), "v3.0.0")
+
     def patch_site_config(self, **values):
         from unittest.mock import patch
 

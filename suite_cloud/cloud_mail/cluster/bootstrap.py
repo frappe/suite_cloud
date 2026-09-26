@@ -8,9 +8,9 @@ from frappe import _
 from frappe.utils import add_to_date, get_datetime, now
 
 from suite_cloud.cloud_mail.cluster import dns, plan
-from suite_cloud.cloud_mail.stalwart import has_credentials
+from suite_cloud.cloud_mail.stalwart import forget_sessions, get_client, has_credentials
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
-from suite_cloud.cloud_mail.stalwart.errors import StalwartError
+from suite_cloud.cloud_mail.stalwart.errors import StalwartError, StalwartUnauthorizedError
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 from suite_cloud.utils import get_config, log_error, log_exception
 
@@ -40,8 +40,10 @@ def serves_clients(node: Document) -> bool:
 
 def provision_node(node: Document) -> Document:
     cluster = node.get_cluster()
-    if cluster.status == "Failed" or (
-        cluster.status == "Pending" and not _has_other_bootstrap_node(cluster, node)
+    if (
+        cluster.status == "Failed"
+        or (cluster.status == "Pending" and not _has_other_bootstrap_node(cluster, node))
+        or _holds_the_only_data_store(cluster, node)
     ):
         if not serves_clients(node):
             frappe.throw(_("The first node must serve clients; pick the full or frontend role."))
@@ -69,6 +71,14 @@ def provision_node(node: Document) -> Document:
 
 def _has_other_bootstrap_node(cluster: Document, node: Document) -> bool:
     return bool(cluster.bootstrap_node and cluster.bootstrap_node != node.name)
+
+
+def _holds_the_only_data_store(cluster: Document, node: Document) -> bool:
+    """A single-node cluster's embedded store lives on its node, so provisioning that node again
+    may start from an empty store. Joining (configure-node.yml) would leave it unset; bootstrapping
+    again sets it up and skips whatever is already in place."""
+
+    return bool(cluster.single_node) and cluster.status == "Active" and cluster.bootstrap_node == node.name
 
 
 def upgrade_node(node: Document) -> Document:
@@ -135,6 +145,7 @@ def build_node_variables(context: dict) -> dict:
         "env_recovery": plan.render_env(plan.node_env(node, "recovery")),
         "config_json": frappe.as_json(plan.node_config(cluster)),
         "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := plan.bootstrap_plan(cluster)),
+        "defaults_ndjson": plan.to_ndjson(plan.defaults_plan()),
         "cluster_ndjson": plan.to_ndjson(recovery_plan),
         "__secret_keys__": list(SECRET_VARIABLES),
         "__secret_values__": [
@@ -268,16 +279,7 @@ def finish_bootstrap(cluster: Document) -> bool:
 
     try:
         admin = cluster.get_admin_client()
-        if not cluster.get_password("api_key", raise_exception=False):
-            # Earlier attempts may have minted keys that were then rolled back; keep only one.
-            for stale in admin.api_keys.get_all():
-                if stale.get("description") == plan.API_KEY_DESCRIPTION:
-                    admin.api_keys.delete(stale["id"])
-            _, secret = admin.api_keys.create_secret(
-                Credential(description=plan.API_KEY_DESCRIPTION, permissions=plan.api_key_permissions())
-            )
-            cluster.api_key = secret
-            cluster.save(ignore_permissions=True)
+        ensure_api_key(cluster, admin)
         _set_default_certificate(cluster, admin)
         registry = admin.cluster_nodes.find_by_hostname(node.hostname)
         problem = _registry_problem(cluster, registry)
@@ -301,6 +303,38 @@ def finish_bootstrap(cluster: Document) -> bool:
         update_modified=False,
     )
     activate_node(node)
+    return True
+
+
+def ensure_api_key(target: Document, admin) -> None:
+    """Mints the management key for a cluster or gateway unless the stored one still works.
+
+    A stored key can be dead: a re-bootstrapped data store never saw it, and a re-run of the
+    recovery-stage plan replaces the admin's credentials, keys included.
+
+    No other key is deleted here. The cron, the job callback and the form buttons can run this
+    at once, and one run could delete the key another has just minted and is about to store.
+    Minting only adds keys, so whichever is stored works; the extras have secrets nobody kept.
+    """
+
+    if _api_key_works(target):
+        return
+    _, secret = admin.api_keys.create_secret(
+        Credential(description=plan.API_KEY_DESCRIPTION, permissions=plan.api_key_permissions())
+    )
+    target.api_key = secret
+    target.save(ignore_permissions=True)
+    forget_sessions(target)
+
+
+def _api_key_works(target: Document) -> bool:
+    if not target.get_password("api_key", raise_exception=False):
+        return False
+    forget_sessions(target)  # a session cached for an earlier data store would hide a dead key
+    try:
+        get_client(target)
+    except StalwartUnauthorizedError:
+        return False
     return True
 
 

@@ -19,6 +19,12 @@
     - name: Bootstrap the data store
       when: not config_file.stat.exists
       block:
+        # A marker left from an earlier data store would skip the cluster plan (domain, ACME, admin
+        # password) for this one; every bootstrap is followed by the recovery stage.
+        - name: Forget cluster plans applied to an earlier data store
+          command: find /etc/stalwart -maxdepth 1 -name ".suite-cloud-plan-*" -delete
+          changed_when: false
+
         - name: Write the bootstrap environment
           no_log: true
           copy:
@@ -75,6 +81,45 @@
             path: /etc/stalwart/config.json
             timeout: 120
 
+        # The first normal start names the node's cluster role (it fails when the role is missing),
+        # checks its DNS resolver for DNSSEC (Unbound is already up) and imports the spam filter
+        # rules, once, from wherever SpamSettings points. Only those are written here: an object
+        # Stalwart counts before inserting its defaults (routes, permission roles, tracers) would
+        # suppress them.
+        - name: Create what the first normal start needs
+          block:
+            - name: Write the recovery environment for the defaults
+              no_log: true
+              copy:
+                content: "{{ env_recovery }}"
+                dest: /etc/stalwart/stalwart.env
+                owner: stalwart
+                group: stalwart
+                mode: "0600"
+
+            - name: Start Stalwart in recovery mode for the defaults
+              systemd:
+                name: stalwart
+                state: restarted
+
+            - name: Wait for the recovery listener for the defaults
+              wait_for:
+                host: 127.0.0.1
+                port: "{{ recovery_port }}"
+                timeout: 120
+
+            - name: Write the defaults plan
+              copy:
+                content: "{{ defaults_ndjson }}"
+                dest: /etc/stalwart/defaults.ndjson
+                owner: stalwart
+                group: stalwart
+                mode: "0600"
+
+            - name: Apply the defaults plan
+              command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/defaults.ndjson --json
+              environment: "{{ cli_env }}"
+
         # Stalwart provisions its built-in roles, the default role lists and other defaults only
         # on a normal start; bootstrap and recovery mode skip that step. Without this start the
         # administrator (and every account) would resolve to no permissions at all.
@@ -107,6 +152,11 @@
         - name: Remove the bootstrap plan
           file:
             path: /etc/stalwart/bootstrap.ndjson
+            state: absent
+
+        - name: Remove the defaults plan
+          file:
+            path: /etc/stalwart/defaults.ndjson
             state: absent
 
     - name: Check whether this cluster plan version was applied
@@ -199,3 +249,17 @@
         port: "{{ item }}"
         timeout: 180
       loop: "{{ wait_ports }}"
+
+    # Stalwart starts even when stored objects fail to load: it logs and skips them, so the job
+    # would pass. It opens its listeners only after logging, so this start's errors are in the log
+    # files by now. Those are read, not the journal, which gets nothing until a Journal tracer is
+    # configured (an empty data store has none).
+    - name: Check the start for configuration errors
+      shell: |
+        since=$(date -u -d "$(systemctl show -p ActiveEnterTimestamp --value stalwart)" +%Y-%m-%dT%H:%M:%SZ)
+        errors=$(grep -hE 'registry\.(validation-error|build-error)' /var/log/stalwart/stalwart* \
+          | awk -v since="$since" '$1 >= since')
+        [ -z "$errors" ] && exit 0
+        echo "$errors" | tail -n 20
+        exit 1
+      changed_when: false

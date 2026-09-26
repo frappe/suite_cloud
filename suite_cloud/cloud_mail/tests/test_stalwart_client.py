@@ -169,6 +169,18 @@ class TestStalwartClient(UnitTestCase):
         second = self.client.apply([tracer_operation()])
         self.assertEqual((second.updated, len(second.unchanged)), ([], 2))
 
+    def test_resolver_and_spam_settings_are_updated_as_singletons(self) -> None:
+        from suite_cloud.cloud_mail.cluster.plan import dns_resolver_operation
+
+        rules = {"spamFilterRulesUrl": "https://rules.example.test/v3.0.1.json.gz"}
+        spam = {"@type": "update", "object": "SpamSettings", "value": rules}
+        result = self.client.apply([dns_resolver_operation(), spam])
+
+        self.assertEqual(result.updated, ["DnsResolver/singleton", "SpamSettings/singleton"])
+        resolver = self.fake.singletons["DnsResolver"]
+        self.assertEqual((resolver["@type"], resolver["servers"]["1"]["protocol"]), ("Custom", "tcp"))
+        self.assertEqual(self.fake.singletons["SpamSettings"], rules)
+
     def test_plan_apply_resends_secrets_without_counting_them_as_changes(self) -> None:
         plan = [
             {

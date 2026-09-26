@@ -323,10 +323,16 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(relay["credentials"]["0"]["secret"], self.cluster.get_password("relay_password"))
         self.assertEqual(operations["Coordinator"]["value"], {"@type": "Disabled"})
         self.assertEqual(operations["Tracer"]["value"]["log"]["path"], "/var/log/stalwart")
+        self.assertEqual(operations["DnsResolver"]["value"]["@type"], "Custom")
+        self.assertIn("SpamSettings", operations)
 
         variables = egress.build_gateway_variables({"gateway": self.gateway.name})
         self.assertEqual(variables["wait_ports"], [443, 2525])
         self.assertIn("STALWART_ROLE=egress", variables["env_normal"])
+        self.assertIn('"object":"SpamSettings"', variables["defaults_ndjson"])
+        self.assertIn('"name":"egress"', variables["defaults_ndjson"])  # the role env_normal names
+        self.assertNotIn('"name":"full"', variables["defaults_ndjson"])
+        self.assertIn('"object":"DnsResolver"', variables["defaults_ndjson"])
         self.assertIn('"@type":"RocksDb"', variables["bootstrap_ndjson"])
         self.assertIn(pool.pool_name, variables["cluster_ndjson"])
 

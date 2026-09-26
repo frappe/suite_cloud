@@ -26,6 +26,7 @@ class SuiteCloudSettings(Document):
         server_job_timeout: DF.Int
         sign_with_ed25519: DF.Check
         site_service_user: DF.Link | None
+        spam_filter_rules_version: DF.Data | None
         stalwart_cli_download_url_template: DF.Data
         stalwart_cli_version: DF.Data
         stalwart_download_url_template: DF.Data
@@ -37,6 +38,9 @@ class SuiteCloudSettings(Document):
             self.public_url = self.public_url.strip().rstrip("/")
         self.stalwart_version = validate_version(self.stalwart_version, _("Stalwart Version"))
         self.stalwart_cli_version = validate_version(self.stalwart_cli_version, _("Stalwart CLI Version"))
+        self.spam_filter_rules_version = validate_version(
+            self.spam_filter_rules_version, _("Spam Filter Rules Version")
+        )
         self.validate_report_retention()
 
     def validate_report_retention(self) -> None:
