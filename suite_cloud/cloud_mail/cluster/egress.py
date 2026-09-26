@@ -360,30 +360,9 @@ def gateway_plan(gateway: Document) -> list[dict]:
         operations.append(
             {"@type": "upsert", "object": "MtaConnectionStrategy", "matchOn": ["name"], "value": strategies}
         )
-    operations.append(
-        {
-            "@type": "upsert",
-            "object": "ClusterRole",
-            "matchOn": ["name"],
-            "value": {
-                # Plan labels are one namespace: "egress" already names the domain.
-                "gateway-role": {
-                    "name": GATEWAY_ROLE,
-                    "description": "Outbound relay only",
-                    "tasks": {
-                        "@type": "EnableSome",
-                        "taskTypes": plan.as_set(["outboundMta", "taskQueueProcessing", "taskScheduler"]),
-                    },
-                    # Every listener stays on so management HTTPS keeps working; the firewall only
-                    # opens 443 and the relay ports.
-                    "listeners": {"@type": "EnableAll"},
-                }
-            },
-        }
-    )
+    operations.extend(gateway_defaults_plan())
     operations.append(plan.tracer_operation())
     operations.append(plan.dns_resolver_operation())
-    operations.extend(plan.defaults_plan())
     operations.append(
         {
             "@type": "update",
@@ -403,6 +382,27 @@ def gateway_plan(gateway: Document) -> list[dict]:
 
 def gateway_recovery_plan(gateway: Document) -> list[dict]:
     return [*gateway_plan(gateway), plan.admin_account_operation(gateway)]
+
+
+def gateway_defaults_plan() -> list[dict]:
+    """The gateway's cluster role and spam rules pin, in place before its first normal start."""
+
+    role = {
+        "name": GATEWAY_ROLE,
+        "description": "Outbound relay only",
+        "tasks": {
+            "@type": "EnableSome",
+            "taskTypes": plan.as_set(["outboundMta", "taskQueueProcessing", "taskScheduler"]),
+        },
+        # Every listener stays on so management HTTPS keeps working; the firewall only opens 443
+        # and the relay ports.
+        "listeners": {"@type": "EnableAll"},
+    }
+    # Plan labels are one namespace: "egress" already names the domain.
+    return [
+        {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": {"gateway-role": role}},
+        *plan.spam_settings_operations(),
+    ]
 
 
 def gateway_bootstrap_plan(gateway: Document) -> list[dict]:
@@ -494,7 +494,7 @@ def build_gateway_variables(context: dict) -> dict:
         "env_recovery": plan.render_env(gateway_env(gateway, "recovery")),
         "config_json": frappe.as_json(gateway.get_store("data_store").config),
         "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := gateway_bootstrap_plan(gateway)),
-        "defaults_ndjson": plan.to_ndjson(plan.defaults_plan()),
+        "defaults_ndjson": plan.to_ndjson(gateway_defaults_plan()),
         "cluster_ndjson": plan.to_ndjson(recovery_plan),
         "__secret_keys__": list(SECRET_VARIABLES),
         "__secret_values__": [

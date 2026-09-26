@@ -195,6 +195,7 @@ class TestServerJob(IntegrationTestCase):
         self.assertIn("STALWART_RECOVERY_ADMIN=admin:", variables["env_recovery"])
         self.assertNotIn("STALWART_RECOVERY", variables["env_normal"])
         self.assertIn('"object":"SpamSettings"', variables["defaults_ndjson"])
+        self.assertIn('"name":"full"', variables["defaults_ndjson"])  # the role env_normal names
         self.assertIn('"@type": "PostgreSql"', variables["config_json"])
         self.assertRegex(variables["plan_marker"], r"^\.suite-cloud-plan-[0-9a-f]{12}$")
 

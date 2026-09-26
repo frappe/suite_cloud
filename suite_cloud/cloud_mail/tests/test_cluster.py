@@ -434,11 +434,13 @@ class TestStalwartCluster(IntegrationTestCase):
             operations["SpamSettings"]["value"]["spamFilterRulesUrl"],
             "https://github.com/stalwartlabs/spam-filter/releases/download/v3.0.1/spam-filter-rules.json.gz",
         )
-        self.assertEqual(plan.defaults_plan(), [operations["SpamSettings"]])
+        # The first normal start names a cluster role, so the roles come before it with the pin.
+        self.assertEqual(plan.defaults_plan(), [operations["ClusterRole"], operations["SpamSettings"]])
 
         configure_settings(spam_filter_rules_version="")
         self.addCleanup(configure_settings)
-        self.assertEqual(plan.defaults_plan(), [])  # Stalwart's own default: the latest release
+        # Stalwart's own default: the latest release
+        self.assertEqual([op["object"] for op in plan.defaults_plan()], ["ClusterRole"])
 
         configure_settings(sign_with_ed25519=1)
         self.addCleanup(configure_settings, sign_with_ed25519=0)

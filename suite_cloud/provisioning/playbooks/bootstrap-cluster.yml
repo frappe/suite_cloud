@@ -75,11 +75,11 @@
             path: /etc/stalwart/config.json
             timeout: 120
 
-        # The first normal start imports the spam filter rules, once, from wherever SpamSettings
-        # points. Nothing but SpamSettings is written here: an object Stalwart counts before
-        # inserting its defaults (routes, roles, tracers) would suppress them.
-        - name: Pin the defaults the first normal start imports
-          when: defaults_ndjson | length > 0
+        # The first normal start names the node's cluster role (it fails when the role is missing)
+        # and imports the spam filter rules, once, from wherever SpamSettings points. Only those
+        # are written here: an object Stalwart counts before inserting its defaults (routes,
+        # permission roles, tracers) would suppress them.
+        - name: Create what the first normal start needs
           block:
             - name: Write the recovery environment for the defaults
               no_log: true

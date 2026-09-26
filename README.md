@@ -293,8 +293,9 @@ index-keyed object; secrets are `{"@type": "Value", "secret": ...}` unions; Let'
 rejects a wildcard order that also names a host it covers; the built-in roles are provisioned
 only on a normal start that finds no Role objects, so the recovery-stage plan creates none;
 bootstrap's admin password is never disclosed, so the recovery-stage plan sets it; the first
-normal start imports the spam filter rules once, from the latest release unless told otherwise,
-so a short recovery stage before it pins the release the server supports; and Stalwart queries
+normal start fails without the cluster role it names and imports the spam filter rules once,
+from the latest release unless told otherwise, so a short recovery stage before it creates the
+roles and pins the release the server supports; and Stalwart queries
 all its DNS servers by measured speed rather than in order, so nodes resolve through a local
 Unbound only (a public fallback would answer too, and blocklists refuse public resolvers).
 

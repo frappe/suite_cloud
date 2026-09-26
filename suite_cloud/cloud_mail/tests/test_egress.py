@@ -296,6 +296,8 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(variables["wait_ports"], [443, 2525])
         self.assertIn("STALWART_ROLE=egress", variables["env_normal"])
         self.assertIn('"object":"SpamSettings"', variables["defaults_ndjson"])
+        self.assertIn('"name":"egress"', variables["defaults_ndjson"])  # the role env_normal names
+        self.assertNotIn('"name":"full"', variables["defaults_ndjson"])
         self.assertIn('"@type":"RocksDb"', variables["bootstrap_ndjson"])
         self.assertIn(pool.pool_name, variables["cluster_ndjson"])
 

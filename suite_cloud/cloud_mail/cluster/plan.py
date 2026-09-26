@@ -4,8 +4,8 @@ Two plans exist. The bootstrap plan is applied once on the first node in bootstr
 only names the stores and hostnames (Stalwart provisions everything else with defaults).
 The cluster plan holds the objects Suite Cloud manages afterwards (roles, coordinator, ACME,
 DNS provider, DNS resolver, default domain, system settings, spam rules source, licences) and is
-re-applied on every sync. Its SpamSettings part is also the defaults plan, applied before the
-first normal start.
+re-applied on every sync. Its cluster roles and SpamSettings are also the defaults plan, applied
+before the first normal start.
 """
 
 import hashlib
@@ -166,7 +166,7 @@ def bootstrap_plan(cluster: Document) -> list[dict]:
 def cluster_plan(cluster: Document) -> list[dict]:
     plan: list[dict] = [
         {"@type": "update", "object": "Coordinator", "value": {"@type": cluster.coordinator or "Disabled"}},
-        {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
+        *defaults_plan(),
         tracer_operation(),
         dns_resolver_operation(),
     ]
@@ -225,7 +225,6 @@ def cluster_plan(cluster: Document) -> list[dict]:
         }
     )
 
-    plan.extend(defaults_plan())
     plan.extend(egress_operations(cluster))
     return plan
 
@@ -322,11 +321,25 @@ def recovery_plan(cluster: Document) -> list[dict]:
 
 
 def defaults_plan() -> list[dict]:
-    """Applied in recovery mode before the first normal start, which imports the spam rules.
+    """Applied in recovery mode before the first normal start, which needs both.
 
-    Left alone, Stalwart imports the latest rules release, which may call expression functions
-    the pinned server lacks: those objects are stored, then skipped at every start. The import
-    runs once and never updates a stored rule, so the pin must be in place before it.
+    That start names the node's cluster role (Stalwart fails the start when it is missing) and
+    imports the spam rules. Neither is an object Stalwart counts before inserting its own
+    defaults, so creating them early suppresses nothing.
+    """
+
+    return [
+        {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
+        *spam_settings_operations(),
+    ]
+
+
+def spam_settings_operations() -> list[dict]:
+    """Pins the spam rules release; empty leaves Stalwart's default, the latest release.
+
+    The latest release may call expression functions the pinned server lacks: those objects are
+    stored, then skipped at every start. The import runs once and never updates a stored rule,
+    so the pin must be in place before it.
     """
 
     version = get_config("spam_filter_rules_version")
