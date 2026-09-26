@@ -111,6 +111,25 @@ class TestEgress(IntegrationTestCase):
             "203.0.113.60",
         )
 
+    def test_reset_host_keys_lets_verify_ssh_record_the_new_ones(self) -> None:
+        self.gateway.db_set("ssh_verified", 1)
+
+        # A reinstalled server presents new keys; the old pin must go before it can be trusted.
+        self.gateway.reset_ssh_host_keys()
+        self.gateway.reload()
+        self.assertEqual((self.gateway.ssh_host_keys, self.gateway.ssh_verified), (None, 0))
+
+        module = "suite_cloud.cloud_mail.doctype.egress_gateway.egress_gateway"
+        with (
+            patch(f"{module}.scan_host_keys", return_value="203.0.113.50 ssh-ed25519 AAAAnew"),
+            patch(f"{module}.ping", return_value=(True, "")),
+        ):
+            self.assertTrue(self.gateway.verify_ssh())
+        self.gateway.reload()
+        self.assertEqual(
+            (self.gateway.ssh_host_keys, self.gateway.ssh_verified), ("203.0.113.50 ssh-ed25519 AAAAnew", 1)
+        )
+
     def test_pool_assigns_ports_hostnames_and_records(self) -> None:
         pool = self.make_pool(("203.0.113.51", "203.0.113.52"))
         second = self.make_pool(("203.0.113.53",))

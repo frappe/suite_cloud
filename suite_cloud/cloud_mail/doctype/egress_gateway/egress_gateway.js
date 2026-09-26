@@ -5,6 +5,17 @@ frappe.ui.form.on('Egress Gateway', {
 	refresh(frm) {
 		if (frm.doc.__islocal) return
 		frm.add_custom_button(__('Verify SSH'), () => frm.events.call(frm, 'verify_ssh', __('Connecting...')), __('Actions'))
+		if (frm.doc.ssh_host_keys) {
+			frm.add_custom_button(
+				__('Reset SSH Host Keys'),
+				() =>
+					frappe.confirm(
+						__('Forget the recorded host keys of {0}? Only do this when the server was reinstalled; the next Verify SSH trusts whatever server answers at {1}.', [frm.doc.hostname, frm.doc.ipv4_address]),
+						() => frm.events.call(frm, 'reset_ssh_host_keys', __('Resetting...')),
+					),
+				__('Actions'),
+			)
+		}
 		frm.add_custom_button(__('Preview Plan'), () => frm.events.call(frm, 'preview_plan', __('Rendering...'), (plan) => {
 			frappe.msgprint({ title: __('Gateway Plan'), message: `<pre>${frappe.utils.escape_html(plan)}</pre>`, wide: true })
 		}), __('Actions'))

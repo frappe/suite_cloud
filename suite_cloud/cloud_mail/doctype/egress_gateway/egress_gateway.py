@@ -195,6 +195,13 @@ class EgressGateway(Document):
         return ok
 
     @frappe.whitelist()
+    def reset_ssh_host_keys(self) -> None:
+        """Forgets the pinned host keys after the server was reinstalled; Verify SSH records the new ones."""
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        self.db_set({"ssh_host_keys": None, "ssh_verified": 0}, update_modified=False)
+
+    @frappe.whitelist()
     def provision(self) -> str:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if not self.ssh_verified:
