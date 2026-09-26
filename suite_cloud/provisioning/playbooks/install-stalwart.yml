@@ -25,6 +25,31 @@
         state: present
         update_cache: true
 
+    # Stalwart resolves through a local validating resolver (the plan points it at 127.0.0.1):
+    # DNSSEC lets it enforce DANE, and blocklists see the node's own address.
+    - name: Install Unbound
+      apt:
+        name:
+          - unbound
+          - bind9-dnsutils
+        state: present
+
+    - name: Start Unbound
+      systemd:
+        name: unbound
+        state: started
+        enabled: true
+
+    # The "ad" flag means Unbound validated the answer. It may still be fetching the root trust
+    # anchor right after install, hence the retries.
+    - name: Check that Unbound validates DNSSEC
+      command: dig @127.0.0.1 +dnssec +time=5 +tries=1 . DNSKEY
+      register: unbound_check
+      changed_when: false
+      retries: 10
+      delay: 3
+      until: unbound_check.stdout is search(';; flags:[^;]* ad[ ;]')
+
     - name: Create the stalwart system user
       user:
         name: stalwart

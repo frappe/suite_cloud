@@ -292,7 +292,11 @@ are now built in: Stalwart encodes every `Set` as `{"value": true}` and every `L
 index-keyed object; secrets are `{"@type": "Value", "secret": ...}` unions; Let's Encrypt
 rejects a wildcard order that also names a host it covers; the built-in roles are provisioned
 only on a normal start that finds no Role objects, so the recovery-stage plan creates none;
-and bootstrap's admin password is never disclosed, so the recovery-stage plan sets it.
+bootstrap's admin password is never disclosed, so the recovery-stage plan sets it; the first
+normal start imports the spam filter rules once, from the latest release unless told otherwise,
+so a short recovery stage before it pins the release the server supports; and Stalwart queries
+all its DNS servers by measured speed rather than in order, so nodes resolve through a local
+Unbound only (a public fallback would answer too, and blocklists refuse public resolvers).
 
 Still unverified on a live server: the egress gateway (relay listeners, connection strategy),
 multi-node registry leases with a Redis coordinator, and node upgrades.

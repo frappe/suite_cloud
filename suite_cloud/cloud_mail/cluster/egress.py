@@ -382,6 +382,8 @@ def gateway_plan(gateway: Document) -> list[dict]:
         }
     )
     operations.append(plan.tracer_operation())
+    operations.append(plan.dns_resolver_operation())
+    operations.extend(plan.defaults_plan())
     operations.append(
         {
             "@type": "update",
@@ -492,6 +494,7 @@ def build_gateway_variables(context: dict) -> dict:
         "env_recovery": plan.render_env(gateway_env(gateway, "recovery")),
         "config_json": frappe.as_json(gateway.get_store("data_store").config),
         "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := gateway_bootstrap_plan(gateway)),
+        "defaults_ndjson": plan.to_ndjson(plan.defaults_plan()),
         "cluster_ndjson": plan.to_ndjson(recovery_plan),
         "__secret_keys__": list(SECRET_VARIABLES),
         "__secret_values__": [

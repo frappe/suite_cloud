@@ -135,6 +135,7 @@ def build_node_variables(context: dict) -> dict:
         "env_recovery": plan.render_env(plan.node_env(node, "recovery")),
         "config_json": frappe.as_json(plan.node_config(cluster)),
         "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := plan.bootstrap_plan(cluster)),
+        "defaults_ndjson": plan.to_ndjson(plan.defaults_plan()),
         "cluster_ndjson": plan.to_ndjson(recovery_plan),
         "__secret_keys__": list(SECRET_VARIABLES),
         "__secret_values__": [

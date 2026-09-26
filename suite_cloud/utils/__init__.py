@@ -17,6 +17,7 @@ CONFIG_KEYS = (
     "stalwart_cli_version",
     "stalwart_download_url_template",
     "stalwart_cli_download_url_template",
+    "spam_filter_rules_version",
     "acme_directory_url",
     "acme_contact_email",
     "server_job_timeout",

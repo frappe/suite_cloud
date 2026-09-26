@@ -420,6 +420,25 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(domain["dkimManagement"]["@type"], "Automatic")
         self.assertEqual(domain["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
         self.assertEqual(domain["dkimManagement"]["selectorTemplate"], "frappemail-{algorithm}")
+        self.assertEqual(
+            operations["DnsResolver"]["value"],
+            {
+                "@type": "Custom",
+                "servers": {
+                    "0": {"address": "127.0.0.1", "port": 53, "protocol": "udp"},
+                    "1": {"address": "127.0.0.1", "port": 53, "protocol": "tcp"},
+                },
+            },
+        )
+        self.assertEqual(
+            operations["SpamSettings"]["value"]["spamFilterRulesUrl"],
+            "https://github.com/stalwartlabs/spam-filter/releases/download/v3.0.1/spam-filter-rules.json.gz",
+        )
+        self.assertEqual(plan.defaults_plan(), [operations["SpamSettings"]])
+
+        configure_settings(spam_filter_rules_version="")
+        self.addCleanup(configure_settings)
+        self.assertEqual(plan.defaults_plan(), [])  # Stalwart's own default: the latest release
 
         configure_settings(sign_with_ed25519=1)
         self.addCleanup(configure_settings, sign_with_ed25519=0)

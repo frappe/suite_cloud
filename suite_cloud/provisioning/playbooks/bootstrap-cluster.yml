@@ -75,6 +75,44 @@
             path: /etc/stalwart/config.json
             timeout: 120
 
+        # The first normal start imports the spam filter rules, once, from wherever SpamSettings
+        # points. Nothing but SpamSettings is written here: an object Stalwart counts before
+        # inserting its defaults (routes, roles, tracers) would suppress them.
+        - name: Pin the defaults the first normal start imports
+          when: defaults_ndjson | length > 0
+          block:
+            - name: Write the recovery environment for the defaults
+              no_log: true
+              copy:
+                content: "{{ env_recovery }}"
+                dest: /etc/stalwart/stalwart.env
+                owner: stalwart
+                group: stalwart
+                mode: "0600"
+
+            - name: Start Stalwart in recovery mode for the defaults
+              systemd:
+                name: stalwart
+                state: restarted
+
+            - name: Wait for the recovery listener for the defaults
+              wait_for:
+                host: 127.0.0.1
+                port: "{{ recovery_port }}"
+                timeout: 120
+
+            - name: Write the defaults plan
+              copy:
+                content: "{{ defaults_ndjson }}"
+                dest: /etc/stalwart/defaults.ndjson
+                owner: stalwart
+                group: stalwart
+                mode: "0600"
+
+            - name: Apply the defaults plan
+              command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/defaults.ndjson --json
+              environment: "{{ cli_env }}"
+
         # Stalwart provisions its built-in roles, the default role lists and other defaults only
         # on a normal start; bootstrap and recovery mode skip that step. Without this start the
         # administrator (and every account) would resolve to no permissions at all.
@@ -107,6 +145,11 @@
         - name: Remove the bootstrap plan
           file:
             path: /etc/stalwart/bootstrap.ndjson
+            state: absent
+
+        - name: Remove the defaults plan
+          file:
+            path: /etc/stalwart/defaults.ndjson
             state: absent
 
     - name: Check whether this cluster plan version was applied
@@ -199,3 +242,15 @@
         port: "{{ item }}"
         timeout: 180
       loop: "{{ wait_ports }}"
+
+    # Stalwart starts even when stored objects fail to load: it logs and skips them, so the job
+    # would pass. It opens its listeners only after logging, so this start's errors are in the
+    # journal by now. The journal drops the details; this start's lines in the log file have them.
+    - name: Check the start for configuration errors
+      shell: |
+        journalctl --no-pager -o cat _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value stalwart)" \
+          | grep -qxE 'Object validation error|Configuration build error' || exit 0
+        since=$(date -u -d "$(systemctl show -p ActiveEnterTimestamp --value stalwart)" +%Y-%m-%dT%H:%M:%SZ)
+        grep -hE 'registry\.(validation-error|build-error)' /var/log/stalwart/stalwart.* | awk -v since="$since" '$1 >= since'
+        exit 1
+      changed_when: false

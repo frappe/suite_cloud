@@ -36,3 +36,21 @@
         port: "{{ item }}"
         timeout: 180
       loop: "{{ wait_ports }}"
+
+    # Stalwart starts even when stored objects fail to load: it logs and skips them, so the job
+    # would pass. It opens its listeners only after logging, so this start's errors are in the
+    # journal by now; a node without listeners (outbound role) gets a moment instead. The journal
+    # drops the details; this start's lines in the log file have them.
+    - name: Give a node without listeners time to finish starting
+      when: wait_ports | length == 0
+      wait_for:
+        timeout: 10
+
+    - name: Check the start for configuration errors
+      shell: |
+        journalctl --no-pager -o cat _SYSTEMD_INVOCATION_ID="$(systemctl show -p InvocationID --value stalwart)" \
+          | grep -qxE 'Object validation error|Configuration build error' || exit 0
+        since=$(date -u -d "$(systemctl show -p ActiveEnterTimestamp --value stalwart)" +%Y-%m-%dT%H:%M:%SZ)
+        grep -hE 'registry\.(validation-error|build-error)' /var/log/stalwart/stalwart.* | awk -v since="$since" '$1 >= since'
+        exit 1
+      changed_when: false

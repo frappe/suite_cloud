@@ -63,7 +63,17 @@ class TestServerJob(IntegrationTestCase):
         self.assertEqual(names[0], "Ensure a Debian-family host")  # from install-stalwart.yml
         self.assertIn("Install the Stalwart binary", names)  # inside a block
         self.assertIn("Apply the cluster plan", names)
-        self.assertEqual(names[-1], "Wait for the listeners")
+        # Stalwart is pointed at Unbound, so Unbound must answer before Stalwart is installed.
+        self.assertLess(
+            names.index("Check that Unbound validates DNSSEC"), names.index("Install the Stalwart binary")
+        )
+        # The spam rules are pinned before the first normal start imports them.
+        self.assertLess(
+            names.index("Apply the defaults plan"),
+            names.index("Start Stalwart normally so it provisions its defaults"),
+        )
+        # A start that logs configuration errors fails the job, though Stalwart keeps running.
+        self.assertEqual(names[-1], "Check the start for configuration errors")
 
     def test_jobs_run_only_known_code(self) -> None:
         # The row is operator-writable: builders, callbacks and commands come from allowlists.
@@ -184,6 +194,7 @@ class TestServerJob(IntegrationTestCase):
         self.assertIn("admin_password", variables["__secret_keys__"])
         self.assertIn("STALWART_RECOVERY_ADMIN=admin:", variables["env_recovery"])
         self.assertNotIn("STALWART_RECOVERY", variables["env_normal"])
+        self.assertIn('"object":"SpamSettings"', variables["defaults_ndjson"])
         self.assertIn('"@type": "PostgreSql"', variables["config_json"])
         self.assertRegex(variables["plan_marker"], r"^\.suite-cloud-plan-[0-9a-f]{12}$")
 

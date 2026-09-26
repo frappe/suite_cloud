@@ -3,7 +3,9 @@
 Two plans exist. The bootstrap plan is applied once on the first node in bootstrap mode and
 only names the stores and hostnames (Stalwart provisions everything else with defaults).
 The cluster plan holds the objects Suite Cloud manages afterwards (roles, coordinator, ACME,
-DNS provider, default domain, system settings, licences) and is re-applied on every sync.
+DNS provider, DNS resolver, default domain, system settings, spam rules source, licences) and is
+re-applied on every sync. Its SpamSettings part is also the defaults plan, applied before the
+first normal start.
 """
 
 import hashlib
@@ -24,6 +26,9 @@ API_KEY_DESCRIPTION = "suite-cloud"
 DISABLED_ROLE_DESCRIPTION = "suite-disabled"
 FIREWALL_PORTS = (25, 465, 587, 143, 993, 110, 995, 443, 4190)
 SECRET_MARKER = "***"
+SPAM_RULES_URL = (
+    "https://github.com/stalwartlabs/spam-filter/releases/download/{version}/spam-filter-rules.json.gz"
+)
 
 
 def as_set(values) -> dict:
@@ -110,6 +115,28 @@ def tracer_operation() -> dict:
     }
 
 
+# --- DNS resolution -------------------------------------------------------------------
+
+LOCAL_RESOLVER = "127.0.0.1"  # Unbound, installed and checked by install-stalwart.yml
+
+
+def dns_resolver_operation() -> dict:
+    """Every lookup goes to the node's own validating resolver.
+
+    DNSSEC answers let Stalwart enforce DANE, and blocklists (Spamhaus, URIBL) see the node's
+    address rather than a shared public resolver they refuse. No public fallback is listed:
+    Stalwart queries all its servers by measured speed, so a fallback would answer too.
+    Stalwart only trusts DNSSEC over a non-UDP connection, hence TCP as well.
+    """
+
+    servers = [{"address": LOCAL_RESOLVER, "port": 53, "protocol": p} for p in ("udp", "tcp")]
+    return {
+        "@type": "update",
+        "object": "DnsResolver",
+        "value": {"@type": "Custom", "servers": as_list(servers)},
+    }
+
+
 # --- bootstrap ------------------------------------------------------------------------
 
 
@@ -141,6 +168,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
         {"@type": "update", "object": "Coordinator", "value": {"@type": cluster.coordinator or "Disabled"}},
         {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
         tracer_operation(),
+        dns_resolver_operation(),
     ]
 
     dns_server = dns_server_object(cluster)
@@ -197,6 +225,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
         }
     )
 
+    plan.extend(defaults_plan())
     plan.extend(egress_operations(cluster))
     return plan
 
@@ -290,6 +319,26 @@ def recovery_plan(cluster: Document) -> list[dict]:
     operations = [op for op in cluster_plan(cluster) if op["object"] != "Role"]
     operations.append(admin_account_operation(cluster))
     return operations
+
+
+def defaults_plan() -> list[dict]:
+    """Applied in recovery mode before the first normal start, which imports the spam rules.
+
+    Left alone, Stalwart imports the latest rules release, which may call expression functions
+    the pinned server lacks: those objects are stored, then skipped at every start. The import
+    runs once and never updates a stored rule, so the pin must be in place before it.
+    """
+
+    version = get_config("spam_filter_rules_version")
+    if not version:
+        return []
+    return [
+        {
+            "@type": "update",
+            "object": "SpamSettings",
+            "value": {"spamFilterRulesUrl": SPAM_RULES_URL.format(version=version)},
+        }
+    ]
 
 
 def egress_operations(cluster: Document) -> list[dict]:
