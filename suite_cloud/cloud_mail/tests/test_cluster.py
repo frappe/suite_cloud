@@ -15,6 +15,8 @@ from suite_cloud.cloud_mail.tests.fixtures import (
     no_dns_provider,
     remove_cluster,
 )
+from suite_cloud.install import SITE_SERVICE_USER
+from suite_cloud.utils import user_context
 
 
 class TestStalwartCluster(IntegrationTestCase):
@@ -48,6 +50,8 @@ class TestStalwartCluster(IntegrationTestCase):
         node.reset_ssh_host_keys()
         node.reload()
         self.assertEqual((node.ssh_host_keys, node.ssh_verified), (None, 0))
+        audit = {"reference_doctype": "Stalwart Node", "reference_name": node.name, "comment_type": "Info"}
+        self.assertEqual(frappe.get_all("Comment", audit, pluck="comment_email"), [frappe.session.user])
 
         module = "suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node"
         with (
@@ -57,6 +61,15 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertTrue(node.verify_ssh())
         node.reload()
         self.assertEqual((node.ssh_host_keys, node.ssh_verified), ("203.0.113.1 ssh-ed25519 AAAAnew", 1))
+
+    def test_only_managers_can_reset_host_keys(self) -> None:
+        cluster = make_cluster()
+        node = make_node(cluster, "203.0.113.1")
+
+        # Dropping the pin lets the next Verify SSH trust any server, so other users are refused.
+        with user_context(SITE_SERVICE_USER), self.assertRaises(frappe.PermissionError):
+            node.reset_ssh_host_keys()
+        self.assertEqual(frappe.db.get_value("Stalwart Node", node.name, "ssh_host_keys"), node.ssh_host_keys)
 
     def test_ssh_user_is_a_plain_login_name(self) -> None:
         cluster = make_cluster()

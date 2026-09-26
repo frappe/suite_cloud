@@ -200,6 +200,8 @@ class EgressGateway(Document):
 
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         self.db_set({"ssh_host_keys": None, "ssh_verified": 0}, update_modified=False)
+        # The next Verify SSH trusts whatever answers, so record who dropped the pin and when.
+        self.add_comment("Info", _("Reset the SSH host keys."))
 
     @frappe.whitelist()
     def provision(self) -> str:

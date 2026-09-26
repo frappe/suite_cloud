@@ -16,6 +16,8 @@ from suite_cloud.cloud_mail.tests.fixtures import (
     make_site,
     remove_cluster,
 )
+from suite_cloud.install import SITE_SERVICE_USER
+from suite_cloud.utils import user_context
 
 
 class TestEgress(IntegrationTestCase):
@@ -118,6 +120,12 @@ class TestEgress(IntegrationTestCase):
         self.gateway.reset_ssh_host_keys()
         self.gateway.reload()
         self.assertEqual((self.gateway.ssh_host_keys, self.gateway.ssh_verified), (None, 0))
+        audit = {
+            "reference_doctype": "Egress Gateway",
+            "reference_name": self.gateway.name,
+            "comment_type": "Info",
+        }
+        self.assertEqual(frappe.get_all("Comment", audit, pluck="comment_email"), [frappe.session.user])
 
         module = "suite_cloud.cloud_mail.doctype.egress_gateway.egress_gateway"
         with (
@@ -129,6 +137,13 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(
             (self.gateway.ssh_host_keys, self.gateway.ssh_verified), ("203.0.113.50 ssh-ed25519 AAAAnew", 1)
         )
+
+    def test_only_managers_can_reset_host_keys(self) -> None:
+        # Dropping the pin lets the next Verify SSH trust any server, so other users are refused.
+        with user_context(SITE_SERVICE_USER), self.assertRaises(frappe.PermissionError):
+            self.gateway.reset_ssh_host_keys()
+        pinned = frappe.db.get_value("Egress Gateway", self.gateway.name, "ssh_host_keys")
+        self.assertEqual(pinned, self.gateway.ssh_host_keys)
 
     def test_pool_assigns_ports_hostnames_and_records(self) -> None:
         pool = self.make_pool(("203.0.113.51", "203.0.113.52"))
