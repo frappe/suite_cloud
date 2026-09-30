@@ -411,18 +411,14 @@ def stored_dkim_selectors(names: list[str]) -> dict[str, set[str]]:
 
 def enqueue_recheck_of_vouched_domains() -> None:
     """Skip Domain Verification was turned off: the domains taken on the cloud's word are checked
-    like any other from now on. In the background, since it resolves every one of them."""
+    like any other from now on. In the background, since it resolves every one of them; one job per
+    turn of the setting, since a job already running took its list before any domain vouched for
+    while it ran, and a second turn must reach those."""
 
     if frappe.flags.do_not_enqueue:
         recheck_vouched_domains()
         return
-    frappe.enqueue(
-        recheck_vouched_domains,
-        queue="long",
-        job_id="recheck-vouched-domains",
-        deduplicate=True,
-        enqueue_after_commit=True,
-    )
+    frappe.enqueue(recheck_vouched_domains, queue="long", enqueue_after_commit=True)
 
 
 def recheck_vouched_domains() -> None:
@@ -434,7 +430,10 @@ def recheck_vouched_domains() -> None:
 
 
 def _recheck_vouched(name: str) -> None:
-    domain = frappe.get_doc("Mail Domain", name)
+    # Locked and read again: two jobs may hold the same list, and the later finds the mark gone.
+    domain = frappe.get_doc("Mail Domain", name, for_update=True)
+    if not domain.verification_skipped:
+        return
     domain.verification_skipped = 0
     domain.skip_scheduled_verification = 0
     domain.save()
@@ -448,6 +447,9 @@ def verify_unverified_domains() -> None:
         _run_isolated(
             name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
         )
+    if not ownership.skipped():
+        # A domain still vouched for with the setting off is one the turn's own job did not reach.
+        recheck_vouched_domains()
 
 
 def domains_due_for_verification() -> list[str]:
