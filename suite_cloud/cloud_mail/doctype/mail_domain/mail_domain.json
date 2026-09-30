@@ -22,6 +22,7 @@
   "dns_section",
   "is_verified",
   "skip_scheduled_verification",
+  "verification_skipped",
   "last_verified_at",
   "column_break_dns",
   "last_refreshed_at",
@@ -153,6 +154,15 @@
    "permlevel": 1
   },
   {
+   "default": "0",
+   "description": "Verified on the cloud's word while Skip Domain Verification (Suite Cloud Settings) was on, with the hourly check left out. Turning that setting off clears this and checks the records like any other domain's.",
+   "fieldname": "verification_skipped",
+   "fieldtype": "Check",
+   "label": "Verification Skipped",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
    "description": "When the records were last resolved, by the Verify DNS Records action or the hourly check of unverified domains.",
    "fieldname": "last_verified_at",
    "fieldtype": "Datetime",
@@ -265,7 +275,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-09-21 12:00:00.000000",
+ "modified": "2026-09-30 16:43:06.381861",
  "modified_by": "Administrator",
  "module": "Cloud Mail",
  "name": "Mail Domain",

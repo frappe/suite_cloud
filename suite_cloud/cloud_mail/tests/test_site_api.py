@@ -218,9 +218,15 @@ class TestDomainOwnership(SiteApiTestCase):
         with patch(target, return_value=False):
             self.assertTrue(domains.verify_dns_records("acme.com")["is_verified"])
 
-        # Switched back on, the next domain has to prove control again.
+        # Switched back on, the domain taken on the cloud's word is checked like any other - and
+        # goes offline, having no records - and the next domain has to prove control again.
         frappe.set_user("Administrator")
-        configure_settings(skip_domain_verification=0)
+        with patch(target, return_value=False):
+            configure_settings(skip_domain_verification=0)
+        domain.reload()
+        self.assertFalse(domain.is_live())
+        self.assertFalse(domain.verification_skipped or domain.skip_scheduled_verification)
+        self.assertFalse(self.fake.all("Domain")[0]["isEnabled"])
         self.act_as(self.site)
         with patch("suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record", return_value=False):
             self.assertRaises(DomainNotVerifiedError, domains.create_domain, "other.com")

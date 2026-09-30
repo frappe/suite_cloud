@@ -66,7 +66,7 @@
   },
   {
    "default": "0",
-   "description": "Take a tenant site's word for its domains: add them without the TXT record that proves control, and treat them as verified without checking their DNS records. For a development cloud, whose test domains exist in no public DNS. Never on a shared cluster: a wrongly claimed domain locks its owner out, and Stalwart accepts mail for every domain marked verified.",
+   "description": "Take a tenant site's word for its domains: add them without the TXT record that proves control, and treat them as verified without checking their DNS records. For a development cloud, whose test domains exist in no public DNS. Never on a shared cluster: a wrongly claimed domain locks its owner out, and Stalwart accepts mail for every domain marked verified. Turning it off re-checks the domains it vouched for.",
    "fieldname": "skip_domain_verification",
    "fieldtype": "Check",
    "label": "Skip Domain Verification"
@@ -221,7 +221,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-30 16:26:32.604548",
+ "modified": "2026-09-30 16:43:06.382365",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
