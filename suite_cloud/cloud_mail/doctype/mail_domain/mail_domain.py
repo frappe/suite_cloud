@@ -98,6 +98,11 @@ class MailDomain(Document):
         if not self.is_new() and self.has_value_changed("enabled") and not self.enabled:
             # Proof of control lapses with the domain: enabling it again needs a fresh verification.
             self.is_verified = 0
+        if ownership.skipped():
+            # The operator vouches for every tenant's domains: they count as verified for as long as
+            # they are enabled, and the hourly check leaves them alone.
+            self.is_verified = int(bool(self.enabled))
+            self.skip_scheduled_verification = 1
         if not self.is_new() and self.has_value_changed("publish_client_discovery_records"):
             # The zone already holds the certificate-bound records; only which tables list them changes.
             self.rebuild_dns_records(self.dns_zone_file or "")
@@ -239,7 +244,7 @@ class MailDomain(Document):
             row.last_checked_at = checked_at
 
         was_live = self.is_live()
-        self.is_verified = int(self.compute_is_verified())
+        self.is_verified = int(ownership.skipped() or self.compute_is_verified())
         self.last_verified_at = checked_at
         if self.stalwart_id and was_live != self.is_live():
             # Cluster first: a failed push must not leave the local flag ahead of Stalwart.

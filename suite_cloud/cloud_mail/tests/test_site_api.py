@@ -200,6 +200,31 @@ class TestDomainOwnership(SiteApiTestCase):
             frappe.DuplicateEntryError, "not available", domains.create_domain, "taken.com"
         )
 
+    def test_a_cloud_that_skips_domain_verification_takes_the_tenants_word(self) -> None:
+        # A development cloud's test domains exist in no public DNS; the operator vouches for them.
+        frappe.set_user("Administrator")
+        configure_settings(skip_domain_verification=1)
+        self.act_as(self.site)
+
+        with patch("suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record", return_value=False):
+            domains.create_domain("acme.com")
+        domain = frappe.get_doc("Mail Domain", "acme.com")
+        self.assertTrue(domain.is_live())
+        self.assertTrue(domain.skip_scheduled_verification)
+        self.assertTrue(self.fake.all("Domain")[0]["isEnabled"])
+
+        # Asking to verify does not take the word back, whatever the resolvers say.
+        target = "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.verify_dns_record"
+        with patch(target, return_value=False):
+            self.assertTrue(domains.verify_dns_records("acme.com")["is_verified"])
+
+        # Switched back on, the next domain has to prove control again.
+        frappe.set_user("Administrator")
+        configure_settings(skip_domain_verification=0)
+        self.act_as(self.site)
+        with patch("suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record", return_value=False):
+            self.assertRaises(DomainNotVerifiedError, domains.create_domain, "other.com")
+
     def test_domain_is_added_only_once_its_record_resolves(self) -> None:
         target = "suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record"
         with patch(target, return_value=False):
