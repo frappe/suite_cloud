@@ -7,7 +7,7 @@ from frappe.model.document import Document
 from frappe.utils import cint
 
 from suite_cloud.cloud_mail.reports import DEFAULT_RETENTION_DAYS
-from suite_cloud.utils import validate_version
+from suite_cloud.utils import clear_config_cache, validate_version
 
 
 class SuiteCloudSettings(Document):
@@ -26,6 +26,7 @@ class SuiteCloudSettings(Document):
         server_job_timeout: DF.Int
         sign_with_ed25519: DF.Check
         site_service_user: DF.Link | None
+        skip_domain_verification: DF.Check
         spam_filter_rules_version: DF.Data | None
         stalwart_cli_download_url_template: DF.Data
         stalwart_cli_version: DF.Data
@@ -42,6 +43,16 @@ class SuiteCloudSettings(Document):
             self.spam_filter_rules_version, _("Spam Filter Rules Version")
         )
         self.validate_report_retention()
+
+    def on_update(self) -> None:
+        clear_config_cache()
+        before = self.get_doc_before_save()
+        if before and cint(before.skip_domain_verification) and not cint(self.skip_domain_verification):
+            from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import (
+                enqueue_recheck_of_vouched_domains,
+            )
+
+            enqueue_recheck_of_vouched_domains()
 
     def validate_report_retention(self) -> None:
         # A site set up before a field existed has it empty: the default applies rather than a

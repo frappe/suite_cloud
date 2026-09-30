@@ -14,6 +14,7 @@ from suite_cloud.api.site import (
     update_site_profile,
 )
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
+from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import verify_unverified_domains
 from suite_cloud.cloud_mail.stalwart import forget_sessions
 from suite_cloud.cloud_mail.tenancy.ownership import (
     VALUE_PREFIX,
@@ -29,6 +30,8 @@ from suite_cloud.cloud_mail.tests.fixtures import (
     make_site,
     verified_ownership,
 )
+
+MAIL_DOMAIN = "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain"
 
 
 class SiteApiTestCase(IntegrationTestCase):
@@ -199,6 +202,55 @@ class TestDomainOwnership(SiteApiTestCase):
         self.assertRaisesRegex(
             frappe.DuplicateEntryError, "not available", domains.create_domain, "taken.com"
         )
+
+    def test_a_cloud_that_skips_domain_verification_takes_the_tenants_word(self) -> None:
+        # A development cloud's test domains exist in no public DNS; the operator vouches for them.
+        frappe.set_user("Administrator")
+        configure_settings(skip_domain_verification=1)
+        self.act_as(self.site)
+
+        with patch("suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record", return_value=False):
+            domains.create_domain("acme.com")
+        domain = frappe.get_doc("Mail Domain", "acme.com")
+        self.assertTrue(domain.is_live())
+        self.assertTrue(domain.skip_scheduled_verification)
+        self.assertTrue(self.fake.all("Domain")[0]["isEnabled"])
+
+        # Asking to verify does not take the word back, whatever the resolvers say.
+        target = f"{MAIL_DOMAIN}.verify_dns_record"
+        with patch(target, return_value=False):
+            self.assertTrue(domains.verify_dns_records("acme.com")["is_verified"])
+
+        # Switched back on, the domain taken on the cloud's word is checked like any other - and
+        # goes offline, having no records - and the next domain has to prove control again.
+        frappe.set_user("Administrator")
+        with patch(target, return_value=False):
+            configure_settings(skip_domain_verification=0)
+        domain.reload()
+        self.assertFalse(domain.is_live())
+        self.assertFalse(domain.verification_skipped or domain.skip_scheduled_verification)
+        self.assertFalse(self.fake.all("Domain")[0]["isEnabled"])
+        self.act_as(self.site)
+        with patch("suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record", return_value=False):
+            self.assertRaises(DomainNotVerifiedError, domains.create_domain, "other.com")
+
+    def test_the_hourly_check_catches_a_vouched_domain_the_recheck_missed(self) -> None:
+        # Vouched for while a recheck job was already running, say: the job's list never had it.
+        frappe.set_user("Administrator")
+        configure_settings(skip_domain_verification=1)
+        self.act_as(self.site)
+        domains.create_domain("acme.com")
+        frappe.set_user("Administrator")
+        with patch(f"{MAIL_DOMAIN}.recheck_vouched_domains"):
+            configure_settings(skip_domain_verification=0)
+        domain = frappe.get_doc("Mail Domain", "acme.com")
+        self.assertTrue(domain.is_live() and domain.verification_skipped)
+
+        with patch(f"{MAIL_DOMAIN}.verify_dns_record", return_value=False):
+            verify_unverified_domains()
+        domain.reload()
+        self.assertFalse(domain.is_live())
+        self.assertFalse(domain.verification_skipped or domain.skip_scheduled_verification)
 
     def test_domain_is_added_only_once_its_record_resolves(self) -> None:
         target = "suite_cloud.cloud_mail.tenancy.ownership.verify_dns_record"

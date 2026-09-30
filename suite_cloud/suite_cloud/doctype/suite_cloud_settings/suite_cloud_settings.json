@@ -9,6 +9,7 @@
   "public_url",
   "column_break_general",
   "site_service_user",
+  "skip_domain_verification",
   "jobs_section",
   "server_job_timeout",
   "column_break_jobs",
@@ -64,6 +65,13 @@
    "read_only": 1
   },
   {
+   "default": "0",
+   "description": "Take a tenant site's word for its domains: add them without the TXT record that proves control, and treat them as verified without checking their DNS records. For a development cloud, whose test domains exist in no public DNS. Never on a shared cluster: a wrongly claimed domain locks its owner out, and Stalwart accepts mail for every domain marked verified. Turning it off re-checks the domains it vouched for.",
+   "fieldname": "skip_domain_verification",
+   "fieldtype": "Check",
+   "label": "Skip Domain Verification"
+  },
+  {
    "fieldname": "jobs_section",
    "fieldtype": "Section Break",
    "label": "Server Jobs"
@@ -81,18 +89,18 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "90",
+   "description": "How long fetched DMARC reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees.",
    "fieldname": "dmarc_report_retention_days",
    "fieldtype": "Int",
-   "label": "DMARC Report Retention (Days)",
-   "default": "90",
-   "description": "How long fetched DMARC reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees."
+   "label": "DMARC Report Retention (Days)"
   },
   {
+   "default": "90",
+   "description": "How long fetched TLS reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees.",
    "fieldname": "tls_report_retention_days",
    "fieldtype": "Int",
-   "label": "TLS Report Retention (Days)",
-   "default": "90",
-   "description": "How long fetched TLS reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees."
+   "label": "TLS Report Retention (Days)"
   },
   {
    "fieldname": "stalwart_tab",
@@ -213,7 +221,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-26 12:00:00.000000",
+ "modified": "2026-09-30 16:43:06.382365",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

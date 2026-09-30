@@ -22,6 +22,7 @@ CONFIG_KEYS = (
     "acme_contact_email",
     "server_job_timeout",
     "sign_with_ed25519",
+    "skip_domain_verification",
     "dmarc_report_retention_days",
     "tls_report_retention_days",
 )
@@ -52,6 +53,17 @@ def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tup
             frappe.throw(_("Suite Cloud config key '{0}' not found").format(k))
 
     return tuple(config[k] for k in keys) if len(keys) > 1 else config[keys[0]]
+
+
+def clear_config_cache() -> None:
+    """Forgets what get_config has read, so a change to Suite Cloud Settings is seen within the
+    request that saved it: Frappe clears the document's own cache only once its hooks have run,
+    and get_config keeps its answer for the rest of the request besides."""
+
+    frappe.clear_document_cache("Suite Cloud Settings", "Suite Cloud Settings")
+    cache = getattr(frappe.local, "request_cache", None)
+    if cache is not None:
+        cache.pop(get_config.__wrapped__, None)
 
 
 def dkim_algorithms() -> tuple[str, ...]:

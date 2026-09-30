@@ -219,6 +219,10 @@ contact email for site-specific notices; the Suite app sends both whenever Suite
    life of the site, so every domain it adds asks for the same record and no other site can
    produce it. This is what keeps one tenant from claiming another tenant's domain on a shared
    cluster. Operators adding a domain from the desk vouch for it themselves and skip this step.
+   So does a cloud with **Skip Domain Verification** on in Suite Cloud Settings: it takes a
+   tenant's word for its domains, which also count as verified without the DNS check below -
+   for a development cloud, whose test domains exist in no public DNS, never for a shared one.
+   Turning it off re-checks the domains it vouched for, so one without records goes offline.
 2. Once the record resolves, `create_domain` creates the Mail Domain and the domain on the
    cluster, disabled.
 3. `get_dns_records` lists what the owner must publish next: an MX record pointing at the

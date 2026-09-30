@@ -63,6 +63,7 @@ class MailDomain(Document):
         routing_records: DF.Table[MailDomainDNSRecord]
         site: DF.Link
         skip_scheduled_verification: DF.Check
+        verification_skipped: DF.Check
         stalwart_id: DF.Data | None
         allow_relaying: DF.Check
         sub_addressing: DF.Check
@@ -98,6 +99,13 @@ class MailDomain(Document):
         if not self.is_new() and self.has_value_changed("enabled") and not self.enabled:
             # Proof of control lapses with the domain: enabling it again needs a fresh verification.
             self.is_verified = 0
+        if ownership.skipped():
+            # The operator vouches for every tenant's domains: they count as verified for as long as
+            # they are enabled, and the hourly check leaves them alone. Marked, so that turning the
+            # setting off finds them again.
+            self.is_verified = int(bool(self.enabled))
+            self.skip_scheduled_verification = 1
+            self.verification_skipped = 1
         if not self.is_new() and self.has_value_changed("publish_client_discovery_records"):
             # The zone already holds the certificate-bound records; only which tables list them changes.
             self.rebuild_dns_records(self.dns_zone_file or "")
@@ -239,7 +247,7 @@ class MailDomain(Document):
             row.last_checked_at = checked_at
 
         was_live = self.is_live()
-        self.is_verified = int(self.compute_is_verified())
+        self.is_verified = int(ownership.skipped() or self.compute_is_verified())
         self.last_verified_at = checked_at
         if self.stalwart_id and was_live != self.is_live():
             # Cluster first: a failed push must not leave the local flag ahead of Stalwart.
@@ -401,6 +409,37 @@ def stored_dkim_selectors(names: list[str]) -> dict[str, set[str]]:
     return selectors
 
 
+def enqueue_recheck_of_vouched_domains() -> None:
+    """Skip Domain Verification was turned off: the domains taken on the cloud's word are checked
+    like any other from now on. In the background, since it resolves every one of them; one job per
+    turn of the setting, since a job already running took its list before any domain vouched for
+    while it ran, and a second turn must reach those."""
+
+    if frappe.flags.do_not_enqueue:
+        recheck_vouched_domains()
+        return
+    frappe.enqueue(recheck_vouched_domains, queue="long", enqueue_after_commit=True)
+
+
+def recheck_vouched_domains() -> None:
+    """Drops the mark and the scheduled-check exemption from every domain verified on the cloud's
+    word, and resolves its records: one without them goes offline until they are published."""
+
+    for name in frappe.get_all("Mail Domain", {"verification_skipped": 1}, pluck="name"):
+        _run_isolated(name, lambda: _recheck_vouched(name), "DNS verification")
+
+
+def _recheck_vouched(name: str) -> None:
+    # Locked and read again: two jobs may hold the same list, and the later finds the mark gone.
+    domain = frappe.get_doc("Mail Domain", name, for_update=True)
+    if not domain.verification_skipped:
+        return
+    domain.verification_skipped = 0
+    domain.skip_scheduled_verification = 0
+    domain.save()
+    domain.verify_dns_records()
+
+
 def verify_unverified_domains() -> None:
     """Hourly: unverified domains, plus verified ones with a mandatory row still unverified (rotations)."""
 
@@ -408,6 +447,9 @@ def verify_unverified_domains() -> None:
         _run_isolated(
             name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
         )
+    if not ownership.skipped():
+        # A domain still vouched for with the setting off is one the turn's own job did not reach.
+        recheck_vouched_domains()
 
 
 def domains_due_for_verification() -> list[str]:
