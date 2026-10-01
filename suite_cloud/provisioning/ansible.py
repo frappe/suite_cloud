@@ -34,7 +34,7 @@ RUNNER_ENV = {
     "ANSIBLE_HOST_KEY_CHECKING": "True",
     "ANSIBLE_RETRY_FILES_ENABLED": "False",
     # The bench's own ansible (a Python dependency) wins over an older system one on PATH.
-    "PATH": os.pathsep.join([os.path.dirname(sys.executable), os.environ.get("PATH", "")]),
+    "PATH": os.pathsep.join([os.path.dirname(sys.executable), os.environ.get("PATH") or os.defpath]),
 }
 
 
