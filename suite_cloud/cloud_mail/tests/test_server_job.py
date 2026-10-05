@@ -1,4 +1,6 @@
 import json
+import os
+import sys
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -7,7 +9,7 @@ from frappe.tests import IntegrationTestCase
 
 from suite_cloud.cloud_mail.cluster import bootstrap, plan
 from suite_cloud.cloud_mail.tests.fixtures import configure_settings, make_cluster, make_node
-from suite_cloud.provisioning.ansible import _spellings, playbook_task_names
+from suite_cloud.provisioning.ansible import _spellings, ping, playbook_task_names
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 
 
@@ -139,6 +141,24 @@ class TestServerJob(IntegrationTestCase):
         self.assertEqual(job.tasks[0].stdout, "done")
         self.assertIn('"commands"', job.variables)
         callback.assert_called_once()
+
+    def test_runs_put_the_bench_environment_first_on_path(self) -> None:
+        # ansible-runner resolves `ansible` and `ansible-playbook` on the PATH it is handed; a
+        # system copy ahead of the bench's would run instead of the pinned one.
+        paths = []
+
+        def run(**kwargs):
+            paths.append(kwargs["envvars"]["PATH"])
+            return SimpleNamespace(rc=0, status="successful", events=[], stdout="", stderr="")
+
+        with patch("suite_cloud.provisioning.ansible.ansible_runner.run", run):
+            self.assertEqual(ping(self.node.ssh_target()), (True, ""))  # the ad-hoc call
+            job = create_server_job(self.node, "run-commands.yml", title="Run")  # the playbook call
+
+        self.assertEqual(frappe.db.get_value("Server Job", job.name, "status"), "Success")
+        self.assertEqual(len(paths), 2)
+        for path in paths:
+            self.assertEqual(path.split(os.pathsep)[0], os.path.dirname(sys.executable))
 
     def test_failed_run_marks_remaining_tasks_and_counts_retry(self) -> None:
         tasks = playbook_task_names("configure-node.yml")
