@@ -11,6 +11,7 @@ dependencies = [
     "dnspython~=2.6.1",  # DNS Record verification, hostname lookups
     "dns-lexicon~=3.20.1",  # DNS provider API (Route53, Cloudflare, ...)
     "ansible-runner~=2.4.1",  # Server Job playbooks over SSH
+    "ansible~=14.4",  # ansible-core 2.21 + community.general (the ufw tasks); a system one may be too old
     "cryptography>=42",  # ed25519 SSH keypairs for clusters
     "PyYAML>=6",  # reading playbooks to pre-create task rows
 ]
@@ -21,12 +22,6 @@ build-backend = "flit_core.buildapi"
 
 [tool.bench.frappe-dependencies]
 frappe = ">=16.0.0,<18.0.0"
-
-# Installed from Ubuntu repositories when the app is hosted on Frappe Cloud
-[deploy.dependencies.apt]
-packages = [
-    "ansible",  # ansible-runner drives it for node provisioning
-]
 
 [tool.ruff]
 line-length = 110
