@@ -3,6 +3,7 @@
 import json
 import os
 import shutil
+import sysconfig
 import tempfile
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -29,7 +30,13 @@ if TYPE_CHECKING:
 
 PLAYBOOKS_DIR = os.path.join(os.path.dirname(__file__), "playbooks")
 FINAL_TASK_STATUSES = ("Success", "Failed", "Unreachable", "Skipped")
-RUNNER_ENV = {"ANSIBLE_HOST_KEY_CHECKING": "True", "ANSIBLE_RETRY_FILES_ENABLED": "False"}
+# ansible-runner finds `ansible` on PATH. The bench's own, pinned in pyproject.toml, goes first: the
+# host's can be years older (Ubuntu 22.04 ships 2.10, which crashes under ansible-runner's callback).
+RUNNER_ENV = {
+    "ANSIBLE_HOST_KEY_CHECKING": "True",
+    "ANSIBLE_RETRY_FILES_ENABLED": "False",
+    "PATH": os.pathsep.join([sysconfig.get_path("scripts"), os.environ.get("PATH", os.defpath)]),
+}
 
 
 def playbook_path(playbook: str) -> str:

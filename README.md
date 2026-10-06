@@ -62,8 +62,10 @@ bench get-app https://github.com/frappe/suite_cloud
 bench --site yoursite install-app suite_cloud
 ```
 
-The bench host needs `ansible` (`apt install ansible`; Frappe Cloud installs it from
-`pyproject.toml`) and the `community.general` Ansible collection, which the firewall steps use.
+Ansible comes with the app: `pyproject.toml` pins it, with the `community.general` collection the
+firewall steps use, and Server Jobs run that copy even when the host has its own. The bench host
+only needs an SSH client (`apt install openssh-client`; Frappe Cloud installs it from
+`pyproject.toml`).
 
 Installing creates three roles and one user:
 
