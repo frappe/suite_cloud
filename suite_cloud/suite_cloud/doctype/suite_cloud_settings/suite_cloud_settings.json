@@ -150,7 +150,7 @@
   },
   {
    "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
-   "description": "Where the node downloads the stalwart-cli archive from. Same placeholders as the server URL.",
+   "description": "Where the node downloads the stalwart-cli archive from. Same placeholders as the server URL, but {target} is the static build, e.g. x86_64-unknown-linux-musl.",
    "fieldname": "stalwart_cli_download_url_template",
    "fieldtype": "Data",
    "label": "Stalwart CLI Download URL Template",
@@ -221,7 +221,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-09-30 16:43:06.382365",
+ "modified": "2026-10-06 14:10:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
