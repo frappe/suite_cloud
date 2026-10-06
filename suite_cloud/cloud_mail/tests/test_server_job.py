@@ -1,4 +1,7 @@
 import json
+import os
+import shutil
+import sysconfig
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -7,7 +10,7 @@ from frappe.tests import IntegrationTestCase
 
 from suite_cloud.cloud_mail.cluster import bootstrap, plan
 from suite_cloud.cloud_mail.tests.fixtures import configure_settings, make_cluster, make_node
-from suite_cloud.provisioning.ansible import _spellings, playbook_task_names
+from suite_cloud.provisioning.ansible import RUNNER_ENV, _spellings, playbook_task_names
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 
 
@@ -111,6 +114,12 @@ class TestServerJob(IntegrationTestCase):
         job.reload()
         self.assertEqual(job.status, "Failed")
         self.assertIn("not one a Server Job may run", job.error_log)
+
+    def test_runs_use_the_ansible_pinned_with_the_app(self) -> None:
+        # The host's own Ansible can be too old for ansible-runner, so the bench's must be found first.
+        for command in ("ansible", "ansible-playbook"):
+            found = shutil.which(command, path=RUNNER_ENV["PATH"])
+            self.assertEqual(os.path.dirname(found or ""), sysconfig.get_path("scripts"))
 
     def test_unknown_playbook_is_rejected(self) -> None:
         self.assertRaisesRegex(
