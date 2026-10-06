@@ -52,6 +52,13 @@ jobs:
       - name: Clone
         uses: actions/checkout@v4
 
+      # What an Ubuntu 20.04 node has, for the test that the pinned Ansible still manages it. Set up
+      # before the bench's own Python so that `python` stays 3.14.
+      - name: Setup Python 3.8 (Ansible target)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.8"
+
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
