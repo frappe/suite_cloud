@@ -84,6 +84,60 @@ class TestStalwartClient(UnitTestCase):
         self.assertEqual(stored["roles"], {"@type": "Custom", "roleIds": {role_id: True}})
         self.assertRaises(StalwartRejectedError, self.client.accounts.set_roles, account["id"], ["role-x"])
 
+    def test_disabling_one_permission_keeps_the_accounts_other_permissions(self) -> None:
+        domain_id = self.client.domains.create_id(Domain(name="example.com"))
+        accounts = self.client.accounts
+        live = lambda account_id: self.fake.get("Account", account_id)["permissions"]  # noqa: E731
+
+        # An account that inherits everything gains the one denial, and loses it again.
+        plain = accounts.create_id(Account(name="plain", domain_id=domain_id))
+        accounts.set_permission_disabled(plain, "emailReceive", True)
+        self.assertEqual(
+            live(plain),
+            {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": {"emailReceive": True}},
+        )
+        accounts.set_permission_disabled(plain, "emailReceive", False)
+        self.assertEqual(live(plain), {"@type": "Inherit"})
+
+        # Grants and denials merged in by hand stay, whichever way the one permission goes.
+        merged = accounts.create_id(Account(name="merged", domain_id=domain_id))
+        self.fake.get("Account", merged)["permissions"] = {
+            "@type": "Merge",
+            "enabledPermissions": {"sysAccountGet": True},
+            "disabledPermissions": {"authenticate": True},
+        }
+        accounts.set_permission_disabled(merged, "emailReceive", True)
+        self.assertEqual(
+            live(merged),
+            {
+                "@type": "Merge",
+                "enabledPermissions": {"sysAccountGet": True},
+                "disabledPermissions": {"authenticate": True, "emailReceive": True},
+            },
+        )
+        accounts.set_permission_disabled(merged, "emailReceive", False)
+        self.assertEqual(
+            live(merged),
+            {
+                "@type": "Merge",
+                "enabledPermissions": {"sysAccountGet": True},
+                "disabledPermissions": {"authenticate": True},
+            },
+        )
+
+        # A list that replaces the roles' is never turned into inheritance, even once it is empty:
+        # that would hand the account every permission it was kept from.
+        bare = accounts.create_id(Account(name="bare", domain_id=domain_id))
+        self.fake.get("Account", bare)["permissions"] = {
+            "@type": "Replace",
+            "enabledPermissions": {},
+            "disabledPermissions": {"emailReceive": True},
+        }
+        accounts.set_permission_disabled(bare, "emailReceive", False)
+        self.assertEqual(
+            live(bare), {"@type": "Replace", "enabledPermissions": {}, "disabledPermissions": {}}
+        )
+
     def test_group_delete_clears_membership(self) -> None:
         domain_id = self.client.domains.create_id(Domain(name="example.com"))
         group_id = self.client.groups.create_id(Group(name="team", domain_id=domain_id))

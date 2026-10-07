@@ -12,13 +12,7 @@ from frappe.utils.password import set_encrypted_password
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import get_account_client
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
-from suite_cloud.cloud_mail.stalwart.directory import (
-    DISK_QUOTA,
-    GB,
-    RECEIVE_PERMISSION,
-    Account,
-    permissions_payload,
-)
+from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA, GB, RECEIVE_PERMISSION, Account
 from suite_cloud.cloud_mail.tenancy import quotas, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
@@ -147,11 +141,10 @@ class MailAccount(QuotaHolder, Document):
             patch["aliases"] = sync.aliases_payload(self)
         if sorted(r.group for r in before.groups) != sorted(r.group for r in self.groups):
             patch["memberGroupIds"] = sync.group_ids_payload(self)
-        if bool(before.disable_receiving) != bool(self.disable_receiving):
-            # permissions is a tagged union like roles: the whole field goes, not a sub-path.
-            patch["permissions"] = permissions_payload(self.disabled_permissions())
         if patch:
             sync.push_update(self, "accounts", patch)
+        if bool(before.disable_receiving) != bool(self.disable_receiving):
+            self.push_receiving()
         if bool(before.enabled) != bool(self.enabled):
             self.push_enabled()
         if self.flags.password:
@@ -181,6 +174,14 @@ class MailAccount(QuotaHolder, Document):
         account that does not receive either gets no mail at all."""
 
         return [RECEIVE_PERMISSION] if self.disable_receiving else []
+
+    def push_receiving(self) -> None:
+        """Only "Email: Receive emails" changes: an adopted account keeps whatever else was granted
+        to it or denied it by hand on the cluster."""
+
+        sync.client_for(self).accounts.set_permission_disabled(
+            self.stalwart_id, RECEIVE_PERMISSION, bool(self.disable_receiving)
+        )
 
     def push_enabled(self) -> None:
         """Disabled accounts keep receiving mail but lose every other permission via a cluster role."""

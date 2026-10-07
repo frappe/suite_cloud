@@ -460,6 +460,41 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(self.fake.find("Account", name="noreply")["permissions"], {"@type": "Inherit"})
         self.assertFalse(accounts.get_account("noreply@acme.com")["disable_receiving"])
 
+    def test_changing_receiving_leaves_an_accounts_other_permissions_alone(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw")
+        # As an adopted account may carry them: a list of its own, set by hand on the cluster.
+        self.fake.find("Account", name="alice")["permissions"] = {
+            "@type": "Replace",
+            "enabledPermissions": {"authenticate": True, "emailReceive": True},
+            "disabledPermissions": {"sysAccountGet": True},
+        }
+
+        doc = frappe.get_doc("Mail Account", "alice@acme.com")
+        doc.disable_receiving = 1
+        doc.save(ignore_permissions=True)
+        self.assertEqual(
+            self.fake.find("Account", name="alice")["permissions"],
+            {
+                "@type": "Replace",
+                "enabledPermissions": {"authenticate": True, "emailReceive": True},
+                "disabledPermissions": {"sysAccountGet": True, "emailReceive": True},
+            },
+        )
+
+        # Receiving again, it is back to exactly what was set by hand: nothing lost, nothing regained.
+        doc.disable_receiving = 0
+        doc.save(ignore_permissions=True)
+        self.assertEqual(
+            self.fake.find("Account", name="alice")["permissions"],
+            {
+                "@type": "Replace",
+                "enabledPermissions": {"authenticate": True, "emailReceive": True},
+                "disabledPermissions": {"sysAccountGet": True},
+            },
+        )
+
     def test_domain_delivery_settings_reach_the_cluster(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")
