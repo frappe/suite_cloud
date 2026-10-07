@@ -94,6 +94,7 @@ jobs:
           version="$(jq -r '.fields[] | select(.fieldname == "stalwart_version") | .default' "$settings")"
           archive="https://github.com/stalwartlabs/stalwart/releases/download/${version}/stalwart-x86_64-unknown-linux-gnu.tar.gz"
           curl -fsSL "$archive" | sudo tar -xz -C /usr/local/bin stalwart
+          sudo chmod +x /usr/local/bin/stalwart  # the archive holds it without the execute bit
           stalwart --version
 
       - name: Setup Bench
