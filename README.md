@@ -290,6 +290,11 @@ client talks to unchanged. Nothing reaches a real server or a real DNS provider.
 sites use names under `.frappe.test` and clean up only those, so they can run on a site that also
 holds real clusters.
 
+The fake keeps the routes it is sent but cannot follow them, so `test_delivery` starts a Stalwart
+of its own to see where they take a message: from a temporary directory, on loopback ports, with
+a local sink as its only way out. It needs a `stalwart` on `PATH` of the version new clusters
+install and is skipped without one; CI installs it.
+
 CI (`.github/workflows/ci.yml`) runs one job per module folder (Core, Mail) plus Ruff, so a
 future product adds a matrix entry rather than a workflow.
 

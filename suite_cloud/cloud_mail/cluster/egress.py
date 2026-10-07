@@ -155,7 +155,7 @@ def route_expression(cluster: Document, grouped: dict[str, list[str]], default: 
         if not str(rule.get("then", "")).startswith(SUITE_RULE_PREFIX)
         and rule.get("then") != LOCAL_RULE["then"]
     ]
-    rules = local_rules(cluster)
+    rules = local_rules(relaying_domains(cluster))
     for pool_name, domain_names in grouped.items():
         condition = " || ".join(f"sender_domain == '{d}'" for d in domain_names)
         rules.append({"if": condition, "then": route_name(pool_name)})
@@ -167,15 +167,14 @@ def route_expression(cluster: Document, grouped: dict[str, list[str]], default: 
     return {"match": plan.as_list(rules + kept), "else": fallback}
 
 
-def local_rules(cluster: Document) -> list[dict]:
-    """The rules that keep mail on the cluster.
+def local_rules(relaying: list[str]) -> list[dict]:
+    """The rules that keep mail on the cluster, given the domains that relay.
 
     Stalwart accepts every address of a relaying domain, held here or not. One it does not hold
     must miss these rules, so that it leaves like any other outbound mail (pool rules, then the
     fallback) and reaches the domain's MX; as local mail it would bounce with no mailbox to take it.
     """
 
-    relaying = relaying_domains(cluster)
     if not relaying:
         return [LOCAL_RULE]
     held_elsewhere = " && ".join(f"rcpt_domain != '{d}'" for d in relaying)

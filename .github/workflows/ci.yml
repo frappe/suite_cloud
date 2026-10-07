@@ -85,6 +85,17 @@ jobs:
           sudo apt update
           sudo apt-get install -y mariadb-client
 
+      # The delivery tests send mail through the release new clusters install. It is read from the
+      # setting's default, so that moving the pin moves this with it.
+      - name: Install Stalwart (delivery tests)
+        if: matrix.name == 'Mail'
+        run: |
+          settings=suite_cloud/suite_cloud/doctype/suite_cloud_settings/suite_cloud_settings.json
+          version="$(jq -r '.fields[] | select(.fieldname == "stalwart_version") | .default' "$settings")"
+          archive="https://github.com/stalwartlabs/stalwart/releases/download/${version}/stalwart-x86_64-unknown-linux-gnu.tar.gz"
+          curl -fsSL "$archive" | sudo tar -xz -C /usr/local/bin stalwart
+          stalwart --version
+
       - name: Setup Bench
         run: |
           pip install frappe-bench
