@@ -29,6 +29,7 @@ SUITE_RULE_PREFIX = "'egress-"
 # Mail between domains of the cluster never leaves it: without this rule first, a relay fallback
 # would send it out through a gateway only to come back through the cluster's own MX.
 LOCAL_RULE = {"if": "is_local_domain(rcpt_domain)", "then": "'local'"}
+LOCAL_ADDRESS_RULE = {"if": "is_local_address(rcpt)", "then": LOCAL_RULE["then"]}
 
 
 # --- pool resolution ------------------------------------------------------------------------
@@ -74,6 +75,17 @@ def domains_by_pool(cluster: Document) -> dict[str, list[str]]:
         if pool in populated:
             grouped.setdefault(pool, []).append(domain.domain_name)
     return grouped
+
+
+def relaying_domains(cluster: Document) -> list[str]:
+    """Enabled domains that keep some of their mailboxes on another server (split delivery)."""
+
+    return frappe.get_all(
+        "Mail Domain",
+        {"cluster": cluster.name, "enabled": 1, "allow_relaying": 1},
+        pluck="domain_name",
+        order_by="domain_name",
+    )
 
 
 # --- cluster side ------------------------------------------------------------------------------
@@ -131,7 +143,10 @@ def route_name(pool_name: str) -> str:
 
 def route_expression(cluster: Document, grouped: dict[str, list[str]], default: str | None) -> dict:
     """Local delivery first, then Suite Cloud's pool rules, with its default pool as the fallback;
-    anything else the strategy holds (foreign rules and a foreign ``else``) is preserved."""
+    anything else the strategy holds (foreign rules and a foreign ``else``) is preserved.
+
+    Every rule Suite Cloud writes routes to ``'local'`` or to an egress pool, which is how its
+    former rules are told from foreign ones and dropped."""
 
     current = current_route_expression(cluster)
     kept = [
@@ -140,7 +155,7 @@ def route_expression(cluster: Document, grouped: dict[str, list[str]], default: 
         if not str(rule.get("then", "")).startswith(SUITE_RULE_PREFIX)
         and rule.get("then") != LOCAL_RULE["then"]
     ]
-    rules = [LOCAL_RULE]
+    rules = local_rules(relaying_domains(cluster))
     for pool_name, domain_names in grouped.items():
         condition = " || ".join(f"sender_domain == '{d}'" for d in domain_names)
         rules.append({"if": condition, "then": route_name(pool_name)})
@@ -150,6 +165,23 @@ def route_expression(cluster: Document, grouped: dict[str, list[str]], default: 
     elif fallback.startswith(SUITE_RULE_PREFIX):
         fallback = "'mx'"  # our former default pool is gone; back to direct delivery
     return {"match": plan.as_list(rules + kept), "else": fallback}
+
+
+def local_rules(relaying: list[str]) -> list[dict]:
+    """The rules that keep mail on the cluster, given the domains that relay.
+
+    Stalwart accepts every address of a relaying domain, held here or not. One it does not hold
+    must miss these rules, so that it leaves like any other outbound mail (pool rules, then the
+    fallback) and reaches the domain's MX; as local mail it would bounce with no mailbox to take it.
+    """
+
+    if not relaying:
+        return [LOCAL_RULE]
+    held_elsewhere = " && ".join(f"rcpt_domain != '{d}'" for d in relaying)
+    return [
+        LOCAL_ADDRESS_RULE,
+        {"if": f"{LOCAL_RULE['if']} && {held_elsewhere}", "then": LOCAL_RULE["then"]},
+    ]
 
 
 def expression_rules(expression: dict) -> list[dict]:

@@ -16,6 +16,33 @@ KIND_TYPES = {
 }
 EMBEDDED_TYPES = ("RocksDb", "FileSystem")
 STORE_FIELDS = ("data_store", "blob_store", "search_store", "in_memory_store")
+# The AWS regions Stalwart names (S3StoreRegion) and so knows the endpoint of.
+S3_REGIONS = (
+    "us-east-1",
+    "us-east-2",
+    "us-west-1",
+    "us-west-2",
+    "ca-central-1",
+    "af-south-1",
+    "ap-east-1",
+    "ap-south-1",
+    "ap-northeast-1",
+    "ap-northeast-2",
+    "ap-northeast-3",
+    "ap-southeast-1",
+    "ap-southeast-2",
+    "cn-north-1",
+    "cn-northwest-1",
+    "eu-north-1",
+    "eu-central-1",
+    "eu-central-2",
+    "eu-west-1",
+    "eu-west-2",
+    "eu-west-3",
+    "il-central-1",
+    "me-south-1",
+    "sa-east-1",
+)
 
 
 class StalwartStore(Document):
@@ -103,6 +130,20 @@ class StalwartStore(Document):
             )
         if self.type in ("PostgreSql", "MySql") and not self.port:
             self.port = 5432 if self.type == "PostgreSql" else 3306
+        if self.type == "S3":
+            self.validate_s3_region()
+
+    def validate_s3_region(self) -> None:
+        """A region Stalwart does not name can only be reached through an endpoint."""
+
+        if not self.region:
+            frappe.throw(_("Region is required for an S3 store."))
+        if not self.endpoint and self.region not in S3_REGIONS:
+            frappe.throw(
+                _(
+                    "Stalwart has no built-in endpoint for region {0}. Set the Endpoint, e.g. {1} for AWS."
+                ).format(self.region, f"https://s3.{self.region}.amazonaws.com")
+            )
 
     def on_trash(self) -> None:
         for field in STORE_FIELDS:
@@ -163,16 +204,27 @@ class StalwartStore(Document):
 
     def _config_s3(self) -> dict:
         return {
-            "region": self.region,
+            "region": self._s3_region(),
             "bucket": self.bucket,
-            "endpoint": self.endpoint or None,
-            "accessKey": self.access_key,
+            # Stalwart's PublicString union: shaped like a secret, but shown in the clear.
+            "accessKey": {"@type": "Value", "value": self.access_key} if self.access_key else None,
             "secretKey": secret(self, "secret_key"),
             "keyPrefix": self.key_prefix or None,
             "timeout": ms(self.timeout, 30),
             "maxRetries": cint(self.max_retries) or 3,
             "verifyAfterWrite": bool(self.verify_after_write),
         }
+
+    def _s3_region(self) -> dict:
+        """Stalwart's S3StoreRegion union: a region it names, or any region with its endpoint.
+
+        The endpoint has no field of its own on the store; S3-compatible services are a Custom region.
+        """
+
+        self.validate_s3_region()  # stores saved before the check existed
+        if self.endpoint:
+            return {"@type": "Custom", "customEndpoint": self.endpoint, "customRegion": self.region}
+        return {"@type": "".join(part.capitalize() for part in self.region.split("-"))}
 
     def _http_auth(self) -> dict:
         if self.http_auth_type == "Basic":

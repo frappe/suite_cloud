@@ -258,7 +258,8 @@ contact email for site-specific notices; the Suite app sends both whenever Suite
 A domain carries three delivery settings a site may change: a catch-all address for local parts
 that match no account, sub-addressing (`user+tag@`), and relaying, which makes the cluster forward
 mail for addresses it does not hold to the domain's MX instead of rejecting it, so a domain can
-keep some mailboxes on another server (split delivery).
+keep some mailboxes on another server (split delivery). Relayed mail leaves like any other the
+cluster sends, through the egress pool of its sender when there is one.
 
 Records for mail client auto-setup (SRV, autoconfig, MTA-STS) are listed only when the domain has
 `publish_client_discovery_records` turned on, because the cluster has no certificate for customer
@@ -296,6 +297,11 @@ and `suite_cloud/cloud_mail/tests` for mail, including the fake Stalwart
 client talks to unchanged. Nothing reaches a real server or a real DNS provider. Tests that create
 sites use names under `.frappe.test` and clean up only those, so they can run on a site that also
 holds real clusters.
+
+The fake keeps the routes it is sent but cannot follow them, so `test_delivery` starts a Stalwart
+of its own to see where they take a message: from a temporary directory, on loopback ports, with
+a local sink as its only way out. It needs a `stalwart` on `PATH` of the version new clusters
+install and is skipped without one; CI installs it.
 
 CI (`.github/workflows/ci.yml`) runs one job per module folder (Core, Mail) plus Ruff, so a
 future product adds a matrix entry rather than a workflow.

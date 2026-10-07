@@ -121,7 +121,7 @@ class TestStalwartCluster(IntegrationTestCase):
         remove_cluster(auto.name)
 
     def test_store_kind_is_enforced(self) -> None:
-        blob = make_store("Blob", "S3", region="r", bucket="b", access_key="a", secret_key="s")
+        blob = make_store("Blob", "S3", region="us-east-1", bucket="b", access_key="a", secret_key="s")
         cluster = frappe.get_doc(
             {
                 "doctype": "Stalwart Cluster",
@@ -131,6 +131,46 @@ class TestStalwartCluster(IntegrationTestCase):
             }
         )
         self.assertRaisesRegex(frappe.ValidationError, "Data store", cluster.insert)
+
+    def test_s3_store_names_its_region_or_carries_its_endpoint(self) -> None:
+        bucket = {"bucket": "mail", "access_key": "AK", "secret_key": "SK"}
+
+        # Stalwart takes the region, key id and secret as tagged unions, and a bare string for
+        # none of them (checked on v0.16.20). On AWS the region is one it names.
+        aws = make_store("Blob", "S3", region="ap-south-1", **bucket)
+        self.assertEqual(
+            aws.config,
+            {
+                "@type": "S3",
+                "region": {"@type": "ApSouth1"},
+                "bucket": "mail",
+                "accessKey": {"@type": "Value", "value": "AK"},
+                "secretKey": {"@type": "Value", "secret": "SK"},
+                "timeout": 15000,
+                "maxRetries": 3,
+                "verifyAfterWrite": True,
+            },
+        )
+
+        # An S3-compatible service is a Custom region holding the endpoint: the store itself has
+        # no endpoint property, and Stalwart refuses one.
+        endpoint = "https://s3.fr-par.scw.cloud"
+        compatible = make_store("Blob", "S3", region="fr-par", endpoint=endpoint, **bucket)
+        self.assertEqual(
+            compatible.config["region"],
+            {"@type": "Custom", "customEndpoint": endpoint, "customRegion": "fr-par"},
+        )
+        self.assertNotIn("endpoint", compatible.config)
+
+        # A region Stalwart does not name cannot be sent without its endpoint.
+        unnamed = {"region": "ap-south-2", **bucket}
+        self.assertRaisesRegex(
+            frappe.ValidationError, "no built-in endpoint", make_store, "Blob", "S3", **unnamed
+        )
+        make_store("Blob", "S3", endpoint="https://s3.ap-south-2.amazonaws.com", **unnamed)
+        self.assertRaisesRegex(
+            frappe.ValidationError, "Region is required", make_store, "Blob", "S3", **bucket
+        )
 
     def test_embedded_stores_pin_the_cluster_to_one_full_node(self) -> None:
         cluster = make_cluster(name="solo", hostname=f"mail.solo.{ROOT_DOMAIN}", multi_node=False)

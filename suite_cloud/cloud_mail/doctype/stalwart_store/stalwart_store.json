@@ -248,7 +248,7 @@
    "fieldtype": "Data",
    "label": "Region",
    "mandatory_depends_on": "eval: doc.type == \"S3\"",
-   "description": "Bucket region, e.g. ap-south-1. Any value works for services that ignore regions."
+   "description": "Bucket region, e.g. ap-south-1. With an endpoint, any value works for services that ignore regions."
   },
   {
    "fieldname": "bucket",
@@ -258,7 +258,7 @@
    "description": "Bucket name. Create it beforehand; Stalwart does not create buckets."
   },
   {
-   "description": "Leave empty for AWS. Set the API URL for MinIO, Garage, Backblaze, Hetzner and other S3-compatible services.",
+   "description": "Leave empty for AWS. Set the API URL for MinIO, Garage, Backblaze, Hetzner and other S3-compatible services, or for an AWS region Stalwart does not know by name.",
    "fieldname": "endpoint",
    "fieldtype": "Data",
    "label": "Endpoint"
@@ -531,7 +531,7 @@
    "link_fieldname": "in_memory_store"
   }
  ],
- "modified": "2026-09-04 14:00:00.000000",
+ "modified": "2026-10-07 09:30:00.000000",
  "modified_by": "Administrator",
  "module": "Cloud Mail",
  "name": "Stalwart Store",
