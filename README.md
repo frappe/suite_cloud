@@ -207,7 +207,8 @@ emails" permission (`emailReceive`) is disabled on it, so it logs in and sends a
 addressed to it bounces back to the sender. Accounts are shown with `disable_receiving`, and
 `update_account` takes it too, as does the Mail Account form. Changing it touches that one
 permission: whatever else was granted to an account or denied it by hand on the cluster stays as
-it is.
+it is. Groups have the same option on `create_group`, `update_group` and the Mail Group form: mail
+sent to the group's address bounces, and its members' own mail is not affected.
 
 Aliases can be replaced as a set (`set_aliases`) or changed one at a time (`add_alias`,
 `remove_alias`, `set_alias_enabled`). The one-at-a-time calls lock the parent row for the change,

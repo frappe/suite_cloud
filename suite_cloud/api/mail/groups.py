@@ -41,7 +41,10 @@ def create_group(
     members: list[str] | str | None = None,
     disk_quota_gb: float | None = None,
     quotas: dict | str | None = None,
+    disable_receiving: bool = False,
 ) -> dict:
+    """``disable_receiving`` makes a group whose address takes no mail: what is sent to it bounces."""
+
     wanted = _resolve_members(members)  # before the insert: a refusal must not leave a cluster group behind
     doc = frappe.get_doc(
         {
@@ -49,6 +52,7 @@ def create_group(
             "email": email,
             "site": current_site().name,
             "description": description,
+            "disable_receiving": int(sbool(disable_receiving)),
             "aliases": as_alias_rows(aliases),
         }
     )
@@ -67,13 +71,17 @@ def update_group(
     description: str | None = None,
     disk_quota_gb: float | None = None,
     quotas: dict | str | None = None,
+    disable_receiving: bool | None = None,
 ) -> dict:
     """``quotas`` replaces the optional limits (``{}`` lifts them all); the disk quota stays unless
-    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it."""
+    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it. ``disable_receiving`` stops the group
+    receiving or lets it receive again; left out, it stays as it is."""
 
     doc = owned("Mail Group", email)
     if description is not None:
         doc.description = description
+    if disable_receiving is not None:
+        doc.disable_receiving = int(sbool(disable_receiving))
     quota_rows.apply(doc, disk_quota_gb, quotas)
     doc.save(ignore_permissions=True)
     return doc.to_api()

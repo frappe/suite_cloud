@@ -482,6 +482,33 @@ class TestDirectoryApi(SiteApiTestCase):
         )
         self.assertEqual(live(), {"@type": "Inherit"})
 
+    def test_a_group_can_be_kept_from_receiving_and_let_receive_again(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        live = lambda name: self.fake.find("Account", name=name)["permissions"]  # noqa: E731
+        denied = {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": {"emailReceive": True}}
+
+        # Created unable to receive, and listed as such; another group is left to inherit.
+        self.assertTrue(groups.create_group("noreply@acme.com", disable_receiving=True)["disable_receiving"])
+        self.assertEqual(live("noreply"), denied)
+        self.assertTrue(groups.list_groups()["items"][0]["disable_receiving"])
+        self.assertFalse(groups.create_group("sales@acme.com")["disable_receiving"])
+        self.assertEqual(live("sales"), {"@type": "Inherit"})
+
+        # Changed on an existing group, in the same update as the rest of the save.
+        calls = len(self.fake.calls)
+        updated = groups.update_group("sales@acme.com", description="Sales", disable_receiving=True)
+        self.assertTrue(updated["disable_receiving"])
+        sales_id = frappe.db.get_value("Mail Group", "sales@acme.com", "stalwart_id")
+        updates = [args["update"] for name, args in self.fake.calls[calls:] if name == "x:Account/set"]
+        self.assertEqual(updates, [{sales_id: {"description": "Sales", "permissions": denied}}])
+        # An update that says nothing about receiving leaves it as it is.
+        self.assertTrue(groups.update_group("sales@acme.com", description="Sales team")["disable_receiving"])
+        self.assertEqual(live("sales"), denied)
+
+        self.assertFalse(groups.update_group("sales@acme.com", disable_receiving=False)["disable_receiving"])
+        self.assertEqual(live("sales"), {"@type": "Inherit"})
+
     def test_changing_receiving_leaves_an_accounts_other_permissions_alone(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")

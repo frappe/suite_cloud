@@ -162,6 +162,7 @@ class Group:
     name: str
     domain_id: str
     description: str | None = None
+    disabled_permissions: list[str] | None = None
     aliases: list[EmailAlias] | None = None
     disk_quota_bytes: int | None = None
     quotas: dict[str, int] | None = None
@@ -171,7 +172,7 @@ class Group:
             "@type": "Group",
             "name": self.name,
             "domainId": self.domain_id,
-            "permissions": {"@type": "Inherit"},
+            "permissions": permissions_payload(self.disabled_permissions),
             "quotas": quotas_payload(self.disk_quota_bytes, self.quotas),
             "aliases": indexed(self.aliases),
             "description": self.description,
