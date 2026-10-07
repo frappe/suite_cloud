@@ -12,7 +12,13 @@ from frappe.utils.password import set_encrypted_password
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import get_account_client
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
-from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA, GB, Account
+from suite_cloud.cloud_mail.stalwart.directory import (
+    DISK_QUOTA,
+    GB,
+    RECEIVE_PERMISSION,
+    Account,
+    permissions_payload,
+)
 from suite_cloud.cloud_mail.tenancy import quotas, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
@@ -48,6 +54,7 @@ class MailAccount(QuotaHolder, Document):
         app_password: DF.Password | None
         cluster: DF.Link | None
         description: DF.Data | None
+        disable_receiving: DF.Check
         display_name: DF.Data | None
         domain: DF.Link | None
         email: DF.Data
@@ -140,6 +147,9 @@ class MailAccount(QuotaHolder, Document):
             patch["aliases"] = sync.aliases_payload(self)
         if sorted(r.group for r in before.groups) != sorted(r.group for r in self.groups):
             patch["memberGroupIds"] = sync.group_ids_payload(self)
+        if bool(before.disable_receiving) != bool(self.disable_receiving):
+            # permissions is a tagged union like roles: the whole field goes, not a sub-path.
+            patch["permissions"] = permissions_payload(self.disabled_permissions())
         if patch:
             sync.push_update(self, "accounts", patch)
         if bool(before.enabled) != bool(self.enabled):
@@ -158,12 +168,19 @@ class MailAccount(QuotaHolder, Document):
             domain_id=sync.domain_stalwart_id(self.domain),
             password=password or frappe.generate_hash(length=24),
             member_group_ids=sync.group_ids(self),
+            disabled_permissions=self.disabled_permissions(),
             aliases=sync.aliases(self),
             description=self.display_name or None,
             locale=self.locale or "en-US",
             time_zone=self.time_zone or None,
             quotas=self.quota_map(),
         )
+
+    def disabled_permissions(self) -> list[str]:
+        """What the account is denied whatever its roles grant, the disabled role included: a locked
+        account that does not receive either gets no mail at all."""
+
+        return [RECEIVE_PERMISSION] if self.disable_receiving else []
 
     def push_enabled(self) -> None:
         """Disabled accounts keep receiving mail but lose every other permission via a cluster role."""
@@ -338,6 +355,7 @@ def account_payload(
         "email": row.email,
         "domain": row.domain,
         "enabled": bool(row.enabled),
+        "disable_receiving": bool(row.disable_receiving),
         "display_name": row.display_name,
         "description": row.description,
         "disk_quota_gb": round(cint(quotas.get(DISK_QUOTA)) / GB, 6),
@@ -360,6 +378,7 @@ ACCOUNT_FIELDS = [
     "cluster",
     "stalwart_id",
     "enabled",
+    "disable_receiving",
     "display_name",
     "description",
     "locale",

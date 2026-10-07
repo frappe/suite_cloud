@@ -85,7 +85,10 @@ def create_account(
     quotas: dict | str | None = None,
     locale: str | None = None,
     time_zone: str | None = None,
+    disable_receiving: bool = False,
 ) -> dict:
+    """``disable_receiving`` makes the account send-only: mail addressed to it bounces."""
+
     validate_password(password)
 
     site = current_site()
@@ -101,6 +104,7 @@ def create_account(
             "description": description,
             "locale": locale or "en-US",
             "time_zone": time_zone,
+            "disable_receiving": int(sbool(disable_receiving)),
             "aliases": as_alias_rows(aliases),
             "groups": [{"group": owned("Mail Group", g).name} for g in as_list(groups, MEMBERSHIP_CAP)],
         }

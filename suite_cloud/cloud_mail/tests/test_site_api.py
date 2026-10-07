@@ -436,6 +436,30 @@ class TestDirectoryApi(SiteApiTestCase):
         options = meta.get_account_options()["quotas"]
         self.assertEqual([o["value"] for o in options], ["maxEmails", "maxSieveScripts"])
 
+    def test_an_account_can_be_created_unable_to_receive(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+
+        account = accounts.create_account("noreply@acme.com", "secret-pw", disable_receiving=True)
+        self.assertTrue(account["disable_receiving"])
+        # "Email: Receive emails" taken away on top of the roles, in the shape Stalwart 0.16 takes.
+        self.assertEqual(
+            self.fake.find("Account", name="noreply")["permissions"],
+            {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": {"emailReceive": True}},
+        )
+        self.assertTrue(accounts.list_accounts()["items"][0]["disable_receiving"])
+
+        # Unasked, an account keeps everything its roles grant.
+        self.assertFalse(accounts.create_account("alice@acme.com", "secret-pw")["disable_receiving"])
+        self.assertEqual(self.fake.find("Account", name="alice")["permissions"], {"@type": "Inherit"})
+
+        # An operator lets it receive again from the form, and the cluster follows.
+        doc = frappe.get_doc("Mail Account", "noreply@acme.com")
+        doc.disable_receiving = 0
+        doc.save(ignore_permissions=True)
+        self.assertEqual(self.fake.find("Account", name="noreply")["permissions"], {"@type": "Inherit"})
+        self.assertFalse(accounts.get_account("noreply@acme.com")["disable_receiving"])
+
     def test_domain_delivery_settings_reach_the_cluster(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")

@@ -50,6 +50,18 @@ def roles_payload(role_ids: list[str] | None) -> dict:
     return {"@type": "User"}
 
 
+# Stalwart's "Email: Receive emails": without it, mail for the account bounces back to its sender.
+RECEIVE_PERMISSION = "emailReceive"
+
+
+def permissions_payload(disabled: list[str] | None) -> dict:
+    """Permissions taken away from what the account's roles grant; none means it keeps them all."""
+
+    if disabled:
+        return {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": id_set(disabled)}
+    return {"@type": "Inherit"}
+
+
 # Stalwart's ``StorageQuota`` enum: what an account or group may hold. Disk space is in bytes,
 # the rest are counts. An absent key means the cluster's default (usually no limit).
 STORAGE_QUOTAS = {
@@ -92,6 +104,7 @@ class Account:
     password: str | None = None
     member_group_ids: list[str] | None = None
     role_ids: list[str] | None = None
+    disabled_permissions: list[str] | None = None
     aliases: list[EmailAlias] | None = None
     description: str | None = None
     locale: str = DEFAULT_LOCALE
@@ -108,7 +121,7 @@ class Account:
             "credentials": credentials,
             "memberGroupIds": id_set(self.member_group_ids),
             "roles": roles_payload(self.role_ids),
-            "permissions": {"@type": "Inherit"},
+            "permissions": permissions_payload(self.disabled_permissions),
             "quotas": quotas_payload(self.disk_quota_bytes, self.quotas),
             "aliases": indexed(self.aliases),
             "description": self.description,
@@ -242,6 +255,7 @@ class AccountService(ManagementService):
         "domainId",
         "locale",
         "memberGroupIds",
+        "permissions",
         "quotas",
         "roles",
         "timeZone",
