@@ -495,6 +495,33 @@ class TestDirectoryApi(SiteApiTestCase):
             },
         )
 
+    def test_a_save_that_changes_receiving_reaches_the_cluster_as_one_update(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("noreply@acme.com", "secret-pw", display_name="No Reply")
+
+        doc = frappe.get_doc("Mail Account", "noreply@acme.com")
+        doc.display_name = "Do Not Reply"
+        doc.disable_receiving = 1
+        calls = len(self.fake.calls)
+        doc.save(ignore_permissions=True)
+
+        # One update is taken or refused whole. Two could leave the cluster with the new name while
+        # the refused second one rolls the document back to the old.
+        updates = [args["update"] for name, args in self.fake.calls[calls:] if name == "x:Account/set"]
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(
+            updates[0][doc.stalwart_id],
+            {
+                "description": "Do Not Reply",
+                "permissions": {
+                    "@type": "Merge",
+                    "enabledPermissions": {},
+                    "disabledPermissions": {"emailReceive": True},
+                },
+            },
+        )
+
     def test_domain_delivery_settings_reach_the_cluster(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")

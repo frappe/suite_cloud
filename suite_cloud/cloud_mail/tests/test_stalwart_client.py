@@ -89,14 +89,18 @@ class TestStalwartClient(UnitTestCase):
         accounts = self.client.accounts
         live = lambda account_id: self.fake.get("Account", account_id)["permissions"]  # noqa: E731
 
+        def set_disabled(account_id: str, permission: str, disabled: bool) -> None:
+            changed = accounts.changed_permissions(account_id, permission, disabled)
+            accounts.update(account_id, {"permissions": changed})
+
         # An account that inherits everything gains the one denial, and loses it again.
         plain = accounts.create_id(Account(name="plain", domain_id=domain_id))
-        accounts.set_permission_disabled(plain, "emailReceive", True)
+        set_disabled(plain, "emailReceive", True)
         self.assertEqual(
             live(plain),
             {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": {"emailReceive": True}},
         )
-        accounts.set_permission_disabled(plain, "emailReceive", False)
+        set_disabled(plain, "emailReceive", False)
         self.assertEqual(live(plain), {"@type": "Inherit"})
 
         # Grants and denials merged in by hand stay, whichever way the one permission goes.
@@ -106,7 +110,7 @@ class TestStalwartClient(UnitTestCase):
             "enabledPermissions": {"sysAccountGet": True},
             "disabledPermissions": {"authenticate": True},
         }
-        accounts.set_permission_disabled(merged, "emailReceive", True)
+        set_disabled(merged, "emailReceive", True)
         self.assertEqual(
             live(merged),
             {
@@ -115,7 +119,7 @@ class TestStalwartClient(UnitTestCase):
                 "disabledPermissions": {"authenticate": True, "emailReceive": True},
             },
         )
-        accounts.set_permission_disabled(merged, "emailReceive", False)
+        set_disabled(merged, "emailReceive", False)
         self.assertEqual(
             live(merged),
             {
@@ -133,7 +137,7 @@ class TestStalwartClient(UnitTestCase):
             "enabledPermissions": {},
             "disabledPermissions": {"emailReceive": True},
         }
-        accounts.set_permission_disabled(bare, "emailReceive", False)
+        set_disabled(bare, "emailReceive", False)
         self.assertEqual(
             live(bare), {"@type": "Replace", "enabledPermissions": {}, "disabledPermissions": {}}
         )

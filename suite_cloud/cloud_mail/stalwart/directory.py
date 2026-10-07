@@ -304,12 +304,12 @@ class AccountService(ManagementService):
         else:
             self.update(account_id, {f"credentials/{row}/secret": new_password})
 
-    def set_permission_disabled(self, account_id: str, permission: str, disabled: bool) -> None:
-        """Disables one permission on the account or stops disabling it, leaving its others intact."""
+    def changed_permissions(self, account_id: str, permission: str, disabled: bool) -> dict:
+        """The account's permissions with one of them disabled or no longer disabled, the others
+        intact. A tagged union like roles: read here, then sent back whole in an update."""
 
         current = (self.get(account_id, properties=["permissions"]) or {}).get("permissions")
-        # A tagged union like roles: read, changed and sent back whole, not patched by sub-path.
-        self.update(account_id, {"permissions": with_permission_disabled(current, permission, disabled)})
+        return with_permission_disabled(current, permission, disabled)
 
     def set_roles(self, account_id: str, role_ids: list[str]) -> None:
         # roles is a tagged union; its @type cannot be patched by sub-path, so the whole field goes.

@@ -141,10 +141,12 @@ class MailAccount(QuotaHolder, Document):
             patch["aliases"] = sync.aliases_payload(self)
         if sorted(r.group for r in before.groups) != sorted(r.group for r in self.groups):
             patch["memberGroupIds"] = sync.group_ids_payload(self)
+        if bool(before.disable_receiving) != bool(self.disable_receiving):
+            # Read before anything is sent and sent with the rest: the save reaches the cluster as
+            # one update, so a refusal cannot leave half of it behind.
+            patch["permissions"] = self.receiving_permissions()
         if patch:
             sync.push_update(self, "accounts", patch)
-        if bool(before.disable_receiving) != bool(self.disable_receiving):
-            self.push_receiving()
         if bool(before.enabled) != bool(self.enabled):
             self.push_enabled()
         if self.flags.password:
@@ -175,11 +177,11 @@ class MailAccount(QuotaHolder, Document):
 
         return [RECEIVE_PERMISSION] if self.disable_receiving else []
 
-    def push_receiving(self) -> None:
-        """Only "Email: Receive emails" changes: an adopted account keeps whatever else was granted
-        to it or denied it by hand on the cluster."""
+    def receiving_permissions(self) -> dict:
+        """The permissions the cluster holds for the account with only "Email: Receive emails"
+        changed: an adopted account keeps whatever else was granted to it or denied it by hand."""
 
-        sync.client_for(self).accounts.set_permission_disabled(
+        return sync.client_for(self).accounts.changed_permissions(
             self.stalwart_id, RECEIVE_PERMISSION, bool(self.disable_receiving)
         )
 
