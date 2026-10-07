@@ -201,6 +201,12 @@ class TestMailDomain(TenancyTestCase):
                 "name": "bob",
                 "domainId": domain_id,
                 "roles": {"@type": "Custom", "roleIds": {disabled_role: True}},
+                # Set by hand on the old server: "Email: Receive emails" under disabled permissions.
+                "permissions": {
+                    "@type": "Merge",
+                    "enabledPermissions": {},
+                    "disabledPermissions": {"emailReceive": True},
+                },
             },
         )
         self.fake._add("Account", {"@type": "User", "name": "admin", "roles": {"@type": "Admin"}})
@@ -247,8 +253,8 @@ class TestMailDomain(TenancyTestCase):
         self.assertEqual([a.alias_email for a in group.aliases], ["crew@legacy.com"])
         alice = frappe.get_doc("Mail Account", "alice@legacy.com")
         self.assertEqual(
-            (alice.display_name, alice.locale, alice.time_zone, alice.enabled),
-            ("Alice", "de-DE", "Europe/Berlin", 1),
+            (alice.display_name, alice.locale, alice.time_zone, alice.enabled, alice.disable_receiving),
+            ("Alice", "de-DE", "Europe/Berlin", 1, 0),
         )
         self.assertEqual(alice.quota_map(), {"maxDiskQuota": gb, "maxEmails": 500})
         self.assertEqual(
@@ -257,7 +263,10 @@ class TestMailDomain(TenancyTestCase):
         )
         self.assertEqual([g.group for g in alice.groups], ["team@legacy.com"])
         bob = frappe.get_doc("Mail Account", "bob@legacy.com")
-        self.assertEqual((bob.enabled, bob.allotted_disk_gb()), (0, self.site.default_disk_quota_gb))
+        self.assertEqual(
+            (bob.enabled, bob.disable_receiving, bob.allotted_disk_gb()),
+            (0, 1, self.site.default_disk_quota_gb),
+        )
         self.assertEqual(
             frappe.get_doc("Mailing List", "all@legacy.com").recipient_emails(),
             ["alice@legacy.com", "ext@example.org"],
