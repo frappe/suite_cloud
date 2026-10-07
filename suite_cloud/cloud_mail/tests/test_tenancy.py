@@ -174,6 +174,12 @@ class TestMailDomain(TenancyTestCase):
                 "description": "Team",
                 "quotas": {"maxDiskQuota": 2 * gb},
                 "aliases": {"0": {"name": "crew", "domainId": domain_id, "enabled": True}},
+                # Set by hand on the old server, as on bob below.
+                "permissions": {
+                    "@type": "Merge",
+                    "enabledPermissions": {},
+                    "disabledPermissions": {"emailReceive": True},
+                },
             },
         )
         disabled_role = self.fake.find("Role", description=DISABLED_ROLE_DESCRIPTION)["id"]
@@ -249,7 +255,9 @@ class TestMailDomain(TenancyTestCase):
         self.assertEqual(domain.catch_all_address, "inbox@legacy.com")
         self.assertTrue(domain.authentication_records)  # the published zone was read in
         group = frappe.get_doc("Mail Group", "team@legacy.com")
-        self.assertEqual((group.stalwart_id, group.allotted_disk_gb()), (group_id, 2))
+        self.assertEqual(
+            (group.stalwart_id, group.allotted_disk_gb(), group.disable_receiving), (group_id, 2, 1)
+        )
         self.assertEqual([a.alias_email for a in group.aliases], ["crew@legacy.com"])
         alice = frappe.get_doc("Mail Account", "alice@legacy.com")
         self.assertEqual(

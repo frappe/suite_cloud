@@ -136,6 +136,7 @@ def _adopt_groups(site, groups: list[dict], domains: dict[str, str], report: Rep
                 "site": site.name,
                 "stalwart_id": live["id"],
                 "description": live.get("description"),
+                "disable_receiving": int(RECEIVE_PERMISSION in _disabled_permissions(live)),
                 "aliases": _alias_rows(live, domains),
                 "quotas": _quota_rows(live),
             },
