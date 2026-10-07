@@ -12,7 +12,7 @@ from frappe.utils.password import set_encrypted_password
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.stalwart import get_account_client
 from suite_cloud.cloud_mail.stalwart.credentials import Credential
-from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA, GB, RECEIVE_PERMISSION, Account
+from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA, GB, Account
 from suite_cloud.cloud_mail.tenancy import quotas, sync
 from suite_cloud.cloud_mail.tenancy.addresses import (
     assert_address_available,
@@ -144,7 +144,7 @@ class MailAccount(QuotaHolder, Document):
         if bool(before.disable_receiving) != bool(self.disable_receiving):
             # Read before anything is sent and sent with the rest: the save reaches the cluster as
             # one update, so a refusal cannot leave half of it behind.
-            patch["permissions"] = self.receiving_permissions()
+            patch["permissions"] = sync.receiving_permissions(self, "accounts")
         if patch:
             sync.push_update(self, "accounts", patch)
         if bool(before.enabled) != bool(self.enabled):
@@ -163,26 +163,12 @@ class MailAccount(QuotaHolder, Document):
             domain_id=sync.domain_stalwart_id(self.domain),
             password=password or frappe.generate_hash(length=24),
             member_group_ids=sync.group_ids(self),
-            disabled_permissions=self.disabled_permissions(),
+            disabled_permissions=sync.disabled_permissions(self),
             aliases=sync.aliases(self),
             description=self.display_name or None,
             locale=self.locale or "en-US",
             time_zone=self.time_zone or None,
             quotas=self.quota_map(),
-        )
-
-    def disabled_permissions(self) -> list[str]:
-        """What the account is denied whatever its roles grant, the disabled role included: a locked
-        account that does not receive either gets no mail at all."""
-
-        return [RECEIVE_PERMISSION] if self.disable_receiving else []
-
-    def receiving_permissions(self) -> dict:
-        """The permissions the cluster holds for the account with only "Email: Receive emails"
-        changed: an adopted account keeps whatever else was granted to it or denied it by hand."""
-
-        return sync.client_for(self).accounts.changed_permissions(
-            self.stalwart_id, RECEIVE_PERMISSION, bool(self.disable_receiving)
         )
 
     def push_enabled(self) -> None:
