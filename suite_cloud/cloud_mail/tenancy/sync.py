@@ -10,7 +10,7 @@ import frappe
 from frappe import _
 
 from suite_cloud.cloud_mail.stalwart import get_client
-from suite_cloud.cloud_mail.stalwart.directory import EmailAlias
+from suite_cloud.cloud_mail.stalwart.directory import RECEIVE_PERMISSION, EmailAlias
 from suite_cloud.cloud_mail.stalwart.errors import StalwartRejectedError
 from suite_cloud.cloud_mail.tenancy.addresses import assert_address_available, validate_email_address
 
@@ -92,6 +92,22 @@ def aliases_payload(doc: Document) -> dict:
 def aliases_changed(before: Document, after: Document) -> bool:
     key = lambda rows: sorted((r.alias_email, bool(r.enabled), r.description or "") for r in rows)  # noqa: E731
     return key(before.aliases) != key(after.aliases)
+
+
+def disabled_permissions(doc: Document) -> list[str]:
+    """What an account or group is denied whatever its roles grant. For an account that includes
+    the disabled role: one that is locked and does not receive either gets no mail at all."""
+
+    return [RECEIVE_PERMISSION] if doc.disable_receiving else []
+
+
+def receiving_permissions(doc: Document, service: str) -> dict:
+    """The permissions the cluster holds for an account or group with only "Email: Receive emails"
+    changed: an adopted one keeps whatever else was granted to it or denied it by hand."""
+
+    return getattr(client_for(doc), service).changed_permissions(
+        doc.stalwart_id, RECEIVE_PERMISSION, bool(doc.disable_receiving)
+    )
 
 
 def group_ids(doc: Document) -> list[str]:

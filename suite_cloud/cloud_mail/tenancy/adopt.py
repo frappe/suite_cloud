@@ -16,6 +16,7 @@ from frappe.utils import cint
 
 from suite_cloud.cloud_mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.cloud_mail.cluster.reconcile import INFRA_ACCOUNTS
+from suite_cloud.cloud_mail.stalwart.directory import RECEIVE_PERMISSION
 
 SAVEPOINT = "adopt_object"
 
@@ -135,6 +136,7 @@ def _adopt_groups(site, groups: list[dict], domains: dict[str, str], report: Rep
                 "site": site.name,
                 "stalwart_id": live["id"],
                 "description": live.get("description"),
+                "disable_receiving": int(RECEIVE_PERMISSION in _disabled_permissions(live)),
                 "aliases": _alias_rows(live, domains),
                 "quotas": _quota_rows(live),
             },
@@ -164,6 +166,7 @@ def _adopt_accounts(site, users: list[dict], domains, groups, disabled_role_id, 
                 "site": site.name,
                 "stalwart_id": live["id"],
                 "enabled": int(not disabled),
+                "disable_receiving": int(RECEIVE_PERMISSION in _disabled_permissions(live)),
                 "display_name": live.get("description"),
                 "locale": live.get("locale"),
                 "time_zone": live.get("timeZone"),
@@ -239,6 +242,10 @@ def _alias_rows(live: dict, domains: dict[str, str]) -> list[dict]:
             }
         )
     return rows
+
+
+def _disabled_permissions(live: dict) -> dict:
+    return (live.get("permissions") or {}).get("disabledPermissions") or {}
 
 
 def _quota_rows(live: dict) -> list[dict]:

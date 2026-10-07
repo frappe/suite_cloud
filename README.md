@@ -202,6 +202,14 @@ issues a new one and revokes the old one. Suite Cloud keeps the app password enc
 Account and never keeps the account's password. An API key (Bearer token) for the account exists
 only when an operator creates one from the Mail Account form.
 
+`create_account` with `disable_receiving` makes a send-only account: Stalwart's "Email: Receive
+emails" permission (`emailReceive`) is disabled on it, so it logs in and sends as usual while mail
+addressed to it bounces back to the sender. Accounts are shown with `disable_receiving`, and
+`update_account` takes it too, as does the Mail Account form. Changing it touches that one
+permission: whatever else was granted to an account or denied it by hand on the cluster stays as
+it is. Groups have the same option on `create_group`, `update_group` and the Mail Group form: mail
+sent to the group's address bounces, and its members' own mail is not affected.
+
 Aliases can be replaced as a set (`set_aliases`) or changed one at a time (`add_alias`,
 `remove_alias`, `set_alias_enabled`). The one-at-a-time calls lock the parent row for the change,
 so two admins editing the same account never drop each other's rows; the dashboard uses those.

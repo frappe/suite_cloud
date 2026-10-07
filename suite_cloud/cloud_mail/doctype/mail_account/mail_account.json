@@ -11,6 +11,7 @@
   "cluster",
   "column_break_main",
   "enabled",
+  "disable_receiving",
   "display_name",
   "description",
   "stalwart_id",
@@ -86,6 +87,13 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Enabled"
+  },
+  {
+   "default": "0",
+   "description": "Tick for a send-only account: it logs in, reads and sends as usual, but mail addressed to it bounces back to the sender. Untick to let it receive again.",
+   "fieldname": "disable_receiving",
+   "fieldtype": "Check",
+   "label": "Disable Receiving"
   },
   {
    "description": "Name shown to other users, e.g. Alice Doe. This is the only text sent to the cluster for the account.",
@@ -209,7 +217,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-11 10:32:49.371834",
+ "modified": "2026-10-07 13:05:00.000000",
  "modified_by": "Administrator",
  "module": "Cloud Mail",
  "name": "Mail Account",

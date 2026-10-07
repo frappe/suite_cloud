@@ -50,6 +50,42 @@ def roles_payload(role_ids: list[str] | None) -> dict:
     return {"@type": "User"}
 
 
+# Stalwart's "Email: Receive emails": without it, mail for the account bounces back to its sender.
+RECEIVE_PERMISSION = "emailReceive"
+
+
+def permissions_payload(disabled: list[str] | None) -> dict:
+    """Permissions taken away from what the account's roles grant; none means it keeps them all."""
+
+    if disabled:
+        return {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": id_set(disabled)}
+    return {"@type": "Inherit"}
+
+
+def with_permission_disabled(permissions: dict | None, permission: str, disabled: bool) -> dict:
+    """``permissions`` with one permission disabled or no longer disabled, the rest as it was.
+
+    An account may carry grants and denials of its own, set by hand on the cluster, or a list
+    that replaces what its roles grant; none of that is this change's to touch. A merge left with
+    nothing to merge goes back to plain inheritance.
+    """
+
+    permissions = permissions or {}
+    kind = permissions.get("@type") or "Inherit"
+    enabled = dict(permissions.get("enabledPermissions") or {})
+    denied = dict(permissions.get("disabledPermissions") or {})
+    if disabled:
+        denied[permission] = True
+    else:
+        denied.pop(permission, None)
+
+    if kind == "Inherit":
+        kind = "Merge"  # inheritance holds no lists of its own
+    if kind == "Merge" and not enabled and not denied:
+        return {"@type": "Inherit"}
+    return {"@type": kind, "enabledPermissions": enabled, "disabledPermissions": denied}
+
+
 # Stalwart's ``StorageQuota`` enum: what an account or group may hold. Disk space is in bytes,
 # the rest are counts. An absent key means the cluster's default (usually no limit).
 STORAGE_QUOTAS = {
@@ -92,6 +128,7 @@ class Account:
     password: str | None = None
     member_group_ids: list[str] | None = None
     role_ids: list[str] | None = None
+    disabled_permissions: list[str] | None = None
     aliases: list[EmailAlias] | None = None
     description: str | None = None
     locale: str = DEFAULT_LOCALE
@@ -108,7 +145,7 @@ class Account:
             "credentials": credentials,
             "memberGroupIds": id_set(self.member_group_ids),
             "roles": roles_payload(self.role_ids),
-            "permissions": {"@type": "Inherit"},
+            "permissions": permissions_payload(self.disabled_permissions),
             "quotas": quotas_payload(self.disk_quota_bytes, self.quotas),
             "aliases": indexed(self.aliases),
             "description": self.description,
@@ -125,6 +162,7 @@ class Group:
     name: str
     domain_id: str
     description: str | None = None
+    disabled_permissions: list[str] | None = None
     aliases: list[EmailAlias] | None = None
     disk_quota_bytes: int | None = None
     quotas: dict[str, int] | None = None
@@ -134,7 +172,7 @@ class Group:
             "@type": "Group",
             "name": self.name,
             "domainId": self.domain_id,
-            "permissions": {"@type": "Inherit"},
+            "permissions": permissions_payload(self.disabled_permissions),
             "quotas": quotas_payload(self.disk_quota_bytes, self.quotas),
             "aliases": indexed(self.aliases),
             "description": self.description,
@@ -242,6 +280,7 @@ class AccountService(ManagementService):
         "domainId",
         "locale",
         "memberGroupIds",
+        "permissions",
         "quotas",
         "roles",
         "timeZone",
@@ -265,6 +304,13 @@ class AccountService(ManagementService):
             self.update(account_id, {"credentials": credentials})
         else:
             self.update(account_id, {f"credentials/{row}/secret": new_password})
+
+    def changed_permissions(self, account_id: str, permission: str, disabled: bool) -> dict:
+        """The account's permissions with one of them disabled or no longer disabled, the others
+        intact. A tagged union like roles: read here, then sent back whole in an update."""
+
+        current = (self.get(account_id, properties=["permissions"]) or {}).get("permissions")
+        return with_permission_disabled(current, permission, disabled)
 
     def set_roles(self, account_id: str, role_ids: list[str]) -> None:
         # roles is a tagged union; its @type cannot be patched by sub-path, so the whole field goes.

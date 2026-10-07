@@ -32,6 +32,7 @@ class MailGroup(QuotaHolder, Document):
         aliases: DF.Table[MailAddressAlias]
         cluster: DF.Link | None
         description: DF.Data | None
+        disable_receiving: DF.Check
         domain: DF.Link | None
         email: DF.Data
         site: DF.Link | None
@@ -79,6 +80,9 @@ class MailGroup(QuotaHolder, Document):
             patch["quotas"] = self.quota_map()
         if sync.aliases_changed(before, self):
             patch["aliases"] = sync.aliases_payload(self)
+        if bool(before.disable_receiving) != bool(self.disable_receiving):
+            # Read before anything is sent and sent with the rest, as for an account.
+            patch["permissions"] = sync.receiving_permissions(self, "groups")
         if patch:
             sync.push_update(self, "groups", patch)
 
@@ -92,6 +96,7 @@ class MailGroup(QuotaHolder, Document):
             name=self.email.split("@", 1)[0],
             domain_id=sync.domain_stalwart_id(self.domain),
             description=self.description or None,
+            disabled_permissions=sync.disabled_permissions(self),
             aliases=sync.aliases(self),
             quotas=self.quota_map(),
         )
@@ -122,6 +127,7 @@ def group_payload(
         "email": row.email,
         "domain": row.domain,
         "description": row.description,
+        "disable_receiving": bool(row.disable_receiving),
         "disk_quota_gb": round(cint(quotas.get(DISK_QUOTA)) / GB, 6),
         "quotas": quotas,
         "used_disk_bytes": used_disk_bytes,
@@ -131,7 +137,17 @@ def group_payload(
     }
 
 
-GROUP_FIELDS = ["name", "email", "domain", "site", "cluster", "stalwart_id", "description", "creation"]
+GROUP_FIELDS = [
+    "name",
+    "email",
+    "domain",
+    "site",
+    "cluster",
+    "stalwart_id",
+    "description",
+    "disable_receiving",
+    "creation",
+]
 
 
 def group_payloads(names: list[str], with_usage: bool = True) -> list[dict]:

@@ -48,6 +48,7 @@ class MailAccount(QuotaHolder, Document):
         app_password: DF.Password | None
         cluster: DF.Link | None
         description: DF.Data | None
+        disable_receiving: DF.Check
         display_name: DF.Data | None
         domain: DF.Link | None
         email: DF.Data
@@ -140,6 +141,10 @@ class MailAccount(QuotaHolder, Document):
             patch["aliases"] = sync.aliases_payload(self)
         if sorted(r.group for r in before.groups) != sorted(r.group for r in self.groups):
             patch["memberGroupIds"] = sync.group_ids_payload(self)
+        if bool(before.disable_receiving) != bool(self.disable_receiving):
+            # Read before anything is sent and sent with the rest: the save reaches the cluster as
+            # one update, so a refusal cannot leave half of it behind.
+            patch["permissions"] = sync.receiving_permissions(self, "accounts")
         if patch:
             sync.push_update(self, "accounts", patch)
         if bool(before.enabled) != bool(self.enabled):
@@ -158,6 +163,7 @@ class MailAccount(QuotaHolder, Document):
             domain_id=sync.domain_stalwart_id(self.domain),
             password=password or frappe.generate_hash(length=24),
             member_group_ids=sync.group_ids(self),
+            disabled_permissions=sync.disabled_permissions(self),
             aliases=sync.aliases(self),
             description=self.display_name or None,
             locale=self.locale or "en-US",
@@ -338,6 +344,7 @@ def account_payload(
         "email": row.email,
         "domain": row.domain,
         "enabled": bool(row.enabled),
+        "disable_receiving": bool(row.disable_receiving),
         "display_name": row.display_name,
         "description": row.description,
         "disk_quota_gb": round(cint(quotas.get(DISK_QUOTA)) / GB, 6),
@@ -360,6 +367,7 @@ ACCOUNT_FIELDS = [
     "cluster",
     "stalwart_id",
     "enabled",
+    "disable_receiving",
     "display_name",
     "description",
     "locale",

@@ -436,6 +436,141 @@ class TestDirectoryApi(SiteApiTestCase):
         options = meta.get_account_options()["quotas"]
         self.assertEqual([o["value"] for o in options], ["maxEmails", "maxSieveScripts"])
 
+    def test_an_account_can_be_created_unable_to_receive(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+
+        account = accounts.create_account("noreply@acme.com", "secret-pw", disable_receiving=True)
+        self.assertTrue(account["disable_receiving"])
+        # "Email: Receive emails" taken away on top of the roles, in the shape Stalwart 0.16 takes.
+        self.assertEqual(
+            self.fake.find("Account", name="noreply")["permissions"],
+            {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": {"emailReceive": True}},
+        )
+        self.assertTrue(accounts.list_accounts()["items"][0]["disable_receiving"])
+
+        # Unasked, an account keeps everything its roles grant.
+        self.assertFalse(accounts.create_account("alice@acme.com", "secret-pw")["disable_receiving"])
+        self.assertEqual(self.fake.find("Account", name="alice")["permissions"], {"@type": "Inherit"})
+
+        # An operator lets it receive again from the form, and the cluster follows.
+        doc = frappe.get_doc("Mail Account", "noreply@acme.com")
+        doc.disable_receiving = 0
+        doc.save(ignore_permissions=True)
+        self.assertEqual(self.fake.find("Account", name="noreply")["permissions"], {"@type": "Inherit"})
+        self.assertFalse(accounts.get_account("noreply@acme.com")["disable_receiving"])
+
+    def test_a_site_stops_and_restores_an_accounts_receiving(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw")
+        live = lambda: self.fake.find("Account", name="alice")["permissions"]  # noqa: E731
+
+        self.assertTrue(
+            accounts.update_account("alice@acme.com", disable_receiving=True)["disable_receiving"]
+        )
+        self.assertEqual(
+            live(),
+            {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": {"emailReceive": True}},
+        )
+        # An update that says nothing about receiving leaves it as it is.
+        self.assertTrue(accounts.update_account("alice@acme.com", display_name="Alice")["disable_receiving"])
+        self.assertEqual(live()["disabledPermissions"], {"emailReceive": True})
+
+        self.assertFalse(
+            accounts.update_account("alice@acme.com", disable_receiving=False)["disable_receiving"]
+        )
+        self.assertEqual(live(), {"@type": "Inherit"})
+
+    def test_a_group_can_be_kept_from_receiving_and_let_receive_again(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        live = lambda name: self.fake.find("Account", name=name)["permissions"]  # noqa: E731
+        denied = {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": {"emailReceive": True}}
+
+        # Created unable to receive, and listed as such; another group is left to inherit.
+        self.assertTrue(groups.create_group("noreply@acme.com", disable_receiving=True)["disable_receiving"])
+        self.assertEqual(live("noreply"), denied)
+        self.assertTrue(groups.list_groups()["items"][0]["disable_receiving"])
+        self.assertFalse(groups.create_group("sales@acme.com")["disable_receiving"])
+        self.assertEqual(live("sales"), {"@type": "Inherit"})
+
+        # Changed on an existing group, in the same update as the rest of the save.
+        calls = len(self.fake.calls)
+        updated = groups.update_group("sales@acme.com", description="Sales", disable_receiving=True)
+        self.assertTrue(updated["disable_receiving"])
+        sales_id = frappe.db.get_value("Mail Group", "sales@acme.com", "stalwart_id")
+        updates = [args["update"] for name, args in self.fake.calls[calls:] if name == "x:Account/set"]
+        self.assertEqual(updates, [{sales_id: {"description": "Sales", "permissions": denied}}])
+        # An update that says nothing about receiving leaves it as it is.
+        self.assertTrue(groups.update_group("sales@acme.com", description="Sales team")["disable_receiving"])
+        self.assertEqual(live("sales"), denied)
+
+        self.assertFalse(groups.update_group("sales@acme.com", disable_receiving=False)["disable_receiving"])
+        self.assertEqual(live("sales"), {"@type": "Inherit"})
+
+    def test_changing_receiving_leaves_an_accounts_other_permissions_alone(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw")
+        # As an adopted account may carry them: a list of its own, set by hand on the cluster.
+        self.fake.find("Account", name="alice")["permissions"] = {
+            "@type": "Replace",
+            "enabledPermissions": {"authenticate": True, "emailReceive": True},
+            "disabledPermissions": {"sysAccountGet": True},
+        }
+
+        doc = frappe.get_doc("Mail Account", "alice@acme.com")
+        doc.disable_receiving = 1
+        doc.save(ignore_permissions=True)
+        self.assertEqual(
+            self.fake.find("Account", name="alice")["permissions"],
+            {
+                "@type": "Replace",
+                "enabledPermissions": {"authenticate": True, "emailReceive": True},
+                "disabledPermissions": {"sysAccountGet": True, "emailReceive": True},
+            },
+        )
+
+        # Receiving again, it is back to exactly what was set by hand: nothing lost, nothing regained.
+        doc.disable_receiving = 0
+        doc.save(ignore_permissions=True)
+        self.assertEqual(
+            self.fake.find("Account", name="alice")["permissions"],
+            {
+                "@type": "Replace",
+                "enabledPermissions": {"authenticate": True, "emailReceive": True},
+                "disabledPermissions": {"sysAccountGet": True},
+            },
+        )
+
+    def test_a_save_that_changes_receiving_reaches_the_cluster_as_one_update(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("noreply@acme.com", "secret-pw", display_name="No Reply")
+
+        doc = frappe.get_doc("Mail Account", "noreply@acme.com")
+        doc.display_name = "Do Not Reply"
+        doc.disable_receiving = 1
+        calls = len(self.fake.calls)
+        doc.save(ignore_permissions=True)
+
+        # One update is taken or refused whole. Two could leave the cluster with the new name while
+        # the refused second one rolls the document back to the old.
+        updates = [args["update"] for name, args in self.fake.calls[calls:] if name == "x:Account/set"]
+        self.assertEqual(len(updates), 1)
+        self.assertEqual(
+            updates[0][doc.stalwart_id],
+            {
+                "description": "Do Not Reply",
+                "permissions": {
+                    "@type": "Merge",
+                    "enabledPermissions": {},
+                    "disabledPermissions": {"emailReceive": True},
+                },
+            },
+        )
+
     def test_domain_delivery_settings_reach_the_cluster(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")

@@ -11,6 +11,7 @@
   "cluster",
   "column_break_main",
   "description",
+  "disable_receiving",
   "quotas_section",
   "quotas",
   "stalwart_id",
@@ -73,6 +74,13 @@
    "description": "What the group is for, e.g. Sales team. Shown on the cluster as the group's name."
   },
   {
+   "default": "0",
+   "fieldname": "disable_receiving",
+   "fieldtype": "Check",
+   "label": "Disable Receiving",
+   "description": "Tick to stop the group receiving mail: mail addressed to it bounces back to the sender, while its members' own mail is not affected. Untick to let it receive again."
+  },
+  {
    "fieldname": "quotas_section",
    "fieldtype": "Section Break",
    "label": "Quotas"
@@ -114,7 +122,7 @@
    "table_fieldname": "groups"
   }
  ],
- "modified": "2026-09-08 15:00:00.000000",
+ "modified": "2026-10-07 15:40:00.000000",
  "modified_by": "Administrator",
  "module": "Cloud Mail",
  "name": "Mail Group",
