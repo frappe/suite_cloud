@@ -204,9 +204,10 @@ only when an operator creates one from the Mail Account form.
 
 `create_account` with `disable_receiving` makes a send-only account: Stalwart's "Email: Receive
 emails" permission (`emailReceive`) is disabled on it, so it logs in and sends as usual while mail
-addressed to it bounces back to the sender. Accounts are shown with `disable_receiving`; an
-operator turns it off again on the Mail Account form. Changing it touches that one permission:
-whatever else was granted to an account or denied it by hand on the cluster stays as it is.
+addressed to it bounces back to the sender. Accounts are shown with `disable_receiving`, and
+`update_account` takes it too, as does the Mail Account form. Changing it touches that one
+permission: whatever else was granted to an account or denied it by hand on the cluster stays as
+it is.
 
 Aliases can be replaced as a set (`set_aliases`) or changed one at a time (`add_alias`,
 `remove_alias`, `set_alias_enabled`). The one-at-a-time calls lock the parent row for the change,

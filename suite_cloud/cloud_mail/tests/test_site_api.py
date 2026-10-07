@@ -460,6 +460,28 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(self.fake.find("Account", name="noreply")["permissions"], {"@type": "Inherit"})
         self.assertFalse(accounts.get_account("noreply@acme.com")["disable_receiving"])
 
+    def test_a_site_stops_and_restores_an_accounts_receiving(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw")
+        live = lambda: self.fake.find("Account", name="alice")["permissions"]  # noqa: E731
+
+        self.assertTrue(
+            accounts.update_account("alice@acme.com", disable_receiving=True)["disable_receiving"]
+        )
+        self.assertEqual(
+            live(),
+            {"@type": "Merge", "enabledPermissions": {}, "disabledPermissions": {"emailReceive": True}},
+        )
+        # An update that says nothing about receiving leaves it as it is.
+        self.assertTrue(accounts.update_account("alice@acme.com", display_name="Alice")["disable_receiving"])
+        self.assertEqual(live()["disabledPermissions"], {"emailReceive": True})
+
+        self.assertFalse(
+            accounts.update_account("alice@acme.com", disable_receiving=False)["disable_receiving"]
+        )
+        self.assertEqual(live(), {"@type": "Inherit"})
+
     def test_changing_receiving_leaves_an_accounts_other_permissions_alone(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")

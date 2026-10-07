@@ -143,9 +143,11 @@ def update_account(
     quotas: dict | str | None = None,
     locale: str | None = None,
     time_zone: str | None = None,
+    disable_receiving: bool | None = None,
 ) -> dict:
     """``quotas`` replaces the optional limits (``{}`` lifts them all); the disk quota stays unless
-    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it."""
+    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it. ``disable_receiving`` makes the
+    account send-only or lets it receive again; left out, it stays as it is."""
 
     doc = owned("Mail Account", email)
     for field, value in {
@@ -156,6 +158,8 @@ def update_account(
     }.items():
         if value is not None:
             doc.set(field, value)
+    if disable_receiving is not None:
+        doc.disable_receiving = int(sbool(disable_receiving))
     quota_rows.apply(doc, disk_quota_gb, quotas)
     doc.save(ignore_permissions=True)
     return doc.to_api()
