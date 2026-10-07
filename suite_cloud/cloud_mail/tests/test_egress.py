@@ -275,6 +275,65 @@ class TestEgress(IntegrationTestCase):
         operations = {op["object"]: op for op in egress.cluster_operations(cluster)}
         self.assertEqual(operations["MtaOutboundStrategy"]["value"]["route"]["else"], "'custom'")
 
+    def live_route(self) -> tuple[list[dict], str]:
+        route = self.fake.singletons["MtaOutboundStrategy"]["route"]
+        return egress.expression_rules(route), route["else"]
+
+    def make_domain(self, domain_name: str, **fields):
+        return frappe.get_doc(
+            {"doctype": "Mail Domain", "domain_name": domain_name, "site": self.site.name, **fields}
+        ).insert()
+
+    def test_relaying_domains_keep_only_the_addresses_they_hold(self) -> None:
+        local = {"if": "is_local_domain(rcpt_domain)", "then": "'local'"}
+        held = {"if": "is_local_address(rcpt)", "then": "'local'"}
+        foreign = {"if": "rcpt_domain == 'partner.com'", "then": "'partner'"}
+        self.fake.singletons["MtaOutboundStrategy"]["route"]["match"]["1"] = foreign
+        split = self.make_domain("split.com")
+        self.make_domain("acme.com")
+
+        # Stalwart accepts every address of a relaying domain; the ones it does not hold must miss
+        # the local rules to reach the domain's MX. Saving the flag is enough to reroute them.
+        split.allow_relaying = 1
+        split.save()
+        beside_split = {"if": f"{local['if']} && rcpt_domain != 'split.com'", "then": "'local'"}
+        self.assertEqual(self.live_route(), ([held, beside_split, foreign], "'mx'"))
+
+        # They leave like any other mail: through the sender's pool, or the default one.
+        pool = self.make_pool()
+        self.cluster.db_set("default_egress_pool", pool.name)
+        other = self.make_pool(("203.0.113.52",))
+        split.reload()
+        split.egress_pool = other.name
+        split.save()
+        by_sender = {"if": "sender_domain == 'split.com'", "then": "'egress-p2'"}
+        self.assertEqual(self.live_route(), ([held, beside_split, by_sender, foreign], "'egress-p1'"))
+
+        # A domain created relaying joins them; a disabled one is the cluster's business no more.
+        moving = self.make_domain("moving.com", allow_relaying=1)
+        beside_both = {
+            "if": f"{local['if']} && rcpt_domain != 'moving.com' && rcpt_domain != 'split.com'",
+            "then": "'local'",
+        }
+        self.assertEqual(self.live_route()[0], [held, beside_both, by_sender, foreign])
+        split.reload()
+        split.enabled = 0
+        split.save()
+        beside_moving = {"if": f"{local['if']} && rcpt_domain != 'moving.com'", "then": "'local'"}
+        self.assertEqual(self.live_route()[0], [held, beside_moving, foreign])
+
+        # Without a relaying domain the route is the plain local rule again, whether the last one
+        # stopped relaying or was deleted; the rules written for it are replaced, not left behind.
+        moving.reload()
+        moving.allow_relaying = 0
+        moving.save()
+        self.assertEqual(self.live_route()[0], [local, foreign])
+        moving.allow_relaying = 1
+        moving.save()
+        self.assertEqual(self.live_route()[0], [held, beside_moving, foreign])
+        moving.delete()
+        self.assertEqual(self.live_route(), ([local, foreign], "'egress-p1'"))
+
     def test_gateway_plan(self) -> None:
         pool = self.make_pool(("203.0.113.51",))
         operations = {

@@ -250,7 +250,8 @@ contact email for site-specific notices; the Suite app sends both whenever Suite
 A domain carries three delivery settings a site may change: a catch-all address for local parts
 that match no account, sub-addressing (`user+tag@`), and relaying, which makes the cluster forward
 mail for addresses it does not hold to the domain's MX instead of rejecting it, so a domain can
-keep some mailboxes on another server (split delivery).
+keep some mailboxes on another server (split delivery). Relayed mail leaves like any other the
+cluster sends, through the egress pool of its sender when there is one.
 
 Records for mail client auto-setup (SRV, autoconfig, MTA-STS) are listed only when the domain has
 `publish_client_discovery_records` turned on, because the cluster has no certificate for customer

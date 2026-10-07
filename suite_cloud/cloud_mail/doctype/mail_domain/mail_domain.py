@@ -31,6 +31,8 @@ PUSHED_FIELDS = (
     "enabled",
     "is_verified",
 )
+# A change to any of these alters the cluster's outbound routes.
+ROUTED_FIELDS = ("egress_pool", "enabled", "allow_relaying")
 
 
 class MailDomain(Document):
@@ -121,6 +123,8 @@ class MailDomain(Document):
         except Exception:
             sync.push_destroy(self, "domains")  # the insert rolls back; the domain must not survive
             raise
+        if self.allow_relaying:
+            egress.resync_cluster_after_commit(self.cluster)
 
     def on_update(self) -> None:
         if self.is_new() or not self.stalwart_id or self.flags.skip_push:
@@ -128,7 +132,7 @@ class MailDomain(Document):
         before = self.get_doc_before_save()
         if before and any(before.get(f) != self.get(f) for f in PUSHED_FIELDS):
             sync.push_update(self, "domains", self.stalwart_patch())
-        if before and (before.egress_pool != self.egress_pool or before.enabled != self.enabled):
+        if before and any(before.get(f) != self.get(f) for f in ROUTED_FIELDS):
             egress.resync_cluster_after_commit(self.cluster)
 
     def on_trash(self) -> None:
@@ -143,7 +147,8 @@ class MailDomain(Document):
         sync.push_destroy(self, "domains")
 
     def after_delete(self) -> None:
-        if self.egress_pool or frappe.db.get_value("Suite Site", self.site, "egress_pool"):
+        on_a_pool = self.egress_pool or frappe.db.get_value("Suite Site", self.site, "egress_pool")
+        if on_a_pool or self.allow_relaying:
             egress.resync_cluster_after_commit(self.cluster)
 
     # --- Stalwart -----------------------------------------------------------------
