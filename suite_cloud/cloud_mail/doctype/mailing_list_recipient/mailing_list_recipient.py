@@ -68,3 +68,4 @@ class MailingListRecipient(Document):
 def on_doctype_update() -> None:
     frappe.db.add_unique("Mailing List Recipient", ["mailing_list", "email"])
     frappe.db.add_index("Mailing List Recipient", ["email"])
+    frappe.db.add_index("Mailing List Recipient", ["site", "mailing_list", "email"])  # list_all_recipients

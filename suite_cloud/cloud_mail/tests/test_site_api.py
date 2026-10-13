@@ -357,6 +357,25 @@ class TestDirectoryApi(SiteApiTestCase):
         page = mailing_lists.list_recipients("all@acme.com")
         self.assertEqual([r["email"] for r in page["items"]], ["alice@acme.com", "ext@example.org"])
         self.assertEqual(page["total"], 2)
+        # The site's whole directory of recipients comes in one listing, paged across lists.
+        mailing_lists.create_mailing_list("dev@acme.com", recipients=["bob@example.org"])
+        self.assertEqual(
+            mailing_lists.list_all_recipients(),
+            {
+                "items": [
+                    {"mailing_list": "all@acme.com", "email": "alice@acme.com", "enabled": True},
+                    {"mailing_list": "all@acme.com", "email": "ext@example.org", "enabled": True},
+                    {"mailing_list": "dev@acme.com", "email": "bob@example.org", "enabled": True},
+                ],
+                "total": 3,
+            },
+        )
+        page = mailing_lists.list_all_recipients(start=2, limit=1)
+        self.assertEqual(([r["email"] for r in page["items"]], page["total"]), (["bob@example.org"], 3))
+        self.act_as(self.other)
+        self.assertEqual(mailing_lists.list_all_recipients(), {"items": [], "total": 0})
+        self.act_as(self.site)
+        mailing_lists.delete_mailing_list("dev@acme.com")
         self.assertEqual(
             mailing_lists.add_recipients("all@acme.com", ["x@y.org", "ext@example.org"])["added"], ["x@y.org"]
         )
