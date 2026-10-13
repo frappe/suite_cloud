@@ -120,6 +120,32 @@ def list_recipients(email: str, search: str | None = None, start: int = 0, limit
     }
 
 
+@frappe.whitelist(methods=["GET", "POST"])
+@site_api
+def list_all_recipients(start: int = 0, limit: int = 1000) -> dict:
+    """Every recipient of every list the site owns, ordered by list then address.
+
+    A site mirrors its lists in a handful of calls this way, instead of one call per list, which
+    would exhaust its rate limit on its own once it holds a few hundred lists.
+    """
+
+    filters = {"site": current_site().name}
+    rows = frappe.get_all(
+        "Mailing List Recipient",
+        filters=filters,
+        fields=["mailing_list", "email", "enabled"],
+        order_by="mailing_list asc, email asc",
+        limit_start=max(cint(start), 0),
+        limit_page_length=page_size(limit, 1000),
+    )
+    return {
+        "items": [
+            {"mailing_list": r.mailing_list, "email": r.email, "enabled": bool(r.enabled)} for r in rows
+        ],
+        "total": frappe.db.count("Mailing List Recipient", filters),
+    }
+
+
 @frappe.whitelist(methods=["POST"])
 @site_api
 def add_recipients(email: str, recipients: list[str] | str | None = None) -> dict:

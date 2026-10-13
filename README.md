@@ -169,7 +169,7 @@ Rules that apply everywhere:
 | `suite_cloud.api.mail.domains` | `check_domain`, `list_domains`, `get_domain`, `create_domain`, `update_domain`, `delete_domain`, `get_dns_records`, `refresh_dns_records`, `verify_dns_records` |
 | `suite_cloud.api.mail.accounts` | `list_accounts(domain, search, start, limit)`, `get_account`, `get_quotas(emails)`, `create_account`, `update_account`, `set_account_enabled`, `set_password`, `rotate_app_password`, `create_app_password`, `set_aliases`, `add_alias`, `remove_alias`, `set_alias_enabled`, `set_groups`, `delete_account` |
 | `suite_cloud.api.mail.groups` | `list_groups(search, start, limit)`, `get_group`, `create_group`, `update_group`, `set_group_aliases`, `add_group_alias`, `remove_group_alias`, `set_group_alias_enabled`, `set_group_members`, `delete_group` |
-| `suite_cloud.api.mail.mailing_lists` | `list_mailing_lists(search, start, limit)`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `add_mailing_list_alias`, `remove_mailing_list_alias`, `set_mailing_list_alias_enabled`, `list_recipients`, `add_recipients`, `remove_recipients`, `set_recipients`, `delete_mailing_list` |
+| `suite_cloud.api.mail.mailing_lists` | `list_mailing_lists(search, start, limit)`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `add_mailing_list_alias`, `remove_mailing_list_alias`, `set_mailing_list_alias_enabled`, `list_recipients`, `list_all_recipients(start, limit)`, `add_recipients`, `remove_recipients`, `set_recipients`, `delete_mailing_list` |
 | `suite_cloud.api.mail.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
 | `suite_cloud.api.mail.dmarc` | `list_dmarc_reports(domain, search, since, until, start, limit, days=)`, `get_dmarc_report(report)` (with the per-source records), `get_dmarc_summary(domain, days)` (totals by domain, source IP and reporter; `days` 0 covers everything held) |
 | `suite_cloud.api.mail.tls` | `list_tls_reports(domain, search, since, until, start, limit, days=)`, `get_tls_report(report)` (with its policies and failure details), `get_tls_summary(domain, days)` (session totals by domain and reporter, failed sessions by result type; `days` 0 covers everything held) |
@@ -215,7 +215,7 @@ Aliases can be replaced as a set (`set_aliases`) or changed one at a time (`add_
 so two admins editing the same account never drop each other's rows; the dashboard uses those.
 
 Recipients of a mailing list are separate documents, not rows on the list, so a list can hold
-hundreds of thousands of addresses. `list_recipients` pages through them, `add_recipients` and
+hundreds of thousands of addresses. `list_recipients` pages through one list and `list_all_recipients` through every list of the site, so a site mirrors its lists in a few calls instead of one per list. `add_recipients` and
 `remove_recipients` change them in batches of up to 5000 and push only the changed addresses to
 the cluster, and `set_recipients` replaces the whole list, which is meant for small lists.
 
