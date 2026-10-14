@@ -135,7 +135,8 @@ message takes.
 
 ## API for Frappe Cloud
 
-Call these with the API key and secret of a user that has the **Frappe Cloud** role.
+Call these at `/api/v2/method/suite_cloud.api.fc.<method>` with the API key and secret of a user
+that has the **Frappe Cloud** role. `get_site` is a GET, `update_site` a PATCH, the rest POSTs.
 
 | Method | What it does |
 | --- | --- |
@@ -149,30 +150,42 @@ Call these with the API key and secret of a user that has the **Frappe Cloud** r
 
 The site sends two headers: `Authorization: token <api_key>:<api_secret>` and
 `Frappe-Authorization-Source: Suite Site`. Frappe's own API-key authentication resolves the key
-against the Suite Site record, so the request runs as the shared site service user.
+against the Suite Site record, so the request runs as the shared site service user. The methods
+live at `/api/v2/method/suite_cloud.api.<module>.<method>`; the v1 path `/api/method/...` answers
+the same methods in Frappe's v1 envelope until every site runs the v2 client.
 
 Rules that apply everywhere:
 
+- The HTTP verb follows the method name: `list_`, `get_` and `check_` are GETs, `update_` a PATCH
+  (omitted fields stay as they are), `set_` a PUT, `delete_` and `remove_` a DELETE, and creates
+  and other actions POSTs. Every method still accepts POST for the pre-v2 client.
+- The result sits under `data`. A create answers 201 and a delete 204 with no body.
 - When the Suite Site lists allowed IP addresses, only requests from those addresses may use its
   key; the rest get a 403. A key copied out of a site's config is then worthless anywhere else.
   Frappe Cloud passes the hosting server's outbound addresses at registration.
 - Anything that belongs to another site is reported as "not found", never as "forbidden".
-- If the cluster refuses a change, the site gets HTTP 422 with Stalwart's error type.
+- If the cluster refuses a change, the site gets HTTP 422 with Stalwart's error type
+  (`ClusterRejectedError`).
 - Each site may make 300 requests per minute.
-- Errors carry Frappe's `exc_type`, so a client can tell a duplicate (`DuplicateEntryError`)
-  from a limit (`ValidationError`), a rate limit (`TooManyRequestsError`), a missing object
-  (`DoesNotExistError`) or a suspended site (`SiteSuspendedError`).
+- An error answers `{"errors": [{"type": ..., "message": ...}]}` (v1: the type as `exc_type`).
+  The type tells a duplicate (`DuplicateEntryError`, 409) from a limit or another refusal
+  (`ValidationError`, 422), a value the API could not parse (`InvalidInputError`, 400), a rate
+  limit (`TooManyRequestsError`, 429), a missing object (`DoesNotExistError`, 404) or a suspended
+  site (`SiteSuspendedError`, 403).
 
 | Module | Methods |
 | --- | --- |
 | `suite_cloud.api.site` | `ping`, `update_site_profile(title, contact_email)` |
 | `suite_cloud.api.mail.domains` | `check_domain`, `list_domains`, `get_domain`, `create_domain`, `update_domain`, `delete_domain`, `get_dns_records`, `refresh_dns_records`, `verify_dns_records` |
 | `suite_cloud.api.mail.accounts` | `list_accounts(domain, search, start, limit)`, `get_account`, `get_quotas(emails)`, `create_account`, `update_account`, `set_account_enabled`, `set_password`, `rotate_app_password`, `create_app_password`, `set_aliases`, `add_alias`, `remove_alias`, `set_alias_enabled`, `set_groups`, `delete_account` |
-| `suite_cloud.api.mail.groups` | `list_groups(search, start, limit)`, `get_group`, `create_group`, `update_group`, `set_group_aliases`, `add_group_alias`, `remove_group_alias`, `set_group_alias_enabled`, `set_group_members`, `delete_group` |
-| `suite_cloud.api.mail.mailing_lists` | `list_mailing_lists(search, start, limit)`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_mailing_list_aliases`, `add_mailing_list_alias`, `remove_mailing_list_alias`, `set_mailing_list_alias_enabled`, `list_recipients`, `list_all_recipients(start, limit)`, `add_recipients`, `remove_recipients`, `set_recipients`, `delete_mailing_list` |
+| `suite_cloud.api.mail.groups` | `list_groups(search, start, limit)`, `get_group`, `create_group`, `update_group`, `set_aliases`, `add_alias`, `remove_alias`, `set_alias_enabled`, `set_members`, `delete_group` |
+| `suite_cloud.api.mail.mailing_lists` | `list_mailing_lists(search, start, limit)`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_aliases`, `add_alias`, `remove_alias`, `set_alias_enabled`, `list_recipients`, `list_all_recipients(start, limit)`, `add_recipients`, `remove_recipients`, `set_recipients`, `delete_mailing_list` |
 | `suite_cloud.api.mail.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
 | `suite_cloud.api.mail.dmarc` | `list_dmarc_reports(domain, search, since, until, start, limit, days=)`, `get_dmarc_report(report)` (with the per-source records), `get_dmarc_summary(domain, days)` (totals by domain, source IP and reporter; `days` 0 covers everything held) |
 | `suite_cloud.api.mail.tls` | `list_tls_reports(domain, search, since, until, start, limit, days=)`, `get_tls_report(report)` (with its policies and failure details), `get_tls_summary(domain, days)` (session totals by domain and reporter, failed sessions by result type; `days` 0 covers everything held) |
+
+The pre-v2 names of the group and list alias and member methods (`set_group_aliases`,
+`set_mailing_list_alias_enabled` and so on) still answer until every site runs the v2 client.
 
 Listings answer `{"items": [...], "total": n}`. `search` matches the address, and the display
 name or description; `limit` is capped (200 accounts, 500 groups, lists, DMARC or TLS reports per page). Account and
