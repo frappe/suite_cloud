@@ -49,7 +49,7 @@ class InvalidInputError(frappe.ValidationError):
     http_status_code = 400
 
 
-class StalwartRejected(frappe.ValidationError):
+class ClusterRejectedError(frappe.ValidationError):
     """Stalwart refused the change; the type/description are safe to show the caller."""
 
     http_status_code = 422
@@ -169,7 +169,7 @@ def api_errors():
     try:
         yield
     except StalwartRejectedError as e:
-        raise StalwartRejected(_("The mail server rejected the change: {0}").format(_describe(e))) from e
+        raise ClusterRejectedError(_("The mail server rejected the change: {0}").format(_describe(e))) from e
     except StalwartUnauthorizedError as e:
         frappe.log_error(title="[Suite Cloud] Cluster credentials rejected", message=str(e))
         raise ClusterMisconfiguredError(_("The mail cluster refused Suite Cloud's credentials.")) from e
