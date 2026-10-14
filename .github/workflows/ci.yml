@@ -29,7 +29,7 @@ jobs:
           - name: Core
             tests: suite_cloud/tests
           - name: Mail
-            tests: suite_cloud/cloud_mail/tests
+            tests: suite_cloud/mail/tests
 
     services:
       redis-cache:

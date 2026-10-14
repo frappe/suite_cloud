@@ -1,0 +1,491 @@
+# Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
+# For license information, please see license.txt
+
+import frappe
+from frappe import _
+from frappe.model.document import Document
+from frappe.utils import cint, now
+
+from suite_cloud.dns.resolver import verify_dns_record
+from suite_cloud.mail.cluster import dns as cluster_dns
+from suite_cloud.mail.cluster import egress
+from suite_cloud.mail.cluster.zone import GROUPS, build_domain_records, group_summaries
+from suite_cloud.mail.doctype.dmarc_report.dmarc_report import DMARC_REPORTS
+from suite_cloud.mail.doctype.tls_report.tls_report import TLS_REPORTS
+from suite_cloud.mail.stalwart.directory import Domain
+from suite_cloud.mail.tenancy import ownership, sync
+from suite_cloud.mail.tenancy.addresses import (
+    assert_addresses_deliverable,
+    assert_domain_available,
+    validate_domain_name,
+    validate_email_address,
+)
+from suite_cloud.utils import dkim_algorithms, get_config, log_exception, utc_iso
+
+# A change to any of these reaches the cluster; is_verified is set by hand only by managers.
+PUSHED_FIELDS = (
+    "description",
+    "catch_all_address",
+    "sub_addressing",
+    "allow_relaying",
+    "enabled",
+    "is_verified",
+)
+# A change to any of these alters the cluster's outbound routes.
+ROUTED_FIELDS = ("egress_pool", "enabled", "allow_relaying")
+
+
+class MailDomain(Document):
+    # begin: auto-generated types
+    # This code is auto-generated. Do not modify anything in this block.
+
+    from typing import TYPE_CHECKING
+
+    if TYPE_CHECKING:
+        from frappe.types import DF
+
+        from suite_cloud.mail.doctype.mail_domain_dns_record.mail_domain_dns_record import (
+            MailDomainDNSRecord,
+        )
+
+        authentication_records: DF.Table[MailDomainDNSRecord]
+        autoconfig_records: DF.Table[MailDomainDNSRecord]
+        catch_all_address: DF.Data | None
+        cluster: DF.Link | None
+        description: DF.Data | None
+        discovery_records: DF.Table[MailDomainDNSRecord]
+        dns_zone_file: DF.Code | None
+        domain_name: DF.Data
+        egress_pool: DF.Link | None
+        enabled: DF.Check
+        is_verified: DF.Check
+        last_refreshed_at: DF.Datetime | None
+        last_verified_at: DF.Datetime | None
+        publish_client_discovery_records: DF.Check
+        routing_records: DF.Table[MailDomainDNSRecord]
+        site: DF.Link
+        skip_scheduled_verification: DF.Check
+        verification_skipped: DF.Check
+        stalwart_id: DF.Data | None
+        allow_relaying: DF.Check
+        sub_addressing: DF.Check
+        transport_security_records: DF.Table[MailDomainDNSRecord]
+    # end: auto-generated types
+
+    # --- lifecycle --------------------------------------------------------------
+
+    def autoname(self) -> None:
+        # Naming runs before validate, so the address is normalised here too.
+        self.domain_name = validate_domain_name(self.domain_name)
+        self.name = self.domain_name
+
+    def validate(self) -> None:
+        self.domain_name = validate_domain_name(self.domain_name)
+        site = self.get_site()
+        self.cluster = site.cluster
+        if self.is_new() and not self.flags.adopting:
+            # Proof of control comes first: only someone who controls the domain's DNS learns
+            # whether another site already holds it.
+            if ownership.required():
+                ownership.assert_ownership(site, self.domain_name)
+            assert_domain_available(self.domain_name, self.site)
+            site.assert_can_add_domain()
+        if self.catch_all_address:
+            self.catch_all_address = validate_email_address(self.catch_all_address)
+            assert_addresses_deliverable(self.site, [self.catch_all_address])
+        if (
+            self.egress_pool
+            and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
+        ):
+            frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
+        if not self.is_new() and self.has_value_changed("enabled") and not self.enabled:
+            # Proof of control lapses with the domain: enabling it again needs a fresh verification.
+            self.is_verified = 0
+        if ownership.skipped():
+            # The operator vouches for every tenant's domains: they count as verified for as long as
+            # they are enabled, and the hourly check leaves them alone. Marked, so that turning the
+            # setting off finds them again.
+            self.is_verified = int(bool(self.enabled))
+            self.skip_scheduled_verification = 1
+            self.verification_skipped = 1
+        if not self.is_new() and self.has_value_changed("publish_client_discovery_records"):
+            # The zone already holds the certificate-bound records; only which tables list them changes.
+            self.rebuild_dns_records(self.dns_zone_file or "")
+
+    def after_insert(self) -> None:
+        payload = self.stalwart_payload()
+        if self.flags.skip_push:  # adopted: the cluster has it; only read what it publishes
+            self.refresh_dns_records()
+            return
+        sync.push_create(self, "domains", payload)
+        try:
+            self.refresh_dns_records(expected_dkim_keys=len(payload.dkim_algorithms))
+        except Exception:
+            sync.push_destroy(self, "domains")  # the insert rolls back; the domain must not survive
+            raise
+        if self.allow_relaying:
+            egress.resync_cluster_after_commit(self.cluster)
+
+    def on_update(self) -> None:
+        if self.is_new() or not self.stalwart_id or self.flags.skip_push:
+            return
+        before = self.get_doc_before_save()
+        if before and any(before.get(f) != self.get(f) for f in PUSHED_FIELDS):
+            sync.push_update(self, "domains", self.stalwart_patch())
+        if before and any(before.get(f) != self.get(f) for f in ROUTED_FIELDS):
+            egress.resync_cluster_after_commit(self.cluster)
+
+    def on_trash(self) -> None:
+        for doctype in ("Mail Account", "Mail Group", "Mailing List"):
+            if frappe.db.exists(doctype, {"domain": self.name}):
+                frappe.throw(_("Delete every {0} of {1} first.").format(_(doctype), self.domain_name))
+        alias_filters = {"alias_email": ["like", f"%@{self.domain_name}"]}
+        if alias := frappe.db.get_value("Mail Address Alias", alias_filters, "parent"):
+            frappe.throw(_("Remove the aliases on {0} first (e.g. on {1}).").format(self.domain_name, alias))
+        for reports in (DMARC_REPORTS, TLS_REPORTS):
+            reports.detach_domain(self.name)
+        sync.push_destroy(self, "domains")
+
+    def after_delete(self) -> None:
+        on_a_pool = self.egress_pool or frappe.db.get_value("Suite Site", self.site, "egress_pool")
+        if on_a_pool or self.allow_relaying:
+            egress.resync_cluster_after_commit(self.cluster)
+
+    # --- Stalwart -----------------------------------------------------------------
+
+    def is_live(self) -> bool:
+        """Mail flows only for verified domains: proof of control comes from the published records."""
+
+        return bool(self.enabled and self.is_verified)
+
+    def stalwart_payload(self) -> Domain:
+        return Domain(
+            name=self.domain_name,
+            description=self.description or f"Suite site {self.site}",
+            is_enabled=self.is_live(),
+            dkim_algorithms=dkim_algorithms(),
+            catch_all_address=self.catch_all_address or None,
+            sub_addressing=bool(self.sub_addressing),
+            allow_relaying=bool(self.allow_relaying),
+            report_address_uri=f"mailto:postmaster@{self.domain_name}",
+        )
+
+    def stalwart_patch(self) -> dict:
+        return {
+            "description": self.description or f"Suite site {self.site}",
+            "isEnabled": self.is_live(),
+            "catchAllAddress": self.catch_all_address or None,
+            "subAddressing": {"@type": "Enabled" if self.sub_addressing else "Disabled"},
+            "allowRelaying": bool(self.allow_relaying),
+        }
+
+    @frappe.whitelist()
+    def replace_dkim_keys(self) -> None:
+        """Emergency replacement after a leaked key: new keys under the same selectors.
+
+        The owner republishes the DKIM records with the new values. Their rows lose their
+        verification, so the hourly check takes the domain offline until the new records resolve;
+        mail signed with the old keys stops verifying as soon as they do.
+        """
+
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        self.assert_saved()
+        algorithms = dkim_algorithms()
+        sync.client_for(self).domains.replace_dkim_keys(self.stalwart_id, algorithms)
+        self.refresh_dns_records(expected_dkim_keys=len(algorithms))
+
+    # --- DNS ------------------------------------------------------------------------
+
+    @frappe.whitelist()
+    def refresh_dns_records(self, expected_dkim_keys: int | None = None) -> None:
+        self.assert_saved()
+        """Re-reads the zone Stalwart expects and rebuilds the record rows (verification kept).
+
+        Right after creation the read waits for the DKIM keys Stalwart is still generating.
+        """
+
+        zone_file = sync.client_for(self).domains.get_zone_file(
+            self.stalwart_id, expected_dkim_keys=cint(expected_dkim_keys)
+        )
+        self.rebuild_dns_records(zone_file)
+        self.last_refreshed_at = now()
+        # Liveness is only ever changed by a verification run: a rotated DKIM selector must not
+        # take a working domain offline before its owner had a chance to publish it.
+        self.save_records()
+
+    def rebuild_dns_records(self, zone_file: str) -> None:
+        """Replaces the group tables with the rows parsed from ``zone_file`` (verification kept)."""
+
+        cluster = self.get_cluster()
+        rows = build_domain_records(
+            self.domain_name,
+            zone_file,
+            spf_include=cluster_dns.spf_include(cluster),
+            include_client_discovery=bool(self.publish_client_discovery_records),
+            default_ttl=cint(get_config("default_dns_ttl")) or 300,
+        )
+        verified = {
+            (r.record_type, r.host, (r.value or "").strip()): r for r in self.dns_rows() if r.is_verified
+        }
+        for group in GROUPS:
+            self.set(group["key"], [])
+        for row in rows:
+            previous = verified.get((row["record_type"], row["host"], row["value"].strip()))
+            if previous:
+                row.update({"is_verified": 1, "last_checked_at": previous.last_checked_at})
+            self.append(row.pop("group"), row)
+        self.dns_zone_file = zone_file
+
+    @frappe.whitelist()
+    def verify_dns_records(self) -> dict:
+        self.assert_saved()
+        """Resolves every record on public resolvers; the domain is verified when all mandatory ones match."""
+
+        checked_at = now()
+        inconclusive = 0
+        for row in self.dns_rows():
+            verified = verify_dns_record(row.fqdn, row.record_type, self.expected_value(row))
+            if verified is None:
+                inconclusive += 1  # resolver trouble says nothing about the record: keep its state
+                continue
+            row.is_verified = cint(verified)
+            row.last_checked_at = checked_at
+
+        was_live = self.is_live()
+        self.is_verified = int(ownership.skipped() or self.compute_is_verified())
+        self.last_verified_at = checked_at
+        if self.stalwart_id and was_live != self.is_live():
+            # Cluster first: a failed push must not leave the local flag ahead of Stalwart.
+            sync.push_update(self, "domains", {"isEnabled": self.is_live()})
+        self.save_records()
+        return {"inconclusive": inconclusive, "is_verified": bool(self.is_verified), **self.records_payload()}
+
+    def compute_is_verified(self) -> bool:
+        """SPF and DMARC must verify, plus at least one DKIM selector.
+
+        A message passes DKIM when any one of its signatures verifies, so one published selector
+        is enough for mail to flow; the rows of the others stay flagged until they are published
+        too. MX is the owner's choice: a domain may send through the cluster and keep receiving
+        elsewhere.
+        """
+
+        rows = self.authentication_records
+        if not rows:
+            return False
+        by_category: dict[str, list] = {}
+        for row in rows:
+            by_category.setdefault(row.category, []).append(row)
+        for category in ("SPF", "DMARC"):
+            if not by_category.get(category) or not all(r.is_verified for r in by_category[category]):
+                return False
+        return any(r.is_verified for r in by_category.get("DKIM", []))
+
+    def dns_rows(self) -> list[Document]:
+        """Every record row across the group tables, in group order."""
+
+        return [row for group in GROUPS for row in self.get(group["key"])]
+
+    def records_payload(self) -> dict:
+        return {"groups": group_summaries(), "records": [r.to_api() for r in self.dns_rows()]}
+
+    @staticmethod
+    def expected_value(row: Document) -> str:
+        """What the resolver's answer must render as; SRV answers carry all four fields."""
+
+        if row.record_type == "SRV":
+            return f"{row.priority} {row.weight} {row.port} {row.value}"
+        return row.value
+
+    def save_records(self) -> None:
+        self.flags.skip_push = True
+        self.save(ignore_permissions=True)
+        self.flags.skip_push = False
+
+    def assert_saved(self) -> None:
+        """Refuses to act on a form with unsaved edits to pushed fields.
+
+        The desk sends the form as it is; saving it here with pushes skipped would commit those
+        edits locally without the cluster ever hearing of them, and no later save would push them.
+        """
+
+        if self.is_new():
+            return
+        fields = [*PUSHED_FIELDS, "egress_pool", "publish_client_discovery_records"]
+        stored = frappe.db.get_value(self.doctype, self.name, fields, as_dict=True) or {}
+        for field in fields:
+            if (stored.get(field) or "") != (self.get(field) or ""):
+                frappe.throw(_("Save the domain before running this action."))
+
+    # --- helpers -----------------------------------------------------------------------
+
+    def get_site(self) -> Document:
+        return frappe.get_cached_doc("Suite Site", self.site)
+
+    def get_cluster(self) -> Document:
+        return frappe.get_cached_doc("Stalwart Cluster", self.cluster or self.get_site().cluster)
+
+    def to_api(self, with_records: bool = True) -> dict:
+        payload = domain_payload(self)
+        if with_records:
+            records = self.records_payload()
+            payload["dns_record_groups"] = records["groups"]
+            payload["dns_records"] = records["records"]
+        return payload
+
+
+def domain_payload(row) -> dict:
+    return {
+        "domain": row.domain_name,
+        "enabled": bool(row.enabled),
+        "description": row.description,
+        "catch_all_address": row.catch_all_address,
+        "sub_addressing": bool(row.sub_addressing),
+        "allow_relaying": bool(row.allow_relaying),
+        "publish_client_discovery_records": bool(row.publish_client_discovery_records),
+        "is_verified": bool(row.is_verified),
+        "last_verified_at": utc_iso(row.last_verified_at),
+        "created_at": utc_iso(row.creation),
+    }
+
+
+DOMAIN_FIELDS = [
+    "name",
+    "domain_name",
+    "enabled",
+    "description",
+    "catch_all_address",
+    "sub_addressing",
+    "allow_relaying",
+    "publish_client_discovery_records",
+    "is_verified",
+    "last_verified_at",
+    "creation",
+]
+
+
+def domain_payloads(names: list[str]) -> list[dict]:
+    """The listing shape of many domains in one query; the five record tables are left unread."""
+
+    if not names:
+        return []
+    rows = frappe.get_all("Mail Domain", filters={"name": ["in", names]}, fields=DOMAIN_FIELDS)
+    by_name = {row.name: row for row in rows}
+    return [domain_payload(by_name[n]) for n in names if n in by_name]
+
+
+def refresh_rotating_domains() -> None:
+    """Hourly: re-read the zone of domains whose DKIM keys are not all stored yet, or rotating.
+
+    A key still generating when the domain was created can be missing from the stored records.
+    Keys are not meant to rotate (see ``dkim_management_payload``), but a domain in a rotation
+    stage is refreshed too rather than left with a selector it never published. Asking for the
+    signatures is one cheap call per domain; only domains that need it pay for the zone refresh.
+    """
+
+    domains = frappe.get_all(
+        "Mail Domain", {"stalwart_id": ["is", "set"], "enabled": 1}, ["name", "cluster", "stalwart_id"]
+    )
+    stored = stored_dkim_selectors([d.name for d in domains])
+    for domain in domains:  # only the cluster and id are needed to ask; the document loads on refresh
+        try:
+            signatures = sync.client_for(domain).dkim_signatures.get_all_by_domain(domain.stalwart_id)
+        except Exception:
+            continue
+        stages = {s.get("selector"): str(s.get("stage") or "").lower() for s in signatures}
+        rotating = any(stage in ("pending", "retiring") for stage in stages.values())
+        published = {selector for selector, stage in stages.items() if stage in ("active", "pending")}
+        if rotating or not published <= stored.get(domain.name, set()):
+            _refresh(domain.name)
+
+
+def stored_dkim_selectors(names: list[str]) -> dict[str, set[str]]:
+    """``{domain: selectors}`` from the stored DKIM rows, whose host is ``<selector>._domainkey``."""
+
+    selectors: dict[str, set[str]] = {}
+    if not names:
+        return selectors
+    rows = frappe.get_all(
+        "Mail Domain DNS Record",
+        {"parenttype": "Mail Domain", "parent": ["in", names], "category": "DKIM"},
+        ["parent", "host"],
+    )
+    for row in rows:
+        selectors.setdefault(row.parent, set()).add(row.host.split("._domainkey", 1)[0])
+    return selectors
+
+
+def enqueue_recheck_of_vouched_domains() -> None:
+    """Skip Domain Verification was turned off: the domains taken on the cloud's word are checked
+    like any other from now on. In the background, since it resolves every one of them; one job per
+    turn of the setting, since a job already running took its list before any domain vouched for
+    while it ran, and a second turn must reach those."""
+
+    if frappe.flags.do_not_enqueue:
+        recheck_vouched_domains()
+        return
+    frappe.enqueue(recheck_vouched_domains, queue="long", enqueue_after_commit=True)
+
+
+def recheck_vouched_domains() -> None:
+    """Drops the mark and the scheduled-check exemption from every domain verified on the cloud's
+    word, and resolves its records: one without them goes offline until they are published."""
+
+    for name in frappe.get_all("Mail Domain", {"verification_skipped": 1}, pluck="name"):
+        _run_isolated(name, lambda: _recheck_vouched(name), "DNS verification")
+
+
+def _recheck_vouched(name: str) -> None:
+    # Locked and read again: two jobs may hold the same list, and the later finds the mark gone.
+    domain = frappe.get_doc("Mail Domain", name, for_update=True)
+    if not domain.verification_skipped:
+        return
+    domain.verification_skipped = 0
+    domain.skip_scheduled_verification = 0
+    domain.save()
+    domain.verify_dns_records()
+
+
+def verify_unverified_domains() -> None:
+    """Hourly: unverified domains, plus verified ones with a mandatory row still unverified (rotations)."""
+
+    for name in domains_due_for_verification():
+        _run_isolated(
+            name, lambda: frappe.get_doc("Mail Domain", name).verify_dns_records(), "DNS verification"
+        )
+    if not ownership.skipped():
+        # A domain still vouched for with the setting off is one the turn's own job did not reach.
+        recheck_vouched_domains()
+
+
+def domains_due_for_verification() -> list[str]:
+    """The domains the hourly check resolves; ``skip_scheduled_verification`` keeps one out of it."""
+
+    # Disabled domains stay unverified on purpose: verification resumes once they are enabled.
+    due = {"enabled": 1, "stalwart_id": ["is", "set"], "skip_scheduled_verification": 0}
+    names = set(frappe.get_all("Mail Domain", {**due, "is_verified": 0}, pluck="name"))
+    unverified_rows = frappe.get_all(
+        "Mail Domain DNS Record",
+        {"is_mandatory": 1, "is_verified": 0, "parenttype": "Mail Domain"},
+        pluck="parent",
+        distinct=True,
+    )
+    if unverified_rows:
+        names.update(frappe.get_all("Mail Domain", {**due, "name": ["in", unverified_rows]}, pluck="name"))
+    return sorted(names)
+
+
+def _refresh(name: str) -> None:
+    _run_isolated(name, lambda: frappe.get_doc("Mail Domain", name).refresh_dns_records(), "DNS refresh")
+
+
+def _run_isolated(name: str, action, label: str) -> None:
+    """One domain per transaction; a failure rolls its partial work back instead of committing it."""
+
+    try:
+        action()
+    except Exception:
+        frappe.db.rollback()
+        log_exception(f"{label} failed for {name}")
+        return
+    if not frappe.in_test:
+        frappe.db.commit()

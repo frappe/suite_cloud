@@ -22,23 +22,23 @@ scheduler_events = {
     "cron": {
         "*/5 * * * *": [
             "suite_cloud.suite_cloud.doctype.server_job.server_job.retry_failed_jobs",
-            "suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node.poll_pending_nodes",
-            "suite_cloud.cloud_mail.doctype.egress_gateway.egress_gateway.poll_pending_gateways",
+            "suite_cloud.mail.doctype.stalwart_node.stalwart_node.poll_pending_nodes",
+            "suite_cloud.mail.doctype.egress_gateway.egress_gateway.poll_pending_gateways",
         ],
     },
     "hourly": [
-        "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.refresh_rotating_domains",
-        "suite_cloud.cloud_mail.doctype.mail_domain.mail_domain.verify_unverified_domains",
-        "suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report.fetch_all_clusters",
-        "suite_cloud.cloud_mail.doctype.tls_report.tls_report.fetch_all_clusters",
+        "suite_cloud.mail.doctype.mail_domain.mail_domain.refresh_rotating_domains",
+        "suite_cloud.mail.doctype.mail_domain.mail_domain.verify_unverified_domains",
+        "suite_cloud.mail.doctype.dmarc_report.dmarc_report.fetch_all_clusters",
+        "suite_cloud.mail.doctype.tls_report.tls_report.fetch_all_clusters",
     ],
     "daily": [
         "suite_cloud.suite_cloud.doctype.dns_record.dns_record.verify_all_dns_records",
-        "suite_cloud.cloud_mail.doctype.stalwart_cluster.stalwart_cluster.check_all_clusters",
-        "suite_cloud.cloud_mail.doctype.stalwart_node.stalwart_node.verify_all_ptr_records",
-        "suite_cloud.cloud_mail.doctype.egress_ip_pool.egress_ip_pool.verify_all_ptr_records",
-        "suite_cloud.cloud_mail.doctype.dmarc_report.dmarc_report.prune_expired_reports",
-        "suite_cloud.cloud_mail.doctype.tls_report.tls_report.prune_expired_reports",
+        "suite_cloud.mail.doctype.stalwart_cluster.stalwart_cluster.check_all_clusters",
+        "suite_cloud.mail.doctype.stalwart_node.stalwart_node.verify_all_ptr_records",
+        "suite_cloud.mail.doctype.egress_ip_pool.egress_ip_pool.verify_all_ptr_records",
+        "suite_cloud.mail.doctype.dmarc_report.dmarc_report.prune_expired_reports",
+        "suite_cloud.mail.doctype.tls_report.tls_report.prune_expired_reports",
     ],
 }
 

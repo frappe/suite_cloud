@@ -1,8 +1,8 @@
 import frappe
 
 from suite_cloud.api.site import current_site, site_api
-from suite_cloud.cloud_mail.stalwart import get_client
-from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA
+from suite_cloud.mail.stalwart import get_client
+from suite_cloud.mail.stalwart.directory import DISK_QUOTA
 
 SCHEMA_CACHE_TTL = 3600
 
