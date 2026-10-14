@@ -304,7 +304,7 @@ def ping() -> dict:
     return current_site().to_api()
 
 
-@frappe.whitelist(methods=["POST"])
+@frappe.whitelist(methods=["PATCH", "POST"])
 @site_api
 def update_site_profile(title: str | None = None, contact_email: str | None = None) -> dict:
     """What the site says about itself: its workspace name as the title, and where to reach it.

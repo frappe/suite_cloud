@@ -68,7 +68,7 @@ def create_domain(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PATCH", "POST", "PUT"])
 @site_api
 def update_domain(
     domain: str,

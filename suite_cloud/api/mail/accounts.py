@@ -133,7 +133,7 @@ def create_account(
     return {**doc.to_api(), "app_password": doc.get_password("app_password")}
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PATCH", "POST", "PUT"])
 @site_api
 def update_account(
     email: str,
@@ -165,7 +165,7 @@ def update_account(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST"])
+@frappe.whitelist(methods=["POST", "PUT"])
 @site_api
 def set_account_enabled(email: str, enabled: bool) -> dict:
     doc = owned("Mail Account", email)
@@ -173,7 +173,7 @@ def set_account_enabled(email: str, enabled: bool) -> dict:
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST"])
+@frappe.whitelist(methods=["POST", "PUT"])
 @site_api
 def set_password(email: str, password: str) -> None:
     owned("Mail Account", email).set_password(password)

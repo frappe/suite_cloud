@@ -82,7 +82,7 @@ def rotate_site_secret(site: str) -> dict:
     return credentials(doc, doc.rotate_secret())
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PATCH", "POST", "PUT"])
 def update_site(
     site: str,
     title: str | None = None,

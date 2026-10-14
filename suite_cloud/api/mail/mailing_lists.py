@@ -59,7 +59,7 @@ def create_mailing_list(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PATCH", "POST", "PUT"])
 @site_api
 def update_mailing_list(email: str, description: str | None = None) -> dict:
     doc = owned("Mailing List", email)
