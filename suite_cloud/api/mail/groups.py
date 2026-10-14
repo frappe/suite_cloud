@@ -126,6 +126,7 @@ def set_group_members(email: str, members: list[str] | str | None = None) -> dic
 @site_api
 def delete_group(email: str) -> None:
     owned("Mail Group", email).delete(ignore_permissions=True)
+    frappe.local.response["http_status_code"] = 204
 
 
 def _resolve_members(members: list[str] | str | None) -> set[str]:

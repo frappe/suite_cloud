@@ -3,9 +3,9 @@
 import frappe
 from frappe import _
 from frappe.query_builder.functions import Count, Sum
-from frappe.utils import cint, get_datetime
+from frappe.utils import cint
 
-from suite_cloud.api.site import current_site, owned, owned_page, site_api
+from suite_cloud.api.site import as_datetime, current_site, owned, owned_page, site_api
 from suite_cloud.mail.doctype.tls_report.tls_report import report_payloads
 from suite_cloud.mail.reports import report_window
 from suite_cloud.utils import utc_iso
@@ -39,10 +39,10 @@ def list_tls_reports(
         filters["policy_domain"] = owned("Mail Domain", domain).name
     if since_days := report_window(days)[0]:
         filters["date_range_end"] = [">=", since_days]
-    if since:
-        filters["date_range_end"] = [">=", get_datetime(since)]
-    if until:
-        filters["date_range_begin"] = ["<=", get_datetime(until)]
+    if since := as_datetime(since):
+        filters["date_range_end"] = [">=", since]
+    if until := as_datetime(until):
+        filters["date_range_begin"] = ["<=", until]
     names, total = owned_page(
         "TLS Report",
         search,

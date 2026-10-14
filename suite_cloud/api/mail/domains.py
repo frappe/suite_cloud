@@ -100,6 +100,7 @@ def update_domain(
 @site_api
 def delete_domain(domain: str) -> None:
     owned("Mail Domain", domain).delete(ignore_permissions=True)
+    frappe.local.response["http_status_code"] = 204
 
 
 @frappe.whitelist(methods=["GET", "POST"])

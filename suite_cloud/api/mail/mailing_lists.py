@@ -182,3 +182,4 @@ def set_recipients(email: str, recipients: list[str] | str | None = None) -> dic
 @site_api
 def delete_mailing_list(email: str) -> None:
     owned("Mailing List", email).delete(ignore_permissions=True)
+    frappe.local.response["http_status_code"] = 204

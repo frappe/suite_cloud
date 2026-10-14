@@ -235,3 +235,4 @@ def set_groups(email: str, groups: list[str] | str | None = None) -> dict:
 @site_api
 def delete_account(email: str) -> None:
     owned("Mail Account", email).delete(ignore_permissions=True)
+    frappe.local.response["http_status_code"] = 204

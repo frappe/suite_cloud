@@ -697,6 +697,19 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertRaises(frappe.DoesNotExistError, accounts.create_account, "eve@acme.com", "secret-pw")
         self.assertRaises(frappe.DoesNotExistError, groups.create_group, "team@acme.com")
 
+    def test_refusals_become_422_and_deletes_204(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        with self.assertRaises(frappe.ValidationError) as ctx:
+            accounts.create_account("carol@acme.com", "short")
+        self.assertEqual(ctx.exception.http_status_code, 422)
+        with self.assertRaises(frappe.DoesNotExistError) as ctx:
+            accounts.get_account("nobody@acme.com")
+        self.assertEqual(ctx.exception.http_status_code, 404)  # not a 417, so left alone
+
+        domains.delete_domain("acme.com")
+        self.assertEqual(frappe.local.response.get("http_status_code"), 204)
+
     def test_stalwart_refusals_become_422(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")

@@ -5,20 +5,32 @@ key/secret). The secret returned by ``create_site`` and ``rotate_site_secret`` i
 FC stores it in the site's configuration.
 """
 
+import functools
+from collections.abc import Callable
+
 import frappe
 from frappe import _
 
-from suite_cloud.api.site import as_list
+from suite_cloud.api.site import api_errors, as_list
 from suite_cloud.utils import child_rows, get_public_url
 
 ROLE = "Frappe Cloud"
 
 
-def require_frappe_cloud() -> None:
-    frappe.only_for((ROLE, "System Manager"))
+def frappe_cloud_api(fn: Callable) -> Callable:
+    """Frappe Cloud or an operator may call; refusals leave with REST status codes."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        frappe.only_for((ROLE, "System Manager"))
+        with api_errors():
+            return fn(*args, **kwargs)
+
+    return wrapper
 
 
 @frappe.whitelist(methods=["POST"])
+@frappe_cloud_api
 def create_site(
     site: str,
     cluster: str | None = None,
@@ -37,7 +49,6 @@ def create_site(
     """``allowed_ips`` is the outbound addresses (or CIDR ranges) of the server hosting the site; set,
     only requests from them may use the site's key."""
 
-    require_frappe_cloud()
     site = (site or "").strip().lower()
     if frappe.db.exists("Suite Site", site):
         frappe.throw(_("Site {0} already exists.").format(site), frappe.DuplicateEntryError)
@@ -70,19 +81,20 @@ def create_site(
 
 
 @frappe.whitelist(methods=["GET", "POST"])
+@frappe_cloud_api
 def get_site(site: str) -> dict:
-    require_frappe_cloud()
     return {**load(site).to_api(), "suite_cloud_url": get_public_url()}
 
 
 @frappe.whitelist(methods=["POST"])
+@frappe_cloud_api
 def rotate_site_secret(site: str) -> dict:
-    require_frappe_cloud()
     doc = load(site)
     return credentials(doc, doc.rotate_secret())
 
 
 @frappe.whitelist(methods=["PATCH", "POST", "PUT"])
+@frappe_cloud_api
 def update_site(
     site: str,
     title: str | None = None,
@@ -98,7 +110,6 @@ def update_site(
     """Changes the site's display name, contact address, limits or allowed addresses; omitted fields
     stay as they are. An empty ``allowed_ips`` list lifts the address restriction."""
 
-    require_frappe_cloud()
     doc = load(site)
     for field, value in {
         "title": title,
@@ -118,24 +129,24 @@ def update_site(
 
 
 @frappe.whitelist(methods=["POST"])
+@frappe_cloud_api
 def suspend_site(site: str) -> dict:
-    require_frappe_cloud()
     doc = load(site)
     doc.suspend()
     return doc.to_api()
 
 
 @frappe.whitelist(methods=["POST"])
+@frappe_cloud_api
 def resume_site(site: str) -> dict:
-    require_frappe_cloud()
     doc = load(site)
     doc.resume()
     return doc.to_api()
 
 
 @frappe.whitelist(methods=["POST"])
+@frappe_cloud_api
 def archive_site(site: str, delete_data: bool = False) -> dict:
-    require_frappe_cloud()
     doc = load(site)
     doc.archive(delete_data=bool(delete_data))
     return doc.to_api()
