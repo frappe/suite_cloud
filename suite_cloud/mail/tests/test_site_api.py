@@ -75,7 +75,7 @@ class SiteApiTestCase(IntegrationTestCase):
 
         frappe.local.suite_site = None
         frappe.set_user(frappe.db.get_single_value("Suite Cloud Settings", "site_service_user"))
-        frappe.local.request = frappe._dict(headers={"Authorization": f"token {site.api_key}:{secret}"})
+        frappe.utils.set_request(headers={"Authorization": f"token {site.api_key}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 
 
@@ -110,12 +110,12 @@ class TestSiteResolution(SiteApiTestCase):
         self.assertEqual(current_site().name, self.site.name)
 
     def test_unknown_key_or_wrong_user_is_rejected(self) -> None:
-        frappe.local.request = frappe._dict(headers={"Authorization": "token nope:secret"})
+        frappe.utils.set_request(headers={"Authorization": "token nope:secret"})
         frappe.local.suite_site = None
         self.assertRaises(SiteAuthError, current_site)
 
         frappe.set_user("Guest")
-        frappe.local.request = frappe._dict(headers={"Authorization": f"token {self.site.api_key}:x"})
+        frappe.utils.set_request(headers={"Authorization": f"token {self.site.api_key}:x"})
         self.assertRaises(SiteAuthError, current_site)
 
     def test_requests_must_come_from_an_allowed_address_when_set(self) -> None:
@@ -169,7 +169,7 @@ class TestSiteResolution(SiteApiTestCase):
     def test_managers_can_act_for_a_site(self) -> None:
         frappe.set_user("Administrator")
         frappe.local.suite_site = None
-        frappe.local.request = frappe._dict(headers={})
+        frappe.utils.set_request(headers={})
         frappe.local.form_dict = frappe._dict(site=self.other.name)
         self.assertEqual(current_site().name, self.other.name)
 

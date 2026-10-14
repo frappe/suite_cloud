@@ -107,3 +107,14 @@ def make_site(cluster, name: str = "acme.frappe.test", **fields):
     site = frappe.get_doc({"doctype": "Suite Site", "site_name": name, "cluster": cluster.name, **fields})
     site.insert()
     return site
+
+
+def error_log_count() -> int:
+    """Error Log lives on Frappe's log database as a virtual DocType, so raw SQL cannot see it."""
+
+    return len(frappe.get_all("Error Log", pluck="name", limit_page_length=0))
+
+
+def latest_error_log_method() -> str | None:
+    rows = frappe.get_all("Error Log", pluck="method", order_by="creation desc", limit_page_length=1)
+    return rows[0] if rows else None

@@ -7,6 +7,7 @@ from frappe.utils import add_days
 from suite_cloud.api.mail import domains, tls
 from suite_cloud.mail import reports
 from suite_cloud.mail.doctype.tls_report.tls_report import TLS_REPORTS
+from suite_cloud.mail.tests.fixtures import error_log_count, latest_error_log_method
 from suite_cloud.mail.tests.test_site_api import SiteApiTestCase
 
 MX = "mail.c1.example.test"
@@ -179,13 +180,11 @@ class TestTlsReports(SiteApiTestCase):
         self.add(stalwart_report("acme.com"))
         broken = self.add({"report": {"policies": {"0": 1}}})
         self.add(stalwart_report("acme.com", org="Microsoft Corporation"))
-        errors_before = frappe.db.count("Error Log")
+        errors_before = error_log_count()
         self.assertEqual(self.fetch(), 2)
         self.assertEqual(len(self.report_names()), 2)
-        self.assertEqual(frappe.db.count("Error Log"), errors_before + 1)
-        self.assertIn(
-            broken, frappe.db.get_value("Error Log", {"name": ["!=", ""]}, "method", order_by="creation desc")
-        )
+        self.assertEqual(error_log_count(), errors_before + 1)
+        self.assertIn(broken, latest_error_log_method())
 
     def test_site_api_shows_only_the_site_s_reports(self) -> None:
         self.add(stalwart_report("acme.com"))

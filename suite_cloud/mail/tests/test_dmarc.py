@@ -8,6 +8,7 @@ from suite_cloud.api.mail import dmarc, domains
 from suite_cloud.mail import reports
 from suite_cloud.mail.doctype.dmarc_report import dmarc_report
 from suite_cloud.mail.tenancy import sync
+from suite_cloud.mail.tests.fixtures import error_log_count, latest_error_log_method
 from suite_cloud.mail.tests.test_site_api import SiteApiTestCase
 
 
@@ -133,10 +134,10 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual((len(paged), set(paged)), (7, ids))
         self.assertEqual(paged, sorted(paged))
         # A cluster that lists an id twice (overlapping pages) stores it once and logs nothing.
-        errors_before = frappe.db.count("Error Log")
+        errors_before = error_log_count()
         with patch.object(type(service), "iter_ids", return_value=iter([*sorted(ids), *sorted(ids)])):
             self.assertEqual(self.fetch(), 7)
-        self.assertEqual((len(self.report_names()), frappe.db.count("Error Log")), (7, errors_before))
+        self.assertEqual((len(self.report_names()), error_log_count()), (7, errors_before))
 
     def test_a_page_holds_up_to_five_hundred_reports(self) -> None:
         self.seed_reports(501)
@@ -198,13 +199,11 @@ class TestDmarcReports(SiteApiTestCase):
             "DmarcExternalReport", {"report": {"policyDomain": "acme.com", "records": {"0": 1}}}
         )
         self.fake._add("DmarcExternalReport", stalwart_report("acme.com", org="yahoo.com"))
-        errors_before = frappe.db.count("Error Log")
+        errors_before = error_log_count()
         self.assertEqual(self.fetch(), 2)
         self.assertEqual(len(self.report_names()), 2)
-        self.assertEqual(frappe.db.count("Error Log"), errors_before + 1)
-        self.assertIn(
-            broken, frappe.db.get_value("Error Log", {"name": ["!=", ""]}, "method", order_by="creation desc")
-        )
+        self.assertEqual(error_log_count(), errors_before + 1)
+        self.assertIn(broken, latest_error_log_method())
 
     def test_site_api_shows_only_the_site_s_reports(self) -> None:
         self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
