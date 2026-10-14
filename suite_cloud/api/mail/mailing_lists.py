@@ -71,7 +71,7 @@ def update_mailing_list(email: str, description: str | None = None) -> dict:
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def set_mailing_list_aliases(email: str, aliases: list | str | None = None) -> dict:
+def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mailing List", email)
     doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
@@ -80,20 +80,27 @@ def set_mailing_list_aliases(email: str, aliases: list | str | None = None) -> d
 
 @frappe.whitelist(methods=["POST"])
 @site_api
-def add_mailing_list_alias(email: str, alias: str, description: str | None = None) -> dict:
+def add_alias(email: str, alias: str, description: str | None = None) -> dict:
     return alias_rows.add("Mailing List", email, alias, description).to_api()
 
 
 @frappe.whitelist(methods=["POST", "DELETE"])
 @site_api
-def remove_mailing_list_alias(email: str, alias: str) -> dict:
+def remove_alias(email: str, alias: str) -> dict:
     return alias_rows.remove("Mailing List", email, alias).to_api()
 
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def set_mailing_list_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
+def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
     return alias_rows.set_enabled("Mailing List", email, alias, sbool(enabled)).to_api()
+
+
+# The names the pre-v2 Suite client calls; they go once every site runs the v2 client.
+set_mailing_list_aliases = set_aliases
+add_mailing_list_alias = add_alias
+remove_mailing_list_alias = remove_alias
+set_mailing_list_alias_enabled = set_alias_enabled
 
 
 # --- recipients: standalone documents, so large lists page instead of loading whole ---------------

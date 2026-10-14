@@ -89,7 +89,7 @@ def update_group(
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def set_group_aliases(email: str, aliases: list | str | None = None) -> dict:
+def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mail Group", email)
     doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
@@ -98,25 +98,25 @@ def set_group_aliases(email: str, aliases: list | str | None = None) -> dict:
 
 @frappe.whitelist(methods=["POST"])
 @site_api
-def add_group_alias(email: str, alias: str, description: str | None = None) -> dict:
+def add_alias(email: str, alias: str, description: str | None = None) -> dict:
     return alias_rows.add("Mail Group", email, alias, description).to_api()
 
 
 @frappe.whitelist(methods=["POST", "DELETE"])
 @site_api
-def remove_group_alias(email: str, alias: str) -> dict:
+def remove_alias(email: str, alias: str) -> dict:
     return alias_rows.remove("Mail Group", email, alias).to_api()
 
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def set_group_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
+def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
     return alias_rows.set_enabled("Mail Group", email, alias, sbool(enabled)).to_api()
 
 
 @frappe.whitelist(methods=["POST", "PUT"])
 @site_api
-def set_group_members(email: str, members: list[str] | str | None = None) -> dict:
+def set_members(email: str, members: list[str] | str | None = None) -> dict:
     doc = owned("Mail Group", email)
     _set_members(doc, _resolve_members(members))
     return doc.to_api()
@@ -127,6 +127,14 @@ def set_group_members(email: str, members: list[str] | str | None = None) -> dic
 def delete_group(email: str) -> None:
     owned("Mail Group", email).delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204
+
+
+# The names the pre-v2 Suite client calls; they go once every site runs the v2 client.
+set_group_aliases = set_aliases
+add_group_alias = add_alias
+remove_group_alias = remove_alias
+set_group_alias_enabled = set_alias_enabled
+set_group_members = set_members
 
 
 def _resolve_members(members: list[str] | str | None) -> set[str]:

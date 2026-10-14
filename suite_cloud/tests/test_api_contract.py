@@ -52,6 +52,19 @@ class TestApiVerbs(UnitTestCase):
         self.assertTrue({"ping", "create_site", "list_accounts", "delete_mailing_list"} <= names)
 
 
+class TestPreV2Names(UnitTestCase):
+    def test_the_old_names_are_the_same_functions(self) -> None:
+        self.assertIs(groups.set_group_aliases, groups.set_aliases)
+        self.assertIs(groups.add_group_alias, groups.add_alias)
+        self.assertIs(groups.remove_group_alias, groups.remove_alias)
+        self.assertIs(groups.set_group_alias_enabled, groups.set_alias_enabled)
+        self.assertIs(groups.set_group_members, groups.set_members)
+        self.assertIs(mailing_lists.set_mailing_list_aliases, mailing_lists.set_aliases)
+        self.assertIs(mailing_lists.add_mailing_list_alias, mailing_lists.add_alias)
+        self.assertIs(mailing_lists.remove_mailing_list_alias, mailing_lists.remove_alias)
+        self.assertIs(mailing_lists.set_mailing_list_alias_enabled, mailing_lists.set_alias_enabled)
+
+
 class TestApiInput(UnitTestCase):
     def test_malformed_input_is_a_400(self) -> None:
         for call in (
