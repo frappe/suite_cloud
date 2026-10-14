@@ -33,7 +33,7 @@ The app has two modules, so one CODEOWNERS line can cover each product:
 | Module | Folder | Holds |
 | --- | --- | --- |
 | **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Site, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
-| **Cloud Mail** | `suite_cloud/cloud_mail` | The mail product: Stalwart Store, Cluster, Node, Egress Gateway and IP Pool, the mail directory (Mail Domain, Mail Account, Mail Group, Mailing List), and the `stalwart`, `cluster` and `tenancy` packages. |
+| **Mail** | `suite_cloud/mail` | The mail product: Stalwart Store, Cluster, Node, Egress Gateway and IP Pool, the mail directory (Mail Domain, Mail Account, Mail Group, Mailing List), and the `stalwart`, `cluster` and `tenancy` packages. |
 
 The site-facing API is split the same way: `suite_cloud.api.site` for what any product needs
 (authentication, `ping`, the site profile) and `suite_cloud.api.mail` for the mail directory.
@@ -112,7 +112,7 @@ again, and **Check Drift** reports what differs from it without changing anythin
 A Stalwart that a Suite site administered directly, before Suite Cloud, holds domains, accounts,
 groups and lists that Suite Cloud never created. Register it as a cluster, create the Suite Site
 for it, then use **Adopt Directory** on the Suite Site (or run
-`suite_cloud.cloud_mail.tenancy.adopt.adopt_directory` with the site name). Every object on the
+`suite_cloud.mail.tenancy.adopt.adopt_directory` with the site name). Every object on the
 cluster is recorded with the id it already has, and nothing is pushed back. The cluster must serve
 that one site, since nothing on it says which site an object belongs to; an object whose record
 already exists anywhere is skipped, and each object imports on its own, so one that cannot (an
@@ -292,8 +292,8 @@ bench --site yoursite run-tests --app suite_cloud --test-category all
 ```
 
 Tests live next to their module: `suite_cloud/tests` for the generic app (settings, fixtures)
-and `suite_cloud/cloud_mail/tests` for mail, including the fake Stalwart
-(`suite_cloud/cloud_mail/tests/fake_stalwart.py`), an in-process JMAP management server the real
+and `suite_cloud/mail/tests` for mail, including the fake Stalwart
+(`suite_cloud/mail/tests/fake_stalwart.py`), an in-process JMAP management server the real
 client talks to unchanged. Nothing reaches a real server or a real DNS provider. Tests that create
 sites use names under `.frappe.test` and clean up only those, so they can run on a site that also
 holds real clusters.

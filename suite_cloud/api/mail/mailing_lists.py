@@ -14,8 +14,8 @@ from suite_cloud.api.site import (
 )
 
 PAGE_CAP = 500  # the dashboard's largest page
-from suite_cloud.cloud_mail.doctype.mailing_list.mailing_list import list_payloads
-from suite_cloud.cloud_mail.tenancy import sync
+from suite_cloud.mail.doctype.mailing_list.mailing_list import list_payloads
+from suite_cloud.mail.tenancy import sync
 
 
 @frappe.whitelist(methods=["GET", "POST"])

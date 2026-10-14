@@ -18,7 +18,7 @@ from frappe import _
 from frappe.query_builder.functions import Count
 from frappe.utils import cint
 
-from suite_cloud.cloud_mail.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
+from suite_cloud.mail.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
 from suite_cloud.utils import get_config
 
 OWNED_DOCTYPES = {"Mail Domain", "Mail Account", "Mail Group", "Mailing List"}

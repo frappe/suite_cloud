@@ -3,9 +3,9 @@ from frappe import _
 from frappe.utils import sbool
 
 from suite_cloud.api.site import current_site, owned, owned_names, site_api
-from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import domain_payloads
-from suite_cloud.cloud_mail.tenancy.addresses import assert_domain_not_reserved, validate_domain_name
-from suite_cloud.cloud_mail.tenancy.ownership import ownership_record
+from suite_cloud.mail.doctype.mail_domain.mail_domain import domain_payloads
+from suite_cloud.mail.tenancy.addresses import assert_domain_not_reserved, validate_domain_name
+from suite_cloud.mail.tenancy.ownership import ownership_record
 
 
 @frappe.whitelist(methods=["GET", "POST"])

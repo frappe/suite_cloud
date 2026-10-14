@@ -9,7 +9,7 @@ from frappe.model.document import Document
 from frappe.query_builder.functions import Sum
 from frappe.utils import cint, flt, now
 
-from suite_cloud.cloud_mail.stalwart.directory import DISK_QUOTA, GB
+from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB
 from suite_cloud.utils import get_config
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
@@ -97,7 +97,7 @@ class SuiteSite(Document):
     def on_update(self) -> None:
         before = self.get_doc_before_save()
         if before and before.egress_pool != self.egress_pool:
-            from suite_cloud.cloud_mail.cluster import egress
+            from suite_cloud.mail.cluster import egress
 
             egress.resync_cluster(self.get_cluster())
 
@@ -119,7 +119,7 @@ class SuiteSite(Document):
         """Records the domains, accounts, groups and lists the cluster already holds for this site."""
 
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        from suite_cloud.cloud_mail.tenancy.adopt import adopt_directory
+        from suite_cloud.mail.tenancy.adopt import adopt_directory
 
         return adopt_directory(self.name)
 

@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint
 
-from suite_cloud.cloud_mail.reports import DEFAULT_RETENTION_DAYS
+from suite_cloud.mail.reports import DEFAULT_RETENTION_DAYS
 from suite_cloud.utils import clear_config_cache, validate_version
 
 
@@ -48,7 +48,7 @@ class SuiteCloudSettings(Document):
         clear_config_cache()
         before = self.get_doc_before_save()
         if before and cint(before.skip_domain_verification) and not cint(self.skip_domain_verification):
-            from suite_cloud.cloud_mail.doctype.mail_domain.mail_domain import (
+            from suite_cloud.mail.doctype.mail_domain.mail_domain import (
                 enqueue_recheck_of_vouched_domains,
             )
 

@@ -6,8 +6,8 @@ from frappe.query_builder.functions import Count, Sum
 from frappe.utils import cint, get_datetime
 
 from suite_cloud.api.site import current_site, owned, owned_page, site_api
-from suite_cloud.cloud_mail.doctype.tls_report.tls_report import report_payloads
-from suite_cloud.cloud_mail.reports import report_window
+from suite_cloud.mail.doctype.tls_report.tls_report import report_payloads
+from suite_cloud.mail.reports import report_window
 from suite_cloud.utils import utc_iso
 
 REPORT_PAGE_CAP = 500  # the dashboard offers pages of up to 500; a listing row carries no policies
