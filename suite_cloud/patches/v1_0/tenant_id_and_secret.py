@@ -11,7 +11,7 @@ from frappe.utils.password import rename_password_field
 def execute() -> None:
     rename_password_field("Suite Tenant", "api_secret", "secret")
 
-    for tenant in frappe.get_all("Suite Tenant", ["name", "title"]):
+    for tenant in frappe.get_all("Suite Tenant", fields=["name", "title"]):
         if is_uuid(tenant.name):
             continue
         if not tenant.title:
