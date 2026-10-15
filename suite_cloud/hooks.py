@@ -15,6 +15,7 @@ use_json_request_body = True
 after_install = "suite_cloud.install.after_install"
 after_migrate = "suite_cloud.install.after_migrate"
 after_request = ["suite_cloud.api.tenant.trim_errors"]
+auth_hooks = ["suite_cloud.api.tenant.authenticate"]
 
 # ============================================================================
 # Scheduled tasks

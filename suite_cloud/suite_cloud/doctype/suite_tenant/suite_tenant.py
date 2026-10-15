@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import ipaddress
+from uuid import uuid7
 
 import frappe
 from frappe import _
@@ -27,22 +28,18 @@ class SuiteTenant(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
-        api_key: DF.Data | None
-        api_secret: DF.Password | None
         archived_at: DF.Datetime | None
         cluster: DF.Link
         contact_email: DF.Data | None
-        domain_verification_token: DF.Data | None
         egress_pool: DF.Link | None
         enabled: DF.Check
-        fc_reference: DF.Data | None
         max_accounts: DF.Int
         max_disk_gb: DF.Float
         max_domains: DF.Int
         max_groups: DF.Int
         max_mailing_lists: DF.Int
-        site_name: DF.Data
-        title: DF.Data | None
+        secret: DF.Password | None
+        title: DF.Data
         status: DF.Literal["Active", "Suspended", "Archived"]
         user: DF.Link | None
         used_disk_bytes: DF.Int
@@ -51,20 +48,14 @@ class SuiteTenant(Document):
     # --- lifecycle ------------------------------------------------------------
 
     def autoname(self) -> None:
-        self.site_name = (self.site_name or "").strip().lower().rstrip("/")
-        self.name = self.site_name
+        self.name = str(uuid7())
 
     def before_insert(self) -> None:
         self.status = "Active"
-        self.api_key = frappe.generate_hash(length=32)
         self.new_secret = self.generate_secret()
-        self.domain_verification_token = frappe.generate_hash(length=32)
 
     def validate(self) -> None:
-        self.site_name = (self.site_name or "").strip().lower().rstrip("/")
-        if "/" in self.site_name or " " in self.site_name or "." not in self.site_name:
-            frappe.throw(_("Site Name must be the site's domain, e.g. acme.frappe.cloud"))
-        self.title = (self.title or "").strip() or self.site_name
+        self.title = (self.title or "").strip()
         if self.contact_email:
             self.contact_email = self.contact_email.strip().lower()
             if not frappe.utils.validate_email_address(self.contact_email):
@@ -83,7 +74,7 @@ class SuiteTenant(Document):
         elif self.has_value_changed("cluster") and self.directory_size():
             # Ids and mailboxes live on the old cluster; moving them is a migration, not a field edit.
             frappe.throw(
-                _("Site {0} has a directory on cluster {1}; it cannot be moved.").format(
+                _("Tenant {0} has a directory on cluster {1}; it cannot be moved.").format(
                     self.name, self.get_doc_before_save().cluster
                 )
             )
@@ -103,15 +94,15 @@ class SuiteTenant(Document):
 
     def on_trash(self) -> None:
         if self.status != "Archived":
-            frappe.throw(_("Archive the site before deleting it."))
+            frappe.throw(_("Archive the tenant before deleting it."))
         if frappe.db.exists("Mail Domain", {"site": self.name}):
-            frappe.throw(_("Delete the site's mail domains first."))
+            frappe.throw(_("Delete the tenant's mail domains first."))
 
     # --- secrets --------------------------------------------------------------
 
     def generate_secret(self) -> str:
         secret = frappe.generate_hash(length=40)
-        self.api_secret = secret
+        self.secret = secret
         return secret
 
     @frappe.whitelist()
@@ -266,7 +257,7 @@ class SuiteTenant(Document):
         """A limit of 0 means unlimited."""
 
         if limit and current >= limit:
-            frappe.throw(_("Site {0} has reached its limit of {1} {2}.").format(self.name, limit, what))
+            frappe.throw(_("Tenant {0} has reached its limit of {1} {2}.").format(self.name, limit, what))
 
     # --- helpers ----------------------------------------------------------------
 
@@ -288,7 +279,7 @@ class SuiteTenant(Document):
     def to_api(self) -> dict:
         cluster = self.get_cluster()
         return {
-            "site": self.name,
+            "tenant": self.name,
             "cluster": self.cluster,
             "status": self.status,
             "title": self.title,

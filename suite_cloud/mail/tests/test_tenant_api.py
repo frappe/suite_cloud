@@ -9,6 +9,7 @@ from suite_cloud.api.tenant import (
     TenantAddressError,
     TenantAuthError,
     TenantSuspendedError,
+    authenticate,
     current_tenant,
     get_disk_usage,
     ping,
@@ -69,17 +70,18 @@ class TenantApiTestCase(IntegrationTestCase):
         frappe.set_user("Administrator")
         # Only the fixture sites: the dev site holds real accounts, and deleting those even
         # inside the rolled-back transaction serialises each one, which asks the live cluster.
+        tenants = frappe.get_all("Suite Tenant", {"title": ["like", "%.frappe.test"]}, pluck="name")
         for doctype in ("Mail Account", "Mail Group", "Mailing List", "Mail Domain"):
-            for name in frappe.get_all(doctype, {"site": ["like", "%.frappe.test"]}, pluck="name"):
+            for name in frappe.get_all(doctype, {"site": ["in", tenants]}, pluck="name"):
                 frappe.delete_doc(doctype, name, force=True, ignore_permissions=True, ignore_on_trash=True)
         frappe.flags.do_not_enqueue = False
 
     def act_as(self, site, secret: str = "any") -> None:
-        """Simulates a request that Frappe already authenticated against the Suite Tenant key."""
+        """Simulates a request the auth hook already signed in for the tenant."""
 
         frappe.local.suite_tenant = None
         frappe.set_user(frappe.db.get_single_value("Suite Cloud Settings", "site_service_user"))
-        frappe.utils.set_request(headers={"Authorization": f"token {site.api_key}:{secret}"})
+        frappe.utils.set_request(headers={"Authorization": f"Tenant {site.name}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 
     @staticmethod
@@ -140,10 +142,9 @@ class TestTenantResolution(TenantApiTestCase):
         profile = update_tenant_profile(title="  Acme Corp ", contact_email="Ops@Acme.test")
         self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", "ops@acme.test"))
         self.assertEqual(frappe.db.get_value("Suite Tenant", self.site.name, "title"), "Acme Corp")
-        # Only the fields passed change; blanks clear the contact and reset the title to the site name.
-        self.assertEqual(update_tenant_profile(contact_email="")["title"], "Acme Corp")
-        profile = update_tenant_profile(title="", contact_email="")
-        self.assertEqual((profile["title"], profile["contact_email"]), (self.site.name, None))
+        # Only the fields passed change; a blank clears the contact.
+        profile = update_tenant_profile(contact_email="")
+        self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", None))
         # A notice address follows the general email rules, not the mail server's local-part rules.
         self.assertEqual(
             update_tenant_profile(contact_email="ops/team@acme.test")["contact_email"], "ops/team@acme.test"
@@ -154,6 +155,8 @@ class TestTenantResolution(TenantApiTestCase):
             update_tenant_profile,
             contact_email="not-an-address",
         )
+        self.act_as(self.site)  # a refused save leaves the request's cached tenant dirty
+        self.assertRaises(frappe.ValidationError, update_tenant_profile, title="")
 
     def test_page_sizes_stay_between_one_and_the_cap(self) -> None:
         from suite_cloud.api.tenant import page_size
@@ -176,14 +179,36 @@ class TestTenantResolution(TenantApiTestCase):
     def test_current_tenant_comes_from_the_authorization_header(self) -> None:
         self.assertEqual(current_tenant().name, self.site.name)
 
-    def test_unknown_key_or_wrong_user_is_rejected(self) -> None:
-        frappe.utils.set_request(headers={"Authorization": "token nope:secret"})
+    def test_unknown_tenant_or_wrong_user_is_rejected(self) -> None:
+        frappe.utils.set_request(headers={"Authorization": "Tenant nope:secret"})
         frappe.local.suite_tenant = None
         self.assertRaises(TenantAuthError, current_tenant)
 
         frappe.set_user("Guest")
-        frappe.utils.set_request(headers={"Authorization": f"token {self.site.api_key}:x"})
+        frappe.utils.set_request(headers={"Authorization": f"Tenant {self.site.name}:x"})
         self.assertRaises(TenantAuthError, current_tenant)
+
+    def test_the_auth_hook_checks_the_tenant_secret(self) -> None:
+        frappe.set_user("Administrator")
+        secret = self.site.rotate_secret()
+        frappe.set_user("Guest")
+
+        frappe.utils.set_request(headers={"Authorization": "token a:b"})
+        authenticate()  # another scheme is left to Frappe
+        self.assertEqual(frappe.session.user, "Guest")
+
+        for credential in (f"{self.site.name}:wrong", f"nope:{secret}", self.site.name):
+            frappe.utils.set_request(headers={"Authorization": f"Tenant {credential}"})
+            self.assertRaisesRegex(frappe.AuthenticationError, "authentication failed", authenticate)
+            self.assertEqual(frappe.session.user, "Guest")
+
+        frappe.utils.set_request(headers={"Authorization": f"Tenant {self.site.name}:{secret}"})
+        authenticate()
+        self.assertEqual(frappe.session.user, self.site.user)
+
+        self.site.db_set("enabled", 0)
+        frappe.set_user("Guest")
+        self.assertRaises(frappe.AuthenticationError, authenticate)
 
     def test_requests_must_come_from_an_allowed_address_when_set(self) -> None:
         self.site.allowed_ips = "203.0.113.10\n2001:db8::/32\n 10.0.0.0/8 "
@@ -194,7 +219,7 @@ class TestTenantResolution(TenantApiTestCase):
         for ip in ("203.0.113.10", "2001:db8:1::5", "10.20.30.40"):
             self.act_as(self.site)
             frappe.local.request_ip = ip
-            self.assertEqual(ping()["site"], self.site.name)
+            self.assertEqual(ping()["tenant"], self.site.name)
         for key in frappe.cache.get_keys("suite_cloud:refused:*"):
             frappe.cache.delete_value(key)
         mock_log = patch("suite_cloud.api.tenant.frappe.log_error").start()
@@ -219,12 +244,12 @@ class TestTenantResolution(TenantApiTestCase):
         frappe.set_user("Administrator")
         frappe.local.suite_tenant = None
         frappe.local.form_dict = frappe._dict(tenant=self.site.name)
-        self.assertEqual(ping()["site"], self.site.name)
+        self.assertEqual(ping()["tenant"], self.site.name)
         # No list means any address.
         frappe.db.set_value("Suite Tenant", self.site.name, "allowed_ips", "")
         frappe.clear_document_cache("Suite Tenant", self.site.name)
         self.act_as(self.site)
-        self.assertEqual(ping()["site"], self.site.name)
+        self.assertEqual(ping()["tenant"], self.site.name)
         frappe.local.request_ip = None
 
     def test_suspended_site_is_refused(self) -> None:
@@ -247,7 +272,7 @@ class TestDomainOwnership(TenantApiTestCase):
         record = result["ownership_record"]
         self.assertEqual(result["domain"], "acme.com")
         self.assertEqual((record["type"], record["host"], record["fqdn"]), ("TXT", "@", "acme.com"))
-        self.assertEqual(record["value"], f"{VALUE_PREFIX}{self.site.domain_verification_token}")
+        self.assertEqual(record["value"], f"{VALUE_PREFIX}{self.site.name}")
         # The same record for every domain of the site, a different one per site.
         self.assertEqual(domains.check_domain("other.com")["ownership_record"]["value"], record["value"])
         self.act_as(self.other)
@@ -322,9 +347,7 @@ class TestDomainOwnership(TenantApiTestCase):
     def test_domain_is_added_only_once_its_record_resolves(self) -> None:
         target = "suite_cloud.mail.tenancy.ownership.verify_dns_record"
         with patch(target, return_value=False):
-            self.assertRaisesRegex(
-                DomainNotVerifiedError, self.site.domain_verification_token, domains.create_domain, "acme.com"
-            )
+            self.assertRaisesRegex(DomainNotVerifiedError, self.site.name, domains.create_domain, "acme.com")
         with patch(target, return_value=None):
             self.assertRaises(OwnershipLookupError, domains.create_domain, "acme.com")
         self.assertFalse(frappe.db.exists("Mail Domain", "acme.com"))
@@ -332,9 +355,7 @@ class TestDomainOwnership(TenantApiTestCase):
 
         with patch(target, return_value=True) as verify:
             domains.create_domain("acme.com")
-        verify.assert_called_once_with(
-            "acme.com", "TXT", f"{VALUE_PREFIX}{self.site.domain_verification_token}"
-        )
+        verify.assert_called_once_with("acme.com", "TXT", f"{VALUE_PREFIX}{self.site.name}")
         self.assertRaisesRegex(frappe.DuplicateEntryError, "already added", domains.check_domain, "acme.com")
         self.act_as(self.other)
         self.assertEqual(

@@ -102,9 +102,9 @@ def activate_cluster(cluster, token: str = "test-token"):
     return cluster
 
 
-def make_site(cluster, name: str = "acme.frappe.test", **fields):
-    frappe.db.delete("Suite Tenant", {"name": name})
-    site = frappe.get_doc({"doctype": "Suite Tenant", "site_name": name, "cluster": cluster.name, **fields})
+def make_site(cluster, title: str = "acme.frappe.test", **fields):
+    frappe.db.delete("Suite Tenant", {"title": title})
+    site = frappe.get_doc({"doctype": "Suite Tenant", "title": title, "cluster": cluster.name, **fields})
     site.insert()
     return site
 

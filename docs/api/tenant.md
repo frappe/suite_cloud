@@ -10,7 +10,7 @@ Confirms the credentials and returns the tenant profile, including where its mai
 
 ```json
 {
-  "site": "acme.frappe.cloud",
+  "tenant": "0199e1a2-3b4c-7d5e-8f60-123456789abc",
   "cluster": "c1.frappemail.com",
   "status": "Active",
   "title": "Acme",
@@ -63,7 +63,7 @@ Suite Cloud asks the mail server for every account and group of the tenant in as
 
 | Parameter | Type | Meaning |
 | --- | --- | --- |
-| `title` | string | The tenant's workspace name, shown to operators. An empty string resets it to the tenant name. |
+| `title` | string | The tenant's workspace name, shown to operators. It cannot be empty. |
 | `contact_email` | string | Where Suite Cloud sends tenant-specific notices. An empty string clears it. |
 
 Only the fields passed change. Returns the tenant profile as `ping` does. The Suite app sends both fields whenever its settings change.

@@ -21,8 +21,7 @@ class TestHttpContract(TenantApiTestCase):
 
         db = frappe.local.db  # the real connection, not the proxy, or the request loops on itself
         headers = {
-            "Authorization": f"token {self.site.api_key}:{self.site.new_secret}",
-            "Frappe-Authorization-Source": "Suite Tenant",
+            "Authorization": f"Tenant {self.site.name}:{self.site.new_secret}",
             "X-Frappe-Site-Name": frappe.local.site,
         }
         payload = {"query_string": params} if verb == "GET" else {"json": params}
@@ -42,7 +41,7 @@ class TestHttpContract(TenantApiTestCase):
     def test_a_read_answers_under_data(self) -> None:
         status, body = self.request("GET", "tenant.ping")
         self.assertEqual(status, 200)
-        self.assertEqual(body["data"]["site"], self.site.name)
+        self.assertEqual(body["data"]["tenant"], self.site.name)
 
     def test_another_verb_is_refused(self) -> None:
         for verb, method in (

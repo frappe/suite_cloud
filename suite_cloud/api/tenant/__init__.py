@@ -1,16 +1,15 @@
 """Tenant-facing API: what a Frappe Suite site may do with its own slice of the directory.
 
-Authentication is Frappe's own API-key scheme pointed at the Suite Tenant DocType: the site
-sends ``Authorization: token <api_key>:<api_secret>`` plus ``Frappe-Authorization-Source:
-Suite Tenant``, which makes the request run as the shared site service user. Every endpoint
-then resolves the calling site from the key in the header and only ever touches documents
-owned by that site. Objects of other sites are reported as missing, never as forbidden.
+The tenant sends ``Authorization: Tenant <id>:<secret>``; the ``authenticate`` auth hook checks
+the secret and runs the request as the shared site service user. Every endpoint then resolves
+the calling tenant from the id in the header and only ever touches documents owned by that
+tenant. Objects of other tenants are reported as missing, never as forbidden.
 """
 
-import base64
 import functools
 import inspect
 import json
+import secrets
 from collections.abc import Callable
 from contextlib import contextmanager
 from datetime import datetime
@@ -20,6 +19,7 @@ import frappe
 from frappe import _
 from frappe.query_builder.functions import Count
 from frappe.utils import cint, get_datetime, sbool
+from frappe.utils.password import get_decrypted_password
 
 from suite_cloud.mail.stalwart.errors import (
     StalwartError,
@@ -94,12 +94,31 @@ def current_tenant():
     return site
 
 
+def authenticate() -> None:
+    """Frappe auth hook: ``Authorization: Tenant <id>:<secret>`` signs in the service user."""
+
+    name, secret = _credentials_from_header()
+    if not name:
+        return
+
+    stored = None
+    if frappe.db.get_value("Suite Tenant", name, "enabled"):
+        stored = get_decrypted_password("Suite Tenant", name, "secret", raise_exception=False)
+    if not stored or not secrets.compare_digest(stored, secret):
+        request_ip = getattr(frappe.local, "request_ip", None)
+        throttle(f"address:{request_ip or 'unknown'}")  # guessing secrets is paced like everything else
+        raise frappe.AuthenticationError(_("Tenant authentication failed."))
+
+    form_dict = frappe.local.form_dict
+    frappe.set_user(get_config("site_service_user"))
+    frappe.local.form_dict = form_dict  # set_user clears the request body Frappe already parsed
+
+
 def _resolve_tenant():
-    api_key = _api_key_from_header()
     service_user = get_config("site_service_user")
 
-    if frappe.session.user == service_user and api_key:
-        name = frappe.db.get_value("Suite Tenant", {"api_key": api_key})
+    if frappe.session.user == service_user:
+        name = _credentials_from_header()[0]
     elif frappe.session.user != "Guest" and set(frappe.get_roles()) & set(MANAGER_ROLES):
         # Operators may act on behalf of a site from the desk or a script.
         name = frappe.form_dict.get("tenant") or frappe.get_request_header("X-Suite-Tenant")
@@ -128,16 +147,12 @@ def _resolve_tenant():
     return site
 
 
-def _api_key_from_header() -> str | None:
+def _credentials_from_header() -> tuple[str, str]:
     scheme, _, credential = frappe.get_request_header("Authorization", "").partition(" ")
-    if scheme.lower() == "token":
-        return credential.split(":", 1)[0] or None
-    if scheme.lower() == "basic":
-        try:
-            return base64.b64decode(credential).decode().split(":", 1)[0] or None
-        except Exception:
-            return None
-    return None
+    if scheme.lower() != "tenant":
+        return "", ""
+    name, _, secret = credential.strip().partition(":")
+    return name, secret
 
 
 def throttle(subject: str) -> None:
@@ -409,8 +424,7 @@ def get_disk_usage(fresh: bool = False) -> dict:
 def update_tenant_profile(title: str | None = None, contact_email: str | None = None) -> dict:
     """What the site says about itself: its workspace name as the title, and where to reach it.
 
-    Only the fields passed change; an empty string clears the contact and resets the title to the
-    site name.
+    Only the fields passed change; an empty string clears the contact. The title cannot be empty.
     """
 
     site = current_tenant()

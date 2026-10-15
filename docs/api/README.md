@@ -17,16 +17,15 @@ Every method lives at `https://<suite-cloud>/api/v2/method/suite_cloud.api.<modu
 
 ## Authentication
 
-A tenant authenticates with the API key and secret issued when it was registered as a Suite Tenant. It sends two headers on every request:
+A tenant authenticates with its id, the name of its Suite Tenant record, and the secret an operator issued with **Rotate Secret**. It sends one header on every request:
 
 ```http
-Authorization: token <api_key>:<api_secret>
-Frappe-Authorization-Source: Suite Tenant
+Authorization: Tenant <id>:<secret>
 ```
 
-Frappe resolves the key against the Suite Tenant record, so the request runs as the shared tenant service user and every method acts only on that tenant's documents. Anything that belongs to another tenant is reported as not found (404), never as forbidden.
+Suite Cloud checks the secret against the Suite Tenant record, so the request runs as the shared tenant service user and every method acts only on that tenant's documents. Anything that belongs to another tenant is reported as not found (404), never as forbidden.
 
-When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `TenantAddressError`, and Suite Cloud logs it for the operators. A key copied out of a tenant's configuration is worthless anywhere else.
+When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its secret. A request from elsewhere gets a 403 with the type `TenantAddressError`, and Suite Cloud logs it for the operators. A secret copied out of a tenant's configuration is worthless anywhere else.
 
 An operator with the System Manager or Suite Cloud Manager role may call the tenant API from the desk or a script on behalf of a tenant. The tenant is named by the `tenant` parameter or the `X-Suite-Tenant` header.
 
@@ -69,8 +68,8 @@ An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` wi
 | Status | Type | Meaning |
 | --- | --- | --- |
 | 400 | `InvalidInputError` | A required parameter left out, or a value the API could not parse: a list that is not a JSON array, a date that is not a date, a list over its cap |
-| 401 | `AuthenticationError` | The key or secret is wrong; Frappe rejects it before the tenant API runs |
-| 401 | `TenantAuthError` | The caller is logged in but is no tenant: a session without a key, or an operator naming an unknown tenant |
+| 401 | `AuthenticationError` | The id or secret is wrong, or the tenant is disabled; the request is rejected before the tenant API runs |
+| 401 | `TenantAuthError` | The caller is logged in but is no tenant: a session without credentials, or an operator naming an unknown tenant |
 | 403 | `PermissionError` | No credentials at all, a verb that does not match the method, or a caller without the role |
 | 403 | `TenantSuspendedError` | The tenant is suspended or archived |
 | 403 | `TenantAddressError` | The request did not come from one of the tenant's allowed addresses |

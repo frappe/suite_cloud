@@ -8,3 +8,4 @@ suite_cloud.patches.v1_0.pin_spam_filter_rules_version
 suite_cloud.patches.v1_0.rename_cloud_mail_module
 suite_cloud.patches.v1_0.drop_mail_account_credentials
 suite_cloud.patches.v1_0.add_credential_quotas
+suite_cloud.patches.v1_0.tenant_id_and_secret

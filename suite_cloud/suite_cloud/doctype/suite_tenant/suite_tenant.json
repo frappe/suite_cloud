@@ -1,15 +1,12 @@
 {
  "actions": [],
- "autoname": "field:site_name",
  "creation": "2026-09-03 12:00:00",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "site_name",
   "title",
   "contact_email",
   "cluster",
-  "fc_reference",
   "column_break_main",
   "enabled",
   "status",
@@ -24,40 +21,29 @@
   "max_disk_gb",
   "used_disk_bytes",
   "access_section",
-  "api_key",
-  "api_secret",
+  "secret",
   "allowed_ips",
   "column_break_access",
-  "user",
-  "domain_verification_token"
+  "user"
  ],
  "fields": [
   {
-   "description": "The Frappe Cloud site domain, e.g. acme.frappe.cloud. Lowercased on save and used as the record name; it cannot change afterwards.",
-   "fieldname": "site_name",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Site Name",
-   "reqd": 1,
-   "set_only_once": 1,
-   "unique": 1
-  },
-  {
-   "description": "Display name shown in lists and links, e.g. Acme Corp. Defaults to the site name.",
+   "description": "The tenant's display name, e.g. Acme Corp. The Suite app sends its workspace name.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Title"
+   "label": "Title",
+   "reqd": 1
   },
   {
-   "description": "Where site-specific notices go, such as downtime or a domain losing verification. Set and updated by Frappe Cloud.",
+   "description": "Where tenant-specific notices go, such as downtime or a domain losing verification. Set by the tenant through the API.",
    "fieldname": "contact_email",
    "fieldtype": "Data",
    "label": "Contact Email",
    "options": "Email"
   },
   {
-   "description": "The Stalwart cluster hosting every mail domain and account of the site. Fixed once the site exists; the cluster must be active at creation.",
+   "description": "The Stalwart cluster hosting every mail domain and account of the site. Fixed once the tenant exists; the cluster must be active at creation.",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -69,18 +55,12 @@
    "set_only_once": 1
   },
   {
-   "description": "Frappe Cloud's own identifier for the site, passed at creation. Only for cross-referencing; nothing here depends on it.",
-   "fieldname": "fc_reference",
-   "fieldtype": "Data",
-   "label": "Frappe Cloud Reference"
-  },
-  {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
   },
   {
    "default": "1",
-   "description": "Unchecked, the site's API key stops authenticating. Archive clears it and Resume sets it again; Suspend leaves it checked so the site gets a 403 naming the suspension instead of a bare 401.",
+   "description": "Unchecked, the tenant's secret stops authenticating. Archive clears it and Resume sets it again; Suspend leaves it checked so the site gets a 403 naming the suspension instead of a bare 401.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
@@ -162,22 +142,14 @@
    "label": "API Access"
   },
   {
-   "description": "Sent by the site as Authorization: token key:secret with Frappe-Authorization-Source: Suite Tenant. Generated at creation and never changes.",
-   "fieldname": "api_key",
-   "fieldtype": "Data",
-   "label": "API Key",
-   "read_only": 1,
-   "unique": 1
-  },
-  {
-   "description": "Stored encrypted and shown once, at creation or after Rotate Secret. Rotating it invalidates the previous secret immediately.",
-   "fieldname": "api_secret",
+   "description": "Sent by the tenant as Authorization: Tenant <id>:<secret>. Stored encrypted and shown once, after Rotate Secret; rotating it invalidates the previous secret immediately.",
+   "fieldname": "secret",
    "fieldtype": "Password",
    "hidden": 1,
-   "label": "API Secret"
+   "label": "Secret"
   },
   {
-   "description": "One per line: the IPv4 or IPv6 addresses, or CIDR ranges, the site's server sends from, as Frappe Cloud reports them. Set, only requests from these addresses may use the site's key; a leaked key is useless elsewhere. Blank accepts any address.",
+   "description": "One per line: the IPv4 or IPv6 addresses, or CIDR ranges, the tenant's server sends from. Set, only requests from these addresses may use the tenant's secret; a leaked secret is useless elsewhere. Blank accepts any address.",
    "fieldname": "allowed_ips",
    "fieldtype": "Small Text",
    "label": "Allowed IP Addresses"
@@ -187,7 +159,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Requests authenticated with the site's key run as this service user. Taken from Suite Cloud Settings on every save.",
+   "description": "Requests authenticated with the tenant's secret run as this service user. Taken from Suite Cloud Settings on every save.",
    "fieldname": "user",
    "fieldtype": "Link",
    "label": "Service User",
@@ -200,15 +172,6 @@
    "fieldtype": "Link",
    "label": "Egress Pool",
    "options": "Egress IP Pool"
-  },
-  {
-   "description": "Proves the site owns a domain before the domain is added: the site publishes a TXT record at the domain's apex with the value frappe-suite-verification= followed by this token. Fixed for the life of the site, so every domain it adds asks for the same record.",
-   "fieldname": "domain_verification_token",
-   "fieldtype": "Data",
-   "label": "Domain Verification Token",
-   "no_copy": 1,
-   "read_only": 1,
-   "unique": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -244,11 +207,10 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-10-15 21:00:00.000000",
+ "modified": "2026-10-15 23:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Tenant",
- "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [
   {
@@ -277,10 +239,11 @@
   }
  ],
  "row_format": "Dynamic",
+ "search_fields": "title",
+ "show_title_field_in_link": 1,
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1,
  "title_field": "title",
- "show_title_field_in_link": 1
+ "track_changes": 1
 }

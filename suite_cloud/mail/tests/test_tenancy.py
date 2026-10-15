@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from uuid import UUID
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -47,8 +48,9 @@ class TenancyTestCase(IntegrationTestCase):
     def tearDown(self) -> None:
         # Only the fixture sites: the dev site holds real accounts, and deleting those even
         # inside the rolled-back transaction serialises each one, which asks the live cluster.
+        tenants = frappe.get_all("Suite Tenant", {"title": ["like", "%.frappe.test"]}, pluck="name")
         for doctype in ("Mail Account", "Mail Group", "Mailing List", "Mail Domain"):
-            for name in frappe.get_all(doctype, {"site": ["like", "%.frappe.test"]}, pluck="name"):
+            for name in frappe.get_all(doctype, {"site": ["in", tenants]}, pluck="name"):
                 frappe.delete_doc(doctype, name, force=True, ignore_permissions=True, ignore_on_trash=True)
         frappe.flags.do_not_enqueue = False
 
@@ -74,9 +76,9 @@ class TenancyTestCase(IntegrationTestCase):
 
 class TestSuiteTenant(TenancyTestCase):
     def test_site_gets_credentials_and_service_user(self) -> None:
-        self.assertEqual(len(self.site.api_key), 32)
+        self.assertEqual(UUID(self.site.name).version, 7)
         self.assertEqual(len(self.site.new_secret), 40)
-        self.assertEqual(self.site.get_password("api_secret"), self.site.new_secret)
+        self.assertEqual(self.site.get_password("secret"), self.site.new_secret)
         self.assertEqual(self.site.user, "suite-site@suite-cloud.internal")
         self.assertEqual(self.site.status, "Active")
         self.assertEqual(self.site.to_api()["jmap_url"], self.cluster.base_url)
@@ -85,15 +87,15 @@ class TestSuiteTenant(TenancyTestCase):
         self.cluster.db_set("status", "Pending")
         frappe.clear_document_cache("Stalwart Cluster", self.cluster.name)
         site = frappe.get_doc(
-            {"doctype": "Suite Tenant", "site_name": "other.frappe.test", "cluster": self.cluster.name}
+            {"doctype": "Suite Tenant", "title": "other.frappe.test", "cluster": self.cluster.name}
         )
         self.assertRaisesRegex(frappe.ValidationError, "not active", site.insert)
 
     def test_rotate_suspend_archive(self) -> None:
-        old = self.site.get_password("api_secret")
+        old = self.site.get_password("secret")
         new = self.site.rotate_secret()
         self.assertNotEqual(old, new)
-        self.assertEqual(self.site.get_password("api_secret"), new)
+        self.assertEqual(self.site.get_password("secret"), new)
 
         self.site.suspend()
         self.assertEqual(

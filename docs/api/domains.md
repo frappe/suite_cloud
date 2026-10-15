@@ -55,7 +55,7 @@ Stores nothing. Answers the TXT record the owner must publish at the apex. The r
 ```json
 {
   "domain": "acme.example",
-  "ownership_record": { "type": "TXT", "host": "@", "fqdn": "acme.example", "value": "frappe-suite-verification=<token>" }
+  "ownership_record": { "type": "TXT", "host": "@", "fqdn": "acme.example", "value": "frappe-suite-verification=<tenant id>" }
 }
 ```
 

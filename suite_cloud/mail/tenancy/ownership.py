@@ -2,9 +2,9 @@
 
 Clusters are shared between sites, so a domain claimed by the wrong site would lock its real
 owner out. Nothing is stored for an unverified claim: the site publishes a TXT record carrying
-its own token at the domain apex, and the Mail Domain is created only once that record
-resolves. The token is fixed for the life of the site, so every domain it adds asks for the
-same record and no other site can produce it.
+its own tenant id at the domain apex, and the Mail Domain is created only once that record
+resolves. The id is fixed for the life of the tenant, so every domain it adds asks for the same
+record and no other tenant can produce it.
 
 The guard is aimed at tenants: it applies to requests made through the tenant API, which run as
 the site service user. Operators adding a domain from the desk vouch for it themselves, and a
@@ -77,5 +77,5 @@ def ownership_record(site, domain_name: str) -> dict:
         "type": "TXT",
         "host": "@",
         "fqdn": domain_name,
-        "value": f"{VALUE_PREFIX}{site.domain_verification_token}",
+        "value": f"{VALUE_PREFIX}{site.name}",
     }
