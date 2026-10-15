@@ -1,4 +1,4 @@
-"""Turns Stalwart's ``dnsZoneFile`` for a domain into the records a site has to publish.
+"""Turns Stalwart's ``dnsZoneFile`` for a domain into the records a tenant has to publish.
 
 Stalwart lists everything a full deployment could use. Suite Cloud keeps the authentication and
 receiving records, rewrites SPF to include the cluster's sending IPs (the generated ``v=spf1 mx``
@@ -6,7 +6,7 @@ would miss egress gateways), and only hands out records that need HTTPS on a cus
 (MTA-STS, autoconfig) on request because the cluster holds no certificates for those names.
 
 Records are sorted into groups, each shown as its own table on Mail Domain and returned to the
-site with the group's key. Only the authentication group decides verification.
+tenant with the group's key. Only the authentication group decides verification.
 """
 
 import re
@@ -73,7 +73,7 @@ CERTIFICATE_BOUND = {"MTA-STS", "Autoconfig", "Autodiscover", "UA Auto Config"}
 
 
 def group_summaries() -> list[dict]:
-    """What a site needs to render the groups: key, label, description and whether it is mandatory."""
+    """What a tenant needs to render the groups: key, label, description and whether it is mandatory."""
 
     return [{k: g[k] for k in ("key", "label", "description", "is_mandatory")} for g in GROUPS]
 

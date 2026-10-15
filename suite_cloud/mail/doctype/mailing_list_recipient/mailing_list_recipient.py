@@ -23,16 +23,16 @@ class MailingListRecipient(Document):
         email: DF.Data
         enabled: DF.Check
         mailing_list: DF.Link
-        site: DF.Link | None
+        tenant: DF.Link | None
     # end: auto-generated types
 
     def validate(self) -> None:
         self.email = validate_email_address(self.email)
         mailing_list = frappe.get_cached_doc("Mailing List", self.mailing_list)
-        self.site = mailing_list.site
+        self.tenant = mailing_list.tenant
         if self.email == mailing_list.email:
             frappe.throw(_("A mailing list cannot be its own recipient."))
-        assert_addresses_deliverable(self.site, [self.email])
+        assert_addresses_deliverable(self.tenant, [self.email])
         if self.is_new() and frappe.db.exists(
             "Mailing List Recipient", {"mailing_list": self.mailing_list, "email": self.email}
         ):
@@ -68,4 +68,4 @@ class MailingListRecipient(Document):
 def on_doctype_update() -> None:
     frappe.db.add_unique("Mailing List Recipient", ["mailing_list", "email"])
     frappe.db.add_index("Mailing List Recipient", ["email"])
-    frappe.db.add_index("Mailing List Recipient", ["site", "mailing_list", "email"])  # list_all_recipients
+    frappe.db.add_index("Mailing List Recipient", ["tenant", "mailing_list", "email"])  # list_all_recipients

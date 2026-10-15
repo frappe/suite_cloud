@@ -1,13 +1,15 @@
 // Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 // For license information, please see license.txt
 
-frappe.ui.form.on('Suite Site', {
+frappe.ui.form.on('Suite Tenant', {
 	setup(frm) {
 		frm.set_query('egress_pool', () => ({ filters: { cluster: frm.doc.cluster || '' } }))
 	},
 
 	refresh(frm) {
-		if (frm.is_new() || frm.doc.status !== 'Active') return
+		if (frm.is_new()) return
+		frm.add_custom_button(__('Rotate Secret'), () => rotate_secret(frm), __('Actions'))
+		if (frm.doc.status !== 'Active') return
 		frm.add_custom_button(__('Adopt Directory'), () => adopt_directory(frm), __('Actions'))
 	},
 
@@ -17,8 +19,25 @@ frappe.ui.form.on('Suite Site', {
 	},
 })
 
-// Records what the cluster already holds (one Stalwart per site, before Suite Cloud) as this
-// site's directory. Nothing is pushed to the cluster; objects that already exist are skipped.
+// The secret is stored encrypted and shown only here; the tenant sends it with its id.
+function rotate_secret(frm) {
+	frappe.confirm(__('Issue a new secret for {0}? The current one stops working at once.', [frm.doc.title]), () =>
+		frm.call('rotate_secret').then((r) => {
+			frappe.msgprint({
+				title: __('New secret'),
+				indicator: 'green',
+				message: __('Tenant {0}<br>Secret {1}<br>Copy both into Suite Settings; the secret is not shown again.', [
+					frappe.utils.escape_html(frm.doc.name),
+					frappe.utils.escape_html(r.message),
+				]),
+			})
+			frm.reload_doc()
+		}),
+	)
+}
+
+// Records what the cluster already holds (one Stalwart per tenant, before Suite Cloud) as this
+// tenant's directory. Nothing is pushed to the cluster; objects that already exist are skipped.
 function adopt_directory(frm) {
 	frappe.confirm(
 		__('Record every domain, account, group and mailing list on cluster {0} as belonging to {1}? Objects that already exist are skipped. Nothing is changed on the cluster.', [

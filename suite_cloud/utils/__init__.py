@@ -12,7 +12,7 @@ from frappe.utils.caching import request_cache
 CONFIG_KEYS = (
     "default_dns_ttl",
     "public_url",
-    "site_service_user",
+    "tenant_service_user",
     "stalwart_version",
     "stalwart_cli_version",
     "stalwart_download_url_template",
@@ -77,16 +77,10 @@ def dkim_algorithms() -> tuple[str, ...]:
     return (DKIM_ED25519, DKIM_RSA) if cint(get_config("sign_with_ed25519")) else (DKIM_RSA,)
 
 
-def get_public_url() -> str:
-    """Returns the URL other systems use to reach this Suite Cloud site."""
-
-    return (get_config("public_url") or frappe.utils.get_url()).rstrip("/")
-
-
 def utc_iso(value) -> str | None:
     """A stored datetime as an aware UTC string (``2026-09-09T10:00:00Z``) for API payloads.
 
-    Frappe stores naive system-time values; handing them out naive lets a site in another time
+    Frappe stores naive system-time values; handing them out naive lets a tenant in another time
     zone read them as its own local time and show them hours off.
     """
 

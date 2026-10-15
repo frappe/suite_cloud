@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import ipaddress
+from uuid import uuid7
 
 import frappe
 from frappe import _
@@ -14,11 +15,11 @@ from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
 from suite_cloud.utils import get_config, utc_iso
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
-MAILBOX_DOCTYPES = ("Mail Account", "Mail Group")  # the documents whose disk usage the site sums
-DISK_USAGE_CACHE_TTL = 300  # seconds a site's summed disk usage is served without asking the cluster
+MAILBOX_DOCTYPES = ("Mail Account", "Mail Group")  # the documents whose disk usage the tenant sums
+DISK_USAGE_CACHE_TTL = 300  # seconds a tenant's summed disk usage is served without asking the cluster
 
 
-class SuiteSite(Document):
+class SuiteTenant(Document):
     # begin: auto-generated types
     # This code is auto-generated. Do not modify anything in this block.
 
@@ -27,22 +28,18 @@ class SuiteSite(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
-        api_key: DF.Data | None
-        api_secret: DF.Password | None
         archived_at: DF.Datetime | None
         cluster: DF.Link
         contact_email: DF.Data | None
-        domain_verification_token: DF.Data | None
         egress_pool: DF.Link | None
         enabled: DF.Check
-        fc_reference: DF.Data | None
         max_accounts: DF.Int
         max_disk_gb: DF.Float
         max_domains: DF.Int
         max_groups: DF.Int
         max_mailing_lists: DF.Int
-        site_name: DF.Data
-        title: DF.Data | None
+        secret: DF.Password | None
+        title: DF.Data
         status: DF.Literal["Active", "Suspended", "Archived"]
         user: DF.Link | None
         used_disk_bytes: DF.Int
@@ -51,29 +48,23 @@ class SuiteSite(Document):
     # --- lifecycle ------------------------------------------------------------
 
     def autoname(self) -> None:
-        self.site_name = (self.site_name or "").strip().lower().rstrip("/")
-        self.name = self.site_name
+        self.name = str(uuid7())
 
     def before_insert(self) -> None:
         self.status = "Active"
-        self.api_key = frappe.generate_hash(length=32)
         self.new_secret = self.generate_secret()
-        self.domain_verification_token = frappe.generate_hash(length=32)
 
     def validate(self) -> None:
-        self.site_name = (self.site_name or "").strip().lower().rstrip("/")
-        if "/" in self.site_name or " " in self.site_name or "." not in self.site_name:
-            frappe.throw(_("Site Name must be the site's domain, e.g. acme.frappe.cloud"))
-        self.title = (self.title or "").strip() or self.site_name
+        self.title = (self.title or "").strip()
         if self.contact_email:
             self.contact_email = self.contact_email.strip().lower()
             if not frappe.utils.validate_email_address(self.contact_email):
                 frappe.throw(_("{0} is not a valid email address.").format(self.contact_email))
         self.allowed_ips = "\n".join(str(n) for n in parse_networks(self.allowed_ips))
 
-        self.user = get_config("site_service_user")
+        self.user = get_config("tenant_service_user")
         if not self.user:
-            frappe.throw(_("The site service user is missing; run bench migrate."))
+            frappe.throw(_("The tenant service user is missing; run bench migrate."))
         self.validate_limits()
 
         if self.is_new():
@@ -83,7 +74,7 @@ class SuiteSite(Document):
         elif self.has_value_changed("cluster") and self.directory_size():
             # Ids and mailboxes live on the old cluster; moving them is a migration, not a field edit.
             frappe.throw(
-                _("Site {0} has a directory on cluster {1}; it cannot be moved.").format(
+                _("Tenant {0} has a directory on cluster {1}; it cannot be moved.").format(
                     self.name, self.get_doc_before_save().cluster
                 )
             )
@@ -103,20 +94,20 @@ class SuiteSite(Document):
 
     def on_trash(self) -> None:
         if self.status != "Archived":
-            frappe.throw(_("Archive the site before deleting it."))
-        if frappe.db.exists("Mail Domain", {"site": self.name}):
-            frappe.throw(_("Delete the site's mail domains first."))
+            frappe.throw(_("Archive the tenant before deleting it."))
+        if frappe.db.exists("Mail Domain", {"tenant": self.name}):
+            frappe.throw(_("Delete the tenant's mail domains first."))
 
     # --- secrets --------------------------------------------------------------
 
     def generate_secret(self) -> str:
         secret = frappe.generate_hash(length=40)
-        self.api_secret = secret
+        self.secret = secret
         return secret
 
     @frappe.whitelist()
     def adopt_directory(self) -> dict:
-        """Records the domains, accounts, groups and lists the cluster already holds for this site."""
+        """Records the domains, accounts, groups and lists the cluster already holds for this tenant."""
 
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         from suite_cloud.mail.tenancy.adopt import adopt_directory
@@ -127,7 +118,7 @@ class SuiteSite(Document):
     def rotate_secret(self) -> str:
         """Returns the new secret once; it is stored encrypted and never shown again."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         secret = self.generate_secret()
         self.save(ignore_permissions=True)
         return secret
@@ -136,24 +127,24 @@ class SuiteSite(Document):
 
     @frappe.whitelist()
     def suspend(self) -> None:
-        # The key keeps authenticating so the site gets a 403 naming the suspension, not a bare 401.
-        frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        # The key keeps authenticating so the tenant gets a 403 naming the suspension, not a bare 401.
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status == "Archived":
-            frappe.throw(_("An archived site cannot be suspended."))
+            frappe.throw(_("An archived tenant cannot be suspended."))
         self.db_set({"status": "Suspended"})
 
     @frappe.whitelist()
     def resume(self) -> None:
-        frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status == "Archived":
-            frappe.throw(_("An archived site cannot be resumed."))
+            frappe.throw(_("An archived tenant cannot be resumed."))
         self.db_set({"enabled": 1, "status": "Active"})
 
     @frappe.whitelist()
     def archive(self, delete_data: bool = False) -> None:
-        """Locks the site out; with ``delete_data`` every directory object is removed from Stalwart too."""
+        """Locks the tenant out; with ``delete_data`` every directory object is removed from Stalwart too."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         self.db_set({"enabled": 0, "status": "Archived", "archived_at": now()})
         if delete_data:
             if frappe.flags.do_not_enqueue:
@@ -161,9 +152,9 @@ class SuiteSite(Document):
             else:
                 frappe.enqueue(
                     purge_directory,
-                    site=self.name,
+                    tenant=self.name,
                     queue="long",
-                    job_id=f"purge-site:{self.name}",
+                    job_id=f"purge-tenant:{self.name}",
                     deduplicate=True,
                     enqueue_after_commit=True,
                 )
@@ -180,16 +171,16 @@ class SuiteSite(Document):
             frappe.throw(_("Total Disk Quota cannot be negative; 0 means unlimited."))
 
     def domain_count(self) -> int:
-        return frappe.db.count("Mail Domain", {"site": self.name})
+        return frappe.db.count("Mail Domain", {"tenant": self.name})
 
     def account_count(self) -> int:
-        return frappe.db.count("Mail Account", {"site": self.name})
+        return frappe.db.count("Mail Account", {"tenant": self.name})
 
     def group_count(self) -> int:
-        return frappe.db.count("Mail Group", {"site": self.name})
+        return frappe.db.count("Mail Group", {"tenant": self.name})
 
     def mailing_list_count(self) -> int:
-        return frappe.db.count("Mailing List", {"site": self.name})
+        return frappe.db.count("Mailing List", {"tenant": self.name})
 
     def assert_can_add_domain(self) -> None:
         self.lock()
@@ -208,7 +199,7 @@ class SuiteSite(Document):
         self.assert_within_limit(self.max_mailing_lists, self.mailing_list_count(), _("mailing lists"))
 
     def directory_size(self) -> int:
-        return sum(frappe.db.count(doctype, {"site": self.name}) for doctype in DIRECTORY_DOCTYPES)
+        return sum(frappe.db.count(doctype, {"tenant": self.name}) for doctype in DIRECTORY_DOCTYPES)
 
     def onload(self) -> None:
         self.flags.with_usage = True  # the form shows the figure
@@ -220,7 +211,7 @@ class SuiteSite(Document):
         return self.get_used_disk_bytes() if self.flags.with_usage else None
 
     def get_used_disk_bytes(self) -> int | None:
-        """A cluster that cannot answer costs the figure, not the form or the site profile."""
+        """A cluster that cannot answer costs the figure, not the form or the tenant profile."""
 
         try:
             return self.get_disk_usage()["used_disk_bytes"]
@@ -231,7 +222,7 @@ class SuiteSite(Document):
             return None
 
     def get_disk_usage(self, fresh: bool = False) -> dict:
-        """``{used_disk_bytes, fetched_at}`` across the site's accounts and groups, kept for
+        """``{used_disk_bytes, fetched_at}`` across the tenant's accounts and groups, kept for
         ``DISK_USAGE_CACHE_TTL`` seconds; ``fresh`` asks the cluster now."""
 
         key = f"suite_cloud:disk-usage:{self.name}"
@@ -243,13 +234,13 @@ class SuiteSite(Document):
         return usage
 
     def fetch_used_disk_bytes(self) -> int:
-        """One cluster call per ``maxObjectsInGet`` ids, all on the site's cluster. A cluster that
+        """One cluster call per ``maxObjectsInGet`` ids, all on the tenant's cluster. A cluster that
         cannot answer raises: a partial sum must never be returned or cached."""
 
         ids = []
         for doctype in MAILBOX_DOCTYPES:
             ids += frappe.get_all(
-                doctype, {"site": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
+                doctype, {"tenant": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
             )
         if not ids:
             return 0  # building a client already fetches the session
@@ -257,16 +248,16 @@ class SuiteSite(Document):
         return sum(cint(o.get("usedDiskQuota")) for o in objects)
 
     def lock(self) -> None:
-        """Serialises this site's limit checks: two requests must not both see room for the last slot."""
+        """Serialises this tenant's limit checks: two requests must not both see room for the last slot."""
 
-        if frappe.db.exists("Suite Site", self.name):
-            frappe.db.get_value("Suite Site", self.name, "name", for_update=True)
+        if frappe.db.exists("Suite Tenant", self.name):
+            frappe.db.get_value("Suite Tenant", self.name, "name", for_update=True)
 
     def assert_within_limit(self, limit: int, current: int, what: str) -> None:
         """A limit of 0 means unlimited."""
 
         if limit and current >= limit:
-            frappe.throw(_("Site {0} has reached its limit of {1} {2}.").format(self.name, limit, what))
+            frappe.throw(_("Tenant {0} has reached its limit of {1} {2}.").format(self.name, limit, what))
 
     # --- helpers ----------------------------------------------------------------
 
@@ -274,7 +265,7 @@ class SuiteSite(Document):
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
 
     def allows_ip(self, ip: str | None) -> bool:
-        """Whether a request from ``ip`` may use the site's key. No list means any address."""
+        """Whether a request from ``ip`` may use the tenant's secret. No list means any address."""
 
         networks = parse_networks(self.allowed_ips)
         if not networks:
@@ -288,7 +279,7 @@ class SuiteSite(Document):
     def to_api(self) -> dict:
         cluster = self.get_cluster()
         return {
-            "site": self.name,
+            "tenant": self.name,
             "cluster": self.cluster,
             "status": self.status,
             "title": self.title,
@@ -329,15 +320,15 @@ def parse_networks(text: str | None) -> list:
     return networks
 
 
-def purge_directory(site: str) -> None:
-    """Deletes an archived site's directory one document at a time.
+def purge_directory(tenant: str) -> None:
+    """Deletes an archived tenant's directory one document at a time.
 
     Each delete is its own transaction: every document destroys its Stalwart object inside its
     delete, so a failure half-way must not resurrect rows whose objects are already gone.
     """
 
     for doctype in DIRECTORY_DOCTYPES:
-        for name in frappe.get_all(doctype, {"site": site}, pluck="name"):
+        for name in frappe.get_all(doctype, {"tenant": tenant}, pluck="name"):
             frappe.delete_doc(doctype, name, ignore_permissions=True)
             if not frappe.in_test:
                 frappe.db.commit()

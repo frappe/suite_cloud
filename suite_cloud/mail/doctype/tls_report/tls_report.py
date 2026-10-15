@@ -71,7 +71,7 @@ class TLSReport(Document):
         report_id: DF.Data | None
         reporter_email: DF.Data | None
         sent_to: DF.SmallText | None
-        site: DF.Link | None
+        tenant: DF.Link | None
         stalwart_id: DF.Data
         subject: DF.SmallText | None
         successful_sessions: DF.Int
@@ -226,7 +226,7 @@ def policy_domains(policy_rows: list[dict]) -> list[str]:
 
     A sender mails a report to the address in one domain's TLS-RPT record, so its policies
     normally name that one domain (several policies of it, such as MTA-STS beside DANE). A report
-    naming more is stored under the first but shown to no site: whichever site held that domain
+    naming more is stored under the first but shown to no tenant: whichever tenant held that domain
     would otherwise see the other domains' results.
     """
 

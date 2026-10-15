@@ -9,7 +9,7 @@ from suite_cloud.mail import reports
 from suite_cloud.mail.doctype.dmarc_report import dmarc_report
 from suite_cloud.mail.tenancy import sync
 from suite_cloud.mail.tests.fixtures import error_log_count, latest_error_log_method
-from suite_cloud.mail.tests.test_site_api import SiteApiTestCase
+from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
 
 
 def stalwart_report(
@@ -70,7 +70,7 @@ NOW = datetime(2026, 9, 18, 12, 0, 0)
 CLOCK = "suite_cloud.mail.reports.now_datetime"
 
 
-class TestDmarcReports(SiteApiTestCase):
+class TestDmarcReports(TenantApiTestCase):
     def setUp(self) -> None:
         super().setUp()
         frozen = patch(CLOCK, return_value=NOW)
@@ -79,7 +79,7 @@ class TestDmarcReports(SiteApiTestCase):
         domains.create_domain("acme.com")
         self.act_as(self.other)
         domains.create_domain("other.com")
-        self.act_as(self.site)
+        self.act_as(self.tenant)
 
     def tearDown(self) -> None:
         dmarc_report.DMARC_REPORTS.delete(self.report_names())
@@ -103,7 +103,7 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual(self.fetch(), 0)  # already stored: nothing is asked for again
 
         doc = frappe.get_doc("DMARC Report", {"cluster": self.cluster.name, "stalwart_id": acme})
-        self.assertEqual((doc.site, doc.policy_domain), (self.site.name, "acme.com"))
+        self.assertEqual((doc.tenant, doc.policy_domain), (self.tenant.name, "acme.com"))
         self.assertEqual((doc.total_messages, doc.passed_messages, doc.failed_messages), (5, 3, 2))
         self.assertEqual((doc.dkim_passed_messages, doc.spf_passed_messages), (3, 3))
         self.assertEqual((doc.policy, doc.testing_mode, doc.adkim), ("reject", 0, "relaxed"))
@@ -115,14 +115,14 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual(len(doc.records), 2)
         self.assertEqual(doc.records[1].override_reasons, "LocalPolicy: allowlisted")
         # A report about a domain no site holds is kept for operators, attributed to nobody.
-        self.assertIsNone(frappe.db.get_value("DMARC Report", {"policy_domain": "nobody.example"}, "site"))
+        self.assertIsNone(frappe.db.get_value("DMARC Report", {"policy_domain": "nobody.example"}, "tenant"))
 
     def test_a_report_addressed_to_another_site_s_domain_reaches_neither(self) -> None:
         stored = self.fake._add(
             "DmarcExternalReport", {**stalwart_report("acme.com"), "to": {"postmaster@other.com": True}}
         )
         self.assertEqual(self.fetch(), 1)
-        self.assertIsNone(frappe.db.get_value("DMARC Report", {"stalwart_id": stored}, "site"))
+        self.assertIsNone(frappe.db.get_value("DMARC Report", {"stalwart_id": stored}, "tenant"))
         self.assertEqual(dmarc.list_dmarc_reports()["total"], 0)
         self.act_as(self.other)
         self.assertEqual(dmarc.list_dmarc_reports()["total"], 0)
@@ -161,7 +161,7 @@ class TestDmarcReports(SiteApiTestCase):
             "cluster",
             "stalwart_id",
             "policy_domain",
-            "site",
+            "tenant",
             "org_name",
             "total_messages",
             "date_range_end",
@@ -178,7 +178,7 @@ class TestDmarcReports(SiteApiTestCase):
                 self.cluster.name,
                 f"seed{i}",
                 "acme.com",
-                self.site.name,
+                self.tenant.name,
                 "seed.test",
                 1,
                 stamp,
@@ -205,7 +205,7 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual(error_log_count(), errors_before + 1)
         self.assertIn(broken, latest_error_log_method())
 
-    def test_site_api_shows_only_the_site_s_reports(self) -> None:
+    def test_tenant_api_shows_only_the_tenant_s_reports(self) -> None:
         self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
         self.fake._add(
             "DmarcExternalReport",
@@ -305,7 +305,7 @@ class TestDmarcReports(SiteApiTestCase):
         self.fake._add("DmarcExternalReport", stalwart_report("other.com"))
         self.fetch()
         domains.delete_domain("acme.com")
-        self.assertIsNone(frappe.db.get_value("DMARC Report", {"stalwart_id": acme}, "site"))
+        self.assertIsNone(frappe.db.get_value("DMARC Report", {"stalwart_id": acme}, "tenant"))
         self.assertEqual(dmarc.list_dmarc_reports()["total"], 0)
         # The cluster still lists the report; registering the domain elsewhere must not revive
         # the previous holder's history for the new one.

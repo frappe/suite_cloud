@@ -32,7 +32,7 @@ frappe.ui.form.on('Mail Account', {
 	},
 
 	rotate_app_password(frm) {
-		frappe.confirm(__('Mint a new app password for this account and revoke the current one? The Suite site must be given the new one.'), () => {
+		frappe.confirm(__('Mint a new app password for this account and revoke the current one? The tenant must be given the new one.'), () => {
 			frm.events.call(frm, 'rotate_app_password', {}, __('Rotating...'), (secret) => {
 				frm.events.reveal(__('App Password'), secret, __('Shown once; the previous app password no longer works.'))
 			})

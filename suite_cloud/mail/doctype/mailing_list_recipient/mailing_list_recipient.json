@@ -9,7 +9,7 @@
   "email",
   "column_break_main",
   "enabled",
-  "site"
+  "tenant"
  ],
  "fields": [
   {
@@ -47,18 +47,18 @@
    "label": "Enabled"
   },
   {
-   "description": "Suite site that owns the list. Derived from the list.",
-   "fieldname": "site",
+   "description": "Suite Tenant that owns the list. Derived from the list.",
+   "fieldname": "tenant",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "label": "Site",
-   "options": "Suite Site",
+   "label": "Tenant",
+   "options": "Suite Tenant",
    "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-13 12:00:00.000000",
+ "modified": "2026-10-16 01:45:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mailing List Recipient",

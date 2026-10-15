@@ -13,7 +13,7 @@ from suite_cloud.mail.tenancy.addresses import (
     assert_address_available,
     assert_addresses_deliverable,
     assert_domain_live,
-    get_site_domain,
+    get_tenant_domain,
     validate_email_address,
 )
 from suite_cloud.utils import alias_payloads, child_rows, utc_iso
@@ -25,7 +25,7 @@ RECIPIENT_COLUMNS = [
     "mailing_list",
     "email",
     "enabled",
-    "site",
+    "tenant",
     "creation",
     "modified",
     "owner",
@@ -49,7 +49,7 @@ class MailingList(Document):
         description: DF.Data | None
         domain: DF.Link | None
         email: DF.Data
-        site: DF.Link | None
+        tenant: DF.Link | None
         stalwart_id: DF.Data | None
     # end: auto-generated types
 
@@ -60,15 +60,15 @@ class MailingList(Document):
 
     def validate(self) -> None:
         self.email = validate_email_address(self.email)
-        domain = get_site_domain(self.site, self.email.split("@", 1)[1]) if self.site else None
+        domain = get_tenant_domain(self.tenant, self.email.split("@", 1)[1]) if self.tenant else None
         if domain is None:
             domain = frappe.get_cached_doc("Mail Domain", self.email.split("@", 1)[1])
         self.domain = domain.name
-        self.site = domain.site
+        self.tenant = domain.tenant
         self.cluster = domain.cluster
         if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
-            frappe.get_cached_doc("Suite Site", self.site).assert_can_add_mailing_list()
+            frappe.get_cached_doc("Suite Tenant", self.tenant).assert_can_add_mailing_list()
         assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
         sync.validate_aliases(self)
 
@@ -130,7 +130,7 @@ class MailingList(Document):
         wanted = list(dict.fromkeys(validate_email_address(e) for e in emails))
         if self.email in wanted:
             frappe.throw(_("A mailing list cannot be its own recipient."))
-        assert_addresses_deliverable(self.site, wanted)
+        assert_addresses_deliverable(self.tenant, wanted)
         existing = set(
             frappe.get_all(
                 "Mailing List Recipient", {"mailing_list": self.name, "email": ["in", wanted]}, pluck="email"
@@ -148,7 +148,7 @@ class MailingList(Document):
                         self.name,
                         email,
                         1,
-                        self.site,
+                        self.tenant,
                         stamp,
                         stamp,
                         user,

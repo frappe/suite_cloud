@@ -7,7 +7,7 @@
  "field_order": [
   "email",
   "domain",
-  "site",
+  "tenant",
   "cluster",
   "column_break_main",
   "enabled",
@@ -33,7 +33,7 @@
  ],
  "fields": [
   {
-   "description": "The mailbox address, e.g. alice@acme.com. Its domain must be a Mail Domain of the site. Cannot change after saving.",
+   "description": "The mailbox address, e.g. alice@acme.com. Its domain must be a Mail Domain of the tenant. Cannot change after saving.",
    "fieldname": "email",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -55,18 +55,18 @@
    "search_index": 1
   },
   {
-   "description": "Suite site that owns the account. Derived from the domain; the site's account limit applies.",
-   "fetch_from": "domain.site",
-   "fieldname": "site",
+   "description": "Suite Tenant that owns the account. Derived from the domain; the tenant's account limit applies.",
+   "fetch_from": "domain.tenant",
+   "fieldname": "tenant",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "label": "Site",
-   "options": "Suite Site",
+   "label": "Tenant",
+   "options": "Suite Tenant",
    "read_only": 1,
    "search_index": 1
   },
   {
-   "description": "Cluster the mailbox lives on. Derived from the site.",
+   "description": "Cluster the mailbox lives on. Derived from the tenant.",
    "fetch_from": "domain.cluster",
    "fieldname": "cluster",
    "fieldtype": "Link",
@@ -128,7 +128,7 @@
    "no_copy": 1
   },
   {
-   "description": "The account's app passwords on the cluster, refreshed when the form opens. A new row is created on save and its secret shown once; a removed row is revoked. Suite Cloud is the Suite site's own login and stays first. The maxAppPasswords quota caps the rows.",
+   "description": "The account's app passwords on the cluster, refreshed when the form opens. A new row is created on save and its secret shown once; a removed row is revoked. Suite Cloud is the tenant's own login and stays first. The maxAppPasswords quota caps the rows.",
    "fieldname": "app_passwords",
    "fieldtype": "Table",
    "label": "App Passwords",
@@ -189,7 +189,7 @@
    "label": "Aliases"
   },
   {
-   "description": "Other addresses delivered to this mailbox. Each must be unique across the cluster and under one of the site's domains.",
+   "description": "Other addresses delivered to this mailbox. Each must be unique across the cluster and under one of the tenant's domains.",
    "fieldname": "aliases",
    "fieldtype": "Table",
    "label": "Aliases",
@@ -211,7 +211,7 @@
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-07 13:05:00.000000",
+ "modified": "2026-10-16 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",
@@ -244,7 +244,7 @@
   }
  ],
  "row_format": "Dynamic",
- "search_fields": "display_name,domain,site",
+ "search_fields": "display_name,domain,tenant",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],

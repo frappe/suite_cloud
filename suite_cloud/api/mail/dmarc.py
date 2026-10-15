@@ -1,4 +1,4 @@
-"""DMARC aggregate reports of the site's domains, as the hourly fetch stored them."""
+"""DMARC aggregate reports of the tenant's domains, as the hourly fetch stored them."""
 
 import frappe
 from frappe import _
@@ -6,7 +6,7 @@ from frappe.query_builder import Case
 from frappe.query_builder.functions import Count, Sum
 from frappe.utils import cint
 
-from suite_cloud.api.site import as_datetime, current_site, owned, owned_page, site_api
+from suite_cloud.api.tenant import as_datetime, current_tenant, owned, owned_page, tenant_api
 from suite_cloud.mail.doctype.dmarc_report.dmarc_report import PASS, report_payloads
 from suite_cloud.mail.reports import report_window
 from suite_cloud.utils import utc_iso
@@ -16,7 +16,7 @@ TOP_SOURCES = 20
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_dmarc_reports(
     domain: str | None = None,
     search: str | None = None,
@@ -58,22 +58,22 @@ def list_dmarc_reports(
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_dmarc_report(report: str) -> dict:
-    name = frappe.db.get_value("DMARC Report", {"name": report, "site": current_site().name})
+    name = frappe.db.get_value("DMARC Report", {"name": report, "tenant": current_tenant().name})
     if not name:
         frappe.throw(_("DMARC report {0} was not found.").format(report), frappe.DoesNotExistError)
     return frappe.get_doc("DMARC Report", name).to_api(with_records=True)
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_dmarc_summary(domain: str | None = None, days: int = 30) -> dict:
     """Totals over the reports whose period ended in the last ``days``, by domain, source and
     reporter; ``days`` of 0 counts everything still held, however long the retention is."""
 
     since, until = report_window(days)
-    scope = ReportScope(current_site().name, owned("Mail Domain", domain).name if domain else None, since)
+    scope = ReportScope(current_tenant().name, owned("Mail Domain", domain).name if domain else None, since)
     return {
         "since": utc_iso(since) if since else None,
         "until": utc_iso(until),
@@ -85,17 +85,17 @@ def get_dmarc_summary(domain: str | None = None, days: int = 30) -> dict:
 
 
 class ReportScope:
-    """The site's reports since a moment, aggregated from the per-source rows."""
+    """The tenant's reports since a moment, aggregated from the per-source rows."""
 
-    def __init__(self, site: str, domain: str | None, since) -> None:
-        self.site = site
+    def __init__(self, tenant: str, domain: str | None, since) -> None:
+        self.tenant = tenant
         self.domain = domain
         self.since = since
         self.report = frappe.qb.DocType("DMARC Report")
         self.record = frappe.qb.DocType("DMARC Report Record")
 
     def totals(self) -> dict:
-        rows = self._rows(self._query(self.report.site))
+        rows = self._rows(self._query(self.report.tenant))
         return rows[0] if rows else self._empty()
 
     def by_domain(self) -> list[dict]:
@@ -117,7 +117,7 @@ class ReportScope:
             frappe.qb.from_(report)
             .join(record)
             .on((record.parent == report.name) & (record.parenttype == "DMARC Report"))
-            .where((report.site == self.site) & (report.total_messages > 0))
+            .where((report.tenant == self.tenant) & (report.total_messages > 0))
             .groupby(group)
             .select(
                 Count(report.name).distinct().as_("reports"),

@@ -60,18 +60,18 @@ def domains_by_pool(cluster: Document) -> dict[str, list[str]]:
     """Enabled domains grouped by the pool they leave through (pools without addresses are skipped)."""
 
     populated = populated_pools(cluster)
-    site_pools = dict(
-        frappe.get_all("Suite Site", {"cluster": cluster.name}, ["name", "egress_pool"], as_list=True)
+    tenant_pools = dict(
+        frappe.get_all("Suite Tenant", {"cluster": cluster.name}, ["name", "egress_pool"], as_list=True)
     )
     grouped: dict[str, list[str]] = {}
     domains = frappe.get_all(
         "Mail Domain",
         {"cluster": cluster.name, "enabled": 1},
-        ["domain_name", "site", "egress_pool"],
+        ["domain_name", "tenant", "egress_pool"],
         order_by="domain_name",
     )
     for domain in domains:
-        pool = pool_for_domain(domain, site_pools.get(domain.site), cluster.default_egress_pool)
+        pool = pool_for_domain(domain, tenant_pools.get(domain.tenant), cluster.default_egress_pool)
         if pool in populated:
             grouped.setdefault(pool, []).append(domain.domain_name)
     return grouped

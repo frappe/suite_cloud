@@ -102,11 +102,11 @@ def activate_cluster(cluster, token: str = "test-token"):
     return cluster
 
 
-def make_site(cluster, name: str = "acme.frappe.test", **fields):
-    frappe.db.delete("Suite Site", {"name": name})
-    site = frappe.get_doc({"doctype": "Suite Site", "site_name": name, "cluster": cluster.name, **fields})
-    site.insert()
-    return site
+def make_tenant(cluster, title: str = "acme.frappe.test", **fields):
+    frappe.db.delete("Suite Tenant", {"title": title})
+    tenant = frappe.get_doc({"doctype": "Suite Tenant", "title": title, "cluster": cluster.name, **fields})
+    tenant.insert()
+    return tenant
 
 
 def error_log_count() -> int:

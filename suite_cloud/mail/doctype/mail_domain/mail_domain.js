@@ -6,8 +6,8 @@ frappe.ui.form.on('Mail Domain', {
 		frm.set_query('egress_pool', () => ({ filters: { cluster: frm.doc.cluster || '' } }))
 	},
 
-	site(frm) {
-		// The cluster follows the site; a pool picked for the old cluster no longer fits.
+	tenant(frm) {
+		// The cluster follows the tenant; a pool picked for the old cluster no longer fits.
 		frm.set_value('egress_pool', null)
 	},
 

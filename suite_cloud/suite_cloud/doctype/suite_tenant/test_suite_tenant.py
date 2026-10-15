@@ -11,9 +11,9 @@ EXTRA_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 IGNORE_TEST_RECORD_DEPENDENCIES = []  # eg. ["User"]
 
 
-class IntegrationTestSuiteSite(IntegrationTestCase):
+class IntegrationTestSuiteTenant(IntegrationTestCase):
     """
-    Integration tests for SuiteSite.
+    Integration tests for SuiteTenant.
     Use this class for testing interactions between multiple components.
     """
 

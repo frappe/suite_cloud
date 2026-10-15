@@ -2,22 +2,22 @@
 
 Suite Cloud is the app that runs the mail servers behind [Frappe Suite](https://github.com/frappe/suite).
 It sets up [Stalwart](https://stalw.art) mail clusters, keeps them configured, and lets many Suite
-sites share one cluster safely.
+tenants share one cluster safely.
 
 ## How it works, in short
 
-- **Frappe Cloud** tells Suite Cloud when a new Suite site is created. Suite Cloud picks a cluster
-  for the site and hands back the mail server URL plus a site key and secret.
-- **A Suite site** never talks to the mail server's admin API itself. When it wants to add a
+- **A Suite Tenant** records each Suite tenant: the cluster it uses, its limits and the key and
+  secret the tenant authenticates with.
+- **A Suite tenant** never talks to the mail server's admin API itself. When it wants to add a
   domain, create a mailbox, change a password and so on, it asks Suite Cloud. Suite Cloud checks
-  that the site owns what it is touching, saves the change in its own records, and pushes it to
+  that the tenant owns what it is touching, saves the change in its own records, and pushes it to
   the cluster in the same step.
 - **End users** (the people reading and sending mail) connect straight to the cluster with their
   own app passwords. Suite Cloud is not in that path.
 - **Operators** use the desk to create clusters, add servers, manage DNS and watch jobs.
 
 ```
-Frappe Cloud ──────────────▶ Suite Cloud ◀────────────── Suite site (admin changes)
+                             Suite Cloud ◀────────────── Suite tenant (admin changes)
                                   │
                                   │ pushes configuration and directory changes
                                   ▼
@@ -32,11 +32,11 @@ The app has two modules, so one CODEOWNERS line can cover each product:
 
 | Module | Folder | Holds |
 | --- | --- | --- |
-| **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Site, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
+| **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Tenant, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
 | **Mail** | `suite_cloud/mail` | The mail product: Stalwart Store, Cluster, Node, Egress Gateway and IP Pool, the mail directory (Mail Domain, Mail Account, Mail Group, Mailing List), and the `stalwart`, `cluster` and `tenancy` packages. |
 
-The site-facing API is split the same way: `suite_cloud.api.site` for what any product needs
-(authentication, `ping`, the site profile) and `suite_cloud.api.mail` for the mail directory.
+The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what any product needs
+(authentication, `ping`, the tenant profile) and `suite_cloud.api.mail` for the mail directory.
 
 ## The pieces
 
@@ -44,15 +44,15 @@ The site-facing API is split the same way: `suite_cloud.api.site` for what any p
 | --- | --- |
 | **DNS Zone** | A domain you own (for example `frappemail.com`) plus the login for the DNS provider that manages it. Suite Cloud publishes server records there. You can have several zones; each cluster picks one. |
 | **Stalwart Store** | Where a cluster keeps its data: a PostgreSQL or MySQL database, an S3 bucket for message bodies, Redis for shared memory, and optionally a search engine. |
-| **Stalwart Cluster** | One mail service with its public hostname (`mail.c1.frappemail.com`), its stores, its admin credentials, an SSH key for its servers and the regions Frappe Cloud may place sites from. |
+| **Stalwart Cluster** | One mail service with its public hostname (`mail.c1.frappemail.com`), its stores, its admin credentials, an SSH key for its servers and the regions tenants may be placed from. |
 | **Stalwart Node** | One server (VPS) that runs Stalwart for a cluster. Nodes share the same stores, so any node can serve any user. |
-| **Egress Gateway** and **Egress IP Pool** | Optional extra servers used only for sending. A pool is a set of IP addresses; a domain, a site or a whole cluster can be told to send through it. |
+| **Egress Gateway** and **Egress IP Pool** | Optional extra servers used only for sending. A pool is a set of IP addresses; a domain, a tenant or a whole cluster can be told to send through it. |
 | **DNS Record** | One record Suite Cloud keeps in a zone (a node's address, the cluster's round-robin entry, the SPF list, and so on). Records are created and removed together with the thing that needs them. |
 | **Server Job** | One run of an install or update script on a node or gateway, with the result of every step. Secrets are looked up when the job runs and never stored in it. |
-| **Suite Site** | A Frappe Suite site: which cluster it uses, its API key and secret, its title and contact email, its limits (domains, accounts, groups, lists, total disk) and the token its domains are verified with. |
-| **Mail Domain, Mail Account, Mail Group, Mailing List** | The mail directory of a site. Saving one of these pushes it to the cluster in the same step, so the records and the cluster never drift apart. Each carries the id Stalwart gave it. |
-| **DMARC Report** | One DMARC aggregate report another receiver sent about a domain, copied hourly from the cluster that intercepted it (Stalwart parses reports mailed to `postmaster@`). Attributed to the site that holds the domain, and only when the report was addressed to one of that site's domains; kept for the configured retention, and read by sites through the API. |
-| **TLS Report** | One TLS aggregate report (RFC 8460) a sending server made about delivering to a domain: sessions that negotiated TLS as the domain's MTA-STS or DANE policy asks, sessions that failed and why. Copied, attributed, kept and served the same way as DMARC reports, with its own retention; a report whose policies name more than one domain is shown to no site. |
+| **Suite Tenant** | One hosted Frappe Suite site: which cluster it uses, its secret, its title and contact email, and its limits (domains, accounts, groups, lists, total disk). Its id is the TXT value its domains are verified with. |
+| **Mail Domain, Mail Account, Mail Group, Mailing List** | The mail directory of a tenant. Saving one of these pushes it to the cluster in the same step, so the records and the cluster never drift apart. Each carries the id Stalwart gave it. |
+| **DMARC Report** | One DMARC aggregate report another receiver sent about a domain, copied hourly from the cluster that intercepted it (Stalwart parses reports mailed to `postmaster@`). Attributed to the tenant that holds the domain, and only when the report was addressed to one of that tenant's domains; kept for the configured retention, and read by tenants through the API. |
+| **TLS Report** | One TLS aggregate report (RFC 8460) a sending server made about delivering to a domain: sessions that negotiated TLS as the domain's MTA-STS or DANE policy asks, sessions that failed and why. Copied, attributed, kept and served the same way as DMARC reports, with its own retention; a report whose policies name more than one domain is shown to no tenant. |
 | **Suite Cloud Settings** | Defaults: DNS time-to-live, Stalwart version and download URLs, certificate settings, the public URL of this Suite Cloud, job timeout. |
 
 ## Install
@@ -67,12 +67,12 @@ firewall steps use, and Server Jobs run that copy even when the host has its own
 only needs an SSH client (`apt install openssh-client`; Frappe Cloud installs it from
 `pyproject.toml`).
 
-Installing creates three roles and one user:
+Installing creates two roles and one user:
 
 - **Suite Cloud Manager**: operators who use the desk.
-- **Suite Site** and **Frappe Cloud**: API-only roles with no access to any record. The endpoints
-  check ownership themselves.
-- A service user that every site request runs as.
+- **Suite Tenant**: the API-only role of the service user, with no access to any record. The
+  endpoints check ownership themselves.
+- A service user that every tenant request runs as.
 
 ## Setting up a cluster, step by step
 
@@ -88,7 +88,7 @@ Installing creates three roles and one user:
    `c2` and so on. The label and the zone make the hostname, `mail.c1.frappemail.com`, and the
    default domain `c1.frappemail.com` that nodes, gateways and pools get their names under. The
    label is only a namespace: a cluster may have servers in several regions. List the regions
-   Frappe Cloud may place sites from, or none to serve every region. Copy the SSH public key.
+   tenants may be placed from, or none to serve every region. Copy the SSH public key.
 5. **First node.** Put that public key on a fresh VPS and set the reverse DNS (PTR) of its IP to the
    node's hostname. Create a Stalwart Node (`n1.c1.frappemail.com` with its IPv4), click
    **Verify SSH**, then **Provision**. The first Verify SSH records the server's host keys; every
@@ -109,14 +109,14 @@ again, and **Check Drift** reports what differs from it without changing anythin
 
 ### Adopting a server that already has a directory
 
-A Stalwart that a Suite site administered directly, before Suite Cloud, holds domains, accounts,
-groups and lists that Suite Cloud never created. Register it as a cluster, create the Suite Site
-for it, then use **Adopt Directory** on the Suite Site (or run
-`suite_cloud.mail.tenancy.adopt.adopt_directory` with the site name). Every object on the
+A Stalwart that a Suite tenant administered directly, before Suite Cloud, holds domains, accounts,
+groups and lists that Suite Cloud never created. Register it as a cluster, create the Suite Tenant
+for it, then use **Adopt Directory** on the Suite Tenant (or run
+`suite_cloud.mail.tenancy.adopt.adopt_directory` with the tenant name). Every object on the
 cluster is recorded with the id it already has, and nothing is pushed back. The cluster must serve
-that one site, since nothing on it says which site an object belongs to; an object whose record
+that one tenant, since nothing on it says which tenant an object belongs to; an object whose record
 already exists anywhere is skipped, and each object imports on its own, so one that cannot (an
-alias on a domain the site does not own, say) is reported while the rest go in. Adopted domains
+alias on a domain the tenant does not own, say) is reported while the rest go in. Adopted domains
 are marked verified; adopted accounts and groups keep the cluster's quotas. Passwords and app
 passwords stay on the cluster and keep working.
 
@@ -126,7 +126,7 @@ passwords stay on the cluster and keep working.
    IPs configured, and provision it.
 2. Create an Egress IP Pool listing those IPs with a hostname for each (`ded1.c1.frappemail.com`,
    with reverse DNS set at the provider).
-3. Assign the pool to a Mail Domain, to a Suite Site, or as the cluster default.
+3. Assign the pool to a Mail Domain, to a Suite Tenant, or as the cluster default.
 
 Mail from the matching sender domains is relayed to the gateway over an authenticated, encrypted
 connection and leaves from the pool's addresses. The `spf.c1.frappemail.com` record that customer
@@ -135,19 +135,18 @@ message takes.
 
 ## API
 
-Suite Cloud serves two REST APIs at `/api/v2/method/suite_cloud.api.<module>.<method>`, documented in [docs/api](docs/api/README.md).
+Suite Cloud serves one REST API at `/api/v2/method/suite_cloud.api.<module>.<method>`, documented in [docs/api](docs/api/README.md).
 
-- The **site API** lets a Frappe Suite site manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The site authenticates with its API key and secret and the `Frappe-Authorization-Source: Suite Site` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
-- The **Frappe Cloud API** registers, limits, suspends and archives the sites, for a user with the **Frappe Cloud** role.
+The **tenant API** lets a Suite Tenant manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The tenant authenticates with its id and secret in an `Authorization: Tenant <id>:<secret>` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
 
-The verb follows the method name (`list_` and `get_` are GETs, `update_` a PATCH, `set_` a PUT, `delete_` and `remove_` a DELETE, the rest POSTs), parameters travel as JSON, the result sits under `data`, and an error answers `{"errors": [{"type", "message"}]}` with a REST status code. Each site may make 300 requests per minute.
+The verb follows the method name (`list_` and `get_` are GETs, `update_` a PATCH, `set_` a PUT, `delete_` and `remove_` a DELETE, the rest POSTs), parameters travel as JSON, the result sits under `data`, and an error answers `{"errors": [{"type", "message"}]}` with a REST status code. Each tenant may make 300 requests per minute.
 
 ### How a domain goes live
 
-1. The site calls `check_domain`. Nothing is stored yet: the answer is a TXT record the domain
-   owner must publish at the apex, `frappe-suite-verification=<token>`. The token is fixed for the
-   life of the site, so every domain it adds asks for the same record and no other site can
-   produce it. This is what keeps one tenant from claiming another tenant's domain on a shared
+1. The tenant calls `check_domain`. Nothing is stored yet: the answer is a TXT record the domain
+   owner must publish at the apex, `frappe-suite-verification=<tenant id>`. The id is fixed for
+   the life of the tenant, so every domain it adds asks for the same record and no other tenant
+   can produce it. This is what keeps one tenant from claiming another tenant's domain on a shared
    cluster. Operators adding a domain from the desk vouch for it themselves and skip this step.
    So does a cloud with **Skip Domain Verification** on in Suite Cloud Settings: it takes a
    tenant's word for its domains, which also count as verified without the DNS check below -
@@ -168,14 +167,14 @@ The verb follows the method name (`list_` and `get_` are GETs, `update_` a PATCH
    at least one DKIM selector resolve, the domain is verified. MX is optional: a domain may use the
    cluster for sending only.
 5. A domain is **active** when it is enabled and verified; only then does Stalwart accept mail for
-   it, and only then may the site create accounts, groups and lists on it. Disabling a domain drops
+   it, and only then may the tenant create accounts, groups and lists on it. Disabling a domain drops
    its verification on purpose, so enabling it again needs a fresh check.
 6. Verification is retried every hour, and a DKIM key the cluster was still generating when the
    records were read is picked up hourly. A temporary DNS failure never turns a working domain off.
    **Skip Scheduled Verification** on the Mail Domain keeps a domain out of the hourly check, so
    one a manager verified by hand stays verified; **Verify DNS Records** still runs on demand.
 
-A domain carries three delivery settings a site may change: a catch-all address for local parts
+A domain carries three delivery settings a tenant may change: a catch-all address for local parts
 that match no account, sub-addressing (`user+tag@`), and relaying, which makes the cluster forward
 mail for addresses it does not hold to the domain's MX instead of rejecting it, so a domain can
 keep some mailboxes on another server (split delivery). Relayed mail leaves like any other the
@@ -215,7 +214,7 @@ Tests live next to their module: `suite_cloud/tests` for the generic app (settin
 and `suite_cloud/mail/tests` for mail, including the fake Stalwart
 (`suite_cloud/mail/tests/fake_stalwart.py`), an in-process JMAP management server the real
 client talks to unchanged. Nothing reaches a real server or a real DNS provider. Tests that create
-sites use names under `.frappe.test` and clean up only those, so they can run on a site that also
+tenants use names under `.frappe.test` and clean up only those, so they can run on a site that also
 holds real clusters.
 
 The fake keeps the routes it is sent but cannot follow them, so `test_delivery` starts a Stalwart

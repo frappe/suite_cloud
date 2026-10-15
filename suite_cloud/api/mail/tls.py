@@ -1,11 +1,11 @@
-"""TLS aggregate reports of the site's domains, as the hourly fetch stored them."""
+"""TLS aggregate reports of the tenant's domains, as the hourly fetch stored them."""
 
 import frappe
 from frappe import _
 from frappe.query_builder.functions import Count, Sum
 from frappe.utils import cint
 
-from suite_cloud.api.site import as_datetime, current_site, owned, owned_page, site_api
+from suite_cloud.api.tenant import as_datetime, current_tenant, owned, owned_page, tenant_api
 from suite_cloud.mail.doctype.tls_report.tls_report import report_payloads
 from suite_cloud.mail.reports import report_window
 from suite_cloud.utils import utc_iso
@@ -15,7 +15,7 @@ TOP_FAILURES = 20
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_tls_reports(
     domain: str | None = None,
     search: str | None = None,
@@ -57,22 +57,22 @@ def list_tls_reports(
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_tls_report(report: str) -> dict:
-    name = frappe.db.get_value("TLS Report", {"name": report, "site": current_site().name})
+    name = frappe.db.get_value("TLS Report", {"name": report, "tenant": current_tenant().name})
     if not name:
         frappe.throw(_("TLS report {0} was not found.").format(report), frappe.DoesNotExistError)
     return frappe.get_doc("TLS Report", name).to_api(with_records=True)
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_tls_summary(domain: str | None = None, days: int = 30) -> dict:
     """Session totals over the reports whose period ended in the last ``days``, by domain and
     reporter, and the failed sessions by result type; ``days`` of 0 counts everything still held."""
 
     since, until = report_window(days)
-    scope = ReportScope(current_site().name, owned("Mail Domain", domain).name if domain else None, since)
+    scope = ReportScope(current_tenant().name, owned("Mail Domain", domain).name if domain else None, since)
     return {
         "since": utc_iso(since) if since else None,
         "until": utc_iso(until),
@@ -84,17 +84,17 @@ def get_tls_summary(domain: str | None = None, days: int = 30) -> dict:
 
 
 class ReportScope:
-    """The site's reports since a moment: sessions from the reports, failures from their rows."""
+    """The tenant's reports since a moment: sessions from the reports, failures from their rows."""
 
-    def __init__(self, site: str, domain: str | None, since) -> None:
-        self.site = site
+    def __init__(self, tenant: str, domain: str | None, since) -> None:
+        self.tenant = tenant
         self.domain = domain
         self.since = since
         self.report = frappe.qb.DocType("TLS Report")
         self.failure = frappe.qb.DocType("TLS Report Failure")
 
     def totals(self) -> dict:
-        rows = self._rows(self._sessions(self.report.site))
+        rows = self._rows(self._sessions(self.report.tenant))
         return rows[0] if rows else {"reports": 0, "sessions": 0, "successful": 0, "failed": 0}
 
     def by_domain(self) -> list[dict]:
@@ -145,7 +145,7 @@ class ReportScope:
 
     def _scoped(self, query):
         report = self.report
-        query = query.where((report.site == self.site) & (report.total_sessions > 0))
+        query = query.where((report.tenant == self.tenant) & (report.total_sessions > 0))
         if self.since:
             query = query.where(report.date_range_end >= self.since)
         if self.domain:

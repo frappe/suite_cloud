@@ -1,16 +1,13 @@
 import frappe
 
-# Desk role for operators, plus two API-only roles: tenant sites authenticate as one shared
-# service user carrying "Suite Site", and Frappe Cloud calls the provisioning endpoints with a
-# user carrying "Frappe Cloud". Neither API role holds DocType permissions; the endpoints check
-# ownership themselves.
+# Desk role for operators, plus the API-only role of the shared service user every tenant
+# request runs as. The API role holds no DocType permissions; the endpoints check ownership.
 ROLES = (
     ("Suite Cloud Manager", 1),
-    ("Suite Site", 0),
-    ("Frappe Cloud", 0),
+    ("Suite Tenant", 0),
 )
 
-SITE_SERVICE_USER = "suite-site@suite-cloud.internal"
+TENANT_SERVICE_USER = "suite-tenant@suite-cloud.internal"
 
 
 def after_install() -> None:
@@ -22,12 +19,12 @@ def after_migrate() -> None:
 
 
 def setup() -> None:
-    """Creates the roles and the shared site service user; safe to run on every migrate."""
+    """Creates the roles and the shared tenant service user; safe to run on every migrate."""
 
     for role_name, desk_access in ROLES:
         ensure_role(role_name, desk_access)
 
-    ensure_site_service_user()
+    ensure_tenant_service_user()
     ensure_setting_defaults()
 
 
@@ -40,29 +37,29 @@ def ensure_role(role_name: str, desk_access: int) -> None:
     ).insert(ignore_permissions=True)
 
 
-def ensure_site_service_user() -> None:
-    """The user every Suite Site API request runs as (see suite_cloud.api.site)."""
+def ensure_tenant_service_user() -> None:
+    """The user every Suite Tenant API request runs as (see suite_cloud.api.tenant)."""
 
-    if not frappe.db.exists("User", SITE_SERVICE_USER):
+    if not frappe.db.exists("User", TENANT_SERVICE_USER):
         user = frappe.get_doc(
             {
                 "doctype": "User",
-                "email": SITE_SERVICE_USER,
-                "first_name": "Suite Site",
+                "email": TENANT_SERVICE_USER,
+                "first_name": "Suite Tenant",
                 "user_type": "Website User",
                 "send_welcome_email": 0,
-                "roles": [{"role": "Suite Site"}],
+                "roles": [{"role": "Suite Tenant"}],
             }
         )
         user.flags.ignore_password_policy = True
         user.insert(ignore_permissions=True)
 
     # A Website User cannot reach the desk; Frappe upgrades the type on save, so pin it here.
-    if frappe.db.get_value("User", SITE_SERVICE_USER, "user_type") != "Website User":
-        frappe.db.set_value("User", SITE_SERVICE_USER, "user_type", "Website User", update_modified=False)
+    if frappe.db.get_value("User", TENANT_SERVICE_USER, "user_type") != "Website User":
+        frappe.db.set_value("User", TENANT_SERVICE_USER, "user_type", "Website User", update_modified=False)
 
-    if frappe.db.get_single_value("Suite Cloud Settings", "site_service_user") != SITE_SERVICE_USER:
-        frappe.db.set_single_value("Suite Cloud Settings", "site_service_user", SITE_SERVICE_USER)
+    if frappe.db.get_single_value("Suite Cloud Settings", "tenant_service_user") != TENANT_SERVICE_USER:
+        frappe.db.set_single_value("Suite Cloud Settings", "tenant_service_user", TENANT_SERVICE_USER)
         frappe.clear_document_cache("Suite Cloud Settings", "Suite Cloud Settings")
 
 

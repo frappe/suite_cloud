@@ -3,7 +3,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.install import SITE_SERVICE_USER
+from suite_cloud.install import TENANT_SERVICE_USER
 from suite_cloud.mail.cluster import dns, egress
 from suite_cloud.mail.stalwart import forget_sessions
 from suite_cloud.mail.tests.fake_stalwart import FakeStalwart
@@ -14,7 +14,7 @@ from suite_cloud.mail.tests.fixtures import (
     configure_settings,
     make_cluster,
     make_node,
-    make_site,
+    make_tenant,
     remove_cluster,
 )
 from suite_cloud.utils import user_context
@@ -43,7 +43,7 @@ class TestEgress(IntegrationTestCase):
         self.addCleanup(self._install.__exit__, None, None, None)
         forget_sessions(self.cluster)
         clear_request_cache()
-        self.site = make_site(self.cluster)
+        self.tenant = make_tenant(self.cluster)
         self.gateway = frappe.get_doc(
             {
                 "doctype": "Egress Gateway",
@@ -59,7 +59,7 @@ class TestEgress(IntegrationTestCase):
         for name in frappe.get_all("Mail Domain", mine, pluck="name"):
             frappe.delete_doc("Mail Domain", name, force=True, ignore_permissions=True, ignore_on_trash=True)
         frappe.db.set_value("Stalwart Cluster", self.cluster.name, "default_egress_pool", None)
-        frappe.db.set_value("Suite Site", self.site.name, "egress_pool", None)
+        frappe.db.set_value("Suite Tenant", self.tenant.name, "egress_pool", None)
         for name in frappe.get_all("Egress IP Pool", mine, pluck="name"):
             frappe.delete_doc(
                 "Egress IP Pool", name, force=True, ignore_permissions=True, ignore_on_trash=True
@@ -140,7 +140,7 @@ class TestEgress(IntegrationTestCase):
 
     def test_only_managers_can_reset_host_keys(self) -> None:
         # Dropping the pin lets the next Verify SSH trust any server, so other users are refused.
-        with user_context(SITE_SERVICE_USER), self.assertRaises(frappe.PermissionError):
+        with user_context(TENANT_SERVICE_USER), self.assertRaises(frappe.PermissionError):
             self.gateway.reset_ssh_host_keys()
         pinned = frappe.db.get_value("Egress Gateway", self.gateway.name, "ssh_host_keys")
         self.assertEqual(pinned, self.gateway.ssh_host_keys)
@@ -180,10 +180,10 @@ class TestEgress(IntegrationTestCase):
     def test_cluster_routes_follow_pool_assignment(self) -> None:
         pool = self.make_pool()
         domain = frappe.get_doc(
-            {"doctype": "Mail Domain", "domain_name": "acme.com", "site": self.site.name}
+            {"doctype": "Mail Domain", "domain_name": "acme.com", "tenant": self.tenant.name}
         ).insert()
         frappe.get_doc(
-            {"doctype": "Mail Domain", "domain_name": "direct.com", "site": self.site.name}
+            {"doctype": "Mail Domain", "domain_name": "direct.com", "tenant": self.tenant.name}
         ).insert()
 
         # No assignment yet: just the local rule (ours, not stacked on the pre-existing one) and no
@@ -252,11 +252,13 @@ class TestEgress(IntegrationTestCase):
             {
                 "doctype": "Mail Domain",
                 "domain_name": "news.com",
-                "site": self.site.name,
+                "tenant": self.tenant.name,
                 "egress_pool": other.name,
             }
         ).insert()
-        frappe.get_doc({"doctype": "Mail Domain", "domain_name": "acme.com", "site": self.site.name}).insert()
+        frappe.get_doc(
+            {"doctype": "Mail Domain", "domain_name": "acme.com", "tenant": self.tenant.name}
+        ).insert()
         operations = {op["object"]: op for op in egress.cluster_operations(cluster)}
         self.assertEqual(sorted(operations["MtaRoute"]["value"]), ["egress-p2", "egress-p3"])
         route = operations["MtaOutboundStrategy"]["value"]["route"]
@@ -281,7 +283,7 @@ class TestEgress(IntegrationTestCase):
 
     def make_domain(self, domain_name: str, **fields):
         return frappe.get_doc(
-            {"doctype": "Mail Domain", "domain_name": domain_name, "site": self.site.name, **fields}
+            {"doctype": "Mail Domain", "domain_name": domain_name, "tenant": self.tenant.name, **fields}
         ).insert()
 
     def test_relaying_domains_keep_only_the_addresses_they_hold(self) -> None:
@@ -436,19 +438,19 @@ class TestEgress(IntegrationTestCase):
         self.assertRaisesRegex(
             frappe.ValidationError,
             "another cluster",
-            make_site,
+            make_tenant,
             other,
             "other.frappe.test",
             egress_pool=pool.name,
         )
 
-        site = make_site(other, "other.frappe.test")
-        self.addCleanup(frappe.db.delete, "Suite Site", {"name": site.name})
+        tenant = make_tenant(other, "other.frappe.test")
+        self.addCleanup(frappe.db.delete, "Suite Tenant", {"name": tenant.name})
         domain = frappe.get_doc(
             {
                 "doctype": "Mail Domain",
                 "domain_name": "other.com",
-                "site": site.name,
+                "tenant": tenant.name,
                 "egress_pool": pool.name,
             }
         )
@@ -456,9 +458,9 @@ class TestEgress(IntegrationTestCase):
 
     def test_pool_deletion_is_blocked_while_used(self) -> None:
         pool = self.make_pool()
-        self.site.db_set("egress_pool", pool.name)
+        self.tenant.db_set("egress_pool", pool.name)
         self.assertRaisesRegex(frappe.ValidationError, "still used", pool.delete)
-        self.site.db_set("egress_pool", None)
+        self.tenant.db_set("egress_pool", None)
         pool.delete()
         self.assertFalse(frappe.db.exists("DNS Record", {"managed_by": pool.name}))
         self.assertNotIn("ip4:203.0.113.51", frappe.db.get_value("DNS Record", {"host": "spf.blr"}, "value"))

@@ -64,7 +64,7 @@ class MailDomain(Document):
         last_verified_at: DF.Datetime | None
         publish_client_discovery_records: DF.Check
         routing_records: DF.Table[MailDomainDNSRecord]
-        site: DF.Link
+        tenant: DF.Link
         skip_scheduled_verification: DF.Check
         verification_skipped: DF.Check
         stalwart_id: DF.Data | None
@@ -82,18 +82,18 @@ class MailDomain(Document):
 
     def validate(self) -> None:
         self.domain_name = validate_domain_name(self.domain_name)
-        site = self.get_site()
-        self.cluster = site.cluster
+        tenant = self.get_site()
+        self.cluster = tenant.cluster
         if self.is_new() and not self.flags.adopting:
             # Proof of control comes first: only someone who controls the domain's DNS learns
-            # whether another site already holds it.
+            # whether another tenant already holds it.
             if ownership.required():
-                ownership.assert_ownership(site, self.domain_name)
-            assert_domain_available(self.domain_name, self.site)
-            site.assert_can_add_domain()
+                ownership.assert_ownership(tenant, self.domain_name)
+            assert_domain_available(self.domain_name, self.tenant)
+            tenant.assert_can_add_domain()
         if self.catch_all_address:
             self.catch_all_address = validate_email_address(self.catch_all_address)
-            assert_addresses_deliverable(self.site, [self.catch_all_address])
+            assert_addresses_deliverable(self.tenant, [self.catch_all_address])
         if (
             self.egress_pool
             and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
@@ -156,7 +156,7 @@ class MailDomain(Document):
         sync.push_destroy(self, "domains")
 
     def after_delete(self) -> None:
-        on_a_pool = self.egress_pool or frappe.db.get_value("Suite Site", self.site, "egress_pool")
+        on_a_pool = self.egress_pool or frappe.db.get_value("Suite Tenant", self.tenant, "egress_pool")
         if on_a_pool or self.allow_relaying:
             egress.resync_cluster_after_commit(self.cluster)
 
@@ -170,7 +170,7 @@ class MailDomain(Document):
     def stalwart_payload(self) -> Domain:
         return Domain(
             name=self.domain_name,
-            description=self.description or f"Suite site {self.site}",
+            description=self.description or f"Suite Tenant {self.tenant}",
             is_enabled=self.is_live(),
             dkim_algorithms=dkim_algorithms(),
             catch_all_address=self.catch_all_address or None,
@@ -181,7 +181,7 @@ class MailDomain(Document):
 
     def stalwart_patch(self) -> dict:
         return {
-            "description": self.description or f"Suite site {self.site}",
+            "description": self.description or f"Suite Tenant {self.tenant}",
             "isEnabled": self.is_live(),
             "catchAllAddress": self.catch_all_address or None,
             "subAddressing": {"@type": "Enabled" if self.sub_addressing else "Disabled"},
@@ -328,7 +328,7 @@ class MailDomain(Document):
     # --- helpers -----------------------------------------------------------------------
 
     def get_site(self) -> Document:
-        return frappe.get_cached_doc("Suite Site", self.site)
+        return frappe.get_cached_doc("Suite Tenant", self.tenant)
 
     def get_cluster(self) -> Document:
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster or self.get_site().cluster)

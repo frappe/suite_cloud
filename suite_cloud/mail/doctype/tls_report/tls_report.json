@@ -6,7 +6,7 @@
  "field_order": [
   "domain_section",
   "policy_domain",
-  "site",
+  "tenant",
   "column_break_domain",
   "cluster",
   "stalwart_id",
@@ -44,7 +44,7 @@
    "label": "Domain"
   },
   {
-   "description": "The domain the report is about, as the reporter names it in its policies. It is the Mail Domain's name whenever a site holds the domain.",
+   "description": "The domain the report is about, as the reporter names it in its policies. It is the Mail Domain's name whenever a tenant holds the domain.",
    "fieldname": "policy_domain",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -55,13 +55,13 @@
    "search_index": 1
   },
   {
-   "description": "The site that held the domain when the report was fetched, set only if the report was also addressed to one of its domains; the site API shows the report to this site only.",
-   "fieldname": "site",
+   "description": "The tenant that held the domain when the report was fetched, set only if the report was also addressed to one of its domains; the tenant API shows the report to this tenant only.",
+   "fieldname": "tenant",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Suite Site",
-   "options": "Suite Site",
+   "label": "Tenant",
+   "options": "Suite Tenant",
    "read_only": 1,
    "search_index": 1
   },
@@ -265,7 +265,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-21 13:00:00.000000",
+ "modified": "2026-10-16 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "TLS Report",
@@ -294,7 +294,7 @@
  ],
  "row_format": "Dynamic",
  "rows_threshold_for_grid_search": 20,
- "search_fields": "policy_domain,org_name,report_id,site",
+ "search_fields": "policy_domain,org_name,report_id,tenant",
  "sort_field": "date_range_end",
  "sort_order": "DESC",
  "states": [],

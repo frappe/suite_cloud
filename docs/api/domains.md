@@ -5,7 +5,7 @@ Module `suite_cloud.api.mail.domains`. The conventions are in the [overview](REA
 | Method | Verb | Purpose |
 | --- | --- | --- |
 | `mail.domains.check_domain` | GET | Whether the domain can be added, and the record that proves ownership |
-| `mail.domains.list_domains` | GET | Every domain of the site |
+| `mail.domains.list_domains` | GET | Every domain of the tenant |
 | `mail.domains.get_domain` | GET | One domain with its DNS records |
 | `mail.domains.create_domain` | POST | Adds the domain once its ownership record resolves |
 | `mail.domains.update_domain` | PATCH | Changes delivery settings or enables and disables the domain |
@@ -14,7 +14,7 @@ Module `suite_cloud.api.mail.domains`. The conventions are in the [overview](REA
 | `mail.domains.refresh_dns_records` | POST | Re-reads the records the cluster expects |
 | `mail.domains.verify_dns_records` | POST | Checks the records on public resolvers now |
 
-A domain is **active** when it is enabled and verified. Only then does the cluster accept mail for it, and only then may the site create accounts, groups and lists on it. Disabling a domain drops its verification, so enabling it again needs a fresh check.
+A domain is **active** when it is enabled and verified. Only then does the cluster accept mail for it, and only then may the tenant create accounts, groups and lists on it. Disabling a domain drops its verification, so enabling it again needs a fresh check.
 
 ## The domain object
 
@@ -50,16 +50,16 @@ A domain is **active** when it is enabled and verified. Only then does the clust
 | --- | --- | --- |
 | `domain` | string, required | The domain to add |
 
-Stores nothing. Answers the TXT record the owner must publish at the apex. The record is the same for every domain the site ever adds.
+Stores nothing. Answers the TXT record the owner must publish at the apex. The record is the same for every domain the tenant ever adds.
 
 ```json
 {
   "domain": "acme.example",
-  "ownership_record": { "type": "TXT", "host": "@", "fqdn": "acme.example", "value": "frappe-suite-verification=<token>" }
+  "ownership_record": { "type": "TXT", "host": "@", "fqdn": "acme.example", "value": "frappe-suite-verification=<tenant id>" }
 }
 ```
 
-A domain the site already holds is a 409. A domain of the mail infrastructure itself is a 422. Whether another site holds the domain is told only to a proven owner, at `create_domain`.
+A domain the tenant already holds is a 409. A domain of the mail infrastructure itself is a 422. Whether another tenant holds the domain is told only to a proven owner, at `create_domain`.
 
 ## `create_domain`
 
@@ -72,7 +72,7 @@ A domain the site already holds is a 409. A domain of the mail infrastructure it
 | `allow_relaying` | boolean | `false` | |
 | `publish_client_discovery_records` | boolean | `false` | |
 
-Answers 201 with the domain object, including the records to publish next. The domain is created disabled on the cluster until it is verified. Until the ownership record resolves, the error names the record. A domain another site holds is a 409 (`Domain … is not available.`); the site's domain limit is a 422.
+Answers 201 with the domain object, including the records to publish next. The domain is created disabled on the cluster until it is verified. Until the ownership record resolves, the error names the record. A domain another tenant holds is a 409 (`Domain … is not available.`); the tenant's domain limit is a 422.
 
 ## `update_domain`
 

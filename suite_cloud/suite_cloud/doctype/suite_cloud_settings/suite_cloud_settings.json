@@ -8,7 +8,7 @@
   "suite_cloud_section",
   "public_url",
   "column_break_general",
-  "site_service_user",
+  "tenant_service_user",
   "skip_domain_verification",
   "jobs_section",
   "server_job_timeout",
@@ -46,7 +46,7 @@
    "label": "Suite Cloud"
   },
   {
-   "description": "Address Frappe Cloud hands to Suite sites so they can reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL.",
+   "description": "Address tenants use to reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL.",
    "fieldname": "public_url",
    "fieldtype": "Data",
    "label": "Public URL",
@@ -57,16 +57,16 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Every request from a Suite site runs as this user. It is created on install and needs no changes.",
-   "fieldname": "site_service_user",
+   "description": "Every tenant request runs as this user. It is created on install and needs no changes.",
+   "fieldname": "tenant_service_user",
    "fieldtype": "Link",
-   "label": "Site Service User",
+   "label": "Tenant Service User",
    "options": "User",
    "read_only": 1
   },
   {
    "default": "0",
-   "description": "Take a tenant site's word for its domains: add them without the TXT record that proves control, and treat them as verified without checking their DNS records. For a development cloud, whose test domains exist in no public DNS. Never on a shared cluster: a wrongly claimed domain locks its owner out, and Stalwart accepts mail for every domain marked verified. Turning it off re-checks the domains it vouched for.",
+   "description": "Take a tenant's word for its domains: add them without the TXT record that proves control, and treat them as verified without checking their DNS records. For a development cloud, whose test domains exist in no public DNS. Never on a shared cluster: a wrongly claimed domain locks its owner out, and Stalwart accepts mail for every domain marked verified. Turning it off re-checks the domains it vouched for.",
    "fieldname": "skip_domain_verification",
    "fieldtype": "Check",
    "label": "Skip Domain Verification"
@@ -90,14 +90,14 @@
   },
   {
    "default": "90",
-   "description": "How long fetched DMARC reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees.",
+   "description": "How long fetched DMARC reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
    "fieldname": "dmarc_report_retention_days",
    "fieldtype": "Int",
    "label": "DMARC Report Retention (Days)"
   },
   {
    "default": "90",
-   "description": "How long fetched TLS reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a site sees.",
+   "description": "How long fetched TLS reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
    "fieldname": "tls_report_retention_days",
    "fieldtype": "Int",
    "label": "TLS Report Retention (Days)"
@@ -211,7 +211,7 @@
   },
   {
    "default": "300",
-   "description": "How long resolvers may cache the records Suite Cloud publishes, used when a DNS Zone sets no TTL of its own. Also suggested to sites for their domain records. 300 keeps node changes quick to roll out.",
+   "description": "How long resolvers may cache the records Suite Cloud publishes, used when a DNS Zone sets no TTL of its own. Also suggested to tenants for their domain records. 300 keeps node changes quick to roll out.",
    "fieldname": "default_dns_ttl",
    "fieldtype": "Int",
    "label": "Default DNS TTL (Seconds)",
@@ -221,7 +221,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-06 14:10:00.000000",
+ "modified": "2026-10-16 02:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

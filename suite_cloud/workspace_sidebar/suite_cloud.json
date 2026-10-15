@@ -12,8 +12,8 @@
    "icon": "globe",
    "indent": 0,
    "keep_closed": 0,
-   "label": "Sites",
-   "link_to": "Suite Site",
+   "label": "Suite Tenants",
+   "link_to": "Suite Tenant",
    "link_type": "DocType",
    "show_arrow": 0,
    "type": "Link"
@@ -217,7 +217,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-09-21 12:00:00.000000",
+ "modified": "2026-10-15 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud",

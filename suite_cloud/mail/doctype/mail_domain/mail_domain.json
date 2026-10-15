@@ -6,7 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "domain_name",
-  "site",
+  "tenant",
   "cluster",
   "column_break_main",
   "enabled",
@@ -47,20 +47,20 @@
    "unique": 1
   },
   {
-   "description": "The Suite Site that owns the domain and administers it through the API. Fixed once the domain exists; it counts against the site's domain limit.",
-   "fieldname": "site",
+   "description": "The Suite Tenant that owns the domain and administers it through the API. Fixed once the domain exists; it counts against the tenant's domain limit.",
+   "fieldname": "tenant",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Site",
-   "options": "Suite Site",
+   "label": "Tenant",
+   "options": "Suite Tenant",
    "reqd": 1,
    "search_index": 1,
    "set_only_once": 1
   },
   {
-   "description": "The site's cluster, copied on every save. The domain is created on this cluster and its DNS records point at it.",
-   "fetch_from": "site.cluster",
+   "description": "The tenant's cluster, copied on every save. The domain is created on this cluster and its DNS records point at it.",
+   "fetch_from": "tenant.cluster",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -81,7 +81,7 @@
    "label": "Enabled"
   },
   {
-   "description": "Free text shown on the cluster next to the domain. Blank falls back to the site's name.",
+   "description": "Free text shown on the cluster next to the domain. Blank falls back to the tenant's name.",
    "fieldname": "description",
    "fieldtype": "Data",
    "label": "Description"
@@ -126,7 +126,7 @@
   },
   {
    "default": "0",
-   "description": "Also list the MTA-STS, autoconfig and autodiscover records. Those hostnames are served over HTTPS and get no certificate from the cluster, so leave this off unless the site handles TLS for them.",
+   "description": "Also list the MTA-STS, autoconfig and autodiscover records. Those hostnames are served over HTTPS and get no certificate from the cluster, so leave this off unless the tenant handles TLS for them.",
    "fieldname": "publish_client_discovery_records",
    "fieldtype": "Check",
    "label": "Publish Client Discovery Records"
@@ -235,7 +235,7 @@
    "read_only": 1
   },
   {
-   "description": "Outbound mail of this domain leaves through this pool instead of the site's or the cluster's default. The pool must belong to the domain's cluster.",
+   "description": "Outbound mail of this domain leaves through this pool instead of the tenant's or the cluster's default. The pool must belong to the domain's cluster.",
    "fieldname": "egress_pool",
    "fieldtype": "Link",
    "label": "Egress Pool",
@@ -275,7 +275,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-09-30 16:43:06.381861",
+ "modified": "2026-10-16 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Domain",

@@ -2,15 +2,15 @@ import frappe
 from frappe.utils import cint, sbool
 
 from suite_cloud.api.mail import aliases as alias_rows
-from suite_cloud.api.site import (
+from suite_cloud.api.tenant import (
     RECIPIENT_BATCH,
     as_alias_rows,
     as_list,
-    current_site,
+    current_tenant,
     owned,
     owned_page,
     page_size,
-    site_api,
+    tenant_api,
 )
 
 PAGE_CAP = 500  # the dashboard's largest page
@@ -19,20 +19,20 @@ from suite_cloud.mail.tenancy import sync
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_mailing_lists(search: str | None = None, start: int = 0, limit: int = 100) -> dict:
     names, total = owned_page("Mailing List", search, start, limit, PAGE_CAP)
     return {"items": list_payloads(names), "total": total}
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_mailing_list(email: str) -> dict:
     return owned("Mailing List", email).to_api()
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def create_mailing_list(
     email: str,
     description: str | None = None,
@@ -43,7 +43,7 @@ def create_mailing_list(
         {
             "doctype": "Mailing List",
             "email": email,
-            "site": current_site().name,
+            "tenant": current_tenant().name,
             "description": description,
             "aliases": as_alias_rows(aliases),
         }
@@ -60,7 +60,7 @@ def create_mailing_list(
 
 
 @frappe.whitelist(methods=["PATCH"])
-@site_api
+@tenant_api
 def update_mailing_list(email: str, description: str | None = None) -> dict:
     doc = owned("Mailing List", email)
     if description is not None:
@@ -70,7 +70,7 @@ def update_mailing_list(email: str, description: str | None = None) -> dict:
 
 
 @frappe.whitelist(methods=["PUT"])
-@site_api
+@tenant_api
 def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mailing List", email)
     doc.set("aliases", as_alias_rows(aliases))
@@ -79,19 +79,19 @@ def set_aliases(email: str, aliases: list | str | None = None) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def add_alias(email: str, alias: str, description: str | None = None) -> dict:
     return alias_rows.add("Mailing List", email, alias, description).to_api()
 
 
 @frappe.whitelist(methods=["DELETE"])
-@site_api
+@tenant_api
 def remove_alias(email: str, alias: str) -> dict:
     return alias_rows.remove("Mailing List", email, alias).to_api()
 
 
 @frappe.whitelist(methods=["PUT"])
-@site_api
+@tenant_api
 def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
     return alias_rows.set_enabled("Mailing List", email, alias, sbool(enabled)).to_api()
 
@@ -100,7 +100,7 @@ def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_recipients(email: str, search: str | None = None, start: int = 0, limit: int = 200) -> dict:
     doc = owned("Mailing List", email)
     filters = {"mailing_list": doc.name}
@@ -121,15 +121,15 @@ def list_recipients(email: str, search: str | None = None, start: int = 0, limit
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_all_recipients(start: int = 0, limit: int = 1000) -> dict:
-    """Every recipient of every list the site owns, ordered by list then address.
+    """Every recipient of every list the tenant owns, ordered by list then address.
 
-    A site mirrors its lists in a handful of calls this way, instead of one call per list, which
+    A tenant mirrors its lists in a handful of calls this way, instead of one call per list, which
     would exhaust its rate limit on its own once it holds a few hundred lists.
     """
 
-    filters = {"site": current_site().name}
+    filters = {"tenant": current_tenant().name}
     rows = frappe.get_all(
         "Mailing List Recipient",
         filters=filters,
@@ -147,7 +147,7 @@ def list_all_recipients(start: int = 0, limit: int = 1000) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def add_recipients(email: str, recipients: list[str] | str | None = None) -> dict:
     """Adds up to 5000 addresses per call; ones already on the list are skipped."""
 
@@ -159,7 +159,7 @@ def add_recipients(email: str, recipients: list[str] | str | None = None) -> dic
 
 
 @frappe.whitelist(methods=["DELETE"])
-@site_api
+@tenant_api
 def remove_recipients(email: str, recipients: list[str] | str | None = None) -> dict:
     doc = owned("Mailing List", email)
     return {
@@ -169,7 +169,7 @@ def remove_recipients(email: str, recipients: list[str] | str | None = None) -> 
 
 
 @frappe.whitelist(methods=["PUT"])
-@site_api
+@tenant_api
 def set_recipients(email: str, recipients: list[str] | str | None = None) -> dict:
     """Full replace, for small lists; large lists should add and remove incrementally."""
 
@@ -179,7 +179,7 @@ def set_recipients(email: str, recipients: list[str] | str | None = None) -> dic
 
 
 @frappe.whitelist(methods=["DELETE"])
-@site_api
+@tenant_api
 def delete_mailing_list(email: str) -> None:
     owned("Mailing List", email).delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204

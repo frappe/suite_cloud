@@ -56,7 +56,7 @@ def domain_stalwart_id(domain_name: str) -> str:
 
 
 def validate_aliases(doc: Document) -> None:
-    """Aliases must sit on one of the site's domains and be free everywhere."""
+    """Aliases must sit on one of the tenant's domains and be free everywhere."""
 
     seen = set()
     for row in doc.aliases:
@@ -68,8 +68,8 @@ def validate_aliases(doc: Document) -> None:
         seen.add(row.alias_email)
 
         alias_domain = row.alias_email.split("@", 1)[1]
-        if frappe.db.get_value("Mail Domain", alias_domain, "site") != doc.site:
-            frappe.throw(_("Alias domain {0} does not belong to this site.").format(alias_domain))
+        if frappe.db.get_value("Mail Domain", alias_domain, "tenant") != doc.tenant:
+            frappe.throw(_("Alias domain {0} does not belong to this tenant.").format(alias_domain))
         assert_address_available(row.alias_email, exclude=(doc.doctype, doc.name))
 
 
