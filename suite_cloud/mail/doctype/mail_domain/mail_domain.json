@@ -6,7 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "domain_name",
-  "site",
+  "tenant",
   "cluster",
   "column_break_main",
   "enabled",
@@ -47,12 +47,12 @@
    "unique": 1
   },
   {
-   "description": "The Suite Tenant that owns the domain and administers it through the API. Fixed once the domain exists; it counts against the site's domain limit.",
-   "fieldname": "site",
+   "description": "The Suite Tenant that owns the domain and administers it through the API. Fixed once the domain exists; it counts against the tenant's domain limit.",
+   "fieldname": "tenant",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Site",
+   "label": "Tenant",
    "options": "Suite Tenant",
    "reqd": 1,
    "search_index": 1,
@@ -60,7 +60,7 @@
   },
   {
    "description": "The site's cluster, copied on every save. The domain is created on this cluster and its DNS records point at it.",
-   "fetch_from": "site.cluster",
+   "fetch_from": "tenant.cluster",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -275,7 +275,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-10-15 21:00:00.000000",
+ "modified": "2026-10-16 01:30:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Domain",

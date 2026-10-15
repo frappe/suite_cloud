@@ -33,7 +33,7 @@ def adopt_directory(site_name: str) -> dict:
         # Rows left by a site that moved or was removed still say whose the cluster's objects are.
         others.update(
             frappe.get_all(
-                doctype, {"cluster": cluster.name, "site": ["!=", site.name]}, pluck="site", distinct=True
+                doctype, {"cluster": cluster.name, "tenant": ["!=", site.name]}, pluck="tenant", distinct=True
             )
         )
     if others:
@@ -101,7 +101,7 @@ def _adopt_domains(site, cluster, client, report: Report) -> dict[str, str]:
             {
                 "doctype": "Mail Domain",
                 "domain_name": name,
-                "site": site.name,
+                "tenant": site.name,
                 "stalwart_id": live["id"],
                 "enabled": int(enabled),
                 "is_verified": int(enabled),  # working on the cluster: the operator vouches for it
@@ -133,7 +133,7 @@ def _adopt_groups(site, groups: list[dict], domains: dict[str, str], report: Rep
             {
                 "doctype": "Mail Group",
                 "email": email,
-                "site": site.name,
+                "tenant": site.name,
                 "stalwart_id": live["id"],
                 "description": live.get("description"),
                 "disable_receiving": int(RECEIVE_PERMISSION in _disabled_permissions(live)),
@@ -163,7 +163,7 @@ def _adopt_accounts(site, users: list[dict], domains, groups, disabled_role_id, 
             {
                 "doctype": "Mail Account",
                 "email": email,
-                "site": site.name,
+                "tenant": site.name,
                 "stalwart_id": live["id"],
                 "enabled": int(not disabled),
                 "disable_receiving": int(RECEIVE_PERMISSION in _disabled_permissions(live)),
@@ -193,7 +193,7 @@ def _adopt_mailing_lists(site, client, domains, report: Report) -> None:
             {
                 "doctype": "Mailing List",
                 "email": email,
-                "site": site.name,
+                "tenant": site.name,
                 "stalwart_id": live["id"],
                 "description": live.get("description"),
                 "aliases": _alias_rows(live, domains),

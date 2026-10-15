@@ -108,7 +108,7 @@ class ReceivedReports:
         and a deleted report would be fetched again and attributed to the domain's next holder.
         """
 
-        frappe.db.set_value(self.doctype, {"policy_domain": domain, "site": ["is", "set"]}, "site", None)
+        frappe.db.set_value(self.doctype, {"policy_domain": domain, "tenant": ["is", "set"]}, "tenant", None)
 
     def delete(self, names: list[str]) -> None:
         if not names:
@@ -131,7 +131,7 @@ def envelope_fields(cluster_name: str, obj: dict, policy_domain: str, attributab
         "cluster": cluster_name,
         "stalwart_id": obj["id"],
         "policy_domain": policy_domain,
-        "site": report_site(policy_domain, recipients) if attributable else None,
+        "tenant": report_tenant(policy_domain, recipients) if attributable else None,
         "subject": obj.get("subject"),
         "sent_to": "\n".join(recipients) or None,
         "received_at": local_datetime(obj.get("receivedAt")),
@@ -140,7 +140,7 @@ def envelope_fields(cluster_name: str, obj: dict, policy_domain: str, attributab
     }
 
 
-def report_site(policy_domain: str, recipients: list[str]) -> str | None:
+def report_tenant(policy_domain: str, recipients: list[str]) -> str | None:
     """The site that holds the report's domain, if the report was also addressed to one of that
     site's domains; otherwise the report is kept for operators and shown to no site.
 
@@ -153,12 +153,12 @@ def report_site(policy_domain: str, recipients: list[str]) -> str | None:
     """
 
     # A Mail Domain is named by its domain, so the report's own domain says who holds it.
-    site = frappe.db.get_value("Mail Domain", policy_domain, "site") if policy_domain else None
+    site = frappe.db.get_value("Mail Domain", policy_domain, "tenant") if policy_domain else None
     addressed = {normalize_domain(r.rpartition("@")[2]) for r in recipients if "@" in r}
     if (
         site
         and addressed
-        and frappe.db.exists("Mail Domain", {"name": ["in", list(addressed)], "site": site})
+        and frappe.db.exists("Mail Domain", {"name": ["in", list(addressed)], "tenant": site})
     ):
         return site
     return None

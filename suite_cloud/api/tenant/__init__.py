@@ -290,7 +290,7 @@ def owned(doctype: str, name: str, for_update: bool = False):
     doc = None
     if name and frappe.db.exists(doctype, name):
         doc = frappe.get_doc(doctype, name, for_update=for_update)
-    if doc is None or doc.site != site.name:
+    if doc is None or doc.tenant != site.name:
         frappe.throw(
             _("{0} {1} was not found.").format(_(NOUNS[doctype]).capitalize(), name), frappe.DoesNotExistError
         )
@@ -298,7 +298,7 @@ def owned(doctype: str, name: str, for_update: bool = False):
 
 
 def owned_names(doctype: str, filters: dict | None = None, **kwargs) -> list[str]:
-    filters = {"site": current_tenant().name, **(filters or {})}
+    filters = {"tenant": current_tenant().name, **(filters or {})}
     return frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", **kwargs)
 
 
@@ -314,7 +314,7 @@ def owned_page(
 ) -> tuple[list[str], int]:
     """One page of the site's document names by name, plus how many match in all."""
 
-    filters = {"site": current_tenant().name, **(filters or {})}
+    filters = {"tenant": current_tenant().name, **(filters or {})}
     or_filters = None
     if search and search.strip():
         like = f"%{search.strip()}%"

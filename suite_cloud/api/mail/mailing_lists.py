@@ -43,7 +43,7 @@ def create_mailing_list(
         {
             "doctype": "Mailing List",
             "email": email,
-            "site": current_tenant().name,
+            "tenant": current_tenant().name,
             "description": description,
             "aliases": as_alias_rows(aliases),
         }
@@ -129,7 +129,7 @@ def list_all_recipients(start: int = 0, limit: int = 1000) -> dict:
     would exhaust its rate limit on its own once it holds a few hundred lists.
     """
 
-    filters = {"site": current_tenant().name}
+    filters = {"tenant": current_tenant().name}
     rows = frappe.get_all(
         "Mailing List Recipient",
         filters=filters,

@@ -7,7 +7,7 @@
  "field_order": [
   "email",
   "domain",
-  "site",
+  "tenant",
   "cluster",
   "column_break_main",
   "enabled",
@@ -55,12 +55,12 @@
    "search_index": 1
   },
   {
-   "description": "Suite site that owns the account. Derived from the domain; the site's account limit applies.",
-   "fetch_from": "domain.site",
-   "fieldname": "site",
+   "description": "Suite Tenant that owns the account. Derived from the domain; the tenant's account limit applies.",
+   "fetch_from": "domain.tenant",
+   "fieldname": "tenant",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "label": "Site",
+   "label": "Tenant",
    "options": "Suite Tenant",
    "read_only": 1,
    "search_index": 1
@@ -211,7 +211,7 @@
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-15 21:00:00.000000",
+ "modified": "2026-10-16 01:45:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",
@@ -244,7 +244,7 @@
   }
  ],
  "row_format": "Dynamic",
- "search_fields": "display_name,domain,site",
+ "search_fields": "display_name,domain,tenant",
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],

@@ -71,7 +71,7 @@ class TLSReport(Document):
         report_id: DF.Data | None
         reporter_email: DF.Data | None
         sent_to: DF.SmallText | None
-        site: DF.Link | None
+        tenant: DF.Link | None
         stalwart_id: DF.Data
         subject: DF.SmallText | None
         successful_sessions: DF.Int

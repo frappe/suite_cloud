@@ -59,7 +59,7 @@ def list_tls_reports(
 @frappe.whitelist(methods=["GET"])
 @tenant_api
 def get_tls_report(report: str) -> dict:
-    name = frappe.db.get_value("TLS Report", {"name": report, "site": current_tenant().name})
+    name = frappe.db.get_value("TLS Report", {"name": report, "tenant": current_tenant().name})
     if not name:
         frappe.throw(_("TLS report {0} was not found.").format(report), frappe.DoesNotExistError)
     return frappe.get_doc("TLS Report", name).to_api(with_records=True)
@@ -87,14 +87,14 @@ class ReportScope:
     """The site's reports since a moment: sessions from the reports, failures from their rows."""
 
     def __init__(self, site: str, domain: str | None, since) -> None:
-        self.site = site
+        self.tenant = site
         self.domain = domain
         self.since = since
         self.report = frappe.qb.DocType("TLS Report")
         self.failure = frappe.qb.DocType("TLS Report Failure")
 
     def totals(self) -> dict:
-        rows = self._rows(self._sessions(self.report.site))
+        rows = self._rows(self._sessions(self.report.tenant))
         return rows[0] if rows else {"reports": 0, "sessions": 0, "successful": 0, "failed": 0}
 
     def by_domain(self) -> list[dict]:
@@ -145,7 +145,7 @@ class ReportScope:
 
     def _scoped(self, query):
         report = self.report
-        query = query.where((report.site == self.site) & (report.total_sessions > 0))
+        query = query.where((report.tenant == self.tenant) & (report.total_sessions > 0))
         if self.since:
             query = query.where(report.date_range_end >= self.since)
         if self.domain:

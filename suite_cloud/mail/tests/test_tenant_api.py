@@ -31,7 +31,7 @@ from suite_cloud.mail.tests.fixtures import (
     clear_request_cache,
     configure_settings,
     make_cluster,
-    make_site,
+    make_tenant,
     verified_ownership,
 )
 
@@ -60,9 +60,9 @@ class TenantApiTestCase(IntegrationTestCase):
         self._ownership = verified_ownership()
         self._ownership.start()
         self.addCleanup(self._ownership.stop)
-        self.site = make_site(self.cluster)
-        self.other = make_site(self.cluster, "other.frappe.test")
-        self.act_as(self.site)
+        self.tenant = make_tenant(self.cluster)
+        self.other = make_tenant(self.cluster, "other.frappe.test")
+        self.act_as(self.tenant)
 
     def tearDown(self) -> None:
         frappe.local.suite_tenant = None
@@ -72,7 +72,7 @@ class TenantApiTestCase(IntegrationTestCase):
         # inside the rolled-back transaction serialises each one, which asks the live cluster.
         tenants = frappe.get_all("Suite Tenant", {"title": ["like", "%.frappe.test"]}, pluck="name")
         for doctype in ("Mail Account", "Mail Group", "Mailing List", "Mail Domain"):
-            for name in frappe.get_all(doctype, {"site": ["in", tenants]}, pluck="name"):
+            for name in frappe.get_all(doctype, {"tenant": ["in", tenants]}, pluck="name"):
                 frappe.delete_doc(doctype, name, force=True, ignore_permissions=True, ignore_on_trash=True)
         frappe.flags.do_not_enqueue = False
 
@@ -94,7 +94,7 @@ class TenantApiTestCase(IntegrationTestCase):
 
 class TestTenantResolution(TenantApiTestCase):
     def test_disk_usage_is_summed_in_one_call_and_cached(self) -> None:
-        key = f"suite_cloud:disk-usage:{self.site.name}"
+        key = f"suite_cloud:disk-usage:{self.tenant.name}"
         frappe.cache.delete_value(key)
         self.addCleanup(frappe.cache.delete_value, key)
         with patch(f"{SUITE_TENANT}.get_client") as get_client:
@@ -119,13 +119,13 @@ class TestTenantResolution(TenantApiTestCase):
         self.assertEqual(get_disk_usage(fresh="1")["used_disk_bytes"], 8704)
         self.assertEqual(get_disk_usage()["used_disk_bytes"], 8704)
         # The desk form shows the same figure; nothing else that reads the document asks for it.
-        doc = frappe.get_doc("Suite Tenant", self.site.name)
+        doc = frappe.get_doc("Suite Tenant", self.tenant.name)
         self.assertIsNone(doc.used_disk_bytes)
         doc.run_method("onload")
         self.assertEqual(doc.used_disk_bytes, 8704)
 
     def test_disk_usage_is_not_cached_when_the_cluster_cannot_answer(self) -> None:
-        key = f"suite_cloud:disk-usage:{self.site.name}"
+        key = f"suite_cloud:disk-usage:{self.tenant.name}"
         frappe.cache.delete_value(key)
         domains.create_domain("acme.com")
         self.verify("acme.com")
@@ -133,7 +133,7 @@ class TestTenantResolution(TenantApiTestCase):
         with patch.object(ManagementService, "get_many", side_effect=StalwartUnavailableError()):
             self.assertRaises(ClusterUnavailableError, get_disk_usage)
             # The form still opens; the figure is simply absent.
-            doc = frappe.get_doc("Suite Tenant", self.site.name)
+            doc = frappe.get_doc("Suite Tenant", self.tenant.name)
             doc.run_method("onload")
             self.assertIsNone(doc.used_disk_bytes)
         self.assertIsNone(frappe.cache.get_value(key, expires=True))
@@ -141,7 +141,7 @@ class TestTenantResolution(TenantApiTestCase):
     def test_site_profile_follows_the_workspace(self) -> None:
         profile = update_tenant_profile(title="  Acme Corp ", contact_email="Ops@Acme.test")
         self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", "ops@acme.test"))
-        self.assertEqual(frappe.db.get_value("Suite Tenant", self.site.name, "title"), "Acme Corp")
+        self.assertEqual(frappe.db.get_value("Suite Tenant", self.tenant.name, "title"), "Acme Corp")
         # Only the fields passed change; a blank clears the contact.
         profile = update_tenant_profile(contact_email="")
         self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", None))
@@ -155,7 +155,7 @@ class TestTenantResolution(TenantApiTestCase):
             update_tenant_profile,
             contact_email="not-an-address",
         )
-        self.act_as(self.site)  # a refused save leaves the request's cached tenant dirty
+        self.act_as(self.tenant)  # a refused save leaves the request's cached tenant dirty
         self.assertRaises(frappe.ValidationError, update_tenant_profile, title="")
 
     def test_page_sizes_stay_between_one_and_the_cap(self) -> None:
@@ -177,7 +177,7 @@ class TestTenantResolution(TenantApiTestCase):
             self.assertRaises(InvalidInputError, as_list, text)
 
     def test_current_tenant_comes_from_the_authorization_header(self) -> None:
-        self.assertEqual(current_tenant().name, self.site.name)
+        self.assertEqual(current_tenant().name, self.tenant.name)
 
     def test_unknown_tenant_or_wrong_user_is_rejected(self) -> None:
         frappe.utils.set_request(headers={"Authorization": "Tenant nope:secret"})
@@ -185,54 +185,54 @@ class TestTenantResolution(TenantApiTestCase):
         self.assertRaises(TenantAuthError, current_tenant)
 
         frappe.set_user("Guest")
-        frappe.utils.set_request(headers={"Authorization": f"Tenant {self.site.name}:x"})
+        frappe.utils.set_request(headers={"Authorization": f"Tenant {self.tenant.name}:x"})
         self.assertRaises(TenantAuthError, current_tenant)
 
     def test_the_auth_hook_checks_the_tenant_secret(self) -> None:
         frappe.set_user("Administrator")
-        secret = self.site.rotate_secret()
+        secret = self.tenant.rotate_secret()
         frappe.set_user("Guest")
 
         frappe.utils.set_request(headers={"Authorization": "token a:b"})
         authenticate()  # another scheme is left to Frappe
         self.assertEqual(frappe.session.user, "Guest")
 
-        for credential in (f"{self.site.name}:wrong", f"nope:{secret}", self.site.name):
+        for credential in (f"{self.tenant.name}:wrong", f"nope:{secret}", self.tenant.name):
             frappe.utils.set_request(headers={"Authorization": f"Tenant {credential}"})
             self.assertRaisesRegex(frappe.AuthenticationError, "authentication failed", authenticate)
             self.assertEqual(frappe.session.user, "Guest")
 
-        frappe.utils.set_request(headers={"Authorization": f"Tenant {self.site.name}:{secret}"})
+        frappe.utils.set_request(headers={"Authorization": f"Tenant {self.tenant.name}:{secret}"})
         authenticate()
-        self.assertEqual(frappe.session.user, self.site.user)
+        self.assertEqual(frappe.session.user, self.tenant.user)
 
-        self.site.db_set("enabled", 0)
+        self.tenant.db_set("enabled", 0)
         frappe.set_user("Guest")
         self.assertRaises(frappe.AuthenticationError, authenticate)
 
     def test_requests_must_come_from_an_allowed_address_when_set(self) -> None:
-        self.site.allowed_ips = "203.0.113.10\n2001:db8::/32\n 10.0.0.0/8 "
-        self.site.save(ignore_permissions=True)  # the fixture request runs as the service user
-        self.assertEqual(self.site.allowed_ips, "203.0.113.10/32\n2001:db8::/32\n10.0.0.0/8")
-        self.assertIn("allowed_ips", self.site.to_api())
+        self.tenant.allowed_ips = "203.0.113.10\n2001:db8::/32\n 10.0.0.0/8 "
+        self.tenant.save(ignore_permissions=True)  # the fixture request runs as the service user
+        self.assertEqual(self.tenant.allowed_ips, "203.0.113.10/32\n2001:db8::/32\n10.0.0.0/8")
+        self.assertIn("allowed_ips", self.tenant.to_api())
 
         for ip in ("203.0.113.10", "2001:db8:1::5", "10.20.30.40"):
-            self.act_as(self.site)
+            self.act_as(self.tenant)
             frappe.local.request_ip = ip
-            self.assertEqual(ping()["tenant"], self.site.name)
+            self.assertEqual(ping()["tenant"], self.tenant.name)
         for key in frappe.cache.get_keys("suite_cloud:refused:*"):
             frappe.cache.delete_value(key)
         mock_log = patch("suite_cloud.api.tenant.frappe.log_error").start()
         self.addCleanup(patch.stopall)
         for ip in ("203.0.113.11", "192.168.1.1", None, "garbage"):
-            self.act_as(self.site)
+            self.act_as(self.tenant)
             frappe.local.request_ip = ip
             self.assertRaisesRegex(TenantAddressError, "does not accept requests", ping)
         # Each refusal leaves an Error Log naming the site and the address, for operators to act
         # on; it is written on the side (deferred) so the refusal's own rollback keeps it, and a
         # flood from one address is logged once per window.
         frappe.local.request_ip = "192.168.1.1"
-        self.act_as(self.site)
+        self.act_as(self.tenant)
         self.assertRaisesRegex(TenantAddressError, "does not accept requests", ping)
         logged = [m for m in mock_log.call_args_list if "outside its allowed list" in m.kwargs["title"]]
         self.assertEqual(len(logged), 4)
@@ -243,18 +243,18 @@ class TestTenantResolution(TenantApiTestCase):
         frappe.local.request_ip = "192.168.1.1"
         frappe.set_user("Administrator")
         frappe.local.suite_tenant = None
-        frappe.local.form_dict = frappe._dict(tenant=self.site.name)
-        self.assertEqual(ping()["tenant"], self.site.name)
+        frappe.local.form_dict = frappe._dict(tenant=self.tenant.name)
+        self.assertEqual(ping()["tenant"], self.tenant.name)
         # No list means any address.
-        frappe.db.set_value("Suite Tenant", self.site.name, "allowed_ips", "")
-        frappe.clear_document_cache("Suite Tenant", self.site.name)
-        self.act_as(self.site)
-        self.assertEqual(ping()["tenant"], self.site.name)
+        frappe.db.set_value("Suite Tenant", self.tenant.name, "allowed_ips", "")
+        frappe.clear_document_cache("Suite Tenant", self.tenant.name)
+        self.act_as(self.tenant)
+        self.assertEqual(ping()["tenant"], self.tenant.name)
         frappe.local.request_ip = None
 
     def test_suspended_site_is_refused(self) -> None:
-        self.site.db_set({"enabled": 0, "status": "Suspended"})
-        frappe.clear_document_cache("Suite Tenant", self.site.name)
+        self.tenant.db_set({"enabled": 0, "status": "Suspended"})
+        frappe.clear_document_cache("Suite Tenant", self.tenant.name)
         frappe.local.suite_tenant = None
         self.assertRaises(TenantSuspendedError, current_tenant)
 
@@ -272,7 +272,7 @@ class TestDomainOwnership(TenantApiTestCase):
         record = result["ownership_record"]
         self.assertEqual(result["domain"], "acme.com")
         self.assertEqual((record["type"], record["host"], record["fqdn"]), ("TXT", "@", "acme.com"))
-        self.assertEqual(record["value"], f"{VALUE_PREFIX}{self.site.name}")
+        self.assertEqual(record["value"], f"{VALUE_PREFIX}{self.tenant.name}")
         # The same record for every domain of the site, a different one per site.
         self.assertEqual(domains.check_domain("other.com")["ownership_record"]["value"], record["value"])
         self.act_as(self.other)
@@ -282,7 +282,7 @@ class TestDomainOwnership(TenantApiTestCase):
         # Another site holds taken.com; asking about it only yields the record to publish.
         self.act_as(self.other)
         domains.create_domain("taken.com")
-        self.act_as(self.site)
+        self.act_as(self.tenant)
         answer = domains.check_domain("taken.com")
         self.assertEqual(answer["ownership_record"]["fqdn"], "taken.com")
         # Only a proven owner learns that it is not available; without the record the answer
@@ -299,7 +299,7 @@ class TestDomainOwnership(TenantApiTestCase):
         # A development cloud's test domains exist in no public DNS; the operator vouches for them.
         frappe.set_user("Administrator")
         configure_settings(skip_domain_verification=1)
-        self.act_as(self.site)
+        self.act_as(self.tenant)
 
         with patch("suite_cloud.mail.tenancy.ownership.verify_dns_record", return_value=False):
             domains.create_domain("acme.com")
@@ -322,7 +322,7 @@ class TestDomainOwnership(TenantApiTestCase):
         self.assertFalse(domain.is_live())
         self.assertFalse(domain.verification_skipped or domain.skip_scheduled_verification)
         self.assertFalse(self.fake.all("Domain")[0]["isEnabled"])
-        self.act_as(self.site)
+        self.act_as(self.tenant)
         with patch("suite_cloud.mail.tenancy.ownership.verify_dns_record", return_value=False):
             self.assertRaises(DomainNotVerifiedError, domains.create_domain, "other.com")
 
@@ -330,7 +330,7 @@ class TestDomainOwnership(TenantApiTestCase):
         # Vouched for while a recheck job was already running, say: the job's list never had it.
         frappe.set_user("Administrator")
         configure_settings(skip_domain_verification=1)
-        self.act_as(self.site)
+        self.act_as(self.tenant)
         domains.create_domain("acme.com")
         frappe.set_user("Administrator")
         with patch(f"{MAIL_DOMAIN}.recheck_vouched_domains"):
@@ -347,7 +347,9 @@ class TestDomainOwnership(TenantApiTestCase):
     def test_domain_is_added_only_once_its_record_resolves(self) -> None:
         target = "suite_cloud.mail.tenancy.ownership.verify_dns_record"
         with patch(target, return_value=False):
-            self.assertRaisesRegex(DomainNotVerifiedError, self.site.name, domains.create_domain, "acme.com")
+            self.assertRaisesRegex(
+                DomainNotVerifiedError, self.tenant.name, domains.create_domain, "acme.com"
+            )
         with patch(target, return_value=None):
             self.assertRaises(OwnershipLookupError, domains.create_domain, "acme.com")
         self.assertFalse(frappe.db.exists("Mail Domain", "acme.com"))
@@ -355,7 +357,7 @@ class TestDomainOwnership(TenantApiTestCase):
 
         with patch(target, return_value=True) as verify:
             domains.create_domain("acme.com")
-        verify.assert_called_once_with("acme.com", "TXT", f"{VALUE_PREFIX}{self.site.name}")
+        verify.assert_called_once_with("acme.com", "TXT", f"{VALUE_PREFIX}{self.tenant.name}")
         self.assertRaisesRegex(frappe.DuplicateEntryError, "already added", domains.check_domain, "acme.com")
         self.act_as(self.other)
         self.assertEqual(
@@ -371,11 +373,11 @@ class TestDomainOwnership(TenantApiTestCase):
         frappe.set_user("Administrator")
         with patch(target, return_value=False) as verify:
             frappe.get_doc(
-                {"doctype": "Mail Domain", "domain_name": "acme.com", "site": self.site.name}
+                {"doctype": "Mail Domain", "domain_name": "acme.com", "tenant": self.tenant.name}
             ).insert()
         verify.assert_not_called()
 
-        self.act_as(self.site)
+        self.act_as(self.tenant)
         with patch(target, return_value=False):
             self.assertRaises(DomainNotVerifiedError, domains.create_domain, "other.com")
 
@@ -455,7 +457,7 @@ class TestDirectoryApi(TenantApiTestCase):
         self.assertEqual(([r["email"] for r in page["items"]], page["total"]), (["bob@example.org"], 3))
         self.act_as(self.other)
         self.assertEqual(mailing_lists.list_all_recipients(), {"items": [], "total": 0})
-        self.act_as(self.site)
+        self.act_as(self.tenant)
         mailing_lists.delete_mailing_list("dev@acme.com")
         self.assertEqual(
             mailing_lists.add_recipients("all@acme.com", ["x@y.org", "ext@example.org"])["added"], ["x@y.org"]

@@ -31,7 +31,7 @@ def check_domain(domain: str) -> dict:
 
     site = current_tenant()
     domain = validate_domain_name(domain)
-    if frappe.db.get_value("Mail Domain", domain, "site") == site.name:
+    if frappe.db.get_value("Mail Domain", domain, "tenant") == site.name:
         frappe.throw(
             _("Domain {0} is already added to this site.").format(domain), frappe.DuplicateEntryError
         )
@@ -55,7 +55,7 @@ def create_domain(
         {
             "doctype": "Mail Domain",
             "domain_name": domain,
-            "site": current_tenant().name,
+            "tenant": current_tenant().name,
             "description": description,
             "catch_all_address": catch_all_address,
             "sub_addressing": int(sbool(sub_addressing)),

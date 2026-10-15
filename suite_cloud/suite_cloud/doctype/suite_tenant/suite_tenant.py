@@ -95,7 +95,7 @@ class SuiteTenant(Document):
     def on_trash(self) -> None:
         if self.status != "Archived":
             frappe.throw(_("Archive the tenant before deleting it."))
-        if frappe.db.exists("Mail Domain", {"site": self.name}):
+        if frappe.db.exists("Mail Domain", {"tenant": self.name}):
             frappe.throw(_("Delete the tenant's mail domains first."))
 
     # --- secrets --------------------------------------------------------------
@@ -171,16 +171,16 @@ class SuiteTenant(Document):
             frappe.throw(_("Total Disk Quota cannot be negative; 0 means unlimited."))
 
     def domain_count(self) -> int:
-        return frappe.db.count("Mail Domain", {"site": self.name})
+        return frappe.db.count("Mail Domain", {"tenant": self.name})
 
     def account_count(self) -> int:
-        return frappe.db.count("Mail Account", {"site": self.name})
+        return frappe.db.count("Mail Account", {"tenant": self.name})
 
     def group_count(self) -> int:
-        return frappe.db.count("Mail Group", {"site": self.name})
+        return frappe.db.count("Mail Group", {"tenant": self.name})
 
     def mailing_list_count(self) -> int:
-        return frappe.db.count("Mailing List", {"site": self.name})
+        return frappe.db.count("Mailing List", {"tenant": self.name})
 
     def assert_can_add_domain(self) -> None:
         self.lock()
@@ -199,7 +199,7 @@ class SuiteTenant(Document):
         self.assert_within_limit(self.max_mailing_lists, self.mailing_list_count(), _("mailing lists"))
 
     def directory_size(self) -> int:
-        return sum(frappe.db.count(doctype, {"site": self.name}) for doctype in DIRECTORY_DOCTYPES)
+        return sum(frappe.db.count(doctype, {"tenant": self.name}) for doctype in DIRECTORY_DOCTYPES)
 
     def onload(self) -> None:
         self.flags.with_usage = True  # the form shows the figure
@@ -240,7 +240,7 @@ class SuiteTenant(Document):
         ids = []
         for doctype in MAILBOX_DOCTYPES:
             ids += frappe.get_all(
-                doctype, {"site": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
+                doctype, {"tenant": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
             )
         if not ids:
             return 0  # building a client already fetches the session
@@ -328,7 +328,7 @@ def purge_directory(site: str) -> None:
     """
 
     for doctype in DIRECTORY_DOCTYPES:
-        for name in frappe.get_all(doctype, {"site": site}, pluck="name"):
+        for name in frappe.get_all(doctype, {"tenant": site}, pluck="name"):
             frappe.delete_doc(doctype, name, ignore_permissions=True)
             if not frappe.in_test:
                 frappe.db.commit()

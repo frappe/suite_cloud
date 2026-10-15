@@ -64,7 +64,7 @@ def get_quotas(emails: list[str] | str) -> dict:
         return {}
     rows = frappe.get_all(
         "Mail Account",
-        filters={"site": current_tenant().name, "name": ["in", wanted]},
+        filters={"tenant": current_tenant().name, "name": ["in", wanted]},
         fields=["name", "stalwart_id", "cluster"],
     )
     quotas = quota_rows.disk_quota_gb_by_name("Mail Account", [row.name for row in rows])
@@ -102,7 +102,7 @@ def create_account(
         {
             "doctype": "Mail Account",
             "email": email,
-            "site": site.name,
+            "tenant": site.name,
             "display_name": display_name,
             "description": description,
             "locale": locale or "en-US",

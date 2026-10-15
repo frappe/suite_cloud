@@ -7,7 +7,7 @@
  "field_order": [
   "email",
   "domain",
-  "site",
+  "tenant",
   "cluster",
   "column_break_main",
   "description",
@@ -42,15 +42,15 @@
    "description": "Mail Domain the address belongs to. Derived from the email."
   },
   {
-   "fetch_from": "domain.site",
-   "fieldname": "site",
+   "fetch_from": "domain.tenant",
+   "fieldname": "tenant",
    "fieldtype": "Link",
    "in_standard_filter": 1,
-   "label": "Site",
+   "label": "Tenant",
    "options": "Suite Tenant",
    "read_only": 1,
    "search_index": 1,
-   "description": "Suite site that owns the group. Derived from the domain; the site's group limit applies."
+   "description": "Suite Tenant that owns the group. Derived from the domain; the tenant's group limit applies."
   },
   {
    "fetch_from": "domain.cluster",
@@ -122,7 +122,7 @@
    "table_fieldname": "groups"
   }
  ],
- "modified": "2026-10-15 21:00:00.000000",
+ "modified": "2026-10-16 01:30:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Group",

@@ -68,7 +68,7 @@ def validate_aliases(doc: Document) -> None:
         seen.add(row.alias_email)
 
         alias_domain = row.alias_email.split("@", 1)[1]
-        if frappe.db.get_value("Mail Domain", alias_domain, "site") != doc.site:
+        if frappe.db.get_value("Mail Domain", alias_domain, "tenant") != doc.tenant:
             frappe.throw(_("Alias domain {0} does not belong to this site.").format(alias_domain))
         assert_address_available(row.alias_email, exclude=(doc.doctype, doc.name))
 

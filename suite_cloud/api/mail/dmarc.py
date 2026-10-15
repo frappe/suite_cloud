@@ -60,7 +60,7 @@ def list_dmarc_reports(
 @frappe.whitelist(methods=["GET"])
 @tenant_api
 def get_dmarc_report(report: str) -> dict:
-    name = frappe.db.get_value("DMARC Report", {"name": report, "site": current_tenant().name})
+    name = frappe.db.get_value("DMARC Report", {"name": report, "tenant": current_tenant().name})
     if not name:
         frappe.throw(_("DMARC report {0} was not found.").format(report), frappe.DoesNotExistError)
     return frappe.get_doc("DMARC Report", name).to_api(with_records=True)
@@ -88,14 +88,14 @@ class ReportScope:
     """The site's reports since a moment, aggregated from the per-source rows."""
 
     def __init__(self, site: str, domain: str | None, since) -> None:
-        self.site = site
+        self.tenant = site
         self.domain = domain
         self.since = since
         self.report = frappe.qb.DocType("DMARC Report")
         self.record = frappe.qb.DocType("DMARC Report Record")
 
     def totals(self) -> dict:
-        rows = self._rows(self._query(self.report.site))
+        rows = self._rows(self._query(self.report.tenant))
         return rows[0] if rows else self._empty()
 
     def by_domain(self) -> list[dict]:
@@ -117,7 +117,7 @@ class ReportScope:
             frappe.qb.from_(report)
             .join(record)
             .on((record.parent == report.name) & (record.parenttype == "DMARC Report"))
-            .where((report.site == self.site) & (report.total_messages > 0))
+            .where((report.tenant == self.tenant) & (report.total_messages > 0))
             .groupby(group)
             .select(
                 Count(report.name).distinct().as_("reports"),

@@ -59,7 +59,7 @@ class DMARCReport(Document):
         report_version: DF.Float
         reporter_email: DF.Data | None
         sent_to: DF.SmallText | None
-        site: DF.Link | None
+        tenant: DF.Link | None
         spf_passed_messages: DF.Int
         stalwart_id: DF.Data
         subdomain_policy: DF.Data | None

@@ -16,7 +16,7 @@ from suite_cloud.mail.tenancy.account_credentials import API_KEYS, APP_PASSWORDS
 from suite_cloud.mail.tenancy.addresses import (
     assert_address_available,
     assert_domain_live,
-    get_site_domain,
+    get_tenant_domain,
     validate_email_address,
 )
 from suite_cloud.mail.tenancy.quotas import QuotaHolder
@@ -54,7 +54,7 @@ class MailAccount(QuotaHolder, Document):
         locale: DF.Data | None
         new_password: DF.Password | None
         quotas: DF.Table[MailQuota]
-        site: DF.Link | None
+        tenant: DF.Link | None
         stalwart_id: DF.Data | None
         time_zone: DF.Data | None
     # end: auto-generated types
@@ -68,18 +68,18 @@ class MailAccount(QuotaHolder, Document):
 
     def validate(self) -> None:
         self.email = validate_email_address(self.email)
-        domain = get_site_domain(self.site, self.email.split("@", 1)[1]) if self.site else None
+        domain = get_tenant_domain(self.tenant, self.email.split("@", 1)[1]) if self.tenant else None
         if domain is None:
             domain = frappe.get_cached_doc("Mail Domain", self.email.split("@", 1)[1])
         self.domain = domain.name
-        self.site = domain.site
+        self.tenant = domain.tenant
         self.cluster = domain.cluster
         if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
 
-        site = frappe.get_cached_doc("Suite Tenant", self.site)
+        site = frappe.get_cached_doc("Suite Tenant", self.tenant)
         if self.is_new() and not self.flags.adopting:
             site.assert_can_add_account()
             account_credentials.apply_default_limits(self)
@@ -105,7 +105,7 @@ class MailAccount(QuotaHolder, Document):
             if row.group in seen:
                 frappe.throw(_("Group {0} is listed twice.").format(row.group))
             seen.add(row.group)
-            if frappe.db.get_value("Mail Group", row.group, "site") != self.site:
+            if frappe.db.get_value("Mail Group", row.group, "tenant") != self.tenant:
                 frappe.throw(_("Group {0} belongs to another site.").format(row.group))
 
     def after_insert(self) -> None:
@@ -283,7 +283,7 @@ class MailAccount(QuotaHolder, Document):
 
         return frappe.get_all(
             "Mailing List Recipient",
-            {"site": self.site, "email": ["in", self.addresses()]},
+            {"tenant": self.tenant, "email": ["in", self.addresses()]},
             pluck="mailing_list",
             distinct=True,
             order_by="mailing_list asc",
@@ -332,7 +332,7 @@ ACCOUNT_FIELDS = [
     "name",
     "email",
     "domain",
-    "site",
+    "tenant",
     "cluster",
     "stalwart_id",
     "enabled",
@@ -363,7 +363,7 @@ def account_payloads(names: list[str], with_usage: bool = True) -> list[dict]:
     groups = child_rows("Mail Group Member", "Mail Account", names, ["group"])
     quotas = child_rows("Mail Quota", "Mail Account", names, ["quota", "value"])
     addresses = {row.name: [row.email, *[a.alias_email for a in aliases[row.name]]] for row in rows}
-    lists = mailing_lists_by_address(rows[0].site, addresses) if rows else {}
+    lists = mailing_lists_by_address(rows[0].tenant, addresses) if rows else {}
     usage = used_disk_by_name(rows) if with_usage else {}
     return [
         account_payload(
@@ -386,7 +386,7 @@ def mailing_lists_by_address(site: str, addresses: dict[str, list[str]]) -> dict
         return {}
     rows = frappe.get_all(
         "Mailing List Recipient",
-        {"site": site, "email": ["in", list(by_address)]},
+        {"tenant": site, "email": ["in", list(by_address)]},
         ["email", "mailing_list"],
     )
     lists: dict[str, set[str]] = {name: set() for name in addresses}

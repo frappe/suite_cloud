@@ -50,7 +50,7 @@ def create_group(
         {
             "doctype": "Mail Group",
             "email": email,
-            "site": current_tenant().name,
+            "tenant": current_tenant().name,
             "description": description,
             "disable_receiving": int(sbool(disable_receiving)),
             "aliases": as_alias_rows(aliases),
@@ -136,7 +136,7 @@ def _resolve_members(members: list[str] | str | None) -> set[str]:
     if not wanted:
         return set()
     site = current_tenant().name
-    known = set(frappe.get_all("Mail Account", {"site": site, "name": ["in", list(wanted)]}, pluck="name"))
+    known = set(frappe.get_all("Mail Account", {"tenant": site, "name": ["in", list(wanted)]}, pluck="name"))
     if missing := sorted(wanted - known):
         frappe.throw(_("Account {0} was not found.").format(missing[0]), frappe.DoesNotExistError)
     return wanted

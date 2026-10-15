@@ -196,35 +196,35 @@
   {
    "group": "Directory",
    "link_doctype": "Mail Domain",
-   "link_fieldname": "site"
+   "link_fieldname": "tenant"
   },
   {
    "group": "Directory",
    "link_doctype": "Mail Account",
-   "link_fieldname": "site"
+   "link_fieldname": "tenant"
   },
   {
    "group": "Directory",
    "link_doctype": "Mail Group",
-   "link_fieldname": "site"
+   "link_fieldname": "tenant"
   },
   {
    "group": "Directory",
    "link_doctype": "Mailing List",
-   "link_fieldname": "site"
+   "link_fieldname": "tenant"
   },
   {
    "group": "Reports",
    "link_doctype": "DMARC Report",
-   "link_fieldname": "site"
+   "link_fieldname": "tenant"
   },
   {
    "group": "Reports",
    "link_doctype": "TLS Report",
-   "link_fieldname": "site"
+   "link_fieldname": "tenant"
   }
  ],
- "modified": "2026-10-16 00:00:00.000000",
+ "modified": "2026-10-16 01:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Tenant",

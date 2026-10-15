@@ -77,7 +77,7 @@ class TestTlsReports(TenantApiTestCase):
         domains.create_domain("acme.com")
         self.act_as(self.other)
         domains.create_domain("other.com")
-        self.act_as(self.site)
+        self.act_as(self.tenant)
 
     def tearDown(self) -> None:
         TLS_REPORTS.delete(self.report_names())
@@ -104,7 +104,7 @@ class TestTlsReports(TenantApiTestCase):
 
         doc = frappe.get_doc("TLS Report", self.stored(acme))
         self.assertEqual(
-            (doc.site, doc.policy_domain, doc.org_name), (self.site.name, "acme.com", "Google Inc.")
+            (doc.tenant, doc.policy_domain, doc.org_name), (self.tenant.name, "acme.com", "Google Inc.")
         )
         self.assertEqual((doc.total_sessions, doc.successful_sessions, doc.failed_sessions), (10, 8, 2))
         self.assertEqual(
@@ -130,7 +130,7 @@ class TestTlsReports(TenantApiTestCase):
             (MX, "X509_V_ERR_CERT_HAS_EXPIRED"),
         )
         # A report about a domain no site holds is kept for operators, attributed to nobody.
-        self.assertIsNone(frappe.db.get_value("TLS Report", {"policy_domain": "nobody.example"}, "site"))
+        self.assertIsNone(frappe.db.get_value("TLS Report", {"policy_domain": "nobody.example"}, "tenant"))
 
     def test_every_policy_counts_and_unknown_values_are_kept(self) -> None:
         both = self.add(
@@ -166,10 +166,10 @@ class TestTlsReports(TenantApiTestCase):
         self.assertEqual(self.fetch(), 4)
 
         def site_of(stalwart_id: str) -> str | None:
-            return frappe.db.get_value("TLS Report", self.stored(stalwart_id), "site")
+            return frappe.db.get_value("TLS Report", self.stored(stalwart_id), "tenant")
 
         self.assertEqual([site_of(i) for i in (misaddressed, unaddressed, mixed)], [None, None, None])
-        self.assertEqual(site_of(central), self.site.name)  # addressed to another of its own domains
+        self.assertEqual(site_of(central), self.tenant.name)  # addressed to another of its own domains
         # Kept for operators under its first domain; neither site lists the mixed report.
         self.assertEqual(frappe.db.get_value("TLS Report", self.stored(mixed), "policy_domain"), "acme.com")
         self.assertEqual(tls.list_tls_reports()["total"], 1)
@@ -279,7 +279,7 @@ class TestTlsReports(TenantApiTestCase):
         acme = self.add(stalwart_report("acme.com"))
         self.fetch()
         domains.delete_domain("acme.com")
-        self.assertIsNone(frappe.db.get_value("TLS Report", self.stored(acme), "site"))
+        self.assertIsNone(frappe.db.get_value("TLS Report", self.stored(acme), "tenant"))
         self.assertEqual(tls.list_tls_reports()["total"], 0)
         # The cluster still lists the report; registering the domain elsewhere must not revive
         # the previous holder's history for the new one.
