@@ -13,7 +13,7 @@ from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.mail.stalwart import get_account_client
 from suite_cloud.mail.stalwart.credentials import Credential, CredentialService
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB, Account
-from suite_cloud.mail.tenancy import quotas, sync
+from suite_cloud.mail.tenancy import app_passwords, quotas, sync
 from suite_cloud.mail.tenancy.addresses import (
     assert_address_available,
     assert_domain_live,
@@ -38,11 +38,13 @@ class MailAccount(QuotaHolder, Document):
         from frappe.types import DF
 
         from suite_cloud.mail.doctype.mail_address_alias.mail_address_alias import MailAddressAlias
+        from suite_cloud.mail.doctype.mail_app_password.mail_app_password import MailAppPassword
         from suite_cloud.mail.doctype.mail_group_member.mail_group_member import MailGroupMember
         from suite_cloud.mail.doctype.mail_quota.mail_quota import MailQuota
 
         aliases: DF.Table[MailAddressAlias]
         api_key: DF.Password | None
+        app_passwords: DF.Table[MailAppPassword]
         cluster: DF.Link | None
         description: DF.Data | None
         disable_receiving: DF.Check
@@ -82,11 +84,14 @@ class MailAccount(QuotaHolder, Document):
         site = frappe.get_cached_doc("Suite Site", self.site)
         if self.is_new() and not self.flags.adopting:
             site.assert_can_add_account()
+            app_passwords.apply_default_limit(self)
         quotas.validate(self)
         site.validate_quota_of(self)
         assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
         sync.validate_aliases(self)
         self.validate_groups()
+        if not self.flags.adopting:
+            app_passwords.validate(self)
         self.take_password()
 
     def take_password(self) -> None:
@@ -110,10 +115,10 @@ class MailAccount(QuotaHolder, Document):
         if self.flags.skip_push:  # adopted: the cluster has it, credentials and all
             return
         sync.push_create(self, "accounts", self.stalwart_payload(self.flags.password))
-        if self.enabled:
-            return
         try:
-            self.push_enabled()
+            app_passwords.push(self, before=None)
+            if not self.enabled:
+                self.push_enabled()
         except Exception:
             sync.push_destroy(self, "accounts")  # the insert rolls back; the account must not survive
             raise
@@ -144,6 +149,7 @@ class MailAccount(QuotaHolder, Document):
             patch["permissions"] = sync.receiving_permissions(self, "accounts")
         if patch:
             sync.push_update(self, "accounts", patch)
+        app_passwords.push(self, before)
         if bool(before.enabled) != bool(self.enabled):
             self.push_enabled()
         if self.flags.password:
@@ -200,20 +206,15 @@ class MailAccount(QuotaHolder, Document):
         self.set_password(password)
         return password
 
-    def create_app_password(self, description: str) -> str:
-        """Returns the generated secret; it is never stored on this side."""
-
-        _, secret = self.account_client().app_passwords.create_secret(
-            Credential(description=description or "Suite")
-        )
-        return secret
-
     # --- Suite Cloud credentials ---------------------------------------------------------------
 
     def mint_app_password(self) -> str:
-        """Mints the Suite site's app password and revokes the previous one; it is never stored here."""
+        """Replaces the Suite site's login; the previous one is revoked once the save commits."""
 
-        return self.mint_credential(self.account_client().app_passwords)
+        self.app_passwords = [r for r in self.app_passwords if r.description != app_passwords.SITE_LOGIN]
+        self.flags.secrets_in_response = True
+        self.save(ignore_permissions=True)
+        return app_passwords.site_login_secret(self)
 
     @frappe.whitelist()
     def rotate_app_password(self) -> str:
@@ -267,6 +268,7 @@ class MailAccount(QuotaHolder, Document):
 
     def onload(self) -> None:
         self.flags.with_usage = True  # the form shows the live figure
+        app_passwords.refresh(self)
 
     @property
     def used_disk_bytes(self) -> int | None:

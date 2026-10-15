@@ -11,8 +11,11 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
 | `mail.accounts.update_account` | PATCH | Changes the name, description, quotas, locale, time zone or receiving |
 | `mail.accounts.set_account_enabled` | PUT | Enables or disables login and delivery |
 | `mail.accounts.set_password` | PUT | Sets the account's own password |
-| `mail.accounts.rotate_app_password` | POST | Mints a new app password and revokes the previous one |
-| `mail.accounts.create_app_password` | POST | Creates an extra app password, returned once |
+| `mail.accounts.rotate_app_password` | POST | Replaces the site's own app password |
+| `mail.accounts.list_app_passwords` | GET | The account's app passwords, without secrets |
+| `mail.accounts.create_app_password` | POST | Creates an app password, returned once |
+| `mail.accounts.update_app_password` | PATCH | Changes the description, expiry or allowed IPs of one |
+| `mail.accounts.delete_app_password` | DELETE | Revokes one app password |
 | `mail.accounts.set_aliases` | PUT | Replaces the alias set |
 | `mail.accounts.add_alias` | POST | Adds one alias |
 | `mail.accounts.remove_alias` | DELETE | Removes one alias |
@@ -49,7 +52,7 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
 
 Every account has a disk quota above 0 GB. It defaults to the site's default quota, and the quotas of the site's accounts and groups together may not exceed the site's total disk; a create or increase beyond the remaining room is a 422.
 
-`quotas` is an object of Stalwart `StorageQuota` names to limits. `maxDiskQuota` (bytes) is the disk row every account has; the others are optional counts (messages, mailboxes, Sieve scripts, calendars, contact cards, app passwords and so on). `get_account_options` lists the optional names. On a create or update, `quotas` replaces the optional rows (`{}` lifts them all) and keeps the disk row unless it names `maxDiskQuota`; `disk_quota_gb` sets the disk row in GB and wins over a `maxDiskQuota` inside `quotas`.
+`quotas` is an object of Stalwart `StorageQuota` names to limits. `maxDiskQuota` (bytes) is the disk row every account has; the others are optional counts (messages, mailboxes, Sieve scripts, calendars, contact cards, app passwords and so on). `get_account_options` lists the optional names. On a create or update, `quotas` replaces the optional rows (`{}` lifts them all) and keeps the disk row unless it names `maxDiskQuota`; `disk_quota_gb` sets the disk row in GB and wins over a `maxDiskQuota` inside `quotas`. A new account gets `maxAppPasswords` of 10 unless `quotas` names it.
 
 ### Aliases
 
@@ -111,9 +114,29 @@ Takes `email` and `enabled`. A disabled account cannot log in; mail addressed to
 
 Takes `email` and `password` (at least 8 characters). Answers 200 with `{"data": null}`.
 
-## `rotate_app_password`, `create_app_password`
+## App passwords
 
-`rotate_app_password` takes `email` and answers `{"app_password": "…"}`; the previous app password stops working. `create_app_password` takes `email` and `description` (default `Suite`) and answers `{"secret": "…"}` for an extra app password that Suite Cloud does not store.
+An app password is a login for the account's mail clients. The cluster holds them; Suite Cloud keeps their descriptions and never a secret. The one described `Suite Cloud` is the site's own login: `create_account` returns it once and `rotate_app_password` replaces it. The account's `maxAppPasswords` quota, 10 unless `quotas` set another value, counts the site's login too; one more is a 422.
+
+```json
+{
+  "id": "b",
+  "description": "Phone",
+  "expires_at": "2027-01-01T00:00:00Z",
+  "allowed_ips": ["203.0.113.0/24"],
+  "created_at": "2026-10-15T09:00:00Z"
+}
+```
+
+| Method | Parameters | Answer |
+| --- | --- | --- |
+| `list_app_passwords` | `email` | `{"items": [...]}` as the cluster holds them, the site's login first |
+| `create_app_password` | `email`, `description` (default `Suite`), `expires_at` (ISO 8601, optional), `allowed_ips` (JSON array of addresses or networks, optional) | 201 with the object plus `secret`, returned once |
+| `update_app_password` | `email`, `id` and any of `description`, `expires_at`, `allowed_ips`; an empty value clears it | The object |
+| `delete_app_password` | `email`, `id` | 204; the `Suite Cloud` login is a 422 |
+| `rotate_app_password` | `email` | `{"app_password": "…"}`; the previous login stops working |
+
+An unknown `id` is a 404. Renaming the `Suite Cloud` login is a 422; rotate it instead.
 
 ## `set_aliases`, `add_alias`, `remove_alias`, `set_alias_enabled`
 

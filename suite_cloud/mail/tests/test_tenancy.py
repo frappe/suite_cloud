@@ -14,6 +14,7 @@ from suite_cloud.mail.tests.fixtures import (
     make_cluster,
     make_site,
 )
+from suite_cloud.patches.v1_0 import add_app_password_quota
 
 
 class TenancyTestCase(IntegrationTestCase):
@@ -700,7 +701,10 @@ class TestMailAccount(TenancyTestCase):
         self.assertEqual(live["memberGroupIds"], {self.group.stalwart_id: True})
         self.assertEqual(live["aliases"]["0"]["name"], "ally")
         self.assertEqual(live["aliases"]["0"]["domainId"], self.domain.stalwart_id)
-        self.assertEqual(live["quotas"], {"maxDiskQuota": int(self.site.default_disk_quota_gb * 1024**3)})
+        self.assertEqual(
+            live["quotas"],
+            {"maxDiskQuota": int(self.site.default_disk_quota_gb * 1024**3), "maxAppPasswords": 10},
+        )
         self.assertEqual(live["description"], "Alice")
         self.assertEqual(live["roles"], {"@type": "User"})
         self.assertEqual(self.group.to_api()["members"], ["alice@acme.com"])
@@ -718,7 +722,9 @@ class TestMailAccount(TenancyTestCase):
 
         live = self.fake.get("Account", account.stalwart_id)
         self.assertEqual(live["description"], "Bob")
-        self.assertEqual(live["quotas"], {"maxDiskQuota": 2 * 1024**3, "maxEmails": 5000})
+        self.assertEqual(
+            live["quotas"], {"maxDiskQuota": 2 * 1024**3, "maxEmails": 5000, "maxAppPasswords": 10}
+        )
         # The whole map travels, so dropping a row lifts that limit on the cluster.
         account.quotas = [row for row in account.quotas if row.quota == "maxDiskQuota"]
         account.save()
@@ -740,10 +746,7 @@ class TestMailAccount(TenancyTestCase):
         account.set_enabled(True)
         self.assertEqual(self.fake.get("Account", account.stalwart_id)["roles"], {"@type": "User"})
 
-        secret = account.create_app_password("Suite")
-        self.assertTrue(secret.startswith("apppassword-"))
-
-        # The site's app password is minted on demand and never stored; the API key only on demand.
+        # The site's login is rotated on demand and never stored; the API key only on demand.
         first = account.mint_app_password()
         self.assertTrue(first.startswith("apppassword-"))
         self.assertIsNone(account.get_password("api_key", raise_exception=False))
@@ -752,9 +755,7 @@ class TestMailAccount(TenancyTestCase):
         self.assertEqual(stored_credential_fields(account.name), [])
         frappe.db.after_commit.run()  # the old credential goes only once the new one is committed
         stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
-        self.assertEqual(
-            [c["description"] for c in stored.values() if c["description"] == "Suite Cloud"], ["Suite Cloud"]
-        )
+        self.assertEqual([c["description"] for c in stored.values()], ["Suite Cloud"])
 
         key = account.rotate_api_key()
         self.assertTrue(key.startswith("apikey-"))
@@ -782,6 +783,99 @@ class TestMailAccount(TenancyTestCase):
 
         account.delete()
         self.assertIsNone(self.fake.get("Account", account.stalwart_id))
+
+    def test_app_passwords_mirror_the_cluster(self) -> None:
+        account = self.make_account("carol@acme.com")
+        # The site's login is minted with the account and its secret handed over once.
+        login = account.app_passwords[0]
+        self.assertEqual(login.description, "Suite Cloud")
+        secret = account.flags.app_password_secrets[login.name]
+        self.assertTrue(secret.startswith("apppassword-"))
+        stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
+        self.assertEqual([c["description"] for c in stored.values()], ["Suite Cloud"])
+        self.assertEqual(stored_credential_fields(account.name), [])
+
+        # A new row is created on save with its IPs; the operator sees the secret once.
+        frappe.clear_messages()
+        account.append(
+            "app_passwords", {"description": "Phone", "allowed_ips": "203.0.113.0/24, 198.51.100.7"}
+        )
+        account.save()
+        phone = account.app_passwords[1]
+        self.assertEqual(stored[phone.credential_id]["allowedIps"], ["203.0.113.0/24", "198.51.100.7"])
+        self.assertIn(account.flags.app_password_secrets[phone.name], str(frappe.get_message_log()))
+
+        # Edits travel as updates; a removed row is revoked once the save commits.
+        phone.description = "Old phone"
+        phone.allowed_ips = ""
+        account.save()
+        live = stored[phone.credential_id]
+        self.assertEqual((live["description"], live["allowedIps"]), ("Old phone", []))
+        account.remove(phone)
+        account.save()
+        self.assertIn(phone.credential_id, stored)
+        frappe.db.after_commit.run()
+        self.assertNotIn(phone.credential_id, stored)
+
+        # Bad IPs stop before the cluster; the site's login is rotated, never renamed.
+        account.append("app_passwords", {"description": "Bad", "allowed_ips": "not-an-ip"})
+        self.assertRaisesRegex(frappe.ValidationError, "not an IP", account.save)
+        account.reload()
+        account.app_passwords[0].description = "Renamed"
+        self.assertRaisesRegex(frappe.ValidationError, "Rotate", account.save)
+        account.reload()
+        rotated = account.rotate_app_password()
+        self.assertNotEqual(rotated, secret)
+        frappe.db.after_commit.run()
+        self.assertNotIn(login.credential_id, stored)
+        self.assertEqual([c["description"] for c in stored.values()], ["Suite Cloud"])
+
+    def test_app_password_limit_and_the_login_outranking_the_oldest(self) -> None:
+        account = self.make_account("dave@acme.com")
+        self.assertEqual(account.quota_map()["maxAppPasswords"], 10)
+        account.quotas = [row for row in account.quotas if row.quota != "maxAppPasswords"]
+        account.append("quotas", {"quota": "maxAppPasswords", "value": 2})
+        account.append("app_passwords", {"description": "Phone"})
+        account.save()
+        account.append("app_passwords", {"description": "Tablet"})
+        self.assertRaisesRegex(frappe.ValidationError, "at most 2", account.save)
+        account.reload()
+        stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
+        self.assertEqual(len(stored), 2)
+
+        # Passwords made elsewhere show up when the form opens, and stay in the database.
+        login_id = account.app_passwords[0].credential_id
+        del stored[login_id]
+        stored["ap-laptop"] = {
+            "id": "ap-laptop",
+            "description": "Laptop",
+            "createdAt": "2026-02-01T00:00:00Z",
+        }
+        account.run_method("onload")
+        self.assertEqual([r.description for r in account.app_passwords], ["Phone", "Laptop"])
+        self.assertEqual(
+            [r.description for r in frappe.get_doc("Mail Account", account.name).app_passwords],
+            ["Phone", "Laptop"],
+        )
+
+        # A lost login is minted again; when the account is full it pushes out the oldest other one.
+        account.save()
+        self.assertEqual([r.description for r in account.app_passwords], ["Suite Cloud", "Laptop"])
+        frappe.db.after_commit.run()
+        self.assertEqual(sorted(c["description"] for c in stored.values()), ["Laptop", "Suite Cloud"])
+
+    def test_patch_adds_the_app_password_limit_to_older_accounts(self) -> None:
+        account = self.make_account("erin@acme.com")
+        frappe.db.delete("Mail Quota", {"parent": account.name, "quota": "maxAppPasswords"})
+        self.fake.objects["Account"][account.stalwart_id]["quotas"].pop("maxAppPasswords")
+
+        add_app_password_quota.execute()
+        add_app_password_quota.execute()  # a second run changes nothing
+        self.assertEqual(frappe.get_doc("Mail Account", account.name).quota_map()["maxAppPasswords"], 10)
+        self.assertEqual(self.fake.objects["Account"][account.stalwart_id]["quotas"]["maxAppPasswords"], 10)
+        self.assertEqual(
+            len(frappe.get_all("Mail Quota", {"parent": account.name, "quota": "maxAppPasswords"})), 1
+        )
 
     def test_address_uniqueness_and_ownership(self) -> None:
         self.make_account("carol@acme.com", aliases=[{"alias_email": "cc@acme.com"}])
