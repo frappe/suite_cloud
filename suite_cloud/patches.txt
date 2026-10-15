@@ -5,3 +5,4 @@ suite_cloud.patches.v1_0.drop_legacy_deployment_doctypes
 suite_cloud.patches.v1_0.move_dns_provider_to_dns_zone
 suite_cloud.patches.v1_0.pin_spam_filter_rules_version
 suite_cloud.patches.v1_0.rename_cloud_mail_module
+suite_cloud.patches.v1_0.drop_mail_account_app_password

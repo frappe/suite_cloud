@@ -11,7 +11,7 @@ from frappe.utils.password import set_encrypted_password
 
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.mail.stalwart import get_account_client
-from suite_cloud.mail.stalwart.credentials import Credential
+from suite_cloud.mail.stalwart.credentials import Credential, CredentialService
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB, Account
 from suite_cloud.mail.tenancy import quotas, sync
 from suite_cloud.mail.tenancy.addresses import (
@@ -25,8 +25,6 @@ from suite_cloud.mail.tenancy.usage import used_disk_by_name
 from suite_cloud.utils import alias_payloads, child_rows, utc_iso
 
 CREDENTIAL_DESCRIPTION = "Suite Cloud"
-# Stored credentials: (field, service attribute on the account client).
-STORED_CREDENTIALS = {"app_password": "app_passwords", "api_key": "api_keys"}
 MIN_PASSWORD_LENGTH = 8
 
 
@@ -45,7 +43,6 @@ class MailAccount(QuotaHolder, Document):
 
         aliases: DF.Table[MailAddressAlias]
         api_key: DF.Password | None
-        app_password: DF.Password | None
         cluster: DF.Link | None
         description: DF.Data | None
         disable_receiving: DF.Check
@@ -113,10 +110,10 @@ class MailAccount(QuotaHolder, Document):
         if self.flags.skip_push:  # adopted: the cluster has it, credentials and all
             return
         sync.push_create(self, "accounts", self.stalwart_payload(self.flags.password))
+        if self.enabled:
+            return
         try:
-            self.mint_credential("app_password")
-            if not self.enabled:
-                self.push_enabled()
+            self.push_enabled()
         except Exception:
             sync.push_destroy(self, "accounts")  # the insert rolls back; the account must not survive
             raise
@@ -211,37 +208,37 @@ class MailAccount(QuotaHolder, Document):
         )
         return secret
 
-    # --- stored credentials ------------------------------------------------------------------------
+    # --- Suite Cloud credentials ---------------------------------------------------------------
+
+    def mint_app_password(self) -> str:
+        """Mints the Suite site's app password and revokes the previous one; it is never stored here."""
+
+        return self.mint_credential(self.account_client().app_passwords)
 
     @frappe.whitelist()
     def rotate_app_password(self) -> str:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        return self.mint_credential("app_password")
-
-    @frappe.whitelist()
-    def show_app_password(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        return self.get_password("app_password")
+        return self.mint_app_password()
 
     @frappe.whitelist()
     def rotate_api_key(self) -> str:
         """The API key exists only on demand; the first rotation creates it."""
 
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        return self.mint_credential("api_key")
+        return self.mint_credential(self.account_client().api_keys, store_as="api_key")
 
     @frappe.whitelist()
     def show_api_key(self) -> str:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         return self.get_password("api_key")
 
-    def mint_credential(self, field: str) -> str:
-        """Creates the account's Suite Cloud credential of this kind, stores it, revokes the old one."""
+    def mint_credential(self, service: CredentialService, store_as: str | None = None) -> str:
+        """Creates the account's Suite Cloud credential on this service and revokes the old one."""
 
-        service = getattr(self.account_client(), STORED_CREDENTIALS[field])
         old_ids = [c["id"] for c in service.get_all() if c.get("description") == CREDENTIAL_DESCRIPTION]
         _, secret = service.create_secret(Credential(description=CREDENTIAL_DESCRIPTION))
-        self.store_secret(field, secret)
+        if store_as:
+            self.store_secret(store_as, secret)
         if old_ids:
             # Only once the new secret is committed: a rollback after this point would otherwise
             # leave the stored secret pointing at a credential that no longer exists.

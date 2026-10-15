@@ -97,7 +97,7 @@ Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` f
 | `time_zone` | string | | One of `get_account_options` |
 | `disable_receiving` | boolean | `false` | Send-only: the account logs in and sends, and mail addressed to it bounces |
 
-Answers 201 with the account object plus `app_password`, the password the site uses for the account's mail access. It is returned only here; `rotate_app_password` issues a fresh one. Suite Cloud keeps the app password encrypted and never keeps the account's own password. An inactive domain or a reached limit is a 422; a taken address is a 409; an unknown group or list is a 404.
+Answers 201 with the account object plus `app_password`, the password the site uses for the account's mail access. It is returned only here; `rotate_app_password` issues a fresh one. Suite Cloud stores neither the app password nor the account's own password. An inactive domain or a reached limit is a 422; a taken address is a 409; an unknown group or list is a 404.
 
 ## `update_account`
 

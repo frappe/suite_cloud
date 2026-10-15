@@ -18,7 +18,6 @@
   "credentials_section",
   "new_password",
   "column_break_credentials",
-  "app_password",
   "api_key",
   "settings_section",
   "locale",
@@ -130,14 +129,6 @@
   {
    "fieldname": "column_break_credentials",
    "fieldtype": "Column Break"
-  },
-  {
-   "description": "Login the Suite site uses for this account's mail access. Minted on creation and handed to the site once; Rotate App Password replaces it and Show App Password reveals it.",
-   "fieldname": "app_password",
-   "fieldtype": "Password",
-   "label": "App Password",
-   "no_copy": 1,
-   "read_only": 1
   },
   {
    "description": "Bearer token for this account's JMAP access. Created only on demand with Rotate API Key, which also replaces an existing one; Show API Key reveals it.",

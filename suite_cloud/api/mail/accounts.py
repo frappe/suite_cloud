@@ -113,13 +113,15 @@ def create_account(
     doc.flags.password = password
     doc.insert(ignore_permissions=True)
 
-    # The list memberships are separate cluster calls after the insert: if one fails the row
-    # rolls back, so the cluster account must go too or a retry meets "already exists".
+    # The list memberships and the app password are separate cluster calls after the insert: if
+    # one fails the row rolls back, so the cluster account must go too or a retry meets
+    # "already exists".
     joined = []
     try:
         for mailing_list in lists:
             mailing_list.add_recipients([doc.email])
             joined.append(mailing_list)
+        app_password = doc.mint_app_password()
     except Exception:
         for mailing_list in joined:  # the lists that took the address must let it go again
             with suppress(Exception):
@@ -128,9 +130,9 @@ def create_account(
         raise
 
     frappe.local.response["http_status_code"] = 201
-    # The app password is minted on creation and returned once; rotate_app_password issues a
-    # fresh one later. Suite Cloud keeps it, the account's own password it never does.
-    return {**doc.to_api(), "app_password": doc.get_password("app_password")}
+    # Returned once; rotate_app_password issues a fresh one later. Suite Cloud stores neither it
+    # nor the account's own password.
+    return {**doc.to_api(), "app_password": app_password}
 
 
 @frappe.whitelist(methods=["PATCH"])
@@ -184,7 +186,7 @@ def set_password(email: str, password: str) -> None:
 def rotate_app_password(email: str) -> dict:
     """Mints a new app password for the account, revokes the previous one, and returns it once."""
 
-    return {"app_password": owned("Mail Account", email).mint_credential("app_password")}
+    return {"app_password": owned("Mail Account", email).mint_app_password()}
 
 
 @frappe.whitelist(methods=["POST"])

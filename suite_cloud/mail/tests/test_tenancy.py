@@ -743,13 +743,13 @@ class TestMailAccount(TenancyTestCase):
         secret = account.create_app_password("Suite")
         self.assertTrue(secret.startswith("apppassword-"))
 
-        # An app password is minted on creation and stored encrypted; the API key only on demand.
-        first = account.get_password("app_password")
+        # The site's app password is minted on demand and never stored; the API key only on demand.
+        first = account.mint_app_password()
         self.assertTrue(first.startswith("apppassword-"))
         self.assertIsNone(account.get_password("api_key", raise_exception=False))
         second = account.rotate_app_password()
         self.assertNotEqual(first, second)
-        self.assertEqual(frappe.get_doc("Mail Account", account.name).show_app_password(), second)
+        self.assertEqual(stored_credential_fields(account.name), [])
         frappe.db.after_commit.run()  # the old credential goes only once the new one is committed
         stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
         self.assertEqual(
@@ -758,6 +758,7 @@ class TestMailAccount(TenancyTestCase):
 
         key = account.rotate_api_key()
         self.assertTrue(key.startswith("apikey-"))
+        self.assertEqual(stored_credential_fields(account.name), ["api_key"])
         self.assertIn(key, self.fake.tokens)
         frappe.db.after_commit.run()
         self.assertNotEqual(account.rotate_api_key(), key)
@@ -969,3 +970,10 @@ class TestMailingList(TenancyTestCase):
         mailing_list.delete()
         self.assertIsNone(self.fake.get("MailingList", mailing_list.stalwart_id))
         self.assertFalse(frappe.db.exists("Mailing List Recipient", {"mailing_list": "all@acme.com"}))
+
+
+def stored_credential_fields(account_name: str) -> list[str]:
+    rows = frappe.db.sql(
+        "select fieldname from `__Auth` where doctype = 'Mail Account' and name = %s", account_name
+    )
+    return sorted(row[0] for row in rows)
