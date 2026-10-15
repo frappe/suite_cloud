@@ -7,16 +7,20 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder.functions import Sum
-from frappe.utils import cint, flt, now
+from frappe.utils import cint, flt, now, now_datetime
 
+from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB
-from suite_cloud.utils import get_config
+from suite_cloud.mail.stalwart.errors import StalwartError
+from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
+from suite_cloud.utils import get_config, utc_iso
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
 
 
 # Documents with a mailbox of their own, hence a quota that counts against the site's total.
 QUOTA_HOLDERS = ("Mail Account", "Mail Group")
+DISK_USAGE_CACHE_TTL = 300  # seconds a site's summed disk usage is served without asking the cluster
 
 
 class SuiteSite(Document):
@@ -47,6 +51,7 @@ class SuiteSite(Document):
         title: DF.Data | None
         status: DF.Literal["Active", "Suspended", "Archived"]
         user: DF.Link | None
+        used_disk_bytes: DF.Int
     # end: auto-generated types
 
     # --- lifecycle ------------------------------------------------------------
@@ -261,6 +266,50 @@ class SuiteSite(Document):
 
     def directory_size(self) -> int:
         return sum(frappe.db.count(doctype, {"site": self.name}) for doctype in DIRECTORY_DOCTYPES)
+
+    def onload(self) -> None:
+        self.flags.with_usage = True  # the form shows the figure
+
+    @property
+    def used_disk_bytes(self) -> int | None:
+        """The virtual field: every serialisation reads it, so only the form pays for the lookup,
+        and a cluster that cannot answer costs the figure, not the form."""
+
+        if not self.flags.with_usage:
+            return None
+        try:
+            return self.get_disk_usage()["used_disk_bytes"]
+        except StalwartError as e:
+            frappe.log_error(
+                title="[Suite Cloud] Disk usage lookup failed", message=str(e), defer_insert=True
+            )
+            return None
+
+    def get_disk_usage(self, fresh: bool = False) -> dict:
+        """``{used_disk_bytes, fetched_at}`` across the site's accounts and groups, kept for
+        ``DISK_USAGE_CACHE_TTL`` seconds; ``fresh`` asks the cluster now."""
+
+        key = f"suite_cloud:disk-usage:{self.name}"
+        if not fresh and (usage := frappe.cache.get_value(key, expires=True)):
+            return usage
+
+        usage = {"used_disk_bytes": self.fetch_used_disk_bytes(), "fetched_at": utc_iso(now_datetime())}
+        frappe.cache.set_value(key, usage, expires_in_sec=DISK_USAGE_CACHE_TTL)
+        return usage
+
+    def fetch_used_disk_bytes(self) -> int:
+        """One cluster call per ``maxObjectsInGet`` ids, all on the site's cluster. A cluster that
+        cannot answer raises: a partial sum must never be returned or cached."""
+
+        ids = []
+        for doctype in QUOTA_HOLDERS:
+            ids += frappe.get_all(
+                doctype, {"site": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
+            )
+        if not ids:
+            return 0  # building a client already fetches the session
+        objects = get_client(self.get_cluster()).accounts.get_many(ids, properties=USAGE_PROPERTIES)
+        return sum(cint(o.get("usedDiskQuota")) for o in objects)
 
     def lock(self) -> None:
         """Serialises this site's limit checks: two requests must not both see room for the last slot."""

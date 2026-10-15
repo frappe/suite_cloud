@@ -23,6 +23,7 @@
   "egress_pool",
   "max_disk_gb",
   "default_disk_quota_gb",
+  "used_disk_bytes",
   "access_section",
   "api_key",
   "api_secret",
@@ -155,6 +156,15 @@
    "label": "Default Disk Quota (GB)"
   },
   {
+   "description": "Disk used by the site's accounts and groups together, as the cluster last reported it (kept for 5 minutes); nothing is stored.",
+   "fieldname": "used_disk_bytes",
+   "fieldtype": "Int",
+   "is_virtual": 1,
+   "label": "Used Disk",
+   "options": "File Size",
+   "read_only": 1
+  },
+  {
    "fieldname": "access_section",
    "fieldtype": "Section Break",
    "label": "API Access"
@@ -242,7 +252,7 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-09-21 12:00:00.000000",
+ "modified": "2026-10-15 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Site",

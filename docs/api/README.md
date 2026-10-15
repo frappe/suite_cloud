@@ -4,7 +4,7 @@ Suite Cloud exposes two REST APIs over Frappe's v2 method endpoint. The **site A
 
 | Page | Covers |
 | --- | --- |
-| [Site](site.md) | `ping`, `update_site_profile` |
+| [Site](site.md) | `ping`, `update_site_profile`, `get_disk_usage` |
 | [Domains](domains.md) | Adding a domain, its DNS records and verification |
 | [Accounts](accounts.md) | Mailboxes, passwords, quotas, aliases, group membership, account options |
 | [Groups](groups.md) | Groups, their members and aliases |
