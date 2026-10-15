@@ -25,7 +25,7 @@ from suite_cloud.mail.tenancy.usage import used_disk_by_name
 ACCOUNT_PAGE_CAP = 200
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def list_accounts(
     domain: str | None = None, search: str | None = None, start: int = 0, limit: int = 50
@@ -37,7 +37,7 @@ def list_accounts(
     return {"items": account_payloads(names), "total": total}
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_account(email: str) -> dict:
     return owned("Mail Account", email).to_api(with_usage=True)
@@ -46,7 +46,7 @@ def get_account(email: str) -> dict:
 QUOTA_LOOKUP_LIMIT = 500
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_quotas(emails: list[str] | str) -> dict:
     """``{email: {disk_quota_gb, used_disk_bytes}}`` for the site's accounts among ``emails``.
@@ -133,7 +133,7 @@ def create_account(
     return {**doc.to_api(), "app_password": doc.get_password("app_password")}
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PATCH"])
 @site_api
 def update_account(
     email: str,
@@ -165,7 +165,7 @@ def update_account(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
 def set_account_enabled(email: str, enabled: bool) -> dict:
     doc = owned("Mail Account", email)
@@ -173,7 +173,7 @@ def set_account_enabled(email: str, enabled: bool) -> dict:
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
 def set_password(email: str, password: str) -> None:
     owned("Mail Account", email).set_password(password)
@@ -195,7 +195,7 @@ def create_app_password(email: str, description: str = "Suite") -> dict:
     return {"secret": owned("Mail Account", email).create_app_password(description)}
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
 def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mail Account", email)
@@ -210,19 +210,19 @@ def add_alias(email: str, alias: str, description: str | None = None) -> dict:
     return aliases.add("Mail Account", email, alias, description).to_api()
 
 
-@frappe.whitelist(methods=["POST", "DELETE"])
+@frappe.whitelist(methods=["DELETE"])
 @site_api
 def remove_alias(email: str, alias: str) -> dict:
     return aliases.remove("Mail Account", email, alias).to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
 def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
     return aliases.set_enabled("Mail Account", email, alias, sbool(enabled)).to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
 def set_groups(email: str, groups: list[str] | str | None = None) -> dict:
     doc = owned("Mail Account", email)
@@ -231,7 +231,8 @@ def set_groups(email: str, groups: list[str] | str | None = None) -> dict:
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "DELETE"])
+@frappe.whitelist(methods=["DELETE"])
 @site_api
 def delete_account(email: str) -> None:
     owned("Mail Account", email).delete(ignore_permissions=True)
+    frappe.local.response["http_status_code"] = 204

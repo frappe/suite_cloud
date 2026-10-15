@@ -78,6 +78,13 @@ class SiteApiTestCase(IntegrationTestCase):
         frappe.utils.set_request(headers={"Authorization": f"token {site.api_key}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 
+    @staticmethod
+    def verify(domain: str) -> None:
+        """Marks the domain verified the way the DNS check would; only live domains take objects."""
+
+        frappe.db.set_value("Mail Domain", domain, "is_verified", 1)
+        frappe.clear_document_cache("Mail Domain", domain)
+
 
 class TestSiteResolution(SiteApiTestCase):
     def test_site_profile_follows_the_workspace(self) -> None:
@@ -98,13 +105,15 @@ class TestSiteResolution(SiteApiTestCase):
         self.assertEqual(page_size(5000, 200), 200)
         self.assertEqual(page_size("x", 200), 200)
 
-    def test_list_params_accept_json_text(self) -> None:
-        from suite_cloud.api.site import as_list
+    def test_list_params_are_json_arrays_or_their_text(self) -> None:
+        from suite_cloud.api.site import InvalidInputError, as_alias_rows, as_list
 
         self.assertEqual(as_list('["a@x.com", "b@x.com"]'), ["a@x.com", "b@x.com"])
-        self.assertEqual(as_list("a@x.com, b@x.com\nc@x.com"), ["a@x.com", "b@x.com", "c@x.com"])
         self.assertEqual(as_list(["a@x.com", " "]), ["a@x.com"])
-        self.assertRaises(frappe.ValidationError, as_list, "[not json")
+        self.assertEqual(as_list(None), [])
+        self.assertEqual(as_alias_rows('[{"email": "a@x.com", "enabled": false}]')[0]["enabled"], 0)
+        for text in ("a@x.com, b@x.com", "a@x.com", "", '{"email": "a@x.com"}'):
+            self.assertRaises(InvalidInputError, as_list, text)
 
     def test_current_site_comes_from_the_authorization_header(self) -> None:
         self.assertEqual(current_site().name, self.site.name)
@@ -293,13 +302,6 @@ class TestDomainOwnership(SiteApiTestCase):
 
 
 class TestDirectoryApi(SiteApiTestCase):
-    @staticmethod
-    def verify(domain: str) -> None:
-        """Marks the domain verified the way the DNS check would; only live domains take objects."""
-
-        frappe.db.set_value("Mail Domain", domain, "is_verified", 1)
-        frappe.clear_document_cache("Mail Domain", domain)
-
     def test_domain_account_group_list_flow(self) -> None:
         domain = domains.create_domain("Acme.com", description="Main")
         self.assertEqual(domain["domain"], "acme.com")
@@ -402,7 +404,7 @@ class TestDirectoryApi(SiteApiTestCase):
             [("al@acme.com", False, "old"), ("ally@acme.com", True, None)],
         )
         self.assertEqual(
-            groups.set_group_members("sales@acme.com", ["alice@acme.com"])["members"], ["alice@acme.com"]
+            groups.set_members("sales@acme.com", ["alice@acme.com"])["members"], ["alice@acme.com"]
         )
         self.assertEqual(mailing_lists.set_recipients("all@acme.com", ["a@b.co"])["recipient_count"], 1)
         self.assertEqual(
@@ -659,30 +661,25 @@ class TestDirectoryApi(SiteApiTestCase):
         )  # already gone
 
         self.assertEqual(
-            [a["email"] for a in groups.add_group_alias("sales@acme.com", "team@acme.com")["aliases"]],
+            [a["email"] for a in groups.add_alias("sales@acme.com", "team@acme.com")["aliases"]],
             ["team@acme.com"],
         )
         self.assertFalse(
-            groups.set_group_alias_enabled("sales@acme.com", "team@acme.com", "0")["aliases"][0]["enabled"]
+            groups.set_alias_enabled("sales@acme.com", "team@acme.com", "0")["aliases"][0]["enabled"]
         )
-        self.assertEqual(groups.remove_group_alias("sales@acme.com", "team@acme.com")["aliases"], [])
+        self.assertEqual(groups.remove_alias("sales@acme.com", "team@acme.com")["aliases"], [])
         self.assertEqual(
-            [
-                a["email"]
-                for a in mailing_lists.add_mailing_list_alias("all@acme.com", "everyone@acme.com")["aliases"]
-            ],
+            [a["email"] for a in mailing_lists.add_alias("all@acme.com", "everyone@acme.com")["aliases"]],
             ["everyone@acme.com"],
         )
         self.assertFalse(
-            mailing_lists.set_mailing_list_alias_enabled("all@acme.com", "everyone@acme.com", False)[
-                "aliases"
-            ][0]["enabled"]
+            mailing_lists.set_alias_enabled("all@acme.com", "everyone@acme.com", False)["aliases"][0][
+                "enabled"
+            ]
         )
-        self.assertEqual(
-            mailing_lists.remove_mailing_list_alias("all@acme.com", "everyone@acme.com")["aliases"], []
-        )
+        self.assertEqual(mailing_lists.remove_alias("all@acme.com", "everyone@acme.com")["aliases"], [])
         # An alias that is taken elsewhere is refused, whichever object asks for it.
-        self.assertRaises(frappe.DuplicateEntryError, groups.add_group_alias, "sales@acme.com", "al@acme.com")
+        self.assertRaises(frappe.DuplicateEntryError, groups.add_alias, "sales@acme.com", "al@acme.com")
 
     def test_other_sites_objects_are_invisible(self) -> None:
         domains.create_domain("acme.com")
@@ -696,6 +693,19 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertRaises(frappe.DoesNotExistError, accounts.set_password, "bob@acme.com", "hijacked")
         self.assertRaises(frappe.DoesNotExistError, accounts.create_account, "eve@acme.com", "secret-pw")
         self.assertRaises(frappe.DoesNotExistError, groups.create_group, "team@acme.com")
+
+    def test_refusals_become_422_and_deletes_204(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        with self.assertRaises(frappe.ValidationError) as ctx:
+            accounts.create_account("carol@acme.com", "short")
+        self.assertEqual(ctx.exception.http_status_code, 422)
+        with self.assertRaises(frappe.DoesNotExistError) as ctx:
+            accounts.get_account("nobody@acme.com")
+        self.assertEqual(ctx.exception.http_status_code, 404)  # not a 417, so left alone
+
+        domains.delete_domain("acme.com")
+        self.assertEqual(frappe.local.response.get("http_status_code"), 204)
 
     def test_stalwart_refusals_become_422(self) -> None:
         domains.create_domain("acme.com")

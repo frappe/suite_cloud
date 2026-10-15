@@ -19,14 +19,14 @@ from suite_cloud.mail.tenancy import quotas as quota_rows
 PAGE_CAP = 500  # the dashboard's largest page
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def list_groups(search: str | None = None, start: int = 0, limit: int = 100) -> dict:
     names, total = owned_page("Mail Group", search, start, limit, PAGE_CAP)
     return {"items": group_payloads(names), "total": total}
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_group(email: str) -> dict:
     return owned("Mail Group", email).to_api(with_usage=True)
@@ -64,7 +64,7 @@ def create_group(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PATCH"])
 @site_api
 def update_group(
     email: str,
@@ -87,9 +87,9 @@ def update_group(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
-def set_group_aliases(email: str, aliases: list | str | None = None) -> dict:
+def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mail Group", email)
     doc.set("aliases", as_alias_rows(aliases))
     doc.save(ignore_permissions=True)
@@ -98,34 +98,35 @@ def set_group_aliases(email: str, aliases: list | str | None = None) -> dict:
 
 @frappe.whitelist(methods=["POST"])
 @site_api
-def add_group_alias(email: str, alias: str, description: str | None = None) -> dict:
+def add_alias(email: str, alias: str, description: str | None = None) -> dict:
     return alias_rows.add("Mail Group", email, alias, description).to_api()
 
 
-@frappe.whitelist(methods=["POST", "DELETE"])
+@frappe.whitelist(methods=["DELETE"])
 @site_api
-def remove_group_alias(email: str, alias: str) -> dict:
+def remove_alias(email: str, alias: str) -> dict:
     return alias_rows.remove("Mail Group", email, alias).to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
-def set_group_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
+def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
     return alias_rows.set_enabled("Mail Group", email, alias, sbool(enabled)).to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
-def set_group_members(email: str, members: list[str] | str | None = None) -> dict:
+def set_members(email: str, members: list[str] | str | None = None) -> dict:
     doc = owned("Mail Group", email)
     _set_members(doc, _resolve_members(members))
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "DELETE"])
+@frappe.whitelist(methods=["DELETE"])
 @site_api
 def delete_group(email: str) -> None:
     owned("Mail Group", email).delete(ignore_permissions=True)
+    frappe.local.response["http_status_code"] = 204
 
 
 def _resolve_members(members: list[str] | str | None) -> set[str]:
@@ -137,7 +138,7 @@ def _resolve_members(members: list[str] | str | None) -> set[str]:
     site = current_site().name
     known = set(frappe.get_all("Mail Account", {"site": site, "name": ["in", list(wanted)]}, pluck="name"))
     if missing := sorted(wanted - known):
-        raise frappe.DoesNotExistError(_("{0} {1} not found.").format(_("Mail Account"), missing[0]))
+        frappe.throw(_("{0} {1} not found.").format(_("Mail Account"), missing[0]), frappe.DoesNotExistError)
     return wanted
 
 

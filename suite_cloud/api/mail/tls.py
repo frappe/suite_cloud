@@ -3,9 +3,9 @@
 import frappe
 from frappe import _
 from frappe.query_builder.functions import Count, Sum
-from frappe.utils import cint, get_datetime
+from frappe.utils import cint
 
-from suite_cloud.api.site import current_site, owned, owned_page, site_api
+from suite_cloud.api.site import as_datetime, current_site, owned, owned_page, site_api
 from suite_cloud.mail.doctype.tls_report.tls_report import report_payloads
 from suite_cloud.mail.reports import report_window
 from suite_cloud.utils import utc_iso
@@ -14,7 +14,7 @@ REPORT_PAGE_CAP = 500  # the dashboard offers pages of up to 500; a listing row 
 TOP_FAILURES = 20
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def list_tls_reports(
     domain: str | None = None,
@@ -39,10 +39,10 @@ def list_tls_reports(
         filters["policy_domain"] = owned("Mail Domain", domain).name
     if since_days := report_window(days)[0]:
         filters["date_range_end"] = [">=", since_days]
-    if since:
-        filters["date_range_end"] = [">=", get_datetime(since)]
-    if until:
-        filters["date_range_begin"] = ["<=", get_datetime(until)]
+    if since := as_datetime(since):
+        filters["date_range_end"] = [">=", since]
+    if until := as_datetime(until):
+        filters["date_range_begin"] = ["<=", until]
     names, total = owned_page(
         "TLS Report",
         search,
@@ -56,16 +56,16 @@ def list_tls_reports(
     return {"items": report_payloads(names), "total": total}
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_tls_report(report: str) -> dict:
     name = frappe.db.get_value("TLS Report", {"name": report, "site": current_site().name})
     if not name:
-        raise frappe.DoesNotExistError(_("TLS Report {0} not found.").format(report))
+        frappe.throw(_("TLS Report {0} not found.").format(report), frappe.DoesNotExistError)
     return frappe.get_doc("TLS Report", name).to_api(with_records=True)
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_tls_summary(domain: str | None = None, days: int = 30) -> dict:
     """Session totals over the reports whose period ended in the last ``days``, by domain and
