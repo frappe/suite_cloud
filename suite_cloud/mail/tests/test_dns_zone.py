@@ -96,7 +96,11 @@ class TestDNSZone(IntegrationTestCase):
 
         make_zone(OTHER_ZONE, is_default=0)
         self.assertRaisesRegex(
-            frappe.ValidationError, "reserved", assert_domain_available, f"customer.{OTHER_ZONE}", "any-site"
+            frappe.ValidationError,
+            "belongs to the mail service",
+            assert_domain_available,
+            f"customer.{OTHER_ZONE}",
+            "any-site",
         )
 
 
