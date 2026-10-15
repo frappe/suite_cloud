@@ -116,6 +116,11 @@ class TestSiteResolution(SiteApiTestCase):
         self.assertEqual(len(self.fake.calls), calls + 1)
         self.assertEqual(get_disk_usage(fresh="1")["used_disk_bytes"], 8704)
         self.assertEqual(get_disk_usage()["used_disk_bytes"], 8704)
+        # The desk form shows the same figure; nothing else that reads the document asks for it.
+        doc = frappe.get_doc("Suite Site", self.site.name)
+        self.assertIsNone(doc.used_disk_bytes)
+        doc.run_method("onload")
+        self.assertEqual(doc.used_disk_bytes, 8704)
 
     def test_disk_usage_is_not_cached_when_the_cluster_cannot_answer(self) -> None:
         key = f"suite_cloud:disk-usage:{self.site.name}"

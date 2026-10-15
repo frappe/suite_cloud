@@ -50,6 +50,7 @@ class SuiteSite(Document):
         title: DF.Data | None
         status: DF.Literal["Active", "Suspended", "Archived"]
         user: DF.Link | None
+        used_disk_bytes: DF.Int
     # end: auto-generated types
 
     # --- lifecycle ------------------------------------------------------------
@@ -264,6 +265,17 @@ class SuiteSite(Document):
 
     def directory_size(self) -> int:
         return sum(frappe.db.count(doctype, {"site": self.name}) for doctype in DIRECTORY_DOCTYPES)
+
+    def onload(self) -> None:
+        self.flags.with_usage = True  # the form shows the figure
+
+    @property
+    def used_disk_bytes(self) -> int | None:
+        """The virtual field: every serialisation reads it, so only the form pays for the lookup."""
+
+        if not self.flags.with_usage:
+            return None
+        return self.get_disk_usage()["used_disk_bytes"]
 
     def get_disk_usage(self, fresh: bool = False) -> dict:
         """``{used_disk_bytes, fetched_at}`` across the site's accounts and groups, kept for
