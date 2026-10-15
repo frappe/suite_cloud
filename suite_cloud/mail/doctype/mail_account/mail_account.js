@@ -6,14 +6,7 @@ frappe.ui.form.on('Mail Account', {
 		if (frm.doc.__islocal) return
 		frm.add_custom_button(__('Reset Password'), () => frm.trigger('reset_password'), __('Credentials'))
 		frm.add_custom_button(__('Rotate App Password'), () => frm.trigger('rotate_app_password'), __('Credentials'))
-		frm.add_custom_button(
-			frm.doc.api_key ? __('Rotate API Key') : __('Create API Key'),
-			() => frm.trigger('rotate_api_key'),
-			__('Credentials'),
-		)
-		if (frm.doc.api_key) {
-			frm.add_custom_button(__('Show API Key'), () => frm.trigger('show_api_key'), __('Credentials'))
-		}
+		frm.add_custom_button(__('Rotate API Key'), () => frm.trigger('rotate_api_key'), __('Credentials'))
 	},
 
 	reset_password(frm) {
@@ -47,16 +40,11 @@ frappe.ui.form.on('Mail Account', {
 	},
 
 	rotate_api_key(frm) {
-		const question = frm.doc.api_key ? __('Mint a new API key for this account and revoke the current one?') : __('Create an API key for this account?')
-		frappe.confirm(question, () => {
+		frappe.confirm(__('Mint a new API key for this account and revoke the current one?'), () => {
 			frm.events.call(frm, 'rotate_api_key', {}, __('Rotating...'), (key) => {
-				frm.events.reveal(__('API Key'), key, __('The previous key no longer works.'))
+				frm.events.reveal(__('API Key'), key, __('Shown once; the previous key no longer works.'))
 			})
 		})
-	},
-
-	show_api_key(frm) {
-		frm.events.call(frm, 'show_api_key', {}, __('Fetching...'), (key) => frm.events.reveal(__('API Key'), key))
 	},
 
 	reveal(title, secret, note) {

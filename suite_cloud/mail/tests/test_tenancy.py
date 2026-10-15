@@ -746,10 +746,9 @@ class TestMailAccount(TenancyTestCase):
         account.set_enabled(True)
         self.assertEqual(self.fake.get("Account", account.stalwart_id)["roles"], {"@type": "User"})
 
-        # The site's login is rotated on demand and never stored; the API key only on demand.
+        # The site's login and the API key are rotated on demand and never stored.
         first = account.mint_app_password()
         self.assertTrue(first.startswith("apppassword-"))
-        self.assertIsNone(account.get_password("api_key", raise_exception=False))
         second = account.rotate_app_password()
         self.assertNotEqual(first, second)
         self.assertEqual(stored_credential_fields(account.name), [])
@@ -759,7 +758,7 @@ class TestMailAccount(TenancyTestCase):
 
         key = account.rotate_api_key()
         self.assertTrue(key.startswith("apikey-"))
-        self.assertEqual(stored_credential_fields(account.name), ["api_key"])
+        self.assertEqual(stored_credential_fields(account.name), [])
         self.assertIn(key, self.fake.tokens)
         frappe.db.after_commit.run()
         self.assertNotEqual(account.rotate_api_key(), key)

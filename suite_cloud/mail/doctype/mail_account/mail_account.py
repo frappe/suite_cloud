@@ -7,11 +7,10 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, flt
-from frappe.utils.password import set_encrypted_password
 
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.mail.stalwart import get_account_client
-from suite_cloud.mail.stalwart.credentials import Credential, CredentialService
+from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB, Account
 from suite_cloud.mail.tenancy import app_passwords, quotas, sync
 from suite_cloud.mail.tenancy.addresses import (
@@ -43,7 +42,6 @@ class MailAccount(QuotaHolder, Document):
         from suite_cloud.mail.doctype.mail_quota.mail_quota import MailQuota
 
         aliases: DF.Table[MailAddressAlias]
-        api_key: DF.Password | None
         app_passwords: DF.Table[MailAppPassword]
         cluster: DF.Link | None
         description: DF.Data | None
@@ -223,34 +221,15 @@ class MailAccount(QuotaHolder, Document):
 
     @frappe.whitelist()
     def rotate_api_key(self) -> str:
-        """The API key exists only on demand; the first rotation creates it."""
+        """Mints the account's Suite Cloud API key, revokes the previous one, and returns it once."""
 
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        return self.mint_credential(self.account_client().api_keys, store_as="api_key")
-
-    @frappe.whitelist()
-    def show_api_key(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        return self.get_password("api_key")
-
-    def mint_credential(self, service: CredentialService, store_as: str | None = None) -> str:
-        """Creates the account's Suite Cloud credential on this service and revokes the old one."""
-
+        service = self.account_client().api_keys
         old_ids = [c["id"] for c in service.get_all() if c.get("description") == CREDENTIAL_DESCRIPTION]
         _, secret = service.create_secret(Credential(description=CREDENTIAL_DESCRIPTION))
-        if store_as:
-            self.store_secret(store_as, secret)
         if old_ids:
-            # Only once the new secret is committed: a rollback after this point would otherwise
-            # leave the stored secret pointing at a credential that no longer exists.
             frappe.db.after_commit.add(lambda: service.delete(old_ids))
         return secret
-
-    def store_secret(self, field: str, secret: str) -> None:
-        # Mirrors what Document.save does for Password fields, without a full save.
-        set_encrypted_password(self.doctype, self.name, secret, field)
-        self.set(field, "*" * len(secret))
-        self.db_set(field, self.get(field), update_modified=False)
 
     def account_client(self):
         """Acts as the account itself (master-user login): app passwords and API keys need that."""
