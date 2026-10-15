@@ -133,105 +133,14 @@ connection and leaves from the pool's addresses. The `spf.c1.frappemail.com` rec
 domains include always lists every node and pool address, so SPF stays valid whichever path a
 message takes.
 
-## API for Frappe Cloud
+## API
 
-Call these at `/api/v2/method/suite_cloud.api.fc.<method>` with the API key and secret of a user
-that has the **Frappe Cloud** role. `get_site` is a GET, `update_site` a PATCH, the rest POSTs.
+Suite Cloud serves two REST APIs at `/api/v2/method/suite_cloud.api.<module>.<method>`, documented in [docs/api](docs/api/README.md).
 
-| Method | What it does |
-| --- | --- |
-| `suite_cloud.api.fc.create_site(site, cluster=None, region=None, fc_reference=None, title=None, contact_email=None, max_domains=None, max_accounts=None, max_groups=None, max_mailing_lists=None, max_disk_gb=None, default_disk_quota_gb=None, allowed_ips=None)` | Registers a site, choosing a cluster by its hostname, by a region it serves (default cluster preferred), or the default; a cluster with no regions serves any region. Returns the mail server URL, the Suite Cloud URL and the site's key and secret. The secret is shown only this once. `allowed_ips` is the outbound addresses (or CIDR ranges) of the server hosting the site. |
-| `get_site(site)` | Status, cluster, title, contact email, limits and current usage. |
-| `update_site(site, title=None, contact_email=None, max_domains=None, ..., allowed_ips=None)` | Changes the display name, the address for site-specific notices, the limits, or the allowed addresses (an empty list lifts the restriction). Omitted fields stay as they are. |
-| `rotate_site_secret(site)` | Issues a new secret, shown once. |
-| `suspend_site(site)`, `resume_site(site)`, `archive_site(site, delete_data=False)` | Turns a site off, back on, or retires it. |
+- The **site API** lets a Frappe Suite site manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The site authenticates with its API key and secret and the `Frappe-Authorization-Source: Suite Site` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
+- The **Frappe Cloud API** registers, limits, suspends and archives the sites, for a user with the **Frappe Cloud** role.
 
-## API for Suite sites
-
-The site sends two headers: `Authorization: token <api_key>:<api_secret>` and
-`Frappe-Authorization-Source: Suite Site`. Frappe's own API-key authentication resolves the key
-against the Suite Site record, so the request runs as the shared site service user. The methods
-live at `/api/v2/method/suite_cloud.api.<module>.<method>`.
-
-Rules that apply everywhere:
-
-- The HTTP verb follows the method name: `list_`, `get_` and `check_` are GETs, `update_` a PATCH
-  (omitted fields stay as they are), `set_` a PUT, `delete_` and `remove_` a DELETE, and creates
-  and other actions POSTs. Another verb gets a 403.
-- Parameters travel as JSON: a body on a write, the query string on a GET, where a list is the
-  array's text (`emails=["a@x.com","b@x.com"]`).
-- The result sits under `data`. A create answers 201 and a delete 204 with no body.
-- When the Suite Site lists allowed IP addresses, only requests from those addresses may use its
-  key; the rest get a 403. A key copied out of a site's config is then worthless anywhere else.
-  Frappe Cloud passes the hosting server's outbound addresses at registration.
-- Anything that belongs to another site is reported as "not found", never as "forbidden".
-- If the cluster refuses a change, the site gets HTTP 422 with Stalwart's error type
-  (`ClusterRejectedError`).
-- Each site may make 300 requests per minute.
-- An error answers `{"errors": [{"type": ..., "message": ...}]}`.
-  The type tells a duplicate (`DuplicateEntryError`, 409) from a limit or another refusal
-  (`ValidationError`, 422), a value the API could not parse (`InvalidInputError`, 400), a rate
-  limit (`TooManyRequestsError`, 429), a missing object (`DoesNotExistError`, 404) or a suspended
-  site (`SiteSuspendedError`, 403).
-
-| Module | Methods |
-| --- | --- |
-| `suite_cloud.api.site` | `ping`, `update_site_profile(title, contact_email)` |
-| `suite_cloud.api.mail.domains` | `check_domain`, `list_domains`, `get_domain`, `create_domain`, `update_domain`, `delete_domain`, `get_dns_records`, `refresh_dns_records`, `verify_dns_records` |
-| `suite_cloud.api.mail.accounts` | `list_accounts(domain, search, start, limit)`, `get_account`, `get_quotas(emails)`, `create_account`, `update_account`, `set_account_enabled`, `set_password`, `rotate_app_password`, `create_app_password`, `set_aliases`, `add_alias`, `remove_alias`, `set_alias_enabled`, `set_groups`, `delete_account` |
-| `suite_cloud.api.mail.groups` | `list_groups(search, start, limit)`, `get_group`, `create_group`, `update_group`, `set_aliases`, `add_alias`, `remove_alias`, `set_alias_enabled`, `set_members`, `delete_group` |
-| `suite_cloud.api.mail.mailing_lists` | `list_mailing_lists(search, start, limit)`, `get_mailing_list`, `create_mailing_list`, `update_mailing_list`, `set_aliases`, `add_alias`, `remove_alias`, `set_alias_enabled`, `list_recipients`, `list_all_recipients(start, limit)`, `add_recipients`, `remove_recipients`, `set_recipients`, `delete_mailing_list` |
-| `suite_cloud.api.mail.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
-| `suite_cloud.api.mail.dmarc` | `list_dmarc_reports(domain, search, since, until, start, limit, days=)`, `get_dmarc_report(report)` (with the per-source records), `get_dmarc_summary(domain, days)` (totals by domain, source IP and reporter; `days` 0 covers everything held) |
-| `suite_cloud.api.mail.tls` | `list_tls_reports(domain, search, since, until, start, limit, days=)`, `get_tls_report(report)` (with its policies and failure details), `get_tls_summary(domain, days)` (session totals by domain and reporter, failed sessions by result type; `days` 0 covers everything held) |
-
-Listings answer `{"items": [...], "total": n}`. `search` matches the address, and the display
-name or description; `limit` is capped (200 accounts, 500 groups, lists, DMARC or TLS reports per page). Account and
-group rows carry `used_disk_bytes`, fetched for the whole page in one cluster call
-(`x:Account/get` in batches of the session's `maxObjectsInGet`), and `get_quotas` answers the
-allotment and usage for up to 500 addresses at once. A single `get_account` or `get_group` asks
-the cluster for its usage as well.
-
-Every account and group has a disk quota above 0 GB, defaulting to the site's default quota. A
-site may carry a total disk quota; when it does, the quotas of its accounts and groups together may
-not exceed it, and a create or quota increase beyond the remaining room is refused. Domains,
-accounts, groups and lists are counted against the site's other limits the same way.
-
-Every quota an account or group has is a Mail Quota row: Stalwart's `StorageQuota` names with a
-limit. `maxDiskQuota` (bytes) is the one row every account and group must have; it defaults to the
-site's default quota and is what the site's total is checked against. The others (messages,
-mailboxes, Sieve scripts, calendars, contact cards, app passwords and so on) are optional counts.
-The API shows them as `quotas`, an object of name to limit, next to `disk_quota_gb`, the disk row
-in GB. `create_account`, `update_account`, `create_group` and `update_group` take both: `quotas`
-replaces the optional rows (`{}` lifts them all) and keeps the disk row unless it names
-`maxDiskQuota`; `disk_quota_gb` sets the disk row in GB. `get_account_options` lists the optional
-names the cluster accepts.
-
-`create_account` needs a password of at least 8 characters and returns, once, an app password
-minted for the account; the site uses it for that account's mail access. `rotate_app_password`
-issues a new one and revokes the old one. Suite Cloud keeps the app password encrypted on the Mail
-Account and never keeps the account's password. An API key (Bearer token) for the account exists
-only when an operator creates one from the Mail Account form.
-
-`create_account` with `disable_receiving` makes a send-only account: Stalwart's "Email: Receive
-emails" permission (`emailReceive`) is disabled on it, so it logs in and sends as usual while mail
-addressed to it bounces back to the sender. Accounts are shown with `disable_receiving`, and
-`update_account` takes it too, as does the Mail Account form. Changing it touches that one
-permission: whatever else was granted to an account or denied it by hand on the cluster stays as
-it is. Groups have the same option on `create_group`, `update_group` and the Mail Group form: mail
-sent to the group's address bounces, and its members' own mail is not affected.
-
-Aliases can be replaced as a set (`set_aliases`) or changed one at a time (`add_alias`,
-`remove_alias`, `set_alias_enabled`). The one-at-a-time calls lock the parent row for the change,
-so two admins editing the same account never drop each other's rows; the dashboard uses those.
-
-Recipients of a mailing list are separate documents, not rows on the list, so a list can hold
-hundreds of thousands of addresses. `list_recipients` pages through one list and `list_all_recipients` through every list of the site, so a site mirrors its lists in a few calls instead of one per list. `add_recipients` and
-`remove_recipients` change them in batches of up to 5000 and push only the changed addresses to
-the cluster, and `set_recipients` replaces the whole list, which is meant for small lists.
-
-`update_site_profile` lets the site publish its workspace name as the Suite Site title and a
-contact email for site-specific notices; the Suite app sends both whenever Suite Settings change.
+The verb follows the method name (`list_` and `get_` are GETs, `update_` a PATCH, `set_` a PUT, `delete_` and `remove_` a DELETE, the rest POSTs), parameters travel as JSON, the result sits under `data`, and an error answers `{"errors": [{"type", "message"}]}` with a REST status code. Each site may make 300 requests per minute.
 
 ### How a domain goes live
 

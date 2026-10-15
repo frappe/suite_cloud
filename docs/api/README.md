@@ -1,0 +1,88 @@
+# Suite Cloud API
+
+Suite Cloud exposes two REST APIs over Frappe's v2 method endpoint. The **site API** lets a Frappe Suite site manage its own slice of the mail directory: domains, accounts, groups, mailing lists and the DMARC and TLS reports of its domains. The **Frappe Cloud API** lets Frappe Cloud register and manage the sites themselves.
+
+| Page | Covers |
+| --- | --- |
+| [Site](site.md) | `ping`, `update_site_profile` |
+| [Domains](domains.md) | Adding a domain, its DNS records and verification |
+| [Accounts](accounts.md) | Mailboxes, passwords, quotas, aliases, group membership, account options |
+| [Groups](groups.md) | Groups, their members and aliases |
+| [Mailing lists](mailing-lists.md) | Lists, their aliases and recipients |
+| [Reports](reports.md) | DMARC and TLS reports and summaries |
+| [Frappe Cloud](frappe-cloud.md) | Registering, limiting, suspending and archiving a site |
+
+## Base URL
+
+Every method lives at `https://<suite-cloud>/api/v2/method/suite_cloud.api.<module>.<method>`. The pages name each method by its module path, for example `mail.accounts.create_account`.
+
+## Authentication
+
+A site authenticates with the API key and secret Frappe Cloud received when it registered the site. It sends two headers on every request:
+
+```http
+Authorization: token <api_key>:<api_secret>
+Frappe-Authorization-Source: Suite Site
+```
+
+Frappe resolves the key against the Suite Site record, so the request runs as the shared site service user and every method acts only on that site's documents. Anything that belongs to another site is reported as not found (404), never as forbidden.
+
+When the Suite Site lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `SiteAddressError`, and Suite Cloud logs it for the operators. A key copied out of a site's configuration is worthless anywhere else.
+
+An operator with the System Manager or Suite Cloud Manager role may call the site API from the desk or a script on behalf of a site. The site is named by the `site` parameter or the `X-Suite-Site` header.
+
+Frappe Cloud authenticates with the API key and secret of a Frappe user that has the **Frappe Cloud** role, through the standard `Authorization: token <key>:<secret>` header.
+
+## Verbs
+
+The HTTP verb follows the method name. A request with another verb gets a 403.
+
+| Name starts with | Verb | Meaning |
+| --- | --- | --- |
+| `list_`, `get_`, `check_`, `ping` | GET | Reads; nothing changes |
+| `create_` and other actions | POST | Creates an object or runs an action |
+| `update_` | PATCH | Changes the fields passed; omitted fields stay as they are |
+| `set_` | PUT | Replaces one value or one whole set |
+| `delete_`, `remove_` | DELETE | Removes an object, an alias or recipients |
+
+## Parameters
+
+Parameters travel as JSON. A write sends a JSON body with `Content-Type: application/json`. A GET sends its parameters in the query string; a list or object among them is the JSON text of that value.
+
+```http
+GET /api/v2/method/suite_cloud.api.mail.accounts.get_quotas?emails=["a@example.com","b@example.com"]
+```
+
+A list parameter is a JSON array in both places. Comma or newline separated text is refused with a 400.
+
+Booleans accept `true`, `false`, `1` and `0`. Email addresses and domain names are lowercased, and the domain part is IDNA encoded, before they are matched or stored.
+
+## Responses
+
+A successful call answers `{"data": <result>}`. A create answers 201, a delete 204 with no body, everything else 200.
+
+Listings answer `{"items": [...], "total": <count of everything that matches>}`. They take `start` (offset, default 0) and `limit` (page length, capped per listing); `search` matches the address and the display name or description.
+
+Timestamps are ISO 8601 in UTC, for example `2026-03-04T05:06:07+00:00`.
+
+## Errors
+
+An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` with the HTTP status below. The type tells a client what happened; the message is written for the admin who made the change.
+
+| Status | Type | Meaning |
+| --- | --- | --- |
+| 400 | `InvalidInputError` | A value the API could not parse: a list that is not a JSON array, a date that is not a date, a list over its cap |
+| 401 | `SiteAuthError` | The key is unknown, or the authorization headers are missing |
+| 403 | `SiteSuspendedError` | The site is suspended or archived |
+| 403 | `SiteAddressError` | The request did not come from one of the site's allowed addresses |
+| 403 | `PermissionError` | The verb does not match the method, or the caller lacks the role |
+| 404 | `DoesNotExistError` | The object does not exist, or belongs to another site |
+| 409 | `DuplicateEntryError` | The address or domain is already taken |
+| 422 | `ValidationError` | Suite Cloud refused the change: a limit, a rule, an inactive domain |
+| 422 | `ClusterRejectedError` | The mail cluster refused the change; the message carries Stalwart's error type and description |
+| 429 | `TooManyRequestsError` | The site made more than 300 requests in the current minute |
+| 502 | `ClusterMisconfiguredError` | Suite Cloud's own credentials for the cluster were rejected; an operator problem |
+
+## Rate limit
+
+Each site may make 300 requests per minute, counted in fixed one-minute windows. Refusals count too. Failed authentication attempts are paced per source address the same way.
