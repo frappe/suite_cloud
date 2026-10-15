@@ -72,10 +72,11 @@ An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` wi
 | Status | Type | Meaning |
 | --- | --- | --- |
 | 400 | `InvalidInputError` | A value the API could not parse: a list that is not a JSON array, a date that is not a date, a list over its cap |
-| 401 | `SiteAuthError` | The key is unknown, or the authorization headers are missing |
+| 401 | `AuthenticationError` | The key or secret is wrong; Frappe rejects it before the site API runs |
+| 401 | `SiteAuthError` | The caller is logged in but is no site: a session without a key, or an operator naming an unknown site |
+| 403 | `PermissionError` | No credentials at all, a verb that does not match the method, or a caller without the role |
 | 403 | `SiteSuspendedError` | The site is suspended or archived |
 | 403 | `SiteAddressError` | The request did not come from one of the site's allowed addresses |
-| 403 | `PermissionError` | The verb does not match the method, or the caller lacks the role |
 | 404 | `DoesNotExistError` | The object does not exist, or belongs to another site |
 | 409 | `DuplicateEntryError` | The address or domain is already taken |
 | 422 | `ValidationError` | Suite Cloud refused the change: a limit, a rule, an inactive domain |

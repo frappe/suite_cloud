@@ -78,6 +78,13 @@ class SiteApiTestCase(IntegrationTestCase):
         frappe.utils.set_request(headers={"Authorization": f"token {site.api_key}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 
+    @staticmethod
+    def verify(domain: str) -> None:
+        """Marks the domain verified the way the DNS check would; only live domains take objects."""
+
+        frappe.db.set_value("Mail Domain", domain, "is_verified", 1)
+        frappe.clear_document_cache("Mail Domain", domain)
+
 
 class TestSiteResolution(SiteApiTestCase):
     def test_site_profile_follows_the_workspace(self) -> None:
@@ -295,13 +302,6 @@ class TestDomainOwnership(SiteApiTestCase):
 
 
 class TestDirectoryApi(SiteApiTestCase):
-    @staticmethod
-    def verify(domain: str) -> None:
-        """Marks the domain verified the way the DNS check would; only live domains take objects."""
-
-        frappe.db.set_value("Mail Domain", domain, "is_verified", 1)
-        frappe.clear_document_cache("Mail Domain", domain)
-
     def test_domain_account_group_list_flow(self) -> None:
         domain = domains.create_domain("Acme.com", description="Main")
         self.assertEqual(domain["domain"], "acme.com")
