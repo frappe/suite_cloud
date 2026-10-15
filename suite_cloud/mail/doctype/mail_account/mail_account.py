@@ -87,7 +87,7 @@ class MailAccount(QuotaHolder, Document):
             site.assert_can_add_account()
         quotas.validate(self)
         site.validate_quota_of(self)
-        assert_address_available(self.email, exclude=(self.doctype, self.name))
+        assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
         sync.validate_aliases(self)
         self.validate_groups()
         self.take_password()
@@ -182,7 +182,7 @@ class MailAccount(QuotaHolder, Document):
         role = client.roles.find_by_description(DISABLED_ROLE_DESCRIPTION)
         if not role:
             frappe.throw(
-                _("The cluster is missing the {0} role; sync its configuration.").format(
+                _("The mail server is missing the {0} role. Contact the Suite Cloud operators.").format(
                     DISABLED_ROLE_DESCRIPTION
                 )
             )

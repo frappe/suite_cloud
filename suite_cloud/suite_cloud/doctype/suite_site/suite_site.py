@@ -253,7 +253,7 @@ class SuiteSite(Document):
         allocated = self.allocated_disk_gb(exclude)
         if allocated + flt(quota_gb) > flt(self.max_disk_gb):
             frappe.throw(
-                _("Site {0} has {1} GB of its {2} GB total disk quota left; {3} GB requested.").format(
+                _("Site {0} has only {1} GB of its {2} GB disk quota left, but {3} GB was requested.").format(
                     self.name, round(flt(self.max_disk_gb) - allocated, 2), self.max_disk_gb, quota_gb
                 )
             )

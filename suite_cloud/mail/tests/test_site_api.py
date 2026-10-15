@@ -721,7 +721,7 @@ class TestDirectoryApi(SiteApiTestCase):
             accounts.create_account("carol@acme.com", "secret-pw")
         frappe.db.rollback(save_point="refusal")  # what the request handler does on an exception
         self.assertEqual(ctx.exception.http_status_code, 422)
-        self.assertIn("alreadyExists", str(ctx.exception))
+        self.assertIn("did not accept the change: Address carol already exists", str(ctx.exception))
         self.assertFalse(frappe.db.exists("Mail Account", "carol@acme.com"))
 
 

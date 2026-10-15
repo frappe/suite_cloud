@@ -11,7 +11,7 @@ from collections.abc import Callable
 import frappe
 from frappe import _
 
-from suite_cloud.api.site import api_errors, as_list
+from suite_cloud.api.site import api_errors, as_list, assert_arguments
 from suite_cloud.utils import child_rows, get_public_url
 
 ROLE = "Frappe Cloud"
@@ -23,6 +23,7 @@ def frappe_cloud_api(fn: Callable) -> Callable:
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         frappe.only_for((ROLE, "System Manager"))
+        assert_arguments(fn, args, kwargs)
         with api_errors():
             return fn(*args, **kwargs)
 
@@ -155,7 +156,7 @@ def archive_site(site: str, delete_data: bool = False) -> dict:
 def load(site: str):
     site = (site or "").strip().lower()
     if not frappe.db.exists("Suite Site", site):
-        frappe.throw(_("Site {0} not found.").format(site), frappe.DoesNotExistError)
+        frappe.throw(_("Site {0} was not found.").format(site), frappe.DoesNotExistError)
     return frappe.get_doc("Suite Site", site)
 
 

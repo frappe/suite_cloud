@@ -67,11 +67,11 @@ Timestamps are ISO 8601 in UTC, for example `2026-03-04T05:06:07+00:00`.
 
 ## Errors
 
-An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` with the HTTP status below. The type tells a client what happened; the message is written for the admin who made the change.
+An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` with the HTTP status below. The entry carries nothing else, except the traceback as `exception` on a developer bench. The type tells a client what happened. The message is a plain sentence for the admin who made the change: it names the object in the words of this reference (domain, account, group, mailing list, alias) and says what to do next.
 
 | Status | Type | Meaning |
 | --- | --- | --- |
-| 400 | `InvalidInputError` | A value the API could not parse: a list that is not a JSON array, a date that is not a date, a list over its cap |
+| 400 | `InvalidInputError` | A required parameter left out, or a value the API could not parse: a list that is not a JSON array, a date that is not a date, a list over its cap |
 | 401 | `AuthenticationError` | The key or secret is wrong; Frappe rejects it before the site API runs |
 | 401 | `SiteAuthError` | The caller is logged in but is no site: a session without a key, or an operator naming an unknown site |
 | 403 | `PermissionError` | No credentials at all, a verb that does not match the method, or a caller without the role |
@@ -80,9 +80,11 @@ An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` wi
 | 404 | `DoesNotExistError` | The object does not exist, or belongs to another site |
 | 409 | `DuplicateEntryError` | The address or domain is already taken |
 | 422 | `ValidationError` | Suite Cloud refused the change: a limit, a rule, an inactive domain |
-| 422 | `ClusterRejectedError` | The mail cluster refused the change; the message carries Stalwart's error type and description |
+| 422 | `ClusterRejectedError` | The mail server refused the change; the message carries its reason |
 | 429 | `TooManyRequestsError` | The site made more than 300 requests in the current minute |
-| 502 | `ClusterMisconfiguredError` | Suite Cloud's own credentials for the cluster were rejected; an operator problem |
+| 502 | `ClusterFailedError` | The mail server failed in a way the caller cannot fix; Suite Cloud logged it for the operators |
+| 502 | `ClusterMisconfiguredError` | Suite Cloud's own credentials for the mail server were rejected; an operator problem |
+| 503 | `ClusterUnavailableError` | The mail server could not be reached; the same request can be sent again in a few minutes |
 
 ## Rate limit
 

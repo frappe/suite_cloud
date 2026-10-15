@@ -47,14 +47,14 @@ def validate(doc: Document) -> None:
     seen = set()
     for row in doc.quotas:
         if row.quota not in STORAGE_QUOTAS:
-            frappe.throw(_("{0} is not a quota the cluster knows.").format(row.quota))
+            frappe.throw(_("{0} is not a known quota name.").format(row.quota))
         if row.quota in seen:
             frappe.throw(_("Quota {0} is listed twice.").format(row.quota))
         seen.add(row.quota)
         if cint(row.value) <= 0:
             if row.quota == DISK_QUOTA:
                 frappe.throw(_("Disk Quota must be above 0 GB."))
-            frappe.throw(_("Quota {0} must be above 0; remove the row for no limit.").format(row.quota))
+            frappe.throw(_("Quota {0} must be above 0. Leave it out for no limit.").format(row.quota))
 
 
 def changed(before: Document, after: Document) -> bool:
@@ -86,7 +86,9 @@ def as_map(value: Any) -> dict[str, int]:
     if value is None:
         return {}
     if not isinstance(value, dict):
-        frappe.throw(_("Quotas must be an object of quota names to limits."))
+        frappe.throw(
+            _('Send quotas as a JSON object of quota names to limits, for example {"maxEmails": 1000}.')
+        )
     return {str(name): cint(limit) for name, limit in value.items()}
 
 
