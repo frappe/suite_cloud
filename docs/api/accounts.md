@@ -76,7 +76,7 @@ Takes `email`. Returns the account object with its usage.
 
 | Parameter | Type | Meaning |
 | --- | --- | --- |
-| `emails` | array of strings, required | Up to 500 addresses; on a GET, the array's JSON text |
+| `emails` | array of strings, required | Up to 500 addresses, as a JSON body on a QUERY, or as the array's JSON text on a GET short enough for a request line |
 
 Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` for the site's accounts among them. Addresses that are not the site's accounts are left out. The allotment is one query and the usage one cluster call per batch, so a list page can show both for every row.
 

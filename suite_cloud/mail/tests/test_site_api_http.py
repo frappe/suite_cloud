@@ -92,6 +92,13 @@ class TestHttpContract(SiteApiTestCase):
         status, body = self.request("GET", "mail.accounts.get_quotas", emails='["nobody@acme.com"]')
         self.assertEqual((status, body), (200, {"data": {}}))
 
+    def test_a_read_with_a_long_list_travels_as_a_query_with_a_json_body(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        emails = [f"nobody{i}@acme.com" for i in range(500)]
+        status, body = self.request("QUERY", "mail.accounts.get_quotas", emails=emails)
+        self.assertEqual((status, body), (200, {"data": {}}))
+
     def test_a_delete_answers_204_without_a_body(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")

@@ -53,7 +53,7 @@ Parameters travel as JSON. A write sends a JSON body with `Content-Type: applica
 GET /api/v2/method/suite_cloud.api.mail.accounts.get_quotas?emails=["a@example.com","b@example.com"]
 ```
 
-A list parameter is a JSON array in both places. Comma or newline separated text is refused with a 400.
+A list parameter is a JSON array in both places. Comma or newline separated text is refused with a 400. A read whose parameters hold a list or an object may also be sent as a QUERY request with a JSON body, as a write is: a long list, such as 500 addresses for `get_quotas`, does not fit in a request line.
 
 Booleans accept `true`, `false`, `1` and `0`. Email addresses and domain names are lowercased, and the domain part is IDNA encoded, before they are matched or stored.
 
