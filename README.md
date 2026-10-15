@@ -151,14 +151,15 @@ that has the **Frappe Cloud** role. `get_site` is a GET, `update_site` a PATCH, 
 The site sends two headers: `Authorization: token <api_key>:<api_secret>` and
 `Frappe-Authorization-Source: Suite Site`. Frappe's own API-key authentication resolves the key
 against the Suite Site record, so the request runs as the shared site service user. The methods
-live at `/api/v2/method/suite_cloud.api.<module>.<method>`; the v1 path `/api/method/...` answers
-the same methods in Frappe's v1 envelope until every site runs the v2 client.
+live at `/api/v2/method/suite_cloud.api.<module>.<method>`.
 
 Rules that apply everywhere:
 
 - The HTTP verb follows the method name: `list_`, `get_` and `check_` are GETs, `update_` a PATCH
   (omitted fields stay as they are), `set_` a PUT, `delete_` and `remove_` a DELETE, and creates
-  and other actions POSTs. Every method still accepts POST for the pre-v2 client.
+  and other actions POSTs. Another verb gets a 403.
+- Parameters travel as JSON: a body on a write, the query string on a GET, where a list is the
+  array's text (`emails=["a@x.com","b@x.com"]`).
 - The result sits under `data`. A create answers 201 and a delete 204 with no body.
 - When the Suite Site lists allowed IP addresses, only requests from those addresses may use its
   key; the rest get a 403. A key copied out of a site's config is then worthless anywhere else.
@@ -167,7 +168,7 @@ Rules that apply everywhere:
 - If the cluster refuses a change, the site gets HTTP 422 with Stalwart's error type
   (`ClusterRejectedError`).
 - Each site may make 300 requests per minute.
-- An error answers `{"errors": [{"type": ..., "message": ...}]}` (v1: the type as `exc_type`).
+- An error answers `{"errors": [{"type": ..., "message": ...}]}`.
   The type tells a duplicate (`DuplicateEntryError`, 409) from a limit or another refusal
   (`ValidationError`, 422), a value the API could not parse (`InvalidInputError`, 400), a rate
   limit (`TooManyRequestsError`, 429), a missing object (`DoesNotExistError`, 404) or a suspended
@@ -183,9 +184,6 @@ Rules that apply everywhere:
 | `suite_cloud.api.mail.meta` | `get_account_options` (the locales and time zones a mailbox can use) |
 | `suite_cloud.api.mail.dmarc` | `list_dmarc_reports(domain, search, since, until, start, limit, days=)`, `get_dmarc_report(report)` (with the per-source records), `get_dmarc_summary(domain, days)` (totals by domain, source IP and reporter; `days` 0 covers everything held) |
 | `suite_cloud.api.mail.tls` | `list_tls_reports(domain, search, since, until, start, limit, days=)`, `get_tls_report(report)` (with its policies and failure details), `get_tls_summary(domain, days)` (session totals by domain and reporter, failed sessions by result type; `days` 0 covers everything held) |
-
-The pre-v2 names of the group and list alias and member methods (`set_group_aliases`,
-`set_mailing_list_alias_enabled` and so on) still answer until every site runs the v2 client.
 
 Listings answer `{"items": [...], "total": n}`. `search` matches the address, and the display
 name or description; `limit` is capped (200 accounts, 500 groups, lists, DMARC or TLS reports per page). Account and
