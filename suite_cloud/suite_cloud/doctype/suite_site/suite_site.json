@@ -160,7 +160,8 @@
    "fieldname": "used_disk_bytes",
    "fieldtype": "Int",
    "is_virtual": 1,
-   "label": "Used Disk (bytes)",
+   "label": "Used Disk",
+   "options": "File Size",
    "read_only": 1
   },
   {
