@@ -37,10 +37,10 @@ KINDS = (APP_PASSWORDS, API_KEYS)
 
 
 def apply_default_limits(doc) -> None:
-    """A new account gets the default limits unless the caller set them."""
+    """A new account gets the default limits unless the caller set or lifted them."""
 
     for kind in KINDS:
-        if kind.quota not in doc.quota_map():
+        if kind.quota not in doc.quota_map() and kind.quota not in (doc.flags.lifted_quotas or ()):
             doc.append("quotas", {"quota": kind.quota, "value": DEFAULT_LIMIT})
 
 

@@ -54,9 +54,9 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
 
 ### Quotas
 
-Every account has a disk quota above 0 GB. It defaults to the site's default quota, and the quotas of the site's accounts and groups together may not exceed the site's total disk; a create or increase beyond the remaining room is a 422.
+An account's disk quota is whatever the site sets: `disk_quota_gb` of 0, or none, means no limit. Suite Cloud applies no default and does not check the quotas against the site's `max_disk_gb`.
 
-`quotas` is an object of Stalwart `StorageQuota` names to limits. `maxDiskQuota` (bytes) is the disk row every account has; the others are optional counts (messages, mailboxes, Sieve scripts, calendars, contact cards, app passwords and so on). `get_account_options` lists the optional names. On a create or update, `quotas` replaces the optional rows (`{}` lifts them all) and keeps the disk row unless it names `maxDiskQuota`; `disk_quota_gb` sets the disk row in GB and wins over a `maxDiskQuota` inside `quotas`. A new account gets `maxAppPasswords` and `maxApiKeys` of 10 unless `quotas` names them.
+`quotas` is an object of Stalwart `StorageQuota` names to limits. `maxDiskQuota` (bytes) is the disk quota; the others are counts (messages, mailboxes, Sieve scripts, calendars, contact cards, app passwords and so on). `get_account_options` lists the other names. On a create or update, `quotas` replaces the other rows (`{}` lifts them all) and keeps the disk row unless it names `maxDiskQuota`; `disk_quota_gb` sets the disk row in GB and wins over a `maxDiskQuota` inside `quotas`. A limit of 0 lifts it. A new account gets `maxAppPasswords` and `maxApiKeys` of 10 unless `quotas` names them.
 
 ### Aliases
 
@@ -85,7 +85,7 @@ Takes `email`. Returns the account object with its usage.
 | --- | --- | --- |
 | `emails` | array of strings, required | Up to 500 addresses, as a JSON body on a QUERY, or as the array's JSON text on a GET short enough for a request line |
 
-Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` for the site's accounts among them. Addresses that are not the site's accounts are left out. The allotment is one query and the usage one cluster call per batch, so a list page can show both for every row.
+Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` for the site's accounts among them; a `disk_quota_gb` of 0 means no limit. Addresses that are not the site's accounts are left out. The quotas are one query and the usage one cluster call per batch, so a list page can show both for every row.
 
 ## `create_account`
 
@@ -98,7 +98,7 @@ Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` f
 | `aliases` | array | | See aliases |
 | `groups` | array of strings | | Group addresses of the site, at most 500 |
 | `mailing_lists` | array of strings | | List addresses of the site the account joins as a recipient, at most 500 |
-| `disk_quota_gb` | number | the site's default | See quotas |
+| `disk_quota_gb` | number | no limit | See quotas |
 | `quotas` | object | | See quotas |
 | `locale` | string | `en-US` | One of `get_account_options` |
 | `time_zone` | string | | One of `get_account_options` |

@@ -10,7 +10,7 @@
  ],
  "fields": [
   {
-   "description": "One of Stalwart's per-account limits. Every account and group needs a maxDiskQuota row; the rest are optional.",
+   "description": "One of Stalwart's per-account limits.",
    "fieldname": "quota",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -19,7 +19,7 @@
    "reqd": 1
   },
   {
-   "description": "The most the account may hold: bytes for maxDiskQuota, a count for the others. Remove an optional row for no limit.",
+   "description": "The most the account may hold: bytes for maxDiskQuota, a count for the others. Remove a row for no limit.",
    "fieldname": "value",
    "fieldtype": "Int",
    "in_list_view": 1,

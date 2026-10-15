@@ -24,20 +24,19 @@ Confirms the credentials and returns the site profile, including where its mail 
     "max_accounts": 100,
     "max_groups": 20,
     "max_mailing_lists": 20,
-    "max_disk_gb": 500,
-    "default_disk_quota_gb": 5
+    "max_disk_gb": 500
   },
   "usage": {
     "domains": 2,
     "accounts": 41,
     "groups": 3,
     "mailing_lists": 1,
-    "allocated_disk_gb": 205
+    "used_disk_bytes": 734003200
   }
 }
 ```
 
-`status` is `Active`, `Suspended` or `Archived`. A limit of `null` means no limit. `allocated_disk_gb` is the sum of the disk quotas of the site's accounts and groups, which the site's `max_disk_gb` bounds.
+`status` is `Active`, `Suspended` or `Archived`. A limit of `null` means no limit. `max_disk_gb` is the disk the site's plan includes; it does not cap the quotas of the site's accounts and groups. `used_disk_bytes` is the figure [`get_disk_usage`](#get_disk_usage) answers, or `null` when the mail server cannot answer.
 
 ## `get_disk_usage`
 

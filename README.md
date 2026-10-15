@@ -117,8 +117,8 @@ cluster is recorded with the id it already has, and nothing is pushed back. The 
 that one site, since nothing on it says which site an object belongs to; an object whose record
 already exists anywhere is skipped, and each object imports on its own, so one that cannot (an
 alias on a domain the site does not own, say) is reported while the rest go in. Adopted domains
-are marked verified; adopted accounts and groups keep the cluster's quotas, which are not checked
-against the site's limits. Passwords and app passwords stay on the cluster and keep working.
+are marked verified; adopted accounts and groups keep the cluster's quotas. Passwords and app
+passwords stay on the cluster and keep working.
 
 ### Sending through dedicated IPs
 

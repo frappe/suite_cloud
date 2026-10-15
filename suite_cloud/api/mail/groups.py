@@ -73,9 +73,9 @@ def update_group(
     quotas: dict | str | None = None,
     disable_receiving: bool | None = None,
 ) -> dict:
-    """``quotas`` replaces the optional limits (``{}`` lifts them all); the disk quota stays unless
-    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it. ``disable_receiving`` stops the group
-    receiving or lets it receive again; left out, it stays as it is."""
+    """``quotas`` replaces the other limits (``{}`` lifts them all); the disk quota stays unless
+    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it, and 0 lifts it. ``disable_receiving``
+    stops the group receiving or lets it receive again; left out, it stays as it is."""
 
     doc = owned("Mail Group", email)
     if description is not None:

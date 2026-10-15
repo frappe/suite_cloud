@@ -52,9 +52,10 @@ QUOTA_LOOKUP_LIMIT = 500
 @frappe.whitelist(methods=["GET"])
 @site_api
 def get_quotas(emails: list[str] | str) -> dict:
-    """``{email: {disk_quota_gb, used_disk_bytes}}`` for the site's accounts among ``emails``.
+    """``{email: {disk_quota_gb, used_disk_bytes}}`` for the site's accounts among ``emails``;
+    a ``disk_quota_gb`` of 0 means no limit.
 
-    The allotment is one query; usage is one cluster call per ``maxObjectsInGet`` accounts, so a
+    The quotas are one query; usage is one cluster call per ``maxObjectsInGet`` accounts, so a
     list page shows both for every row.
     """
 
@@ -66,11 +67,10 @@ def get_quotas(emails: list[str] | str) -> dict:
         filters={"site": current_site().name, "name": ["in", wanted]},
         fields=["name", "stalwart_id", "cluster"],
     )
-    allotted = quota_rows.disk_quota_gb_by_name("Mail Account", [row.name for row in rows])
+    quotas = quota_rows.disk_quota_gb_by_name("Mail Account", [row.name for row in rows])
     usage = used_disk_by_name(rows)
     return {
-        row.name: {"disk_quota_gb": allotted.get(row.name), "used_disk_bytes": usage.get(row.name)}
-        for row in rows
+        row.name: {"disk_quota_gb": quotas[row.name], "used_disk_bytes": usage.get(row.name)} for row in rows
     }
 
 
@@ -149,9 +149,9 @@ def update_account(
     time_zone: str | None = None,
     disable_receiving: bool | None = None,
 ) -> dict:
-    """``quotas`` replaces the optional limits (``{}`` lifts them all); the disk quota stays unless
-    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it. ``disable_receiving`` makes the
-    account send-only or lets it receive again; left out, it stays as it is."""
+    """``quotas`` replaces the other limits (``{}`` lifts them all); the disk quota stays unless
+    ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it, and 0 lifts it. ``disable_receiving``
+    makes the account send-only or lets it receive again; left out, it stays as it is."""
 
     doc = owned("Mail Account", email)
     for field, value in {

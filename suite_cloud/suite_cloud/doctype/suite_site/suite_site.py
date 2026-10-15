@@ -6,20 +6,15 @@ import ipaddress
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.query_builder.functions import Sum
 from frappe.utils import cint, flt, now, now_datetime
 
 from suite_cloud.mail.stalwart import get_client
-from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB
 from suite_cloud.mail.stalwart.errors import StalwartError
 from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
 from suite_cloud.utils import get_config, utc_iso
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
-
-
-# Documents with a mailbox of their own, hence a quota that counts against the site's total.
-QUOTA_HOLDERS = ("Mail Account", "Mail Group")
+MAILBOX_DOCTYPES = ("Mail Account", "Mail Group")  # the documents whose disk usage the site sums
 DISK_USAGE_CACHE_TTL = 300  # seconds a site's summed disk usage is served without asking the cluster
 
 
@@ -37,7 +32,6 @@ class SuiteSite(Document):
         archived_at: DF.Datetime | None
         cluster: DF.Link
         contact_email: DF.Data | None
-        default_disk_quota_gb: DF.Float
         domain_verification_token: DF.Data | None
         egress_pool: DF.Link | None
         enabled: DF.Check
@@ -80,7 +74,7 @@ class SuiteSite(Document):
         self.user = get_config("site_service_user")
         if not self.user:
             frappe.throw(_("The site service user is missing; run bench migrate."))
-        self.validate_disk_quotas()
+        self.validate_limits()
 
         if self.is_new():
             cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
@@ -176,18 +170,14 @@ class SuiteSite(Document):
 
     # --- limits -----------------------------------------------------------------
 
-    def validate_disk_quotas(self) -> None:
+    def validate_limits(self) -> None:
         for field in ("max_domains", "max_accounts", "max_groups", "max_mailing_lists"):
             if cint(self.get(field)) < 0:
                 frappe.throw(
                     _("{0} cannot be negative; 0 means unlimited.").format(self.meta.get_label(field))
                 )
-        if flt(self.default_disk_quota_gb) <= 0:
-            frappe.throw(_("Default Disk Quota must be above 0: every account needs a quota."))
         if flt(self.max_disk_gb) < 0:
             frappe.throw(_("Total Disk Quota cannot be negative; 0 means unlimited."))
-        if flt(self.max_disk_gb) and flt(self.default_disk_quota_gb) > flt(self.max_disk_gb):
-            frappe.throw(_("Default Disk Quota cannot exceed the site's Total Disk Quota."))
 
     def domain_count(self) -> int:
         return frappe.db.count("Mail Domain", {"site": self.name})
@@ -217,53 +207,6 @@ class SuiteSite(Document):
         self.lock()
         self.assert_within_limit(self.max_mailing_lists, self.mailing_list_count(), _("mailing lists"))
 
-    def allocated_disk_gb(self, exclude: tuple[str, str] | None = None) -> float:
-        """Sum of the disk quotas of the site's accounts and groups, optionally leaving one out."""
-
-        quota = frappe.qb.DocType("Mail Quota")
-        total = 0
-        for doctype in QUOTA_HOLDERS:
-            holder = frappe.qb.DocType(doctype)
-            query = (
-                frappe.qb.from_(quota)
-                .join(holder)
-                .on((quota.parent == holder.name) & (quota.parenttype == doctype))
-                .select(Sum(quota.value))
-                .where((holder.site == self.name) & (quota.quota == DISK_QUOTA))
-            )
-            if exclude and exclude[0] == doctype:
-                query = query.where(holder.name != exclude[1])
-            total += cint(query.run()[0][0])
-        return round(total / GB, 6)
-
-    def validate_quota_of(self, doc: Document) -> None:
-        """Accounts and groups: a disk quota above 0 (defaulting to the site's), within the site's total."""
-
-        if doc.is_new() and doc.disk_row() is None:
-            doc.set_disk_quota_gb(self.default_disk_quota_gb)
-        if doc.disk_quota_bytes() <= 0:
-            frappe.throw(_("Disk Quota must be above 0 GB."))
-        if doc.flags.adopting:
-            return  # the cluster already grants it; the operator sizes the site's total afterwards
-        before = doc.get_doc_before_save()
-        if doc.is_new() or before.disk_quota_bytes() != doc.disk_quota_bytes():
-            exclude = None if doc.is_new() else (doc.doctype, doc.name)
-            self.assert_can_allocate_disk(doc.allotted_disk_gb(), exclude)
-
-    def assert_can_allocate_disk(self, quota_gb: float, exclude: tuple[str, str] | None = None) -> None:
-        """The site's accounts and groups together may not exceed its total disk quota (0 = unlimited)."""
-
-        if not flt(self.max_disk_gb):
-            return
-        self.lock()
-        allocated = self.allocated_disk_gb(exclude)
-        if allocated + flt(quota_gb) > flt(self.max_disk_gb):
-            frappe.throw(
-                _("Site {0} has only {1} GB of its {2} GB disk quota left, but {3} GB was requested.").format(
-                    self.name, round(flt(self.max_disk_gb) - allocated, 2), self.max_disk_gb, quota_gb
-                )
-            )
-
     def directory_size(self) -> int:
         return sum(frappe.db.count(doctype, {"site": self.name}) for doctype in DIRECTORY_DOCTYPES)
 
@@ -272,11 +215,13 @@ class SuiteSite(Document):
 
     @property
     def used_disk_bytes(self) -> int | None:
-        """The virtual field: every serialisation reads it, so only the form pays for the lookup,
-        and a cluster that cannot answer costs the figure, not the form."""
+        """The virtual field: every serialisation reads it, so only the form pays for the lookup."""
 
-        if not self.flags.with_usage:
-            return None
+        return self.get_used_disk_bytes() if self.flags.with_usage else None
+
+    def get_used_disk_bytes(self) -> int | None:
+        """A cluster that cannot answer costs the figure, not the form or the site profile."""
+
         try:
             return self.get_disk_usage()["used_disk_bytes"]
         except StalwartError as e:
@@ -302,7 +247,7 @@ class SuiteSite(Document):
         cannot answer raises: a partial sum must never be returned or cached."""
 
         ids = []
-        for doctype in QUOTA_HOLDERS:
+        for doctype in MAILBOX_DOCTYPES:
             ids += frappe.get_all(
                 doctype, {"site": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
             )
@@ -358,14 +303,13 @@ class SuiteSite(Document):
                 "max_groups": self.max_groups,
                 "max_mailing_lists": self.max_mailing_lists,
                 "max_disk_gb": self.max_disk_gb,
-                "default_disk_quota_gb": self.default_disk_quota_gb,
             },
             "usage": {
                 "domains": self.domain_count(),
                 "accounts": self.account_count(),
                 "groups": self.group_count(),
                 "mailing_lists": self.mailing_list_count(),
-                "allocated_disk_gb": self.allocated_disk_gb(),
+                "used_disk_bytes": self.get_used_disk_bytes(),
             },
         }
 
