@@ -6,25 +6,28 @@
  "field_order": [
   "title",
   "contact_email",
-  "cluster",
   "column_break_main",
   "enabled",
   "status",
   "archived_at",
+  "access_section",
+  "secret",
+  "allowed_ips",
+  "column_break_access",
+  "user",
+  "mail_tab",
+  "cluster_section",
+  "cluster",
+  "column_break_cluster",
+  "egress_pool",
   "limits_section",
   "max_domains",
   "max_accounts",
   "max_groups",
   "max_mailing_lists",
   "column_break_limits",
-  "egress_pool",
   "max_disk_gb",
-  "used_disk_bytes",
-  "access_section",
-  "secret",
-  "allowed_ips",
-  "column_break_access",
-  "user"
+  "used_disk_bytes"
  ],
  "fields": [
   {
@@ -41,18 +44,6 @@
    "fieldtype": "Data",
    "label": "Contact Email",
    "options": "Email"
-  },
-  {
-   "description": "The Stalwart cluster hosting every mail domain and account of the site. Fixed once the tenant exists; the cluster must be active at creation.",
-   "fieldname": "cluster",
-   "fieldtype": "Link",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Cluster",
-   "options": "Stalwart Cluster",
-   "reqd": 1,
-   "search_index": 1,
-   "set_only_once": 1
   },
   {
    "fieldname": "column_break_main",
@@ -82,6 +73,69 @@
    "fieldtype": "Datetime",
    "label": "Archived At",
    "read_only": 1
+  },
+  {
+   "fieldname": "access_section",
+   "fieldtype": "Section Break",
+   "label": "API Access"
+  },
+  {
+   "description": "Sent by the tenant as Authorization: Tenant <id>:<secret>. Stored encrypted and shown once, after Rotate Secret; rotating it invalidates the previous secret immediately.",
+   "fieldname": "secret",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Secret"
+  },
+  {
+   "description": "One per line: the IPv4 or IPv6 addresses, or CIDR ranges, the tenant's server sends from. Set, only requests from these addresses may use the tenant's secret; a leaked secret is useless elsewhere. Blank accepts any address.",
+   "fieldname": "allowed_ips",
+   "fieldtype": "Small Text",
+   "label": "Allowed IP Addresses"
+  },
+  {
+   "fieldname": "column_break_access",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Requests authenticated with the tenant's secret run as this service user. Taken from Suite Cloud Settings on every save.",
+   "fieldname": "user",
+   "fieldtype": "Link",
+   "label": "Service User",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "mail_tab",
+   "fieldtype": "Tab Break",
+   "label": "Mail"
+  },
+  {
+   "fieldname": "cluster_section",
+   "fieldtype": "Section Break",
+   "label": "Cluster"
+  },
+  {
+   "description": "The Stalwart cluster hosting every mail domain and account of the site. Fixed once the tenant exists; the cluster must be active at creation.",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "reqd": 1,
+   "search_index": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "column_break_cluster",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Outbound mail of this site's domains leaves through this pool instead of the cluster default. A domain may name its own pool. The pool must belong to the site's cluster.",
+   "fieldname": "egress_pool",
+   "fieldtype": "Link",
+   "label": "Egress Pool",
+   "options": "Egress IP Pool"
   },
   {
    "fieldname": "limits_section",
@@ -135,43 +189,6 @@
    "label": "Used Disk",
    "options": "File Size",
    "read_only": 1
-  },
-  {
-   "fieldname": "access_section",
-   "fieldtype": "Section Break",
-   "label": "API Access"
-  },
-  {
-   "description": "Sent by the tenant as Authorization: Tenant <id>:<secret>. Stored encrypted and shown once, after Rotate Secret; rotating it invalidates the previous secret immediately.",
-   "fieldname": "secret",
-   "fieldtype": "Password",
-   "hidden": 1,
-   "label": "Secret"
-  },
-  {
-   "description": "One per line: the IPv4 or IPv6 addresses, or CIDR ranges, the tenant's server sends from. Set, only requests from these addresses may use the tenant's secret; a leaked secret is useless elsewhere. Blank accepts any address.",
-   "fieldname": "allowed_ips",
-   "fieldtype": "Small Text",
-   "label": "Allowed IP Addresses"
-  },
-  {
-   "fieldname": "column_break_access",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Requests authenticated with the tenant's secret run as this service user. Taken from Suite Cloud Settings on every save.",
-   "fieldname": "user",
-   "fieldtype": "Link",
-   "label": "Service User",
-   "options": "User",
-   "read_only": 1
-  },
-  {
-   "description": "Outbound mail of this site's domains leaves through this pool instead of the cluster default. A domain may name its own pool. The pool must belong to the site's cluster.",
-   "fieldname": "egress_pool",
-   "fieldtype": "Link",
-   "label": "Egress Pool",
-   "options": "Egress IP Pool"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -207,7 +224,7 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-10-15 23:00:00.000000",
+ "modified": "2026-10-16 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Tenant",
