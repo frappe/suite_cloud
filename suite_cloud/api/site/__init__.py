@@ -27,7 +27,7 @@ from suite_cloud.mail.stalwart.errors import (
     StalwartUnauthorizedError,
     StalwartUnavailableError,
 )
-from suite_cloud.mail.tenancy.addresses import NOUNS, validate_email_address
+from suite_cloud.mail.tenancy.addresses import NOUNS
 from suite_cloud.utils import get_config
 
 API_PATH = "/api/v2/method/suite_cloud.api."
@@ -408,6 +408,6 @@ def update_site_profile(title: str | None = None, contact_email: str | None = No
     if title is not None:
         site.title = title.strip()
     if contact_email is not None:
-        site.contact_email = validate_email_address(contact_email) if contact_email.strip() else None
+        site.contact_email = contact_email.strip() or None
     site.save(ignore_permissions=True)
     return site.to_api()

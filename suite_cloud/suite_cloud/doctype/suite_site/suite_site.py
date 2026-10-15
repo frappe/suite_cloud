@@ -68,7 +68,8 @@ class SuiteSite(Document):
         self.title = (self.title or "").strip() or self.site_name
         if self.contact_email:
             self.contact_email = self.contact_email.strip().lower()
-            frappe.utils.validate_email_address(self.contact_email, throw=True)
+            if not frappe.utils.validate_email_address(self.contact_email):
+                frappe.throw(_("{0} is not a valid email address.").format(self.contact_email))
         self.allowed_ips = "\n".join(str(n) for n in parse_networks(self.allowed_ips))
 
         self.user = get_config("site_service_user")
