@@ -1,13 +1,10 @@
 import frappe
 
-# Desk role for operators, plus two API-only roles: tenant sites authenticate as one shared
-# service user carrying "Suite Tenant", and Frappe Cloud runs the Suite Tenant actions with a
-# user carrying "Frappe Cloud". Neither API role holds DocType permissions; the endpoints check
-# ownership themselves.
+# Desk role for operators, plus the API-only role of the shared service user every tenant
+# request runs as. The API role holds no DocType permissions; the endpoints check ownership.
 ROLES = (
     ("Suite Cloud Manager", 1),
     ("Suite Tenant", 0),
-    ("Frappe Cloud", 0),
 )
 
 TENANT_SERVICE_USER = "suite-tenant@suite-cloud.internal"

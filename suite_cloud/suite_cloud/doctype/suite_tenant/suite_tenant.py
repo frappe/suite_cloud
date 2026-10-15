@@ -118,7 +118,7 @@ class SuiteTenant(Document):
     def rotate_secret(self) -> str:
         """Returns the new secret once; it is stored encrypted and never shown again."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         secret = self.generate_secret()
         self.save(ignore_permissions=True)
         return secret
@@ -128,14 +128,14 @@ class SuiteTenant(Document):
     @frappe.whitelist()
     def suspend(self) -> None:
         # The key keeps authenticating so the site gets a 403 naming the suspension, not a bare 401.
-        frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status == "Archived":
             frappe.throw(_("An archived site cannot be suspended."))
         self.db_set({"status": "Suspended"})
 
     @frappe.whitelist()
     def resume(self) -> None:
-        frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status == "Archived":
             frappe.throw(_("An archived site cannot be resumed."))
         self.db_set({"enabled": 1, "status": "Active"})
@@ -144,7 +144,7 @@ class SuiteTenant(Document):
     def archive(self, delete_data: bool = False) -> None:
         """Locks the site out; with ``delete_data`` every directory object is removed from Stalwart too."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager", "Frappe Cloud"))
+        frappe.only_for(("System Manager", "Suite Cloud Manager"))
         self.db_set({"enabled": 0, "status": "Archived", "archived_at": now()})
         if delete_data:
             if frappe.flags.do_not_enqueue:
