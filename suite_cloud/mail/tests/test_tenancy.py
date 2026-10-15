@@ -79,7 +79,7 @@ class TestSuiteTenant(TenancyTestCase):
         self.assertEqual(UUID(self.tenant.name).version, 7)
         self.assertEqual(len(self.tenant.new_secret), 40)
         self.assertEqual(self.tenant.get_password("secret"), self.tenant.new_secret)
-        self.assertEqual(self.tenant.user, "suite-site@suite-cloud.internal")
+        self.assertEqual(self.tenant.user, "suite-tenant@suite-cloud.internal")
         self.assertEqual(self.tenant.status, "Active")
         self.assertEqual(self.tenant.to_api()["jmap_url"], self.cluster.base_url)
 

@@ -10,7 +10,7 @@ ROLES = (
     ("Frappe Cloud", 0),
 )
 
-SITE_SERVICE_USER = "suite-site@suite-cloud.internal"
+SITE_SERVICE_USER = "suite-tenant@suite-cloud.internal"
 
 
 def after_install() -> None:

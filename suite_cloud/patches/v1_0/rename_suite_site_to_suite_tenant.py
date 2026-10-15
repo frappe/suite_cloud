@@ -1,9 +1,8 @@
 import frappe
 
-from suite_cloud.install import SITE_SERVICE_USER
-
 OLD = "Suite Site"
 NEW = "Suite Tenant"
+OLD_SERVICE_USER = "suite-site@suite-cloud.internal"
 
 
 def execute() -> None:
@@ -15,7 +14,7 @@ def execute() -> None:
     if frappe.db.exists("Role", OLD) and not frappe.db.exists("Role", NEW):
         frappe.rename_doc("Role", OLD, NEW, force=True)
 
-    if frappe.db.exists("User", SITE_SERVICE_USER):
+    if frappe.db.exists("User", OLD_SERVICE_USER):
         frappe.db.set_value(
-            "User", SITE_SERVICE_USER, {"first_name": NEW, "full_name": NEW}, update_modified=False
+            "User", OLD_SERVICE_USER, {"first_name": NEW, "full_name": NEW}, update_modified=False
         )
