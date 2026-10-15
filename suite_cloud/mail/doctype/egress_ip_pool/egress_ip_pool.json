@@ -81,7 +81,7 @@
  "links": [
   {
    "group": "Users",
-   "link_doctype": "Suite Site",
+   "link_doctype": "Suite Tenant",
    "link_fieldname": "egress_pool"
   },
   {
@@ -95,7 +95,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-08 19:20:00.000000",
+ "modified": "2026-10-15 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress IP Pool",

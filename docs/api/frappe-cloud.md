@@ -36,7 +36,7 @@ Answers 201 with the credentials, the site profile and the Suite Cloud URL. The 
 {
   "api_key": "0a1b2c3d4e5f6a7",
   "api_secret": "…",
-  "authorization_source": "Suite Site",
+  "authorization_source": "Suite Tenant",
   "site": "acme.frappe.cloud",
   "cluster": "c1.frappemail.com",
   "status": "Active",

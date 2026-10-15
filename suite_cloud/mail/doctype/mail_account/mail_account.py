@@ -79,7 +79,7 @@ class MailAccount(QuotaHolder, Document):
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
 
-        site = frappe.get_cached_doc("Suite Site", self.site)
+        site = frappe.get_cached_doc("Suite Tenant", self.site)
         if self.is_new() and not self.flags.adopting:
             site.assert_can_add_account()
             account_credentials.apply_default_limits(self)

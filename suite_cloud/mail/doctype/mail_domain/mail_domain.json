@@ -47,13 +47,13 @@
    "unique": 1
   },
   {
-   "description": "The Suite Site that owns the domain and administers it through the API. Fixed once the domain exists; it counts against the site's domain limit.",
+   "description": "The Suite Tenant that owns the domain and administers it through the API. Fixed once the domain exists; it counts against the site's domain limit.",
    "fieldname": "site",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Site",
-   "options": "Suite Site",
+   "options": "Suite Tenant",
    "reqd": 1,
    "search_index": 1,
    "set_only_once": 1
@@ -275,7 +275,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-09-30 16:43:06.381861",
+ "modified": "2026-10-15 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Domain",

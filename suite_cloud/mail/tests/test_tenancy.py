@@ -72,7 +72,7 @@ class TenancyTestCase(IntegrationTestCase):
         return account
 
 
-class TestSuiteSite(TenancyTestCase):
+class TestSuiteTenant(TenancyTestCase):
     def test_site_gets_credentials_and_service_user(self) -> None:
         self.assertEqual(len(self.site.api_key), 32)
         self.assertEqual(len(self.site.new_secret), 40)
@@ -85,7 +85,7 @@ class TestSuiteSite(TenancyTestCase):
         self.cluster.db_set("status", "Pending")
         frappe.clear_document_cache("Stalwart Cluster", self.cluster.name)
         site = frappe.get_doc(
-            {"doctype": "Suite Site", "site_name": "other.frappe.test", "cluster": self.cluster.name}
+            {"doctype": "Suite Tenant", "site_name": "other.frappe.test", "cluster": self.cluster.name}
         )
         self.assertRaisesRegex(frappe.ValidationError, "not active", site.insert)
 
@@ -97,15 +97,15 @@ class TestSuiteSite(TenancyTestCase):
 
         self.site.suspend()
         self.assertEqual(
-            frappe.db.get_value("Suite Site", self.site.name, ["enabled", "status"]), (1, "Suspended")
+            frappe.db.get_value("Suite Tenant", self.site.name, ["enabled", "status"]), (1, "Suspended")
         )
         self.site.resume()
-        self.assertEqual(frappe.db.get_value("Suite Site", self.site.name, "status"), "Active")
+        self.assertEqual(frappe.db.get_value("Suite Tenant", self.site.name, "status"), "Active")
 
         self.make_domain()
         self.make_account("a@acme.com")
         self.site.archive(delete_data=True)
-        self.assertEqual(frappe.db.get_value("Suite Site", self.site.name, "status"), "Archived")
+        self.assertEqual(frappe.db.get_value("Suite Tenant", self.site.name, "status"), "Archived")
         self.assertFalse(frappe.db.exists("Mail Domain", "acme.com"))
         self.assertEqual(self.fake.all("Domain"), [])
         self.assertEqual([a for a in self.fake.all("Account") if a["name"] != "admin"], [])
@@ -397,12 +397,12 @@ class TestMailDomain(TenancyTestCase):
 
     def test_domain_limits_reserved_names_and_ownership(self) -> None:
         self.site.db_set("max_domains", 1)
-        frappe.clear_document_cache("Suite Site", self.site.name)
+        frappe.clear_document_cache("Suite Tenant", self.site.name)
         self.make_domain()
         self.assertRaisesRegex(frappe.ValidationError, "limit", self.make_domain, "second.com")
 
         self.site.db_set("max_domains", 5)
-        frappe.clear_document_cache("Suite Site", self.site.name)
+        frappe.clear_document_cache("Suite Tenant", self.site.name)
         self.assertRaisesRegex(
             frappe.ValidationError,
             "belongs to the mail service",
@@ -975,7 +975,7 @@ class TestMailAccount(TenancyTestCase):
         )
 
         self.site.db_set("max_accounts", 1)
-        frappe.clear_document_cache("Suite Site", self.site.name)
+        frappe.clear_document_cache("Suite Tenant", self.site.name)
         self.assertRaisesRegex(frappe.ValidationError, "limit", self.make_account, "g@acme.com")
 
     def test_other_quotas_are_known_positive_and_listed_once(self) -> None:
@@ -1011,7 +1011,7 @@ class TestMailAccount(TenancyTestCase):
         self.assertEqual(self.fake.get("Account", group.stalwart_id)["quotas"]["maxEmails"], 100)
 
     def test_disk_quotas_are_what_the_site_asks_for(self) -> None:
-        site = frappe.get_doc("Suite Site", self.site.name)
+        site = frappe.get_doc("Suite Tenant", self.site.name)
         site.max_disk_gb = -1
         self.assertRaisesRegex(frappe.ValidationError, "negative", site.save)
         site.reload()
@@ -1033,21 +1033,21 @@ class TestMailAccount(TenancyTestCase):
         frappe.cache.delete_value(key)
         self.addCleanup(frappe.cache.delete_value, key)
         self.fake.find("Account", name="q1")["usedDiskQuota"] = 4096
-        usage = frappe.get_doc("Suite Site", self.site.name).to_api()["usage"]
+        usage = frappe.get_doc("Suite Tenant", self.site.name).to_api()["usage"]
         self.assertNotIn("allocated_disk_gb", usage)
         self.assertEqual(usage["used_disk_bytes"], 4096)
 
     def test_group_and_mailing_list_limits(self) -> None:
         self.site.db_set({"max_groups": 1, "max_mailing_lists": 0})  # one group exists; lists unlimited
-        frappe.clear_document_cache("Suite Site", self.site.name)
+        frappe.clear_document_cache("Suite Tenant", self.site.name)
         group = frappe.get_doc({"doctype": "Mail Group", "email": "ops@acme.com", "site": self.site.name})
         self.assertRaisesRegex(frappe.ValidationError, "limit of 1 groups", group.insert)
         frappe.get_doc({"doctype": "Mailing List", "email": "news@acme.com", "site": self.site.name}).insert()
         self.site.db_set("max_mailing_lists", 1)
-        frappe.clear_document_cache("Suite Site", self.site.name)
+        frappe.clear_document_cache("Suite Tenant", self.site.name)
         more = frappe.get_doc({"doctype": "Mailing List", "email": "more@acme.com", "site": self.site.name})
         self.assertRaisesRegex(frappe.ValidationError, "mailing lists", more.insert)
-        usage = frappe.get_doc("Suite Site", self.site.name).to_api()["usage"]
+        usage = frappe.get_doc("Suite Tenant", self.site.name).to_api()["usage"]
         self.assertEqual((usage["groups"], usage["mailing_lists"]), (1, 1))
 
     def test_group_delete_clears_membership(self) -> None:

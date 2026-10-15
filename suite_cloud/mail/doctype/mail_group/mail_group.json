@@ -47,7 +47,7 @@
    "fieldtype": "Link",
    "in_standard_filter": 1,
    "label": "Site",
-   "options": "Suite Site",
+   "options": "Suite Tenant",
    "read_only": 1,
    "search_index": 1,
    "description": "Suite site that owns the group. Derived from the domain; the site's group limit applies."
@@ -122,7 +122,7 @@
    "table_fieldname": "groups"
   }
  ],
- "modified": "2026-10-07 15:40:00.000000",
+ "modified": "2026-10-15 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Group",

@@ -18,7 +18,7 @@ MAILBOX_DOCTYPES = ("Mail Account", "Mail Group")  # the documents whose disk us
 DISK_USAGE_CACHE_TTL = 300  # seconds a site's summed disk usage is served without asking the cluster
 
 
-class SuiteSite(Document):
+class SuiteTenant(Document):
     # begin: auto-generated types
     # This code is auto-generated. Do not modify anything in this block.
 
@@ -259,8 +259,8 @@ class SuiteSite(Document):
     def lock(self) -> None:
         """Serialises this site's limit checks: two requests must not both see room for the last slot."""
 
-        if frappe.db.exists("Suite Site", self.name):
-            frappe.db.get_value("Suite Site", self.name, "name", for_update=True)
+        if frappe.db.exists("Suite Tenant", self.name):
+            frappe.db.get_value("Suite Tenant", self.name, "name", for_update=True)
 
     def assert_within_limit(self, limit: int, current: int, what: str) -> None:
         """A limit of 0 means unlimited."""

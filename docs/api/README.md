@@ -22,12 +22,12 @@ A site authenticates with the API key and secret Frappe Cloud received when it r
 
 ```http
 Authorization: token <api_key>:<api_secret>
-Frappe-Authorization-Source: Suite Site
+Frappe-Authorization-Source: Suite Tenant
 ```
 
-Frappe resolves the key against the Suite Site record, so the request runs as the shared site service user and every method acts only on that site's documents. Anything that belongs to another site is reported as not found (404), never as forbidden.
+Frappe resolves the key against the Suite Tenant record, so the request runs as the shared site service user and every method acts only on that site's documents. Anything that belongs to another site is reported as not found (404), never as forbidden.
 
-When the Suite Site lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `SiteAddressError`, and Suite Cloud logs it for the operators. A key copied out of a site's configuration is worthless anywhere else.
+When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `SiteAddressError`, and Suite Cloud logs it for the operators. A key copied out of a site's configuration is worthless anywhere else.
 
 An operator with the System Manager or Suite Cloud Manager role may call the site API from the desk or a script on behalf of a site. The site is named by the `site` parameter or the `X-Suite-Site` header.
 

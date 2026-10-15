@@ -32,7 +32,7 @@ The app has two modules, so one CODEOWNERS line can cover each product:
 
 | Module | Folder | Holds |
 | --- | --- | --- |
-| **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Site, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
+| **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Tenant, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
 | **Mail** | `suite_cloud/mail` | The mail product: Stalwart Store, Cluster, Node, Egress Gateway and IP Pool, the mail directory (Mail Domain, Mail Account, Mail Group, Mailing List), and the `stalwart`, `cluster` and `tenancy` packages. |
 
 The site-facing API is split the same way: `suite_cloud.api.site` for what any product needs
@@ -49,7 +49,7 @@ The site-facing API is split the same way: `suite_cloud.api.site` for what any p
 | **Egress Gateway** and **Egress IP Pool** | Optional extra servers used only for sending. A pool is a set of IP addresses; a domain, a site or a whole cluster can be told to send through it. |
 | **DNS Record** | One record Suite Cloud keeps in a zone (a node's address, the cluster's round-robin entry, the SPF list, and so on). Records are created and removed together with the thing that needs them. |
 | **Server Job** | One run of an install or update script on a node or gateway, with the result of every step. Secrets are looked up when the job runs and never stored in it. |
-| **Suite Site** | A Frappe Suite site: which cluster it uses, its API key and secret, its title and contact email, its limits (domains, accounts, groups, lists, total disk) and the token its domains are verified with. |
+| **Suite Tenant** | A Frappe Suite site: which cluster it uses, its API key and secret, its title and contact email, its limits (domains, accounts, groups, lists, total disk) and the token its domains are verified with. |
 | **Mail Domain, Mail Account, Mail Group, Mailing List** | The mail directory of a site. Saving one of these pushes it to the cluster in the same step, so the records and the cluster never drift apart. Each carries the id Stalwart gave it. |
 | **DMARC Report** | One DMARC aggregate report another receiver sent about a domain, copied hourly from the cluster that intercepted it (Stalwart parses reports mailed to `postmaster@`). Attributed to the site that holds the domain, and only when the report was addressed to one of that site's domains; kept for the configured retention, and read by sites through the API. |
 | **TLS Report** | One TLS aggregate report (RFC 8460) a sending server made about delivering to a domain: sessions that negotiated TLS as the domain's MTA-STS or DANE policy asks, sessions that failed and why. Copied, attributed, kept and served the same way as DMARC reports, with its own retention; a report whose policies name more than one domain is shown to no site. |
@@ -70,7 +70,7 @@ only needs an SSH client (`apt install openssh-client`; Frappe Cloud installs it
 Installing creates three roles and one user:
 
 - **Suite Cloud Manager**: operators who use the desk.
-- **Suite Site** and **Frappe Cloud**: API-only roles with no access to any record. The endpoints
+- **Suite Tenant** and **Frappe Cloud**: API-only roles with no access to any record. The endpoints
   check ownership themselves.
 - A service user that every site request runs as.
 
@@ -110,8 +110,8 @@ again, and **Check Drift** reports what differs from it without changing anythin
 ### Adopting a server that already has a directory
 
 A Stalwart that a Suite site administered directly, before Suite Cloud, holds domains, accounts,
-groups and lists that Suite Cloud never created. Register it as a cluster, create the Suite Site
-for it, then use **Adopt Directory** on the Suite Site (or run
+groups and lists that Suite Cloud never created. Register it as a cluster, create the Suite Tenant
+for it, then use **Adopt Directory** on the Suite Tenant (or run
 `suite_cloud.mail.tenancy.adopt.adopt_directory` with the site name). Every object on the
 cluster is recorded with the id it already has, and nothing is pushed back. The cluster must serve
 that one site, since nothing on it says which site an object belongs to; an object whose record
@@ -126,7 +126,7 @@ passwords stay on the cluster and keep working.
    IPs configured, and provision it.
 2. Create an Egress IP Pool listing those IPs with a hostname for each (`ded1.c1.frappemail.com`,
    with reverse DNS set at the provider).
-3. Assign the pool to a Mail Domain, to a Suite Site, or as the cluster default.
+3. Assign the pool to a Mail Domain, to a Suite Tenant, or as the cluster default.
 
 Mail from the matching sender domains is relayed to the gateway over an authenticated, encrypted
 connection and leaves from the pool's addresses. The `spf.c1.frappemail.com` record that customer
@@ -137,7 +137,7 @@ message takes.
 
 Suite Cloud serves two REST APIs at `/api/v2/method/suite_cloud.api.<module>.<method>`, documented in [docs/api](docs/api/README.md).
 
-- The **site API** lets a Frappe Suite site manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The site authenticates with its API key and secret and the `Frappe-Authorization-Source: Suite Site` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
+- The **site API** lets a Frappe Suite site manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The site authenticates with its API key and secret and the `Frappe-Authorization-Source: Suite Tenant` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
 - The **Frappe Cloud API** registers, limits, suspends and archives the sites, for a user with the **Frappe Cloud** role.
 
 The verb follows the method name (`list_` and `get_` are GETs, `update_` a PATCH, `set_` a PUT, `delete_` and `remove_` a DELETE, the rest POSTs), parameters travel as JSON, the result sits under `data`, and an error answers `{"errors": [{"type", "message"}]}` with a REST status code. Each site may make 300 requests per minute.

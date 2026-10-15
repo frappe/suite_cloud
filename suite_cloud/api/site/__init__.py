@@ -1,8 +1,8 @@
 """Site-facing API: what a Frappe Suite site may do with its own slice of the directory.
 
-Authentication is Frappe's own API-key scheme pointed at the Suite Site DocType: the site
+Authentication is Frappe's own API-key scheme pointed at the Suite Tenant DocType: the site
 sends ``Authorization: token <api_key>:<api_secret>`` plus ``Frappe-Authorization-Source:
-Suite Site``, which makes the request run as the shared site service user. Every endpoint
+Suite Tenant``, which makes the request run as the shared site service user. Every endpoint
 then resolves the calling site from the key in the header and only ever touches documents
 owned by that site. Objects of other sites are reported as missing, never as forbidden.
 """
@@ -84,13 +84,13 @@ class ClusterMisconfiguredError(frappe.ValidationError):
 
 
 def current_site():
-    """The Suite Site behind this request (cached for the request)."""
+    """The Suite Tenant behind this request (cached for the request)."""
 
-    if site := getattr(frappe.local, "suite_site", None):
+    if site := getattr(frappe.local, "suite_tenant", None):
         return site
 
     site = _resolve_site()
-    frappe.local.suite_site = site
+    frappe.local.suite_tenant = site
     return site
 
 
@@ -99,7 +99,7 @@ def _resolve_site():
     service_user = get_config("site_service_user")
 
     if frappe.session.user == service_user and api_key:
-        name = frappe.db.get_value("Suite Site", {"api_key": api_key})
+        name = frappe.db.get_value("Suite Tenant", {"api_key": api_key})
     elif frappe.session.user != "Guest" and set(frappe.get_roles()) & set(MANAGER_ROLES):
         # Operators may act on behalf of a site from the desk or a script.
         name = frappe.form_dict.get("site") or frappe.get_request_header("X-Suite-Site")
@@ -107,11 +107,11 @@ def _resolve_site():
         name = None
 
     request_ip = getattr(frappe.local, "request_ip", None)
-    if not name or not frappe.db.exists("Suite Site", name):
+    if not name or not frappe.db.exists("Suite Tenant", name):
         throttle(f"address:{request_ip or 'unknown'}")  # guessing keys is paced like everything else
         frappe.throw(_("Site authentication failed."), SiteAuthError)
 
-    site = frappe.get_cached_doc("Suite Site", name)
+    site = frappe.get_cached_doc("Suite Tenant", name)
     throttle(f"site:{site.name}")  # counted before any refusal, so refusals cannot be free
     if not site.enabled or site.status != "Active":
         frappe.throw(

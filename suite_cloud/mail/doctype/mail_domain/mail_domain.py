@@ -156,7 +156,7 @@ class MailDomain(Document):
         sync.push_destroy(self, "domains")
 
     def after_delete(self) -> None:
-        on_a_pool = self.egress_pool or frappe.db.get_value("Suite Site", self.site, "egress_pool")
+        on_a_pool = self.egress_pool or frappe.db.get_value("Suite Tenant", self.site, "egress_pool")
         if on_a_pool or self.allow_relaying:
             egress.resync_cluster_after_commit(self.cluster)
 
@@ -328,7 +328,7 @@ class MailDomain(Document):
     # --- helpers -----------------------------------------------------------------------
 
     def get_site(self) -> Document:
-        return frappe.get_cached_doc("Suite Site", self.site)
+        return frappe.get_cached_doc("Suite Tenant", self.site)
 
     def get_cluster(self) -> Document:
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster or self.get_site().cluster)

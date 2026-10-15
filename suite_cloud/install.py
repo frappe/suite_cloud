@@ -1,12 +1,12 @@
 import frappe
 
 # Desk role for operators, plus two API-only roles: tenant sites authenticate as one shared
-# service user carrying "Suite Site", and Frappe Cloud calls the provisioning endpoints with a
+# service user carrying "Suite Tenant", and Frappe Cloud calls the provisioning endpoints with a
 # user carrying "Frappe Cloud". Neither API role holds DocType permissions; the endpoints check
 # ownership themselves.
 ROLES = (
     ("Suite Cloud Manager", 1),
-    ("Suite Site", 0),
+    ("Suite Tenant", 0),
     ("Frappe Cloud", 0),
 )
 
@@ -41,17 +41,17 @@ def ensure_role(role_name: str, desk_access: int) -> None:
 
 
 def ensure_site_service_user() -> None:
-    """The user every Suite Site API request runs as (see suite_cloud.api.site)."""
+    """The user every Suite Tenant API request runs as (see suite_cloud.api.site)."""
 
     if not frappe.db.exists("User", SITE_SERVICE_USER):
         user = frappe.get_doc(
             {
                 "doctype": "User",
                 "email": SITE_SERVICE_USER,
-                "first_name": "Suite Site",
+                "first_name": "Suite Tenant",
                 "user_type": "Website User",
                 "send_welcome_email": 0,
-                "roles": [{"role": "Suite Site"}],
+                "roles": [{"role": "Suite Tenant"}],
             }
         )
         user.flags.ignore_password_policy = True

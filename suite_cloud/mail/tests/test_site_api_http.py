@@ -22,7 +22,7 @@ class TestHttpContract(SiteApiTestCase):
         db = frappe.local.db  # the real connection, not the proxy, or the request loops on itself
         headers = {
             "Authorization": f"token {self.site.api_key}:{self.site.new_secret}",
-            "Frappe-Authorization-Source": "Suite Site",
+            "Frappe-Authorization-Source": "Suite Tenant",
             "X-Frappe-Site-Name": frappe.local.site,
         }
         payload = {"query_string": params} if verb == "GET" else {"json": params}

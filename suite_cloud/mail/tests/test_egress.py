@@ -59,7 +59,7 @@ class TestEgress(IntegrationTestCase):
         for name in frappe.get_all("Mail Domain", mine, pluck="name"):
             frappe.delete_doc("Mail Domain", name, force=True, ignore_permissions=True, ignore_on_trash=True)
         frappe.db.set_value("Stalwart Cluster", self.cluster.name, "default_egress_pool", None)
-        frappe.db.set_value("Suite Site", self.site.name, "egress_pool", None)
+        frappe.db.set_value("Suite Tenant", self.site.name, "egress_pool", None)
         for name in frappe.get_all("Egress IP Pool", mine, pluck="name"):
             frappe.delete_doc(
                 "Egress IP Pool", name, force=True, ignore_permissions=True, ignore_on_trash=True
@@ -443,7 +443,7 @@ class TestEgress(IntegrationTestCase):
         )
 
         site = make_site(other, "other.frappe.test")
-        self.addCleanup(frappe.db.delete, "Suite Site", {"name": site.name})
+        self.addCleanup(frappe.db.delete, "Suite Tenant", {"name": site.name})
         domain = frappe.get_doc(
             {
                 "doctype": "Mail Domain",

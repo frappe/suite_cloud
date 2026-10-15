@@ -440,7 +440,7 @@
   },
   {
    "group": "Tenancy",
-   "link_doctype": "Suite Site",
+   "link_doctype": "Suite Tenant",
    "link_fieldname": "cluster"
   },
   {
@@ -464,7 +464,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-09-21 12:00:00.000000",
+ "modified": "2026-10-15 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

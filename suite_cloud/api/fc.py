@@ -1,4 +1,4 @@
-"""Frappe Cloud endpoints: provisioning a Suite Site when a Suite-enabled site is created.
+"""Frappe Cloud endpoints: provisioning a Suite Tenant when a Suite-enabled site is created.
 
 Callers authenticate with a Frappe user carrying the "Frappe Cloud" role (standard API
 key/secret). The secret returned by ``create_site`` and ``rotate_site_secret`` is shown once;
@@ -50,12 +50,12 @@ def create_site(
     only requests from them may use the site's key."""
 
     site = (site or "").strip().lower()
-    if frappe.db.exists("Suite Site", site):
+    if frappe.db.exists("Suite Tenant", site):
         frappe.throw(_("Site {0} already exists.").format(site), frappe.DuplicateEntryError)
 
     doc = frappe.get_doc(
         {
-            "doctype": "Suite Site",
+            "doctype": "Suite Tenant",
             "site_name": site,
             "cluster": pick_cluster(cluster, region),
             "fc_reference": fc_reference,
@@ -151,9 +151,9 @@ def archive_site(site: str, delete_data: bool = False) -> dict:
 
 def load(site: str):
     site = (site or "").strip().lower()
-    if not frappe.db.exists("Suite Site", site):
+    if not frappe.db.exists("Suite Tenant", site):
         frappe.throw(_("Site {0} was not found.").format(site), frappe.DoesNotExistError)
-    return frappe.get_doc("Suite Site", site)
+    return frappe.get_doc("Suite Tenant", site)
 
 
 def ips_text(value: list[str] | str | None) -> str | None:
@@ -167,7 +167,7 @@ def ips_text(value: list[str] | str | None) -> str | None:
 
 
 def credentials(doc, secret: str) -> dict:
-    return {"api_key": doc.api_key, "api_secret": secret, "authorization_source": "Suite Site"}
+    return {"api_key": doc.api_key, "api_secret": secret, "authorization_source": "Suite Tenant"}
 
 
 def pick_cluster(cluster: str | None, region: str | None) -> str:

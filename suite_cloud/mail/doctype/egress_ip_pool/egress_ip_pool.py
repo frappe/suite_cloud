@@ -100,7 +100,7 @@ class EgressIPPool(Document):
     def on_trash(self) -> None:
         for doctype, field in (
             ("Stalwart Cluster", "default_egress_pool"),
-            ("Suite Site", "egress_pool"),
+            ("Suite Tenant", "egress_pool"),
             ("Mail Domain", "egress_pool"),
         ):
             if user := frappe.db.exists(doctype, {field: self.name}):

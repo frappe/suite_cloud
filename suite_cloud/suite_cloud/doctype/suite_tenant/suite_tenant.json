@@ -162,7 +162,7 @@
    "label": "API Access"
   },
   {
-   "description": "Sent by the site as Authorization: token key:secret with Frappe-Authorization-Source: Suite Site. Generated at creation and never changes.",
+   "description": "Sent by the site as Authorization: token key:secret with Frappe-Authorization-Source: Suite Tenant. Generated at creation and never changes.",
    "fieldname": "api_key",
    "fieldtype": "Data",
    "label": "API Key",
@@ -244,10 +244,10 @@
    "link_fieldname": "site"
   }
  ],
- "modified": "2026-10-15 12:00:00.000000",
+ "modified": "2026-10-15 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
- "name": "Suite Site",
+ "name": "Suite Tenant",
  "naming_rule": "By fieldname",
  "owner": "Administrator",
  "permissions": [

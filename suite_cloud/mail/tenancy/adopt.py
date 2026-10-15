@@ -24,10 +24,10 @@ SAVEPOINT = "adopt_object"
 def adopt_directory(site_name: str) -> dict:
     """Returns ``{"adopted": {doctype: [names]}, "skipped": {doctype: [[name, reason]]}}``."""
 
-    site = frappe.get_doc("Suite Site", site_name)
+    site = frappe.get_doc("Suite Tenant", site_name)
     cluster = site.get_cluster()
     others = set(
-        frappe.get_all("Suite Site", {"cluster": cluster.name, "name": ["!=", site.name]}, pluck="name")
+        frappe.get_all("Suite Tenant", {"cluster": cluster.name, "name": ["!=", site.name]}, pluck="name")
     )
     for doctype in ("Mail Domain", "Mail Account", "Mail Group", "Mailing List"):
         # Rows left by a site that moved or was removed still say whose the cluster's objects are.
