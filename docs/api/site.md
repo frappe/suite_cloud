@@ -39,6 +39,25 @@ Confirms the credentials and returns the site profile, including where its mail 
 
 `status` is `Active`, `Suspended` or `Archived`. A limit of `null` means no limit. `allocated_disk_gb` is the sum of the disk quotas of the site's accounts and groups, which the site's `max_disk_gb` bounds.
 
+## `get_disk_usage`
+
+`GET site.get_disk_usage`
+
+| Parameter | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `fresh` | boolean | `false` | Asks the mail server now instead of answering from the cache |
+
+Answers the disk the site's accounts and groups use together, as the mail server reports it:
+
+```json
+{
+  "used_disk_bytes": 734003200,
+  "fetched_at": "2026-03-04T05:06:07Z"
+}
+```
+
+Suite Cloud asks the mail server for every account and group of the site in as few calls as the server allows, then keeps the sum for 5 minutes. A call inside that time answers the kept figure and `fetched_at` says when it was read. `fresh` reads the mail server again and replaces the kept figure. When the mail server cannot answer, the call fails with a 503 and nothing is kept, so a partial sum is never served.
+
 ## `update_site_profile`
 
 `PATCH site.update_site_profile`

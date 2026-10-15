@@ -19,7 +19,7 @@ from typing import Any
 import frappe
 from frappe import _
 from frappe.query_builder.functions import Count
-from frappe.utils import cint, get_datetime
+from frappe.utils import cint, get_datetime, sbool
 
 from suite_cloud.mail.stalwart.errors import (
     StalwartError,
@@ -393,6 +393,15 @@ def ping() -> dict:
     """Confirms the credentials and returns where the site's mail lives."""
 
     return current_site().to_api()
+
+
+@frappe.whitelist(methods=["GET"])
+@site_api
+def get_disk_usage(fresh: bool = False) -> dict:
+    """The disk the site's accounts and groups use together, served from a short-lived cache;
+    ``fresh`` asks the mail server now."""
+
+    return current_site().get_disk_usage(sbool(fresh))
 
 
 @frappe.whitelist(methods=["PATCH"])

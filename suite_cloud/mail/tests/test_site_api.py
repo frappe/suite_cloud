@@ -6,16 +6,20 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.api import fc
 from suite_cloud.api.mail import accounts, domains, groups, mailing_lists, meta
 from suite_cloud.api.site import (
+    ClusterUnavailableError,
     SiteAddressError,
     SiteAuthError,
     SiteSuspendedError,
     current_site,
+    get_disk_usage,
     ping,
     update_site_profile,
 )
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.mail.doctype.mail_domain.mail_domain import verify_unverified_domains
 from suite_cloud.mail.stalwart import forget_sessions
+from suite_cloud.mail.stalwart.errors import StalwartUnavailableError
+from suite_cloud.mail.stalwart.service import ManagementService
 from suite_cloud.mail.tenancy.ownership import (
     VALUE_PREFIX,
     DomainNotVerifiedError,
@@ -87,6 +91,42 @@ class SiteApiTestCase(IntegrationTestCase):
 
 
 class TestSiteResolution(SiteApiTestCase):
+    def test_disk_usage_is_summed_in_one_call_and_cached(self) -> None:
+        key = f"suite_cloud:disk-usage:{self.site.name}"
+        frappe.cache.delete_value(key)
+        self.addCleanup(frappe.cache.delete_value, key)
+        calls = len(self.fake.calls)
+        self.assertEqual(get_disk_usage()["used_disk_bytes"], 0)  # nothing to ask the cluster about
+        self.assertEqual(len(self.fake.calls), calls)
+
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw")
+        groups.create_group("sales@acme.com")
+        self.fake.find("Account", name="alice")["usedDiskQuota"] = 4096
+        self.fake.find("Account", name="sales")["usedDiskQuota"] = 512
+        calls = len(self.fake.calls)
+        usage = get_disk_usage(fresh=True)
+        self.assertEqual(usage["used_disk_bytes"], 4608)
+        self.assertIsNotNone(frappe.utils.get_datetime(usage["fetched_at"]))
+        self.assertEqual([c[0] for c in self.fake.calls[calls:]], ["x:Account/get"])
+        # The cached figure is served until it expires or the caller asks for a fresh one.
+        self.fake.find("Account", name="alice")["usedDiskQuota"] = 8192
+        self.assertEqual(get_disk_usage(), usage)
+        self.assertEqual(len(self.fake.calls), calls + 1)
+        self.assertEqual(get_disk_usage(fresh="1")["used_disk_bytes"], 8704)
+        self.assertEqual(get_disk_usage()["used_disk_bytes"], 8704)
+
+    def test_disk_usage_is_not_cached_when_the_cluster_cannot_answer(self) -> None:
+        key = f"suite_cloud:disk-usage:{self.site.name}"
+        frappe.cache.delete_value(key)
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw")
+        with patch.object(ManagementService, "get_many", side_effect=StalwartUnavailableError()):
+            self.assertRaises(ClusterUnavailableError, get_disk_usage)
+        self.assertIsNone(frappe.cache.get_value(key, expires=True))
+
     def test_site_profile_follows_the_workspace(self) -> None:
         profile = update_site_profile(title="  Acme Corp ", contact_email="Ops@Acme.test")
         self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", "ops@acme.test"))
