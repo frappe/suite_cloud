@@ -69,7 +69,7 @@ class MailingList(Document):
         if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
             frappe.get_cached_doc("Suite Site", self.site).assert_can_add_mailing_list()
-        assert_address_available(self.email, exclude=(self.doctype, self.name))
+        assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
         sync.validate_aliases(self)
 
     def after_insert(self) -> None:

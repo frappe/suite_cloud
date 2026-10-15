@@ -7,7 +7,13 @@ from frappe.tests import UnitTestCase
 
 from suite_cloud.api import fc, site
 from suite_cloud.api.mail import accounts, dmarc, domains, groups, mailing_lists, meta, tls
-from suite_cloud.api.site import InvalidInputError, as_datetime, as_list
+from suite_cloud.api.site import InvalidInputError, api_errors, as_datetime, as_list
+from suite_cloud.mail.stalwart.errors import (
+    StalwartError,
+    StalwartRejectedError,
+    StalwartUnauthorizedError,
+    StalwartUnavailableError,
+)
 
 MODULES = (site, fc, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
 VERB_BY_PREFIX = {
@@ -68,6 +74,26 @@ class TestApiInput(UnitTestCase):
             with self.assertRaises(InvalidInputError) as ctx:
                 call()
             self.assertEqual(ctx.exception.http_status_code, 400)
+
+    def test_mail_server_failures_leave_with_a_status_and_a_plain_message(self) -> None:
+        cases = (
+            (
+                StalwartRejectedError({"type": "forbidden", "description": "Quota exceeded."}),
+                422,
+                "Quota exceeded.",
+            ),
+            (StalwartRejectedError({"notCreated": {"0": {"type": "alreadyExists"}}}), 422, "alreadyExists"),
+            (StalwartUnavailableError(), 503, "not reachable"),
+            (StalwartUnauthorizedError("bad key"), 502, "credentials"),
+            (StalwartError("boom"), 502, "could not complete"),
+        )
+        for raised, status, text in cases:
+            with self.subTest(type(raised).__name__), self.assertRaises(frappe.ValidationError) as ctx:
+                with api_errors():
+                    raise raised
+            self.assertEqual(ctx.exception.http_status_code, status)
+            self.assertIn(text, str(ctx.exception))
+            self.assertNotIn("Stalwart", str(ctx.exception))
 
     def test_moments_parse_or_stay_absent(self) -> None:
         self.assertIsNone(as_datetime(None))

@@ -9,6 +9,7 @@ owned by that site. Objects of other sites are reported as missing, never as for
 
 import base64
 import functools
+import inspect
 import json
 from collections.abc import Callable
 from contextlib import contextmanager
@@ -20,8 +21,17 @@ from frappe import _
 from frappe.query_builder.functions import Count
 from frappe.utils import cint, get_datetime
 
-from suite_cloud.mail.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
+from suite_cloud.mail.stalwart.errors import (
+    StalwartError,
+    StalwartRejectedError,
+    StalwartUnauthorizedError,
+    StalwartUnavailableError,
+)
+from suite_cloud.mail.tenancy.addresses import NOUNS
 from suite_cloud.utils import get_config
+
+API_PATH = "/api/v2/method/suite_cloud.api."
+ERROR_KEYS = ("type", "message", "exception")
 
 OWNED_DOCTYPES = {"Mail Domain", "Mail Account", "Mail Group", "Mailing List"}
 MANAGER_ROLES = ("System Manager", "Suite Cloud Manager")
@@ -50,9 +60,21 @@ class InvalidInputError(frappe.ValidationError):
 
 
 class ClusterRejectedError(frappe.ValidationError):
-    """Stalwart refused the change; the type/description are safe to show the caller."""
+    """Stalwart refused the change; its description is safe to show the caller."""
 
     http_status_code = 422
+
+
+class ClusterUnavailableError(frappe.ValidationError):
+    """The mail server could not be reached; the same request can be tried again."""
+
+    http_status_code = 503
+
+
+class ClusterFailedError(frappe.ValidationError):
+    """The mail server failed in a way the caller cannot fix; the detail goes to the Error Log."""
+
+    http_status_code = 502
 
 
 class ClusterMisconfiguredError(frappe.ValidationError):
@@ -92,7 +114,10 @@ def _resolve_site():
     site = frappe.get_cached_doc("Suite Site", name)
     throttle(f"site:{site.name}")  # counted before any refusal, so refusals cannot be free
     if not site.enabled or site.status != "Active":
-        frappe.throw(_("Site {0} is {1}.").format(site.name, site.status.lower()), SiteSuspendedError)
+        frappe.throw(
+            _("Site {0} is {1} and cannot use the API.").format(site.name, site.status.lower()),
+            SiteSuspendedError,
+        )
     if frappe.session.user == service_user and not site.allows_ip(request_ip):
         # A key copied out of a site's config is worthless from anywhere but the site's own servers.
         # Either the key has leaked or the site moved servers; operators need to know which.
@@ -128,7 +153,9 @@ def throttle(subject: str) -> None:
         frappe.cache.expire(key, 90)
     if count > RATE_LIMIT:
         frappe.throw(
-            _("Rate limit of {0} requests per minute exceeded.").format(RATE_LIMIT),
+            _("The site sent more than {0} requests in a minute. Wait a moment and try again.").format(
+                RATE_LIMIT
+            ),
             frappe.TooManyRequestsError,
         )
 
@@ -158,34 +185,67 @@ def site_api(fn: Callable) -> Callable:
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         current_site()  # resolves and throttles once per request
+        assert_arguments(fn, args, kwargs)
         with api_errors():
             return fn(*args, **kwargs)
 
     return wrapper
 
 
+def assert_arguments(fn: Callable, args: tuple, kwargs: dict) -> None:
+    """A required parameter the request left out is a 400 that names it, not Python's TypeError."""
+
+    parameters = list(inspect.signature(fn).parameters.values())[len(args) :]
+    for parameter in parameters:
+        if parameter.default is parameter.empty and parameter.name not in kwargs:
+            frappe.throw(_("The {0} field is required.").format(parameter.name), InvalidInputError)
+
+
 @contextmanager
 def api_errors():
-    """Stalwart's refusals become 422 and its rejected credentials 502. A refusal of Suite Cloud's
-    own leaves as 422 too: Frappe's 417 for a validation error means nothing to a REST client."""
+    """The mail server's refusals become 422, its outages 503 and its other failures 502. A refusal
+    of Suite Cloud's own leaves as 422 too: Frappe's 417 for a validation error means nothing to a
+    REST client."""
 
     try:
         yield
     except StalwartRejectedError as e:
-        frappe.throw(_("The mail server rejected the change: {0}").format(_describe(e)), ClusterRejectedError)
+        reason = e.description or e.error_type or _("no reason was given")
+        frappe.throw(_("The mail server did not accept the change: {0}").format(reason), ClusterRejectedError)
+    except StalwartUnavailableError:
+        frappe.throw(
+            _("The mail server is not reachable right now. Try again in a few minutes."),
+            ClusterUnavailableError,
+        )
     except StalwartUnauthorizedError as e:
         frappe.log_error(title="[Suite Cloud] Cluster credentials rejected", message=str(e))
-        frappe.throw(_("The mail cluster refused Suite Cloud's credentials."), ClusterMisconfiguredError)
+        frappe.throw(
+            _("The mail server did not accept Suite Cloud's credentials. Contact the Suite Cloud operators."),
+            ClusterMisconfiguredError,
+        )
+    except StalwartError as e:
+        frappe.log_error(title="[Suite Cloud] Cluster call failed", message=str(e))
+        frappe.throw(
+            _("The mail server could not complete the change. Contact the Suite Cloud operators."),
+            ClusterFailedError,
+        )
     except frappe.ValidationError as e:
         if e.http_status_code == 417:
             e.http_status_code = 422
         raise
 
 
-def _describe(error: StalwartRejectedError) -> str:
-    if error.error_type and error.description:
-        return f"{error.error_type} ({error.description})"
-    return error.error_type or error.description or "unknown error"
+def trim_errors(response, request) -> None:
+    """Only the documented keys of an error leave the API: Frappe's desk hints (title, indicator,
+    as_table) mean nothing to a REST client."""
+
+    if not request.path.startswith(API_PATH) or response.status_code < 400 or not response.is_json:
+        return
+    body = response.get_json(silent=True)
+    if not body or "errors" not in body:
+        return
+    body["errors"] = [{k: v for k, v in error.items() if k in ERROR_KEYS} for error in body["errors"]]
+    response.set_data(json.dumps(body))
 
 
 def normalize_name(name: str | None) -> str:
@@ -216,7 +276,9 @@ def owned(doctype: str, name: str, for_update: bool = False):
     if name and frappe.db.exists(doctype, name):
         doc = frappe.get_doc(doctype, name, for_update=for_update)
     if doc is None or doc.site != site.name:
-        frappe.throw(_("{0} {1} not found.").format(_(doctype), name), frappe.DoesNotExistError)
+        frappe.throw(
+            _("{0} {1} was not found.").format(_(NOUNS[doctype]).capitalize(), name), frappe.DoesNotExistError
+        )
     return doc
 
 
@@ -305,9 +367,9 @@ def as_items(value: Any, cap: int | None = None) -> list:
         except ValueError:
             value = None
     if not isinstance(value, list):
-        frappe.throw(_("Expected a list."), InvalidInputError)
+        frappe.throw(_('Send a JSON array, for example ["a@example.com"].'), InvalidInputError)
     if cap is not None and len(value) > cap:
-        frappe.throw(_("At most {0} entries per request.").format(cap), InvalidInputError)
+        frappe.throw(_("Send at most {0} entries in one request.").format(cap), InvalidInputError)
     return value
 
 
@@ -319,7 +381,10 @@ def as_datetime(value: Any) -> datetime | None:
     try:
         return get_datetime(value)
     except (TypeError, ValueError):
-        frappe.throw(_("{0} is not a date.").format(value), InvalidInputError)
+        frappe.throw(
+            _("{0} is not a date. Use ISO 8601, for example 2026-03-04T05:06:07.").format(value),
+            InvalidInputError,
+        )
 
 
 @frappe.whitelist(methods=["GET"])
@@ -343,9 +408,6 @@ def update_site_profile(title: str | None = None, contact_email: str | None = No
     if title is not None:
         site.title = title.strip()
     if contact_email is not None:
-        contact_email = contact_email.strip().lower()
-        if contact_email:
-            frappe.utils.validate_email_address(contact_email, throw=True)
-        site.contact_email = contact_email or None
+        site.contact_email = contact_email.strip() or None
     site.save(ignore_permissions=True)
     return site.to_api()

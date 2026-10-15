@@ -51,7 +51,7 @@ def push_destroy(doc: Document, service: str) -> None:
 def domain_stalwart_id(domain_name: str) -> str:
     stalwart_id = frappe.db.get_value("Mail Domain", domain_name, "stalwart_id")
     if not stalwart_id:
-        frappe.throw(_("Domain {0} is not registered on the cluster yet.").format(domain_name))
+        frappe.throw(_("Domain {0} is not on the mail server yet. Try again shortly.").format(domain_name))
     return stalwart_id
 
 
@@ -115,7 +115,7 @@ def group_ids(doc: Document) -> list[str]:
     for row in doc.groups:
         stalwart_id = frappe.db.get_value("Mail Group", row.group, "stalwart_id")
         if not stalwart_id:
-            frappe.throw(_("Group {0} is not registered on the cluster yet.").format(row.group))
+            frappe.throw(_("Group {0} is not on the mail server yet. Try again shortly.").format(row.group))
         ids.append(stalwart_id)
     return ids
 

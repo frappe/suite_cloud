@@ -403,7 +403,10 @@ class TestMailDomain(TenancyTestCase):
         self.site.db_set("max_domains", 5)
         frappe.clear_document_cache("Suite Site", self.site.name)
         self.assertRaisesRegex(
-            frappe.ValidationError, "reserved", self.make_domain, self.cluster.default_domain
+            frappe.ValidationError,
+            "belongs to the mail service",
+            self.make_domain,
+            self.cluster.default_domain,
         )
         self.assertRaisesRegex(frappe.ValidationError, "not a valid domain", self.make_domain, "bad_domain")
 
@@ -540,7 +543,7 @@ class TestMailDomain(TenancyTestCase):
 
     def test_reserved_names_cover_every_cluster_zone(self) -> None:
         self.assertRaisesRegex(
-            frappe.ValidationError, "reserved", self.make_domain, "mail.other.example.test"
+            frappe.ValidationError, "belongs to the mail service", self.make_domain, "mail.other.example.test"
         )
 
     def test_domain_name_collision_is_neutral(self) -> None:
@@ -665,7 +668,7 @@ class TestMailDomain(TenancyTestCase):
     def test_domain_delete_requires_empty_directory_and_removes_dkim(self) -> None:
         domain = self.make_domain()
         self.make_account("a@acme.com")
-        self.assertRaisesRegex(frappe.ValidationError, "Delete every", domain.delete)
+        self.assertRaisesRegex(frappe.ValidationError, "Remove the accounts on", domain.delete)
 
         frappe.delete_doc("Mail Account", "a@acme.com")
         domain.delete()
@@ -835,7 +838,7 @@ class TestMailAccount(TenancyTestCase):
             frappe.ValidationError, "Disk Quota", save_with, [{"quota": "maxEmails", "value": 5}]
         )
         self.assertRaisesRegex(
-            frappe.ValidationError, "not a quota", save_with, [{"quota": "maxNope", "value": 5}]
+            frappe.ValidationError, "not a known quota", save_with, [{"quota": "maxNope", "value": 5}]
         )
 
         group = frappe.get_doc("Mail Group", "sales@acme.com")
@@ -867,7 +870,7 @@ class TestMailAccount(TenancyTestCase):
         second = self.make_account("q2@acme.com", disk_quota_gb=2)  # exactly full
         first.reload()
         first.set_disk_quota_gb(6)
-        self.assertRaisesRegex(frappe.ValidationError, "total disk quota", first.save)
+        self.assertRaisesRegex(frappe.ValidationError, "disk quota left", first.save)
         first.reload()
         first.set_disk_quota_gb(4)  # shrinking is always fine
         first.save()

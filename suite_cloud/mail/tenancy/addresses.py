@@ -8,6 +8,12 @@ from frappe.utils import validate_email_address as frappe_validate_email
 
 DOMAIN_LABEL = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)$")
 ADDRESS_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List")
+NOUNS = {
+    "Mail Domain": "domain",
+    "Mail Account": "account",
+    "Mail Group": "group",
+    "Mailing List": "mailing list",
+}  # what a message calls each object; DocType names stay inside the desk
 
 
 def normalize_domain(value: str | None) -> str:
@@ -53,9 +59,7 @@ def get_site_domain(site: str, domain_name: str):
         else None
     )
     if domain is None or domain.site != site:
-        frappe.throw(
-            _("Domain {0} does not belong to this site.").format(domain_name), frappe.DoesNotExistError
-        )
+        frappe.throw(_("Domain {0} was not found.").format(domain_name), frappe.DoesNotExistError)
     return domain
 
 
@@ -87,7 +91,7 @@ def assert_domain_available(domain_name: str, site: str) -> None:
 def assert_domain_not_reserved(domain_name: str) -> None:
     for zone in frappe.get_all("DNS Zone", pluck="name"):
         if domain_name == zone or domain_name.endswith(f".{zone}"):
-            frappe.throw(_("{0} is reserved for the mail infrastructure.").format(domain_name))
+            frappe.throw(_("{0} belongs to the mail service and cannot be added.").format(domain_name))
 
 
 def assert_addresses_deliverable(site: str, emails: list[str]) -> None:
@@ -116,7 +120,7 @@ def assert_address_available(email: str, exclude: tuple[str, str] | None = None)
             continue
         if frappe.db.exists(doctype, email):
             frappe.throw(
-                _("{0} is already a {1}.").format(email, _(doctype)),
+                _("{0} is already the address of an existing {1}.").format(email, _(NOUNS[doctype])),
                 frappe.DuplicateEntryError,
             )
 
@@ -125,6 +129,5 @@ def assert_address_available(email: str, exclude: tuple[str, str] | None = None)
     )
     if alias and (alias.parenttype, alias.parent) != exclude:
         frappe.throw(
-            _("{0} is already an alias of {1} {2}.").format(email, _(alias.parenttype), alias.parent),
-            frappe.DuplicateEntryError,
+            _("{0} is already an alias of {1}.").format(email, alias.parent), frappe.DuplicateEntryError
         )

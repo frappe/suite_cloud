@@ -95,7 +95,16 @@ class TestSiteResolution(SiteApiTestCase):
         self.assertEqual(update_site_profile(contact_email="")["title"], "Acme Corp")
         profile = update_site_profile(title="", contact_email="")
         self.assertEqual((profile["title"], profile["contact_email"]), (self.site.name, None))
-        self.assertRaises(frappe.ValidationError, update_site_profile, contact_email="not-an-address")
+        # A notice address follows the general email rules, not the mail server's local-part rules.
+        self.assertEqual(
+            update_site_profile(contact_email="ops/team@acme.test")["contact_email"], "ops/team@acme.test"
+        )
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "not a valid email address",
+            update_site_profile,
+            contact_email="not-an-address",
+        )
 
     def test_page_sizes_stay_between_one_and_the_cap(self) -> None:
         from suite_cloud.api.site import page_size
@@ -721,7 +730,7 @@ class TestDirectoryApi(SiteApiTestCase):
             accounts.create_account("carol@acme.com", "secret-pw")
         frappe.db.rollback(save_point="refusal")  # what the request handler does on an exception
         self.assertEqual(ctx.exception.http_status_code, 422)
-        self.assertIn("alreadyExists", str(ctx.exception))
+        self.assertIn("did not accept the change: Address carol already exists", str(ctx.exception))
         self.assertFalse(frappe.db.exists("Mail Account", "carol@acme.com"))
 
 

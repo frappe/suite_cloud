@@ -15,6 +15,7 @@ from suite_cloud.mail.doctype.tls_report.tls_report import TLS_REPORTS
 from suite_cloud.mail.stalwart.directory import Domain
 from suite_cloud.mail.tenancy import ownership, sync
 from suite_cloud.mail.tenancy.addresses import (
+    NOUNS,
     assert_addresses_deliverable,
     assert_domain_available,
     validate_domain_name,
@@ -138,10 +139,18 @@ class MailDomain(Document):
     def on_trash(self) -> None:
         for doctype in ("Mail Account", "Mail Group", "Mailing List"):
             if frappe.db.exists(doctype, {"domain": self.name}):
-                frappe.throw(_("Delete every {0} of {1} first.").format(_(doctype), self.domain_name))
+                frappe.throw(
+                    _("Remove the {0} on {1} before deleting the domain.").format(
+                        _(f"{NOUNS[doctype]}s"), self.domain_name
+                    )
+                )
         alias_filters = {"alias_email": ["like", f"%@{self.domain_name}"]}
         if alias := frappe.db.get_value("Mail Address Alias", alias_filters, "parent"):
-            frappe.throw(_("Remove the aliases on {0} first (e.g. on {1}).").format(self.domain_name, alias))
+            frappe.throw(
+                _("Remove the aliases on {0} before deleting the domain, for example the one on {1}.").format(
+                    self.domain_name, alias
+                )
+            )
         for reports in (DMARC_REPORTS, TLS_REPORTS):
             reports.detach_domain(self.name)
         sync.push_destroy(self, "domains")

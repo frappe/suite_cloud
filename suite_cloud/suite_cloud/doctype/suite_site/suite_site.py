@@ -68,7 +68,8 @@ class SuiteSite(Document):
         self.title = (self.title or "").strip() or self.site_name
         if self.contact_email:
             self.contact_email = self.contact_email.strip().lower()
-            frappe.utils.validate_email_address(self.contact_email, throw=True)
+            if not frappe.utils.validate_email_address(self.contact_email):
+                frappe.throw(_("{0} is not a valid email address.").format(self.contact_email))
         self.allowed_ips = "\n".join(str(n) for n in parse_networks(self.allowed_ips))
 
         self.user = get_config("site_service_user")
@@ -253,7 +254,7 @@ class SuiteSite(Document):
         allocated = self.allocated_disk_gb(exclude)
         if allocated + flt(quota_gb) > flt(self.max_disk_gb):
             frappe.throw(
-                _("Site {0} has {1} GB of its {2} GB total disk quota left; {3} GB requested.").format(
+                _("Site {0} has only {1} GB of its {2} GB disk quota left, but {3} GB was requested.").format(
                     self.name, round(flt(self.max_disk_gb) - allocated, 2), self.max_disk_gb, quota_gb
                 )
             )

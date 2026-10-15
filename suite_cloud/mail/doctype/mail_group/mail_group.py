@@ -59,7 +59,7 @@ class MailGroup(QuotaHolder, Document):
             site.assert_can_add_group()
         quotas.validate(self)
         site.validate_quota_of(self)
-        assert_address_available(self.email, exclude=(self.doctype, self.name))
+        assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
         sync.validate_aliases(self)
 
     def after_insert(self) -> None:
