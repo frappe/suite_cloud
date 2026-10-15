@@ -477,12 +477,129 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(domains.list_domains(), [])
         self.assertEqual(self.fake.all("Domain"), [])
 
+    def test_app_passwords_are_managed_per_account(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        account = accounts.create_account("alice@acme.com", "secret-pw")
+        self.assertTrue(account["app_password"].startswith("apppassword-"))
+        self.assertEqual(account["quotas"]["maxAppPasswords"], 10)
+        listed = accounts.list_app_passwords("alice@acme.com")["items"]
+        self.assertEqual([p["description"] for p in listed], ["Suite Cloud"])
+        self.assertNotIn("secret", listed[0])
+
+        created = accounts.create_app_password(
+            "alice@acme.com", "Phone", expires_at="2027-01-01T00:00:00Z", allowed_ips=["203.0.113.0/24"]
+        )
+        self.assertEqual(frappe.local.response["http_status_code"], 201)
+        self.assertTrue(created["secret"].startswith("apppassword-"))
+        self.assertEqual(
+            (created["description"], created["expires_at"], created["allowed_ips"]),
+            ("Phone", "2027-01-01T00:00:00Z", ["203.0.113.0/24"]),
+        )
+        stalwart_id = frappe.db.get_value("Mail Account", "alice@acme.com", "stalwart_id")
+        live = self.fake.objects[f"AppPassword:{stalwart_id}"]
+        self.assertEqual(live[created["id"]]["expiresAt"], "2027-01-01T00:00:00Z")
+
+        updated = accounts.update_app_password(
+            "alice@acme.com", created["id"], description="Old phone", allowed_ips=[]
+        )
+        self.assertEqual(
+            (updated["description"], updated["allowed_ips"], updated["expires_at"]),
+            ("Old phone", [], "2027-01-01T00:00:00Z"),
+        )
+        self.assertEqual(
+            (live[created["id"]]["description"], live[created["id"]]["allowedIps"]), ("Old phone", [])
+        )
+
+        # The site's own login is rotated, not deleted; the others go for good.
+        self.assertRaises(
+            frappe.ValidationError, accounts.delete_app_password, "alice@acme.com", listed[0]["id"]
+        )
+        self.assertRaises(frappe.DoesNotExistError, accounts.delete_app_password, "alice@acme.com", "nope")
+        accounts.delete_app_password("alice@acme.com", created["id"])
+        self.assertEqual(frappe.local.response["http_status_code"], 204)
+        frappe.db.after_commit.run()
+        self.assertNotIn(created["id"], live)
+        rotated = accounts.rotate_app_password("alice@acme.com")["app_password"]
+        self.assertNotEqual(rotated, account["app_password"])
+        frappe.db.after_commit.run()
+        self.assertEqual([c["description"] for c in live.values()], ["Suite Cloud"])
+
+        # A credential made outside Suite Cloud is listed, and its id works for a change or a revoke.
+        live["ap-watch"] = {"id": "ap-watch", "description": "Watch", "createdAt": "2026-02-01T00:00:00Z"}
+        self.assertIn("ap-watch", [p["id"] for p in accounts.list_app_passwords("alice@acme.com")["items"]])
+        self.assertEqual(
+            accounts.update_app_password("alice@acme.com", "ap-watch", description="Old watch")[
+                "description"
+            ],
+            "Old watch",
+        )
+        self.assertEqual(live["ap-watch"]["description"], "Old watch")
+        accounts.delete_app_password("alice@acme.com", "ap-watch")
+        frappe.db.after_commit.run()
+        self.assertNotIn("ap-watch", live)
+
+        # The default limit counts the site's login; another site sees nothing.
+        for number in range(9):
+            accounts.create_app_password("alice@acme.com", f"Device {number}")
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "at most 10",
+            accounts.create_app_password,
+            "alice@acme.com",
+            "One too many",
+        )
+        self.act_as(self.other)
+        self.assertRaises(frappe.DoesNotExistError, accounts.list_app_passwords, "alice@acme.com")
+
+    def test_api_keys_are_managed_per_account_except_the_reserved_one(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw")
+        self.assertEqual(accounts.list_api_keys("alice@acme.com")["items"], [])
+        self.assertRaisesRegex(
+            frappe.ValidationError, "reserved", accounts.create_api_key, "alice@acme.com", "Suite Cloud"
+        )
+
+        created = accounts.create_api_key("alice@acme.com", "Reporting", allowed_ips='["198.51.100.7"]')
+        self.assertEqual(frappe.local.response["http_status_code"], 201)
+        self.assertTrue(created["secret"].startswith("apikey-"))
+        self.assertEqual(created["allowed_ips"], ["198.51.100.7"])
+        self.assertIn(created["secret"], self.fake.tokens)
+        updated = accounts.update_api_key(
+            "alice@acme.com", created["id"], description="Reports", allowed_ips=[]
+        )
+        self.assertEqual((updated["description"], updated["allowed_ips"]), ("Reports", []))
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "reserved",
+            accounts.update_api_key,
+            "alice@acme.com",
+            created["id"],
+            description="Suite Cloud",
+        )
+        listed = accounts.list_api_keys("alice@acme.com")["items"]
+        self.assertEqual([k["description"] for k in listed], ["Reports"])
+        accounts.delete_api_key("alice@acme.com", created["id"])
+        self.assertEqual(frappe.local.response["http_status_code"], 204)
+        frappe.db.after_commit.run()
+        self.assertEqual(accounts.list_api_keys("alice@acme.com")["items"], [])
+
+        for number in range(10):
+            accounts.create_api_key("alice@acme.com", f"Key {number}")
+        self.assertRaisesRegex(
+            frappe.ValidationError, "at most 10", accounts.create_api_key, "alice@acme.com", "One too many"
+        )
+
     def test_quotas_travel_as_a_map_with_disk_always_present(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")
         default_bytes = int(self.site.default_disk_quota_gb * 1024**3)
         account = accounts.create_account("alice@acme.com", "secret-pw", quotas='{"maxEmails": 1000}')
-        self.assertEqual(account["quotas"], {"maxEmails": 1000, "maxDiskQuota": default_bytes})
+        self.assertEqual(
+            account["quotas"],
+            {"maxEmails": 1000, "maxDiskQuota": default_bytes, "maxAppPasswords": 10, "maxApiKeys": 10},
+        )
         self.assertEqual(account["disk_quota_gb"], self.site.default_disk_quota_gb)
         self.assertEqual(self.fake.find("Account", name="alice")["quotas"]["maxEmails"], 1000)
 

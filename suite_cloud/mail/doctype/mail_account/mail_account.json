@@ -17,9 +17,8 @@
   "stalwart_id",
   "credentials_section",
   "new_password",
-  "column_break_credentials",
-  "app_password",
-  "api_key",
+  "app_passwords",
+  "api_keys",
   "settings_section",
   "locale",
   "column_break_settings",
@@ -116,6 +115,7 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
    "fieldname": "credentials_section",
    "fieldtype": "Section Break",
    "label": "Credentials"
@@ -128,24 +128,18 @@
    "no_copy": 1
   },
   {
-   "fieldname": "column_break_credentials",
-   "fieldtype": "Column Break"
+   "description": "The account's app passwords on the cluster, refreshed when the form opens. A new row is created on save and its secret shown once; a removed row is revoked. Suite Cloud is the Suite site's own login and stays first. The maxAppPasswords quota caps the rows.",
+   "fieldname": "app_passwords",
+   "fieldtype": "Table",
+   "label": "App Passwords",
+   "options": "Mail Credential"
   },
   {
-   "description": "Login the Suite site uses for this account's mail access. Minted on creation and handed to the site once; Rotate App Password replaces it and Show App Password reveals it.",
-   "fieldname": "app_password",
-   "fieldtype": "Password",
-   "label": "App Password",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "description": "Bearer token for this account's JMAP access. Created only on demand with Rotate API Key, which also replaces an existing one; Show API Key reveals it.",
-   "fieldname": "api_key",
-   "fieldtype": "Password",
-   "label": "API Key",
-   "no_copy": 1,
-   "read_only": 1
+   "description": "Bearer tokens for the account's JMAP access, handled like the app passwords. Suite Cloud is reserved for Rotate API Key. The maxApiKeys quota caps the rows.",
+   "fieldname": "api_keys",
+   "fieldtype": "Table",
+   "label": "API Keys",
+   "options": "Mail Credential"
   },
   {
    "fieldname": "settings_section",
@@ -214,7 +208,7 @@
    "options": "Mail Group Member"
   }
  ],
- "in_create": 1,
+ "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
  "modified": "2026-10-07 13:05:00.000000",

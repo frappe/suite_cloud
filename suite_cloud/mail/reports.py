@@ -8,16 +8,14 @@ than the cluster does and reads it through the site API without ever touching th
 
 import json
 from dataclasses import dataclass
-from datetime import UTC
-from zoneinfo import ZoneInfo
 
 import frappe
 from frappe.model.base_document import get_controller
 from frappe.model.document import Document
-from frappe.utils import add_days, cint, get_datetime, get_system_timezone, now_datetime
+from frappe.utils import add_days, cint, get_datetime, now_datetime
 
 from suite_cloud.mail.stalwart import get_client, has_credentials
-from suite_cloud.utils import get_config, log_exception, utc_iso
+from suite_cloud.utils import get_config, local_datetime, log_exception, utc_iso
 
 DEFAULT_RETENTION_DAYS = 90
 
@@ -228,14 +226,3 @@ def normalize_domain(value) -> str:
 
 def lower(value) -> str | None:
     return str(value).lower() if value not in (None, "") else None
-
-
-def local_datetime(value):
-    """A UTC timestamp from Stalwart as the naive system-time value Frappe stores."""
-
-    if not value:
-        return None
-    moment = get_datetime(value)
-    if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(ZoneInfo(get_system_timezone())).replace(tzinfo=None)

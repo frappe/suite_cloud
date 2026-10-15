@@ -20,10 +20,10 @@ from suite_cloud.mail.reports import (
     envelope_fields,
     envelope_payload,
     listing_payloads,
-    local_datetime,
     normalize_domain,
     sender_address,
 )
+from suite_cloud.utils import local_datetime
 
 # Stalwart spells the RFC 8460 values in camelCase; they are stored the way the RFC spells them.
 POLICY_TYPES = {"tlsa": "tlsa", "sts": "sts", "noPolicyFound": "no-policy-found", "other": "other"}

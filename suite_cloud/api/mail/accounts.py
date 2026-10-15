@@ -1,6 +1,7 @@
 from contextlib import suppress
 
 import frappe
+from frappe import _
 from frappe.utils import sbool
 
 from suite_cloud.api.mail import aliases
@@ -18,9 +19,11 @@ from suite_cloud.mail.doctype.mail_account.mail_account import (
     account_payloads,
     validate_password,
 )
+from suite_cloud.mail.tenancy import account_credentials, sync
 from suite_cloud.mail.tenancy import quotas as quota_rows
-from suite_cloud.mail.tenancy import sync
+from suite_cloud.mail.tenancy.account_credentials import API_KEYS, APP_PASSWORDS, Kind
 from suite_cloud.mail.tenancy.usage import used_disk_by_name
+from suite_cloud.utils import local_datetime
 
 ACCOUNT_PAGE_CAP = 200
 
@@ -111,6 +114,7 @@ def create_account(
     )
     quota_rows.apply(doc, disk_quota_gb, quotas)
     doc.flags.password = password
+    doc.flags.secrets_in_response = True
     doc.insert(ignore_permissions=True)
 
     # The list memberships are separate cluster calls after the insert: if one fails the row
@@ -128,9 +132,9 @@ def create_account(
         raise
 
     frappe.local.response["http_status_code"] = 201
-    # The app password is minted on creation and returned once; rotate_app_password issues a
-    # fresh one later. Suite Cloud keeps it, the account's own password it never does.
-    return {**doc.to_api(), "app_password": doc.get_password("app_password")}
+    # Returned once; rotate_app_password issues a fresh one later. Suite Cloud stores neither it
+    # nor the account's own password.
+    return {**doc.to_api(), "app_password": account_credentials.site_login_secret(doc, APP_PASSWORDS)}
 
 
 @frappe.whitelist(methods=["PATCH"])
@@ -184,15 +188,133 @@ def set_password(email: str, password: str) -> None:
 def rotate_app_password(email: str) -> dict:
     """Mints a new app password for the account, revokes the previous one, and returns it once."""
 
-    return {"app_password": owned("Mail Account", email).mint_credential("app_password")}
+    return {"app_password": owned("Mail Account", email, for_update=True).mint_app_password()}
+
+
+@frappe.whitelist(methods=["GET"])
+@site_api
+def list_app_passwords(email: str) -> dict:
+    return list_credentials(APP_PASSWORDS, email)
 
 
 @frappe.whitelist(methods=["POST"])
 @site_api
-def create_app_password(email: str, description: str = "Suite") -> dict:
-    """The secret is returned once and never stored by Suite Cloud."""
+def create_app_password(
+    email: str,
+    description: str = "Suite",
+    expires_at: str | None = None,
+    allowed_ips: list[str] | str | None = None,
+) -> dict:
+    return create_credential(APP_PASSWORDS, email, description, expires_at, allowed_ips)
 
-    return {"secret": owned("Mail Account", email).create_app_password(description)}
+
+@frappe.whitelist(methods=["PATCH"])
+@site_api
+def update_app_password(
+    email: str,
+    id: str,
+    description: str | None = None,
+    expires_at: str | None = None,
+    allowed_ips: list[str] | str | None = None,
+) -> dict:
+    return update_credential(APP_PASSWORDS, email, id, description, expires_at, allowed_ips)
+
+
+@frappe.whitelist(methods=["DELETE"])
+@site_api
+def delete_app_password(email: str, id: str) -> None:
+    delete_credential(APP_PASSWORDS, email, id)
+
+
+@frappe.whitelist(methods=["GET"])
+@site_api
+def list_api_keys(email: str) -> dict:
+    return list_credentials(API_KEYS, email)
+
+
+@frappe.whitelist(methods=["POST"])
+@site_api
+def create_api_key(
+    email: str,
+    description: str,
+    expires_at: str | None = None,
+    allowed_ips: list[str] | str | None = None,
+) -> dict:
+    return create_credential(API_KEYS, email, description, expires_at, allowed_ips)
+
+
+@frappe.whitelist(methods=["PATCH"])
+@site_api
+def update_api_key(
+    email: str,
+    id: str,
+    description: str | None = None,
+    expires_at: str | None = None,
+    allowed_ips: list[str] | str | None = None,
+) -> dict:
+    return update_credential(API_KEYS, email, id, description, expires_at, allowed_ips)
+
+
+@frappe.whitelist(methods=["DELETE"])
+@site_api
+def delete_api_key(email: str, id: str) -> None:
+    delete_credential(API_KEYS, email, id)
+
+
+def list_credentials(kind: Kind, email: str) -> dict:
+    """The credentials as the cluster holds them; no secret is part of the answer."""
+
+    doc = owned("Mail Account", email)
+    account_credentials.load(doc, kind)
+    return {"items": [account_credentials.payload(row) for row in doc.get(kind.field)]}
+
+
+def create_credential(kind: Kind, email: str, description: str, expires_at, allowed_ips) -> dict:
+    """Answers 201 with the new credential and its secret, which Suite Cloud does not keep."""
+
+    doc = owned("Mail Account", email, for_update=True)
+    row = doc.append(
+        kind.field,
+        {
+            "description": description,
+            "expires_at": local_datetime(expires_at),
+            "allowed_ips": "\n".join(as_list(allowed_ips)),
+        },
+    )
+    doc.flags.secrets_in_response = True
+    doc.save(ignore_permissions=True)
+
+    frappe.local.response["http_status_code"] = 201
+    return {**account_credentials.payload(row), "secret": doc.flags.credential_secrets[row.name]}
+
+
+def update_credential(kind: Kind, email: str, id: str, description, expires_at, allowed_ips) -> dict:
+    """Only the fields passed change; an empty ``expires_at`` or ``allowed_ips`` clears it."""
+
+    doc = owned("Mail Account", email, for_update=True)
+    row = account_credentials.row_by_id(doc, kind, id)
+    if description is not None:
+        row.description = description
+    if expires_at is not None:
+        row.expires_at = local_datetime(expires_at)
+    if allowed_ips is not None:
+        row.allowed_ips = "\n".join(as_list(allowed_ips))
+    doc.save(ignore_permissions=True)
+    return account_credentials.payload(row)
+
+
+def delete_credential(kind: Kind, email: str, id: str) -> None:
+    """Revokes one credential; the site's own app password is rotated, never deleted."""
+
+    doc = owned("Mail Account", email, for_update=True)
+    row = account_credentials.row_by_id(doc, kind, id)
+    if row.description == account_credentials.SITE_LOGIN and kind.always_present:
+        frappe.throw(
+            _("Use rotate_app_password for the {0} app password.").format(account_credentials.SITE_LOGIN)
+        )
+    doc.remove(row)
+    doc.save(ignore_permissions=True)
+    frappe.local.response["http_status_code"] = 204
 
 
 @frappe.whitelist(methods=["PUT"])
