@@ -298,6 +298,8 @@ class SuiteSite(Document):
             ids += frappe.get_all(
                 doctype, {"site": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
             )
+        if not ids:
+            return 0  # building a client already fetches the session
         objects = get_client(self.get_cluster()).accounts.get_many(ids, properties=USAGE_PROPERTIES)
         return sum(cint(o.get("usedDiskQuota")) for o in objects)
 

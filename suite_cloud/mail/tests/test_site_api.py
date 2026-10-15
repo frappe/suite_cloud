@@ -36,6 +36,7 @@ from suite_cloud.mail.tests.fixtures import (
 )
 
 MAIL_DOMAIN = "suite_cloud.mail.doctype.mail_domain.mail_domain"
+SUITE_SITE = "suite_cloud.suite_cloud.doctype.suite_site.suite_site"
 
 
 class SiteApiTestCase(IntegrationTestCase):
@@ -95,9 +96,9 @@ class TestSiteResolution(SiteApiTestCase):
         key = f"suite_cloud:disk-usage:{self.site.name}"
         frappe.cache.delete_value(key)
         self.addCleanup(frappe.cache.delete_value, key)
-        calls = len(self.fake.calls)
-        self.assertEqual(get_disk_usage()["used_disk_bytes"], 0)  # nothing to ask the cluster about
-        self.assertEqual(len(self.fake.calls), calls)
+        with patch(f"{SUITE_SITE}.get_client") as get_client:
+            self.assertEqual(get_disk_usage()["used_disk_bytes"], 0)
+        get_client.assert_not_called()  # nothing to ask, so not even the session is fetched
 
         domains.create_domain("acme.com")
         self.verify("acme.com")
