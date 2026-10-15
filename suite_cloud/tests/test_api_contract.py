@@ -5,7 +5,7 @@ from datetime import datetime
 import frappe
 from frappe.tests import UnitTestCase
 
-from suite_cloud.api import fc, site
+from suite_cloud.api import site
 from suite_cloud.api.mail import accounts, dmarc, domains, groups, mailing_lists, meta, tls
 from suite_cloud.api.site import InvalidInputError, api_errors, as_datetime, as_list
 from suite_cloud.mail.stalwart.errors import (
@@ -15,7 +15,7 @@ from suite_cloud.mail.stalwart.errors import (
     StalwartUnavailableError,
 )
 
-MODULES = (site, fc, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
+MODULES = (site, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
 VERB_BY_PREFIX = {
     "list_": "GET",
     "get_": "GET",
@@ -29,13 +29,11 @@ VERB_BY_PREFIX = {
 
 
 def api_functions():
-    """Every whitelisted function of the site API; Frappe Cloud's caller is checked on its own."""
+    """Every whitelisted function of the site API."""
 
     for module in MODULES:
         for name, member in vars(module).items():
             if callable(member) and member in frappe.whitelisted and member.__module__ == module.__name__:
-                if module is fc and name in ("get_site", "update_site"):
-                    continue
                 yield f"{module.__name__}.{name}", name, member
 
 
@@ -53,15 +51,9 @@ class TestApiVerbs(UnitTestCase):
             with self.subTest(path):
                 self.assertEqual(methods, ("GET", "QUERY") if verb == "GET" else (verb,))
 
-    def test_frappe_cloud_methods_keep_post_for_their_caller(self) -> None:
-        for name, function in (("get_site", fc.get_site), ("update_site", fc.update_site)):
-            methods = frappe.allowed_http_methods_for_whitelisted_func[function]
-            self.assertIn(expected_verb(name), methods)
-            self.assertIn("POST", methods)
-
     def test_the_contract_covers_the_whole_package(self) -> None:
         names = {name for _, name, _ in api_functions()}
-        self.assertTrue({"ping", "create_site", "list_accounts", "delete_mailing_list"} <= names)
+        self.assertTrue({"ping", "create_domain", "list_accounts", "delete_mailing_list"} <= names)
 
 
 class TestApiInput(UnitTestCase):

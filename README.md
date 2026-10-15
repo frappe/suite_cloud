@@ -6,8 +6,8 @@ sites share one cluster safely.
 
 ## How it works, in short
 
-- **Frappe Cloud** tells Suite Cloud when a new Suite site is created. Suite Cloud picks a cluster
-  for the site and hands back the mail server URL plus a site key and secret.
+- **A Suite Tenant** records each Suite site: the cluster it uses, its limits and the key and
+  secret the site authenticates with.
 - **A Suite site** never talks to the mail server's admin API itself. When it wants to add a
   domain, create a mailbox, change a password and so on, it asks Suite Cloud. Suite Cloud checks
   that the site owns what it is touching, saves the change in its own records, and pushes it to
@@ -17,7 +17,7 @@ sites share one cluster safely.
 - **Operators** use the desk to create clusters, add servers, manage DNS and watch jobs.
 
 ```
-Frappe Cloud ──────────────▶ Suite Cloud ◀────────────── Suite site (admin changes)
+                             Suite Cloud ◀────────────── Suite site (admin changes)
                                   │
                                   │ pushes configuration and directory changes
                                   ▼
@@ -135,10 +135,9 @@ message takes.
 
 ## API
 
-Suite Cloud serves two REST APIs at `/api/v2/method/suite_cloud.api.<module>.<method>`, documented in [docs/api](docs/api/README.md).
+Suite Cloud serves one REST API at `/api/v2/method/suite_cloud.api.<module>.<method>`, documented in [docs/api](docs/api/README.md).
 
-- The **site API** lets a Frappe Suite site manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The site authenticates with its API key and secret and the `Frappe-Authorization-Source: Suite Tenant` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
-- The **Frappe Cloud API** registers, limits, suspends and archives the sites, for a user with the **Frappe Cloud** role.
+The **site API** lets a Frappe Suite site manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The site authenticates with its API key and secret and the `Frappe-Authorization-Source: Suite Tenant` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
 
 The verb follows the method name (`list_` and `get_` are GETs, `update_` a PATCH, `set_` a PUT, `delete_` and `remove_` a DELETE, the rest POSTs), parameters travel as JSON, the result sits under `data`, and an error answers `{"errors": [{"type", "message"}]}` with a REST status code. Each site may make 300 requests per minute.
 

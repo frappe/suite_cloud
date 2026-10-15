@@ -1,6 +1,6 @@
 # Suite Cloud API
 
-Suite Cloud exposes two REST APIs over Frappe's v2 method endpoint. The **site API** lets a Frappe Suite site manage its own slice of the mail directory: domains, accounts, groups, mailing lists and the DMARC and TLS reports of its domains. The **Frappe Cloud API** lets Frappe Cloud register and manage the sites themselves.
+Suite Cloud exposes one REST API over Frappe's v2 method endpoint. The **site API** lets a Frappe Suite site manage its own slice of the mail directory: domains, accounts, groups, mailing lists and the DMARC and TLS reports of its domains.
 
 | Page | Covers |
 | --- | --- |
@@ -10,7 +10,6 @@ Suite Cloud exposes two REST APIs over Frappe's v2 method endpoint. The **site A
 | [Groups](groups.md) | Groups, their members and aliases |
 | [Mailing lists](mailing-lists.md) | Lists, their aliases and recipients |
 | [Reports](reports.md) | DMARC and TLS reports and summaries |
-| [Frappe Cloud](frappe-cloud.md) | Registering, limiting, suspending and archiving a site |
 
 ## Base URL
 
@@ -18,7 +17,7 @@ Every method lives at `https://<suite-cloud>/api/v2/method/suite_cloud.api.<modu
 
 ## Authentication
 
-A site authenticates with the API key and secret Frappe Cloud received when it registered the site. It sends two headers on every request:
+A site authenticates with the API key and secret issued when it was registered as a Suite Tenant. It sends two headers on every request:
 
 ```http
 Authorization: token <api_key>:<api_secret>
@@ -30,8 +29,6 @@ Frappe resolves the key against the Suite Tenant record, so the request runs as 
 When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `SiteAddressError`, and Suite Cloud logs it for the operators. A key copied out of a site's configuration is worthless anywhere else.
 
 An operator with the System Manager or Suite Cloud Manager role may call the site API from the desk or a script on behalf of a site. The site is named by the `site` parameter or the `X-Suite-Site` header.
-
-Frappe Cloud authenticates with the API key and secret of a Frappe user that has the **Frappe Cloud** role, through the standard `Authorization: token <key>:<secret>` header.
 
 ## Verbs
 

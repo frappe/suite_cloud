@@ -3,7 +3,6 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.api import fc
 from suite_cloud.api.mail import accounts, domains, groups, mailing_lists, meta
 from suite_cloud.api.site import (
     ClusterUnavailableError,
@@ -896,82 +895,3 @@ class TestDirectoryApi(SiteApiTestCase):
         self.assertEqual(ctx.exception.http_status_code, 422)
         self.assertIn("did not accept the change: Address carol already exists", str(ctx.exception))
         self.assertFalse(frappe.db.exists("Mail Account", "carol@acme.com"))
-
-
-class TestFrappeCloudApi(SiteApiTestCase):
-    def setUp(self) -> None:
-        super().setUp()
-        frappe.set_user("Administrator")
-        frappe.local.suite_tenant = None
-        # The site may hold a real default cluster; selection must land on the fixture cluster.
-        frappe.db.set_value("Stalwart Cluster", {"name": ["!=", self.cluster.name]}, "is_default", 0)
-        self.cluster.db_set("is_default", 1)
-
-    def test_create_site_returns_credentials_once(self) -> None:
-        with patch("suite_cloud.api.fc.get_public_url", return_value="https://cloud.suite.test"):
-            result = fc.create_site(
-                "New.Frappe.Test", region="blr", fc_reference="site-42", contact_email="Ops@New.Test"
-            )
-
-        self.assertEqual(result["site"], "new.frappe.test")
-        self.assertEqual((result["title"], result["contact_email"]), ("new.frappe.test", "ops@new.test"))
-        updated = fc.update_site(
-            "new.frappe.test", title="New Co", contact_email="admin@new.test", max_groups=7
-        )
-        self.assertEqual(
-            (updated["title"], updated["contact_email"], updated["limits"]["max_groups"]),
-            ("New Co", "admin@new.test", 7),
-        )
-        self.assertRaises(
-            frappe.ValidationError, fc.update_site, "new.frappe.test", contact_email="not-an-address"
-        )
-        # Frappe Cloud passes the hosting server's outbound addresses; bad ones are refused.
-        self.assertEqual(
-            fc.update_site("new.frappe.test", allowed_ips=["203.0.113.10", "10.0.0.0/8"])["allowed_ips"],
-            ["203.0.113.10/32", "10.0.0.0/8"],
-        )
-        self.assertEqual(fc.update_site("new.frappe.test", allowed_ips=[])["allowed_ips"], [])
-        self.assertRaisesRegex(
-            frappe.ValidationError, "not an IP", fc.update_site, "new.frappe.test", allowed_ips=["nope"]
-        )
-        self.assertEqual(result["cluster"], self.cluster.name)
-        self.assertEqual(result["jmap_url"], self.cluster.base_url)
-        self.assertEqual(result["suite_cloud_url"], "https://cloud.suite.test")
-        self.assertEqual(result["authorization_source"], "Suite Tenant")
-        self.assertEqual(len(result["api_secret"]), 40)
-        self.assertEqual(
-            frappe.get_doc("Suite Tenant", "new.frappe.test").get_password("api_secret"), result["api_secret"]
-        )
-        self.assertNotIn("api_secret", fc.get_site("new.frappe.test"))
-        self.assertRaises(frappe.DuplicateEntryError, fc.create_site, "new.frappe.test")
-
-    def test_rotate_suspend_resume_archive(self) -> None:
-        rotated = fc.rotate_site_secret(self.site.name)
-        self.assertEqual(
-            frappe.get_doc("Suite Tenant", self.site.name).get_password("api_secret"), rotated["api_secret"]
-        )
-        self.assertEqual(fc.suspend_site(self.site.name)["status"], "Suspended")
-        self.assertEqual(fc.resume_site(self.site.name)["status"], "Active")
-        self.assertEqual(fc.archive_site(self.site.name)["status"], "Archived")
-        self.assertRaisesRegex(
-            frappe.ValidationError, "negative", fc.update_site, self.site.name, max_domains=-1
-        )
-        # Archived is final: neither suspend nor resume may bring the site back.
-        self.assertRaisesRegex(frappe.ValidationError, "archived", fc.suspend_site, self.site.name)
-
-    def test_cluster_selection(self) -> None:
-        self.assertEqual(fc.pick_cluster(None, None), self.cluster.name)
-        self.assertEqual(fc.pick_cluster(None, "BLR"), self.cluster.name)
-        self.assertEqual(fc.pick_cluster(None, "sfo"), self.cluster.name)  # falls back to the default
-        self.assertRaisesRegex(frappe.ValidationError, "not active", fc.pick_cluster, "missing", None)
-
-        # Without a default, a region nobody serves is refused unless some cluster serves all regions.
-        # The site may hold real clusters serving "blr", so the fixture gets a region of its own.
-        self.cluster.db_set("is_default", 0)
-        self.cluster.append("regions", {"region": "fixture-only"})
-        self.cluster.save()
-        self.assertRaisesRegex(
-            frappe.ValidationError, "serves region nowhere", fc.pick_cluster, None, "nowhere"
-        )
-        self.assertEqual(fc.pick_cluster(None, "FIXTURE-ONLY"), self.cluster.name)
-        self.cluster.db_set("is_default", 1)

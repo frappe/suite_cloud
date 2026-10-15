@@ -77,12 +77,6 @@ def dkim_algorithms() -> tuple[str, ...]:
     return (DKIM_ED25519, DKIM_RSA) if cint(get_config("sign_with_ed25519")) else (DKIM_RSA,)
 
 
-def get_public_url() -> str:
-    """Returns the URL other systems use to reach this Suite Cloud site."""
-
-    return (get_config("public_url") or frappe.utils.get_url()).rstrip("/")
-
-
 def utc_iso(value) -> str | None:
     """A stored datetime as an aware UTC string (``2026-09-09T10:00:00Z``) for API payloads.
 
