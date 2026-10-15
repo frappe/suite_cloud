@@ -25,8 +25,7 @@ Module `suite_cloud.api.fc`. The caller is a Frappe user with the **Frappe Cloud
 | `title` | string | Display name |
 | `contact_email` | string | Address for site-specific notices |
 | `max_domains`, `max_accounts`, `max_groups`, `max_mailing_lists` | integer | Object limits; unset means no limit |
-| `max_disk_gb` | number | Total disk the site's accounts and groups may be allotted together |
-| `default_disk_quota_gb` | number | The disk quota a new account or group gets when none is passed |
+| `max_disk_gb` | number | The disk the site's plan includes, shown to the site next to its usage; it does not cap the quotas of its accounts and groups |
 | `allowed_ips` | array of strings | The outbound addresses or CIDR ranges of the server hosting the site. Set, only requests from them may use the site's key. |
 
 The cluster is chosen in this order: the named cluster, else one that serves the region with the default cluster preferred, else the default cluster, else a cluster that serves every region. A cluster with no regions serves any region. Naming a cluster that is not active is a 422.
@@ -61,7 +60,7 @@ Returns the site profile as [`ping`](site.md#ping) does, plus `suite_cloud_url`.
 
 ## `update_site`
 
-Takes `site` and any of `title`, `contact_email`, `max_domains`, `max_accounts`, `max_groups`, `max_mailing_lists`, `max_disk_gb`, `default_disk_quota_gb` and `allowed_ips`, with the meanings above. Only the fields passed change. An empty `allowed_ips` list lifts the address restriction. `allowed_ips` also accepts newline separated text. Returns the site profile plus `suite_cloud_url`.
+Takes `site` and any of `title`, `contact_email`, `max_domains`, `max_accounts`, `max_groups`, `max_mailing_lists`, `max_disk_gb` and `allowed_ips`, with the meanings above. Only the fields passed change. An empty `allowed_ips` list lifts the address restriction. `allowed_ips` also accepts newline separated text. Returns the site profile plus `suite_cloud_url`.
 
 ## `rotate_site_secret`
 

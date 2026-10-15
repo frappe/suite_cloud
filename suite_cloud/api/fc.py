@@ -44,7 +44,6 @@ def create_site(
     max_groups: int | None = None,
     max_mailing_lists: int | None = None,
     max_disk_gb: float | None = None,
-    default_disk_quota_gb: float | None = None,
     allowed_ips: list[str] | str | None = None,
 ) -> dict:
     """``allowed_ips`` is the outbound addresses (or CIDR ranges) of the server hosting the site; set,
@@ -70,7 +69,6 @@ def create_site(
         "max_groups": max_groups,
         "max_mailing_lists": max_mailing_lists,
         "max_disk_gb": max_disk_gb,
-        "default_disk_quota_gb": default_disk_quota_gb,
         "allowed_ips": ips_text(allowed_ips),
     }.items():
         if value is not None:
@@ -105,7 +103,6 @@ def update_site(
     max_groups: int | None = None,
     max_mailing_lists: int | None = None,
     max_disk_gb: float | None = None,
-    default_disk_quota_gb: float | None = None,
     allowed_ips: list[str] | str | None = None,
 ) -> dict:
     """Changes the site's display name, contact address, limits or allowed addresses; omitted fields
@@ -120,7 +117,6 @@ def update_site(
         "max_groups": max_groups,
         "max_mailing_lists": max_mailing_lists,
         "max_disk_gb": max_disk_gb,
-        "default_disk_quota_gb": default_disk_quota_gb,
         "allowed_ips": ips_text(allowed_ips),
     }.items():
         if value is not None:

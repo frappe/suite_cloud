@@ -56,7 +56,7 @@ Takes `email`. Returns the group object with its usage.
 | `description` | string | | |
 | `aliases` | array | | As for [accounts](accounts.md#aliases) |
 | `members` | array of strings | | Account addresses of the site, at most 500 |
-| `disk_quota_gb` | number | the site's default | As for [accounts](accounts.md#quotas) |
+| `disk_quota_gb` | number | no limit | As for [accounts](accounts.md#quotas) |
 | `quotas` | object | | As for accounts |
 | `disable_receiving` | boolean | `false` | Mail sent to the group's address bounces; the members' own mail is not affected |
 

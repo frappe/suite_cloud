@@ -1,9 +1,8 @@
 """What an account or group may hold: Stalwart's storage quotas, kept as Mail Quota rows.
 
-Disk space (``maxDiskQuota``, in bytes) is one of the rows, and the one every account and group
-must have: it defaults to the site's default quota and counts against the site's total. The other
-rows (messages, mailboxes, Sieve scripts, calendars and so on) are optional counts. Every push
-sends the complete map, so a removed row lifts its limit on the cluster.
+Disk space (``maxDiskQuota``, in bytes) is one of the rows; the other rows (messages, mailboxes,
+Sieve scripts, calendars and so on) are counts. Every row is optional: an absent one means no
+limit on the cluster, and every push sends the complete map, so removing a row lifts its limit.
 """
 
 from typing import Any
@@ -28,11 +27,14 @@ class QuotaHolder:
         row = self.disk_row()
         return cint(row.value) if row else 0
 
-    def allotted_disk_gb(self) -> float:
-        return round(self.disk_quota_bytes() / GB, 6)
-
     def set_disk_quota_gb(self, gb: float) -> None:
+        """0 or less lifts the limit: the row goes, and with it the key on the cluster."""
+
         row = self.disk_row()
+        if flt(gb) <= 0:
+            if row is not None:
+                self.remove(row)
+            return
         if row is None:
             row = self.append("quotas", {"quota": DISK_QUOTA})
         row.value = int(flt(gb) * GB)
@@ -42,7 +44,7 @@ class QuotaHolder:
 
 
 def validate(doc: Document) -> None:
-    """Known names, listed once, above 0. The disk row's presence is the site's concern."""
+    """Known names, listed once, above 0."""
 
     seen = set()
     for row in doc.quotas:
@@ -52,8 +54,6 @@ def validate(doc: Document) -> None:
             frappe.throw(_("Quota {0} is listed twice.").format(row.quota))
         seen.add(row.quota)
         if cint(row.value) <= 0:
-            if row.quota == DISK_QUOTA:
-                frappe.throw(_("Disk Quota must be above 0 GB."))
             frappe.throw(_("Quota {0} must be above 0. Leave it out for no limit.").format(row.quota))
 
 
@@ -62,15 +62,16 @@ def changed(before: Document, after: Document) -> bool:
 
 
 def apply(doc: Document, disk_quota_gb: float | None, quotas: Any) -> None:
-    """API input: ``quotas`` replaces the optional rows (the disk row stays unless it names one),
-    ``disk_quota_gb`` sets the disk row and wins over a ``maxDiskQuota`` inside ``quotas``."""
+    """API input: ``quotas`` replaces the other rows (the disk row stays unless it names one),
+    ``disk_quota_gb`` sets the disk row and wins over a ``maxDiskQuota`` inside ``quotas``.
+    A limit of 0 in either lifts it."""
 
     if isinstance(quotas, str) and not quotas.strip():
         quotas = None  # a form field left empty is not a request to lift every limit
     if quotas is not None:
         wanted = as_map(quotas)
         disk = doc.disk_row()
-        rows = [{"quota": name, "value": limit} for name, limit in wanted.items()]
+        rows = [{"quota": name, "value": limit} for name, limit in wanted.items() if limit > 0]
         if DISK_QUOTA not in wanted and disk is not None:
             rows.append({"quota": DISK_QUOTA, "value": disk.value})
         doc.set("quotas", rows)
@@ -93,7 +94,7 @@ def as_map(value: Any) -> dict[str, int]:
 
 
 def disk_quota_gb_by_name(doctype: str, names: list[str]) -> dict[str, float]:
-    """The disk quota of many accounts or groups in one query."""
+    """The disk quota of many accounts or groups in one query; 0 for one without a limit."""
 
     if not names:
         return {}
@@ -102,4 +103,4 @@ def disk_quota_gb_by_name(doctype: str, names: list[str]) -> dict[str, float]:
         filters={"parenttype": doctype, "parent": ["in", names], "quota": DISK_QUOTA},
         fields=["parent", "value"],
     )
-    return {row.parent: round(cint(row.value) / GB, 6) for row in rows}
+    return {name: 0.0 for name in names} | {row.parent: round(cint(row.value) / GB, 6) for row in rows}

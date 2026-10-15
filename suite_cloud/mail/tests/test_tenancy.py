@@ -274,10 +274,8 @@ class TestMailDomain(TenancyTestCase):
         )
         self.assertEqual([g.group for g in alice.groups], ["team@legacy.com"])
         bob = frappe.get_doc("Mail Account", "bob@legacy.com")
-        self.assertEqual(
-            (bob.enabled, bob.disable_receiving, bob.allotted_disk_gb()),
-            (0, 1, self.site.default_disk_quota_gb),
-        )
+        # Bob had no quota on the old server, and nothing hands him one.
+        self.assertEqual((bob.enabled, bob.disable_receiving, bob.quota_map()), (0, 1, {}))
         self.assertEqual(
             frappe.get_doc("Mailing List", "all@legacy.com").recipient_emails(),
             ["alice@legacy.com", "ext@example.org"],
@@ -696,21 +694,14 @@ class TestMailAccount(TenancyTestCase):
         )
 
         self.assertEqual(account.name, "alice@acme.com")
-        self.assertEqual(account.allotted_disk_gb(), self.site.default_disk_quota_gb)
         live = self.fake.get("Account", account.stalwart_id)
         self.assertEqual(live["@type"], "User")
         self.assertEqual(live["credentials"]["0"]["secret"], "secret-pw")
         self.assertEqual(live["memberGroupIds"], {self.group.stalwart_id: True})
         self.assertEqual(live["aliases"]["0"]["name"], "ally")
         self.assertEqual(live["aliases"]["0"]["domainId"], self.domain.stalwart_id)
-        self.assertEqual(
-            live["quotas"],
-            {
-                "maxDiskQuota": int(self.site.default_disk_quota_gb * 1024**3),
-                "maxAppPasswords": 10,
-                "maxApiKeys": 10,
-            },
-        )
+        # No disk quota was asked for, so the cluster gets none: the mailbox is unlimited.
+        self.assertEqual(live["quotas"], {"maxAppPasswords": 10, "maxApiKeys": 10})
         self.assertEqual(live["description"], "Alice")
         self.assertEqual(live["roles"], {"@type": "User"})
         self.assertEqual(self.group.to_api()["members"], ["alice@acme.com"])
@@ -1007,10 +998,9 @@ class TestMailAccount(TenancyTestCase):
             save_with,
             [{"quota": "maxDiskQuota", "value": 1024**3}, {"quota": "maxEmails", "value": 0}],
         )
-        # The disk row is the one row that cannot go: without it the account has no quota.
-        self.assertRaisesRegex(
-            frappe.ValidationError, "Disk Quota", save_with, [{"quota": "maxEmails", "value": 5}]
-        )
+        # The disk row may go like any other: the mailbox is then unlimited.
+        save_with([{"quota": "maxEmails", "value": 5}])
+        self.assertEqual(self.fake.find("Account", name="quota")["quotas"], {"maxEmails": 5})
         self.assertRaisesRegex(
             frappe.ValidationError, "not a known quota", save_with, [{"quota": "maxNope", "value": 5}]
         )
@@ -1020,40 +1010,32 @@ class TestMailAccount(TenancyTestCase):
         group.save()
         self.assertEqual(self.fake.get("Account", group.stalwart_id)["quotas"]["maxEmails"], 100)
 
-    def test_disk_quotas_are_positive_and_within_the_site_total(self) -> None:
-        self.assertRaisesRegex(
-            frappe.ValidationError, "above 0", self.make_account, "z@acme.com", disk_quota_gb=0
-        )
-
+    def test_disk_quotas_are_what_the_site_asks_for(self) -> None:
         site = frappe.get_doc("Suite Site", self.site.name)
-        site.default_disk_quota_gb = 0
-        self.assertRaisesRegex(frappe.ValidationError, "above 0", site.save)
+        site.max_disk_gb = -1
+        self.assertRaisesRegex(frappe.ValidationError, "negative", site.save)
         site.reload()
-        site.max_disk_gb = 8
-        site.default_disk_quota_gb = 5
+        site.max_disk_gb = 1
         site.save()
 
-        # The fixture group took the site's default quota when it was created; give it 1 GB so
-        # it leaves room and still counts in the total.
-        group = frappe.get_doc("Mail Group", self.group.name)
-        group.set_disk_quota_gb(1)
-        group.save()
-        self.assertEqual(self.fake.get("Account", group.stalwart_id)["quotas"], {"maxDiskQuota": 1024**3})
-        first = self.make_account("q1@acme.com")  # 5 + 1 of 8
-        self.assertRaisesRegex(frappe.ValidationError, "2.0 GB of its 8", self.make_account, "q2@acme.com")
-        second = self.make_account("q2@acme.com", disk_quota_gb=2)  # exactly full
-        first.reload()
-        first.set_disk_quota_gb(6)
-        self.assertRaisesRegex(frappe.ValidationError, "disk quota left", first.save)
-        first.reload()
-        first.set_disk_quota_gb(4)  # shrinking is always fine
-        first.save()
+        # The site's disk figure is a plan size, not a cap: a quota beyond it is granted as asked.
+        account = self.make_account("q1@acme.com", disk_quota_gb=5)
+        self.assertEqual(self.fake.find("Account", name="q1")["quotas"]["maxDiskQuota"], 5 * 1024**3)
+        self.assertEqual(account.to_api()["disk_quota_gb"], 5)
+        # 0 lifts the limit: the row goes, and with it the key on the cluster.
+        account.set_disk_quota_gb(0)
+        account.save()
+        self.assertNotIn("maxDiskQuota", self.fake.find("Account", name="q1")["quotas"])
+        self.assertEqual(account.to_api()["disk_quota_gb"], 0)
+        self.assertEqual(self.make_account("q2@acme.com", disk_quota_gb=0).quota_map()["maxAppPasswords"], 10)
+
+        key = f"suite_cloud:disk-usage:{self.site.name}"
+        frappe.cache.delete_value(key)
+        self.addCleanup(frappe.cache.delete_value, key)
+        self.fake.find("Account", name="q1")["usedDiskQuota"] = 4096
         usage = frappe.get_doc("Suite Site", self.site.name).to_api()["usage"]
-        self.assertEqual(usage["allocated_disk_gb"], 7)  # 4 + 2 accounts, 1 group
-        group.reload()
-        group.set_disk_quota_gb(0)
-        self.assertRaisesRegex(frappe.ValidationError, "above 0", group.save)
-        second.delete()
+        self.assertNotIn("allocated_disk_gb", usage)
+        self.assertEqual(usage["used_disk_bytes"], 4096)
 
     def test_group_and_mailing_list_limits(self) -> None:
         self.site.db_set({"max_groups": 1, "max_mailing_lists": 0})  # one group exists; lists unlimited

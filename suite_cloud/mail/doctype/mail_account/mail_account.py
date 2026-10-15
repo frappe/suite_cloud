@@ -84,7 +84,6 @@ class MailAccount(QuotaHolder, Document):
             site.assert_can_add_account()
             account_credentials.apply_default_limits(self)
         quotas.validate(self)
-        site.validate_quota_of(self)
         assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
         sync.validate_aliases(self)
         self.validate_groups()

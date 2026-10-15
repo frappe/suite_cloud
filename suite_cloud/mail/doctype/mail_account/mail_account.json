@@ -177,7 +177,7 @@
    "label": "Quotas"
   },
   {
-   "description": "Stalwart's per-account limits. maxDiskQuota (bytes) is required and defaults to the site's default quota; it counts against the site's total disk quota. The others are optional counts.",
+   "description": "Stalwart's per-account limits: maxDiskQuota in bytes, the others as counts. Every row is optional; leave one out for no limit.",
    "fieldname": "quotas",
    "fieldtype": "Table",
    "label": "Quotas",
