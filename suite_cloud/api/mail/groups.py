@@ -19,14 +19,14 @@ from suite_cloud.mail.tenancy import quotas as quota_rows
 PAGE_CAP = 500  # the dashboard's largest page
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def list_groups(search: str | None = None, start: int = 0, limit: int = 100) -> dict:
     names, total = owned_page("Mail Group", search, start, limit, PAGE_CAP)
     return {"items": group_payloads(names), "total": total}
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_group(email: str) -> dict:
     return owned("Mail Group", email).to_api(with_usage=True)
@@ -64,7 +64,7 @@ def create_group(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["PATCH", "POST", "PUT"])
+@frappe.whitelist(methods=["PATCH"])
 @site_api
 def update_group(
     email: str,
@@ -87,7 +87,7 @@ def update_group(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
 def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mail Group", email)
@@ -102,19 +102,19 @@ def add_alias(email: str, alias: str, description: str | None = None) -> dict:
     return alias_rows.add("Mail Group", email, alias, description).to_api()
 
 
-@frappe.whitelist(methods=["POST", "DELETE"])
+@frappe.whitelist(methods=["DELETE"])
 @site_api
 def remove_alias(email: str, alias: str) -> dict:
     return alias_rows.remove("Mail Group", email, alias).to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
 def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
     return alias_rows.set_enabled("Mail Group", email, alias, sbool(enabled)).to_api()
 
 
-@frappe.whitelist(methods=["POST", "PUT"])
+@frappe.whitelist(methods=["PUT"])
 @site_api
 def set_members(email: str, members: list[str] | str | None = None) -> dict:
     doc = owned("Mail Group", email)
@@ -122,7 +122,7 @@ def set_members(email: str, members: list[str] | str | None = None) -> dict:
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "DELETE"])
+@frappe.whitelist(methods=["DELETE"])
 @site_api
 def delete_group(email: str) -> None:
     owned("Mail Group", email).delete(ignore_permissions=True)

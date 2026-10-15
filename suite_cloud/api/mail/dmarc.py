@@ -15,7 +15,7 @@ REPORT_PAGE_CAP = 500  # the dashboard offers pages of up to 500; a listing row 
 TOP_SOURCES = 20
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def list_dmarc_reports(
     domain: str | None = None,
@@ -57,7 +57,7 @@ def list_dmarc_reports(
     return {"items": report_payloads(names), "total": total}
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_dmarc_report(report: str) -> dict:
     name = frappe.db.get_value("DMARC Report", {"name": report, "site": current_site().name})
@@ -66,7 +66,7 @@ def get_dmarc_report(report: str) -> dict:
     return frappe.get_doc("DMARC Report", name).to_api(with_records=True)
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_dmarc_summary(domain: str | None = None, days: int = 30) -> dict:
     """Totals over the reports whose period ended in the last ``days``, by domain, source and

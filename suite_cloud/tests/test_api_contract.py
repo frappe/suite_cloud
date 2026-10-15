@@ -23,9 +23,13 @@ VERB_BY_PREFIX = {
 
 
 def api_functions():
+    """Every whitelisted function of the site API; Frappe Cloud's caller is checked on its own."""
+
     for module in MODULES:
         for name, member in vars(module).items():
             if callable(member) and member in frappe.whitelisted and member.__module__ == module.__name__:
+                if module is fc and name in ("get_site", "update_site"):
+                    continue
                 yield f"{module.__name__}.{name}", name, member
 
 
@@ -36,16 +40,18 @@ def expected_verb(name: str) -> str:
 
 
 class TestApiVerbs(UnitTestCase):
-    def test_every_function_allows_the_verb_its_name_says(self) -> None:
+    def test_every_site_method_answers_only_the_verb_its_name_says(self) -> None:
         for path, name, function in api_functions():
             methods = frappe.allowed_http_methods_for_whitelisted_func[function]
             verb = expected_verb(name)
             with self.subTest(path):
-                self.assertIn(verb, methods)
-                if verb != "GET":
-                    self.assertNotIn("GET", methods)
-                if verb == "POST":
-                    self.assertEqual(methods, ("POST",))
+                self.assertEqual(methods, ("GET", "QUERY") if verb == "GET" else (verb,))
+
+    def test_frappe_cloud_methods_keep_post_for_their_caller(self) -> None:
+        for name, function in (("get_site", fc.get_site), ("update_site", fc.update_site)):
+            methods = frappe.allowed_http_methods_for_whitelisted_func[function]
+            self.assertIn(expected_verb(name), methods)
+            self.assertIn("POST", methods)
 
     def test_the_contract_covers_the_whole_package(self) -> None:
         names = {name for _, name, _ in api_functions()}

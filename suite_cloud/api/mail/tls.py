@@ -14,7 +14,7 @@ REPORT_PAGE_CAP = 500  # the dashboard offers pages of up to 500; a listing row 
 TOP_FAILURES = 20
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def list_tls_reports(
     domain: str | None = None,
@@ -56,7 +56,7 @@ def list_tls_reports(
     return {"items": report_payloads(names), "total": total}
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_tls_report(report: str) -> dict:
     name = frappe.db.get_value("TLS Report", {"name": report, "site": current_site().name})
@@ -65,7 +65,7 @@ def get_tls_report(report: str) -> dict:
     return frappe.get_doc("TLS Report", name).to_api(with_records=True)
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_tls_summary(domain: str | None = None, days: int = 30) -> dict:
     """Session totals over the reports whose period ended in the last ``days``, by domain and

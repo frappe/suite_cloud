@@ -7,7 +7,7 @@ from suite_cloud.mail.stalwart.directory import DISK_QUOTA
 SCHEMA_CACHE_TTL = 3600
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_account_options() -> dict:
     """Locales and time zones the cluster accepts for accounts (from Stalwart's schema)."""

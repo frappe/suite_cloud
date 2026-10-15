@@ -328,7 +328,7 @@ def as_datetime(value: Any) -> datetime | None:
         frappe.throw(_("{0} is not a date.").format(value), InvalidInputError)
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def ping() -> dict:
     """Confirms the credentials and returns where the site's mail lives."""
@@ -336,7 +336,7 @@ def ping() -> dict:
     return current_site().to_api()
 
 
-@frappe.whitelist(methods=["PATCH", "POST"])
+@frappe.whitelist(methods=["PATCH"])
 @site_api
 def update_site_profile(title: str | None = None, contact_email: str | None = None) -> dict:
     """What the site says about itself: its workspace name as the title, and where to reach it.

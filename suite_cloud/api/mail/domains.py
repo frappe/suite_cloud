@@ -8,19 +8,19 @@ from suite_cloud.mail.tenancy.addresses import assert_domain_not_reserved, valid
 from suite_cloud.mail.tenancy.ownership import ownership_record
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def list_domains() -> list[dict]:
     return domain_payloads(owned_names("Mail Domain"))
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_domain(domain: str) -> dict:
     return owned("Mail Domain", domain).to_api()
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def check_domain(domain: str) -> dict:
     """Whether the domain can be added, and the record the site must publish to prove it owns it.
@@ -68,7 +68,7 @@ def create_domain(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["PATCH", "POST", "PUT"])
+@frappe.whitelist(methods=["PATCH"])
 @site_api
 def update_domain(
     domain: str,
@@ -96,14 +96,14 @@ def update_domain(
     return doc.to_api()
 
 
-@frappe.whitelist(methods=["POST", "DELETE"])
+@frappe.whitelist(methods=["DELETE"])
 @site_api
 def delete_domain(domain: str) -> None:
     owned("Mail Domain", domain).delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204
 
 
-@frappe.whitelist(methods=["GET", "POST"])
+@frappe.whitelist(methods=["GET"])
 @site_api
 def get_dns_records(domain: str) -> dict:
     return _records(owned("Mail Domain", domain))
