@@ -110,12 +110,12 @@ def authenticate() -> None:
         raise frappe.AuthenticationError(_("Tenant authentication failed."))
 
     form_dict = frappe.local.form_dict
-    frappe.set_user(get_config("site_service_user"))
+    frappe.set_user(get_config("tenant_service_user"))
     frappe.local.form_dict = form_dict  # set_user clears the request body Frappe already parsed
 
 
 def _resolve_tenant():
-    service_user = get_config("site_service_user")
+    service_user = get_config("tenant_service_user")
 
     if frappe.session.user == service_user:
         name = _credentials_from_header()[0]

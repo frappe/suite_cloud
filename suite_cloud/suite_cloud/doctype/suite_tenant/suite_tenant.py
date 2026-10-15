@@ -62,9 +62,9 @@ class SuiteTenant(Document):
                 frappe.throw(_("{0} is not a valid email address.").format(self.contact_email))
         self.allowed_ips = "\n".join(str(n) for n in parse_networks(self.allowed_ips))
 
-        self.user = get_config("site_service_user")
+        self.user = get_config("tenant_service_user")
         if not self.user:
-            frappe.throw(_("The site service user is missing; run bench migrate."))
+            frappe.throw(_("The tenant service user is missing; run bench migrate."))
         self.validate_limits()
 
         if self.is_new():

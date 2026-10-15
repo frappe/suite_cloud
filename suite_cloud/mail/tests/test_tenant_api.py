@@ -80,7 +80,7 @@ class TenantApiTestCase(IntegrationTestCase):
         """Simulates a request the auth hook already signed in for the tenant."""
 
         frappe.local.suite_tenant = None
-        frappe.set_user(frappe.db.get_single_value("Suite Cloud Settings", "site_service_user"))
+        frappe.set_user(frappe.db.get_single_value("Suite Cloud Settings", "tenant_service_user"))
         frappe.utils.set_request(headers={"Authorization": f"Tenant {site.name}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 

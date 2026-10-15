@@ -12,7 +12,7 @@ from frappe.utils.caching import request_cache
 CONFIG_KEYS = (
     "default_dns_ttl",
     "public_url",
-    "site_service_user",
+    "tenant_service_user",
     "stalwart_version",
     "stalwart_cli_version",
     "stalwart_download_url_template",

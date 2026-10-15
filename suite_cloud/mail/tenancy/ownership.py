@@ -38,7 +38,7 @@ def required() -> bool:
     """Whether the request has to prove control of the domain: a site's own, on a cloud that
     checks."""
 
-    return frappe.session.user == get_config("site_service_user") and not skipped()
+    return frappe.session.user == get_config("tenant_service_user") and not skipped()
 
 
 def skipped() -> bool:

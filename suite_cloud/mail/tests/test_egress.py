@@ -3,7 +3,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.install import SITE_SERVICE_USER
+from suite_cloud.install import TENANT_SERVICE_USER
 from suite_cloud.mail.cluster import dns, egress
 from suite_cloud.mail.stalwart import forget_sessions
 from suite_cloud.mail.tests.fake_stalwart import FakeStalwart
@@ -140,7 +140,7 @@ class TestEgress(IntegrationTestCase):
 
     def test_only_managers_can_reset_host_keys(self) -> None:
         # Dropping the pin lets the next Verify SSH trust any server, so other users are refused.
-        with user_context(SITE_SERVICE_USER), self.assertRaises(frappe.PermissionError):
+        with user_context(TENANT_SERVICE_USER), self.assertRaises(frappe.PermissionError):
             self.gateway.reset_ssh_host_keys()
         pinned = frappe.db.get_value("Egress Gateway", self.gateway.name, "ssh_host_keys")
         self.assertEqual(pinned, self.gateway.ssh_host_keys)
