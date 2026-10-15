@@ -49,9 +49,9 @@ def validate(doc) -> None:
 
     before = doc.get_doc_before_save()
     for kind in KINDS:
-        if before is not None and not before.get(kind.field) and doc.stalwart_id:
+        if before is not None and not before.get(kind.field) and doc.stalwart_id and not is_loaded(doc, kind):
             load(doc, kind)  # an account mirrored for the first time starts from the cluster's list
-        previous = {r.credential_id: r for r in before.get(kind.field) if r.credential_id} if before else {}
+        previous = baseline(doc, before, kind)
         for row in doc.get(kind.field):
             row.allowed_ips = "\n".join(parse_ips(row.allowed_ips))
             was = previous.get(row.credential_id)
@@ -132,6 +132,8 @@ def parse_ips(text: str | None) -> list[str]:
 def rotate_site_login(doc, kind: Kind) -> str:
     """Mints the Suite Cloud credential anew; the previous one is revoked once the save commits."""
 
+    if doc.stalwart_id and not doc.get(kind.field):
+        load(doc, kind)  # an account mirrored for the first time: the old credential must be known to go
     doc.set(kind.field, [r for r in doc.get(kind.field) if r.description != SITE_LOGIN])
     if not kind.always_present:
         append_site_login(doc, kind)
@@ -149,7 +151,7 @@ def push(doc, before) -> None:
 
 def push_kind(doc, before, kind: Kind) -> None:
     rows = doc.get(kind.field)
-    previous = {r.credential_id: r for r in (before.get(kind.field) if before else []) if r.credential_id}
+    previous = baseline(doc, before, kind)
     kept = {r.credential_id for r in rows if r.credential_id}
     added = [r for r in rows if not r.credential_id]
     changed = [
@@ -160,8 +162,12 @@ def push_kind(doc, before, kind: Kind) -> None:
         return
 
     service = getattr(doc.account_client(), kind.field)
-    for row in added:
-        create(service, row, doc, kind)
+    if added:
+        # A credential created before a later step fails outlives the rollback; it goes with it.
+        created: list[str] = []
+        frappe.db.after_rollback.add(lambda: revoke(service, created))
+        for row in added:
+            created.append(create(service, row, doc, kind))
     for row in changed:
         service.update(row.credential_id, patch(row))
     if gone:
@@ -170,7 +176,7 @@ def push_kind(doc, before, kind: Kind) -> None:
         frappe.db.after_commit.add(lambda: revoke(service, gone))
 
 
-def create(service, row, doc, kind: Kind) -> None:
+def create(service, row, doc, kind: Kind) -> str:
     credential_id, secret = service.create_secret(credential(row))
     row.db_set({"credential_id": credential_id, "created_at": now_datetime()}, update_modified=False)
     doc.flags.setdefault("credential_secrets", {})[row.name] = secret
@@ -181,9 +187,12 @@ def create(service, row, doc, kind: Kind) -> None:
             ),
             title=kind.label,
         )
+    return credential_id
 
 
 def revoke(service, ids: list[str]) -> None:
+    if not ids:
+        return
     try:
         service.delete(ids)
     except StalwartRejectedError as e:
@@ -198,9 +207,22 @@ def load(doc, kind: Kind) -> None:
     rows = sorted(
         (as_row(c) for c in live), key=lambda r: (r["description"] != SITE_LOGIN, str(r["created_at"]))
     )
+    doc.flags.setdefault("credential_baseline", {})[kind.field] = [frappe._dict(r) for r in rows]
     pending = [r for r in doc.get(kind.field) if not r.credential_id]
     doc.set(kind.field, rows)
     reorder(doc, kind, [*doc.get(kind.field), *pending])
+
+
+def is_loaded(doc, kind: Kind) -> bool:
+    return kind.field in (doc.flags.credential_baseline or {})
+
+
+def baseline(doc, before, kind: Kind) -> dict:
+    """What the cluster held before this save, by id: the list a load fetched in this request,
+    else the saved rows. A credential taken out of it is revoked; one changed in it is updated."""
+
+    rows = (doc.flags.credential_baseline or {}).get(kind.field) or (before.get(kind.field) if before else [])
+    return {r.credential_id: r for r in rows if r.credential_id}
 
 
 def refresh(doc) -> None:
@@ -281,10 +303,19 @@ def payload(row) -> dict:
 
 
 def row_by_id(doc, kind: Kind, credential_id: str):
-    row = next((r for r in doc.get(kind.field) if r.credential_id == credential_id), None)
+    """A saved row, or one the cluster holds that this side has not mirrored yet."""
+
+    row = find_row(doc, kind, credential_id)
+    if row is None and doc.stalwart_id and not is_loaded(doc, kind):
+        load(doc, kind)
+        row = find_row(doc, kind, credential_id)
     if row is None:
         frappe.throw(_("{0} {1} was not found.").format(kind.label, credential_id), frappe.DoesNotExistError)
     return row
+
+
+def find_row(doc, kind: Kind, credential_id: str):
+    return next((r for r in doc.get(kind.field) if r.credential_id == credential_id), None)
 
 
 def site_login_secret(doc, kind: Kind) -> str:

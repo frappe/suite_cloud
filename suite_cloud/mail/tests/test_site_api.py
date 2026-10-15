@@ -525,6 +525,20 @@ class TestDirectoryApi(SiteApiTestCase):
         frappe.db.after_commit.run()
         self.assertEqual([c["description"] for c in live.values()], ["Suite Cloud"])
 
+        # A credential made outside Suite Cloud is listed, and its id works for a change or a revoke.
+        live["ap-watch"] = {"id": "ap-watch", "description": "Watch", "createdAt": "2026-02-01T00:00:00Z"}
+        self.assertIn("ap-watch", [p["id"] for p in accounts.list_app_passwords("alice@acme.com")["items"]])
+        self.assertEqual(
+            accounts.update_app_password("alice@acme.com", "ap-watch", description="Old watch")[
+                "description"
+            ],
+            "Old watch",
+        )
+        self.assertEqual(live["ap-watch"]["description"], "Old watch")
+        accounts.delete_app_password("alice@acme.com", "ap-watch")
+        frappe.db.after_commit.run()
+        self.assertNotIn("ap-watch", live)
+
         # The default limit counts the site's login; another site sees nothing.
         for number in range(9):
             accounts.create_app_password("alice@acme.com", f"Device {number}")

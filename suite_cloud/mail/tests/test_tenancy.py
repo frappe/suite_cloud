@@ -5,6 +5,8 @@ from frappe.tests import IntegrationTestCase
 
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.mail.stalwart import forget_sessions
+from suite_cloud.mail.stalwart.credentials import AppPasswordService
+from suite_cloud.mail.stalwart.errors import StalwartRejectedError
 from suite_cloud.mail.tenancy.addresses import get_site_domain
 from suite_cloud.mail.tests.fake_stalwart import FakeError, FakeStalwart
 from suite_cloud.mail.tests.fixtures import (
@@ -870,6 +872,44 @@ class TestMailAccount(TenancyTestCase):
         self.assertEqual([r.description for r in account.app_passwords], ["Suite Cloud", "Laptop"])
         frappe.db.after_commit.run()
         self.assertEqual(sorted(c["description"] for c in stored.values()), ["Laptop", "Suite Cloud"])
+
+    def test_first_mirror_knows_what_the_cluster_holds(self) -> None:
+        # An account from before the tables: the database has no rows, the cluster has the login.
+        account = self.make_account("grace@acme.com")
+        stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
+        old_id = account.app_passwords[0].credential_id
+        stored["ap-phone"] = {"id": "ap-phone", "description": "Phone", "createdAt": "2026-02-01T00:00:00Z"}
+        frappe.db.delete("Mail Credential", {"parent": account.name})
+
+        # Rotation replaces the old login instead of adopting it, and the other rows are kept.
+        account = frappe.get_doc("Mail Account", account.name)
+        secret = account.rotate_app_password()
+        self.assertTrue(secret.startswith("apppassword-"))
+        self.assertEqual([r.description for r in account.app_passwords], ["Suite Cloud", "Phone"])
+        frappe.db.after_commit.run()
+        self.assertNotIn(old_id, stored)
+        self.assertEqual(sorted(c["description"] for c in stored.values()), ["Phone", "Suite Cloud"])
+
+    def test_credentials_created_before_a_failed_save_are_revoked_with_it(self) -> None:
+        account = self.make_account("heidi@acme.com")
+        frappe.db.after_rollback.reset()  # the insert's own callback goes with its commit outside tests
+        stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
+        account.append("app_passwords", {"description": "Phone"})
+        account.append("app_passwords", {"description": "Tablet"})
+        original = AppPasswordService.create_secret
+        calls = []
+
+        def second_create_fails(service, credential):
+            calls.append(credential.description)
+            if len(calls) == 2:
+                raise StalwartRejectedError({"type": "overQuota"}, "AppPassword")
+            return original(service, credential)
+
+        with patch.object(AppPasswordService, "create_secret", second_create_fails):
+            self.assertRaises(StalwartRejectedError, account.save)
+        self.assertEqual(sorted(c["description"] for c in stored.values()), ["Phone", "Suite Cloud"])
+        frappe.db.after_rollback.run()  # what the request handler does with the failed save
+        self.assertEqual([c["description"] for c in stored.values()], ["Suite Cloud"])
 
     def test_api_keys_are_a_table_with_a_reserved_description(self) -> None:
         account = self.make_account("frank@acme.com")
