@@ -13,7 +13,7 @@ Module `suite_cloud.api.mail.mailing_lists`. The conventions are in the [overvie
 | `mail.mailing_lists.remove_alias` | DELETE | Removes one alias |
 | `mail.mailing_lists.set_alias_enabled` | PUT | Turns one alias on or off |
 | `mail.mailing_lists.list_recipients` | GET | A page of one list's recipients |
-| `mail.mailing_lists.list_all_recipients` | GET | A page of every recipient of every list of the site |
+| `mail.mailing_lists.list_all_recipients` | GET | A page of every recipient of every list of the tenant |
 | `mail.mailing_lists.add_recipients` | POST | Adds up to 5000 recipients |
 | `mail.mailing_lists.remove_recipients` | DELETE | Removes up to 5000 recipients |
 | `mail.mailing_lists.set_recipients` | PUT | Replaces the whole recipient set, for small lists |
@@ -52,12 +52,12 @@ Takes `email`. Returns the list object.
 
 | Parameter | Type | Meaning |
 | --- | --- | --- |
-| `email` | string, required | On an active domain of the site |
+| `email` | string, required | On an active domain of the tenant |
 | `description` | string | |
 | `aliases` | array | As for [accounts](accounts.md#aliases) |
 | `recipients` | array of strings | Up to 5000 addresses |
 
-Answers 201 with the list object. If adding the recipients fails, the list is not created. A taken address is a 409; an inactive domain or the site's list limit is a 422.
+Answers 201 with the list object. If adding the recipients fails, the list is not created. A taken address is a 409; an inactive domain or the tenant's list limit is a 422.
 
 ## `update_mailing_list`
 
@@ -69,7 +69,7 @@ The same parameters and rules as for [accounts](accounts.md#set_aliases-add_alia
 
 ## Recipients
 
-A recipient is any address. An address under a domain that another site holds is refused as not found (404), so a list cannot inject mail into another site's mailboxes. Addresses are lowercased before they are stored or matched.
+A recipient is any address. An address under a domain that another tenant holds is refused as not found (404), so a list cannot inject mail into another tenant's mailboxes. Addresses are lowercased before they are stored or matched.
 
 ### `list_recipients`
 
@@ -89,7 +89,7 @@ Answers `{"items": [{"email": "a@example.com", "enabled": true}, …], "total": 
 | `start` | integer | 0 | Offset |
 | `limit` | integer | 1000 | Page length, at most 1000 |
 
-Answers `{"items": [{"mailing_list": "all@acme.example", "email": "a@example.com", "enabled": true}, …], "total": n}` ordered by list, then address. A site mirrors every list in a handful of calls this way instead of one call per list, which would exhaust its rate limit once it holds a few hundred lists.
+Answers `{"items": [{"mailing_list": "all@acme.example", "email": "a@example.com", "enabled": true}, …], "total": n}` ordered by list, then address. A tenant mirrors every list in a handful of calls this way instead of one call per list, which would exhaust its rate limit once it holds a few hundred lists.
 
 ### `add_recipients`, `remove_recipients`
 

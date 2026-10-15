@@ -11,7 +11,7 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
 | `mail.accounts.update_account` | PATCH | Changes the name, description, quotas, locale, time zone or receiving |
 | `mail.accounts.set_account_enabled` | PUT | Enables or disables login and delivery |
 | `mail.accounts.set_password` | PUT | Sets the account's own password |
-| `mail.accounts.rotate_app_password` | POST | Replaces the site's own app password |
+| `mail.accounts.rotate_app_password` | POST | Replaces the tenant's own app password |
 | `mail.accounts.list_app_passwords` | GET | The account's app passwords, without secrets |
 | `mail.accounts.create_app_password` | POST | Creates an app password, returned once |
 | `mail.accounts.update_app_password` | PATCH | Changes the description, expiry or allowed IPs of one |
@@ -54,7 +54,7 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
 
 ### Quotas
 
-An account's disk quota is whatever the site sets: `disk_quota_gb` of 0, or none, means no limit. Suite Cloud applies no default and does not check the quotas against the site's `max_disk_gb`.
+An account's disk quota is whatever the tenant sets: `disk_quota_gb` of 0, or none, means no limit. Suite Cloud applies no default and does not check the quotas against the tenant's `max_disk_gb`.
 
 `quotas` is an object of Stalwart `StorageQuota` names to limits. `maxDiskQuota` (bytes) is the disk quota; the others are counts (messages, mailboxes, Sieve scripts, calendars, contact cards, app passwords and so on). `get_account_options` lists the other names. On a create or update, `quotas` replaces the other rows (`{}` lifts them all) and keeps the disk row unless it names `maxDiskQuota`; `disk_quota_gb` sets the disk row in GB and wins over a `maxDiskQuota` inside `quotas`. A limit of 0 lifts it. A new account gets `maxAppPasswords` and `maxApiKeys` of 10 unless `quotas` names them.
 
@@ -85,26 +85,26 @@ Takes `email`. Returns the account object with its usage.
 | --- | --- | --- |
 | `emails` | array of strings, required | Up to 500 addresses, as a JSON body on a QUERY, or as the array's JSON text on a GET short enough for a request line |
 
-Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` for the site's accounts among them; a `disk_quota_gb` of 0 means no limit. Addresses that are not the site's accounts are left out. The quotas are one query and the usage one cluster call per batch, so a list page can show both for every row.
+Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` for the tenant's accounts among them; a `disk_quota_gb` of 0 means no limit. Addresses that are not the tenant's accounts are left out. The quotas are one query and the usage one cluster call per batch, so a list page can show both for every row.
 
 ## `create_account`
 
 | Parameter | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `email` | string, required | | On an active domain of the site |
+| `email` | string, required | | On an active domain of the tenant |
 | `password` | string, required | | At least 8 characters; never stored by Suite Cloud |
 | `display_name` | string | | |
 | `description` | string | | |
 | `aliases` | array | | See aliases |
-| `groups` | array of strings | | Group addresses of the site, at most 500 |
-| `mailing_lists` | array of strings | | List addresses of the site the account joins as a recipient, at most 500 |
+| `groups` | array of strings | | Group addresses of the tenant, at most 500 |
+| `mailing_lists` | array of strings | | List addresses of the tenant the account joins as a recipient, at most 500 |
 | `disk_quota_gb` | number | no limit | See quotas |
 | `quotas` | object | | See quotas |
 | `locale` | string | `en-US` | One of `get_account_options` |
 | `time_zone` | string | | One of `get_account_options` |
 | `disable_receiving` | boolean | `false` | Send-only: the account logs in and sends, and mail addressed to it bounces |
 
-Answers 201 with the account object plus `app_password`, the password the site uses for the account's mail access. It is returned only here; `rotate_app_password` issues a fresh one. Suite Cloud stores neither the app password nor the account's own password. An inactive domain or a reached limit is a 422; a taken address is a 409; an unknown group or list is a 404.
+Answers 201 with the account object plus `app_password`, the password the tenant uses for the account's mail access. It is returned only here; `rotate_app_password` issues a fresh one. Suite Cloud stores neither the app password nor the account's own password. An inactive domain or a reached limit is a 422; a taken address is a 409; an unknown group or list is a 404.
 
 ## `update_account`
 
@@ -120,7 +120,7 @@ Takes `email` and `password` (at least 8 characters). Answers 200 with `{"data":
 
 ## App passwords and API keys
 
-An app password is a login for the account's mail clients; an API key is a Bearer token for its JMAP access. The cluster holds both; Suite Cloud keeps their descriptions and never a secret. The description `Suite Cloud` is reserved: the app password with it is the site's own login, which `create_account` returns once and `rotate_app_password` replaces, and an API key with it exists only when a Suite Cloud operator mints one. Creating or renaming a credential to `Suite Cloud` is a 422. The account's `maxAppPasswords` and `maxApiKeys` quotas, 10 each unless `quotas` set another value, count the site's login too; one more is a 422.
+An app password is a login for the account's mail clients; an API key is a Bearer token for its JMAP access. The cluster holds both; Suite Cloud keeps their descriptions and never a secret. The description `Suite Cloud` is reserved: the app password with it is the tenant's own login, which `create_account` returns once and `rotate_app_password` replaces, and an API key with it exists only when a Suite Cloud operator mints one. Creating or renaming a credential to `Suite Cloud` is a 422. The account's `maxAppPasswords` and `maxApiKeys` quotas, 10 each unless `quotas` set another value, count the tenant's login too; one more is a 422.
 
 ```json
 {
@@ -136,7 +136,7 @@ The methods come in two sets, `*_app_password` and `*_api_key`, with the same pa
 
 | Method | Parameters | Answer |
 | --- | --- | --- |
-| `list_app_passwords`, `list_api_keys` | `email` | `{"items": [...]}` as the cluster holds them, the site's login first |
+| `list_app_passwords`, `list_api_keys` | `email` | `{"items": [...]}` as the cluster holds them, the tenant's login first |
 | `create_app_password`, `create_api_key` | `email`, `description` (app passwords default to `Suite`), `expires_at` (ISO 8601, optional), `allowed_ips` (JSON array of addresses or networks, optional) | 201 with the object plus `secret`, returned once |
 | `update_app_password`, `update_api_key` | `email`, `id` and any of `description`, `expires_at`, `allowed_ips`; an empty value clears it | The object |
 | `delete_app_password`, `delete_api_key` | `email`, `id` | 204; the `Suite Cloud` app password is a 422 |
@@ -157,7 +157,7 @@ Each returns the account object.
 
 ## `set_groups`
 
-Takes `email` and `groups`, an array of the site's group addresses (at most 500; empty or omitted leaves every group). Returns the account object.
+Takes `email` and `groups`, an array of the tenant's group addresses (at most 500; empty or omitted leaves every group). Returns the account object.
 
 ## `delete_account`
 

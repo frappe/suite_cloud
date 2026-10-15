@@ -32,7 +32,7 @@ Module `suite_cloud.api.mail.groups`. The conventions are in the [overview](READ
 }
 ```
 
-`members` lists the site's account addresses that belong to the group, sorted. `used_disk_bytes`, `quotas`, `disk_quota_gb` and `aliases` work as they do for [accounts](accounts.md#the-account-object). Membership lives on the accounts: `set_members` here and `set_groups` on an account change the same thing from either side.
+`members` lists the tenant's account addresses that belong to the group, sorted. `used_disk_bytes`, `quotas`, `disk_quota_gb` and `aliases` work as they do for [accounts](accounts.md#the-account-object). Membership lives on the accounts: `set_members` here and `set_groups` on an account change the same thing from either side.
 
 ## `list_groups`
 
@@ -52,15 +52,15 @@ Takes `email`. Returns the group object with its usage.
 
 | Parameter | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `email` | string, required | | On an active domain of the site |
+| `email` | string, required | | On an active domain of the tenant |
 | `description` | string | | |
 | `aliases` | array | | As for [accounts](accounts.md#aliases) |
-| `members` | array of strings | | Account addresses of the site, at most 500 |
+| `members` | array of strings | | Account addresses of the tenant, at most 500 |
 | `disk_quota_gb` | number | no limit | As for [accounts](accounts.md#quotas) |
 | `quotas` | object | | As for accounts |
 | `disable_receiving` | boolean | `false` | Mail sent to the group's address bounces; the members' own mail is not affected |
 
-Answers 201 with the group object. An address that is not one of the site's accounts is a 404 and nothing is created; a taken address is a 409; an inactive domain or the site's group limit is a 422.
+Answers 201 with the group object. An address that is not one of the tenant's accounts is a 404 and nothing is created; a taken address is a 409; an inactive domain or the tenant's group limit is a 422.
 
 ## `update_group`
 
@@ -72,7 +72,7 @@ The same parameters and rules as for [accounts](accounts.md#set_aliases-add_alia
 
 ## `set_members`
 
-Takes `email` and `members`, an array of the site's account addresses (at most 500; empty or omitted removes every member). Only the accounts whose membership changes are touched, each saved on its own. An unknown address is a 404 and nothing changes. Returns the group object.
+Takes `email` and `members`, an array of the tenant's account addresses (at most 500; empty or omitted removes every member). Only the accounts whose membership changes are touched, each saved on its own. An unknown address is a 404 and nothing changes. Returns the group object.
 
 ## `delete_group`
 

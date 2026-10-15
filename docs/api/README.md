@@ -1,6 +1,6 @@
 # Suite Cloud API
 
-Suite Cloud exposes one REST API over Frappe's v2 method endpoint. The **tenant API** lets a Frappe Suite site manage its own slice of the mail directory: domains, accounts, groups, mailing lists and the DMARC and TLS reports of its domains.
+Suite Cloud exposes one REST API over Frappe's v2 method endpoint. The **tenant API** lets a Suite Tenant manage its own slice of the mail directory: domains, accounts, groups, mailing lists and the DMARC and TLS reports of its domains.
 
 | Page | Covers |
 | --- | --- |
@@ -17,18 +17,18 @@ Every method lives at `https://<suite-cloud>/api/v2/method/suite_cloud.api.<modu
 
 ## Authentication
 
-A site authenticates with the API key and secret issued when it was registered as a Suite Tenant. It sends two headers on every request:
+A tenant authenticates with the API key and secret issued when it was registered as a Suite Tenant. It sends two headers on every request:
 
 ```http
 Authorization: token <api_key>:<api_secret>
 Frappe-Authorization-Source: Suite Tenant
 ```
 
-Frappe resolves the key against the Suite Tenant record, so the request runs as the shared site service user and every method acts only on that site's documents. Anything that belongs to another site is reported as not found (404), never as forbidden.
+Frappe resolves the key against the Suite Tenant record, so the request runs as the shared tenant service user and every method acts only on that tenant's documents. Anything that belongs to another tenant is reported as not found (404), never as forbidden.
 
-When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `TenantAddressError`, and Suite Cloud logs it for the operators. A key copied out of a site's configuration is worthless anywhere else.
+When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `TenantAddressError`, and Suite Cloud logs it for the operators. A key copied out of a tenant's configuration is worthless anywhere else.
 
-An operator with the System Manager or Suite Cloud Manager role may call the tenant API from the desk or a script on behalf of a site. The tenant is named by the `tenant` parameter or the `X-Suite-Tenant` header.
+An operator with the System Manager or Suite Cloud Manager role may call the tenant API from the desk or a script on behalf of a tenant. The tenant is named by the `tenant` parameter or the `X-Suite-Tenant` header.
 
 ## Verbs
 
@@ -70,19 +70,19 @@ An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` wi
 | --- | --- | --- |
 | 400 | `InvalidInputError` | A required parameter left out, or a value the API could not parse: a list that is not a JSON array, a date that is not a date, a list over its cap |
 | 401 | `AuthenticationError` | The key or secret is wrong; Frappe rejects it before the tenant API runs |
-| 401 | `TenantAuthError` | The caller is logged in but is no site: a session without a key, or an operator naming an unknown site |
+| 401 | `TenantAuthError` | The caller is logged in but is no tenant: a session without a key, or an operator naming an unknown tenant |
 | 403 | `PermissionError` | No credentials at all, a verb that does not match the method, or a caller without the role |
-| 403 | `TenantSuspendedError` | The site is suspended or archived |
-| 403 | `TenantAddressError` | The request did not come from one of the site's allowed addresses |
-| 404 | `DoesNotExistError` | The object does not exist, or belongs to another site |
+| 403 | `TenantSuspendedError` | The tenant is suspended or archived |
+| 403 | `TenantAddressError` | The request did not come from one of the tenant's allowed addresses |
+| 404 | `DoesNotExistError` | The object does not exist, or belongs to another tenant |
 | 409 | `DuplicateEntryError` | The address or domain is already taken |
 | 422 | `ValidationError` | Suite Cloud refused the change: a limit, a rule, an inactive domain |
 | 422 | `ClusterRejectedError` | The mail server refused the change; the message carries its reason |
-| 429 | `TooManyRequestsError` | The site made more than 300 requests in the current minute |
+| 429 | `TooManyRequestsError` | The tenant made more than 300 requests in the current minute |
 | 502 | `ClusterFailedError` | The mail server failed in a way the caller cannot fix; Suite Cloud logged it for the operators |
 | 502 | `ClusterMisconfiguredError` | Suite Cloud's own credentials for the mail server were rejected; an operator problem |
 | 503 | `ClusterUnavailableError` | The mail server could not be reached; the same request can be sent again in a few minutes |
 
 ## Rate limit
 
-Each site may make 300 requests per minute, counted in fixed one-minute windows. Refusals count too. Failed authentication attempts are paced per source address the same way.
+Each tenant may make 300 requests per minute, counted in fixed one-minute windows. Refusals count too. Failed authentication attempts are paced per source address the same way.

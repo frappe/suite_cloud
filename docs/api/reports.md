@@ -1,6 +1,6 @@
 # Reports
 
-Modules `suite_cloud.api.mail.dmarc` and `suite_cloud.api.mail.tls`. The conventions are in the [overview](README.md). The cluster receives DMARC aggregate reports and SMTP TLS reports for the site's domains; Suite Cloud copies them hourly and drops them after their retention. The site sees the reports of its own domains.
+Modules `suite_cloud.api.mail.dmarc` and `suite_cloud.api.mail.tls`. The conventions are in the [overview](README.md). The cluster receives DMARC aggregate reports and SMTP TLS reports for the tenant's domains; Suite Cloud copies them hourly and drops them after their retention. The tenant sees the reports of its own domains.
 
 | Method | Verb | Purpose |
 | --- | --- | --- |
@@ -17,7 +17,7 @@ Both listings take the same parameters.
 
 | Parameter | Type | Default | Meaning |
 | --- | --- | --- | --- |
-| `domain` | string | | Only reports about this domain of the site |
+| `domain` | string | | Only reports about this domain of the tenant |
 | `search` | string | | Matches the domain, the reporter or the report id |
 | `since` | datetime | | Only reports whose period ended at or after this moment |
 | `until` | datetime | | Only reports whose period began at or before this moment |
