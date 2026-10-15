@@ -101,6 +101,20 @@ def utc_iso(value) -> str | None:
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def local_datetime(value):
+    """A UTC timestamp from Stalwart as the naive system-time value Frappe stores."""
+
+    if not value:
+        return None
+    from datetime import UTC
+    from zoneinfo import ZoneInfo
+
+    moment = frappe.utils.get_datetime(value)
+    if moment.tzinfo is None:
+        moment = moment.replace(tzinfo=UTC)
+    return moment.astimezone(ZoneInfo(frappe.utils.get_system_timezone())).replace(tzinfo=None)
+
+
 def password_or_none(doc, field: str) -> str | None:
     """Returns the decrypted password if the field is set, otherwise None."""
 

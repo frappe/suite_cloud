@@ -16,11 +16,11 @@ from suite_cloud.mail.reports import (
     envelope_fields,
     envelope_payload,
     listing_payloads,
-    local_datetime,
     lower,
     normalize_domain,
     sender_address,
 )
+from suite_cloud.utils import local_datetime
 
 PASS = "pass"
 
