@@ -61,7 +61,7 @@ def list_tls_reports(
 def get_tls_report(report: str) -> dict:
     name = frappe.db.get_value("TLS Report", {"name": report, "site": current_site().name})
     if not name:
-        raise frappe.DoesNotExistError(_("TLS Report {0} not found.").format(report))
+        frappe.throw(_("TLS Report {0} not found.").format(report), frappe.DoesNotExistError)
     return frappe.get_doc("TLS Report", name).to_api(with_records=True)
 
 

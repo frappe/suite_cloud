@@ -41,7 +41,7 @@ def set_enabled(doctype: str, email: str, alias: str, enabled: bool):
     alias = normalize_name(alias)
     row = _row(doc, alias)
     if row is None:
-        raise frappe.DoesNotExistError(_("Alias {0} not found on {1}.").format(alias, doc.email))
+        frappe.throw(_("Alias {0} not found on {1}.").format(alias, doc.email), frappe.DoesNotExistError)
     row.enabled = int(bool(enabled))
     doc.save(ignore_permissions=True)
     return doc

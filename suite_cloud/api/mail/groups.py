@@ -138,7 +138,7 @@ def _resolve_members(members: list[str] | str | None) -> set[str]:
     site = current_site().name
     known = set(frappe.get_all("Mail Account", {"site": site, "name": ["in", list(wanted)]}, pluck="name"))
     if missing := sorted(wanted - known):
-        raise frappe.DoesNotExistError(_("{0} {1} not found.").format(_("Mail Account"), missing[0]))
+        frappe.throw(_("{0} {1} not found.").format(_("Mail Account"), missing[0]), frappe.DoesNotExistError)
     return wanted
 
 

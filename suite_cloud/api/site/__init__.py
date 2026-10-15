@@ -87,17 +87,19 @@ def _resolve_site():
     request_ip = getattr(frappe.local, "request_ip", None)
     if not name or not frappe.db.exists("Suite Site", name):
         throttle(f"address:{request_ip or 'unknown'}")  # guessing keys is paced like everything else
-        raise SiteAuthError(_("Site authentication failed."))
+        frappe.throw(_("Site authentication failed."), SiteAuthError)
 
     site = frappe.get_cached_doc("Suite Site", name)
     throttle(f"site:{site.name}")  # counted before any refusal, so refusals cannot be free
     if not site.enabled or site.status != "Active":
-        raise SiteSuspendedError(_("Site {0} is {1}.").format(site.name, site.status.lower()))
+        frappe.throw(_("Site {0} is {1}.").format(site.name, site.status.lower()), SiteSuspendedError)
     if frappe.session.user == service_user and not site.allows_ip(request_ip):
         # A key copied out of a site's config is worthless from anywhere but the site's own servers.
         # Either the key has leaked or the site moved servers; operators need to know which.
         log_refusal_once(site.name, request_ip, ", ".join((site.allowed_ips or "").split("\n")))
-        raise SiteAddressError(_("Site {0} does not accept requests from this address.").format(site.name))
+        frappe.throw(
+            _("Site {0} does not accept requests from this address.").format(site.name), SiteAddressError
+        )
     return site
 
 
@@ -125,8 +127,9 @@ def throttle(subject: str) -> None:
     if count == 1:
         frappe.cache.expire(key, 90)
     if count > RATE_LIMIT:
-        raise frappe.TooManyRequestsError(
-            _("Rate limit of {0} requests per minute exceeded.").format(RATE_LIMIT)
+        frappe.throw(
+            _("Rate limit of {0} requests per minute exceeded.").format(RATE_LIMIT),
+            frappe.TooManyRequestsError,
         )
 
 
@@ -169,10 +172,10 @@ def api_errors():
     try:
         yield
     except StalwartRejectedError as e:
-        raise ClusterRejectedError(_("The mail server rejected the change: {0}").format(_describe(e))) from e
+        frappe.throw(_("The mail server rejected the change: {0}").format(_describe(e)), ClusterRejectedError)
     except StalwartUnauthorizedError as e:
         frappe.log_error(title="[Suite Cloud] Cluster credentials rejected", message=str(e))
-        raise ClusterMisconfiguredError(_("The mail cluster refused Suite Cloud's credentials.")) from e
+        frappe.throw(_("The mail cluster refused Suite Cloud's credentials."), ClusterMisconfiguredError)
     except frappe.ValidationError as e:
         if e.http_status_code == 417:
             e.http_status_code = 422
@@ -213,7 +216,7 @@ def owned(doctype: str, name: str, for_update: bool = False):
     if name and frappe.db.exists(doctype, name):
         doc = frappe.get_doc(doctype, name, for_update=for_update)
     if doc is None or doc.site != site.name:
-        raise frappe.DoesNotExistError(_("{0} {1} not found.").format(_(doctype), name))
+        frappe.throw(_("{0} {1} not found.").format(_(doctype), name), frappe.DoesNotExistError)
     return doc
 
 

@@ -62,7 +62,7 @@ def list_dmarc_reports(
 def get_dmarc_report(report: str) -> dict:
     name = frappe.db.get_value("DMARC Report", {"name": report, "site": current_site().name})
     if not name:
-        raise frappe.DoesNotExistError(_("DMARC Report {0} not found.").format(report))
+        frappe.throw(_("DMARC Report {0} not found.").format(report), frappe.DoesNotExistError)
     return frappe.get_doc("DMARC Report", name).to_api(with_records=True)
 
 
