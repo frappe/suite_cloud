@@ -131,6 +131,10 @@ class TestSiteResolution(SiteApiTestCase):
         accounts.create_account("alice@acme.com", "secret-pw")
         with patch.object(ManagementService, "get_many", side_effect=StalwartUnavailableError()):
             self.assertRaises(ClusterUnavailableError, get_disk_usage)
+            # The form still opens; the figure is simply absent.
+            doc = frappe.get_doc("Suite Site", self.site.name)
+            doc.run_method("onload")
+            self.assertIsNone(doc.used_disk_bytes)
         self.assertIsNone(frappe.cache.get_value(key, expires=True))
 
     def test_site_profile_follows_the_workspace(self) -> None:

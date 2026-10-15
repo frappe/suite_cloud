@@ -11,6 +11,7 @@ from frappe.utils import cint, flt, now, now_datetime
 
 from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB
+from suite_cloud.mail.stalwart.errors import StalwartError
 from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
 from suite_cloud.utils import get_config, utc_iso
 
@@ -271,11 +272,18 @@ class SuiteSite(Document):
 
     @property
     def used_disk_bytes(self) -> int | None:
-        """The virtual field: every serialisation reads it, so only the form pays for the lookup."""
+        """The virtual field: every serialisation reads it, so only the form pays for the lookup,
+        and a cluster that cannot answer costs the figure, not the form."""
 
         if not self.flags.with_usage:
             return None
-        return self.get_disk_usage()["used_disk_bytes"]
+        try:
+            return self.get_disk_usage()["used_disk_bytes"]
+        except StalwartError as e:
+            frappe.log_error(
+                title="[Suite Cloud] Disk usage lookup failed", message=str(e), defer_insert=True
+            )
+            return None
 
     def get_disk_usage(self, fresh: bool = False) -> dict:
         """``{used_disk_bytes, fetched_at}`` across the site's accounts and groups, kept for
