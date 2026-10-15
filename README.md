@@ -44,7 +44,7 @@ The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what a
 | --- | --- |
 | **DNS Zone** | A domain you own (for example `frappemail.com`) plus the login for the DNS provider that manages it. Suite Cloud publishes server records there. You can have several zones; each cluster picks one. |
 | **Stalwart Store** | Where a cluster keeps its data: a PostgreSQL or MySQL database, an S3 bucket for message bodies, Redis for shared memory, and optionally a search engine. |
-| **Stalwart Cluster** | One mail service with its public hostname (`mail.c1.frappemail.com`), its stores, its admin credentials, an SSH key for its servers and the regions Frappe Cloud may place tenants from. |
+| **Stalwart Cluster** | One mail service with its public hostname (`mail.c1.frappemail.com`), its stores, its admin credentials, an SSH key for its servers and the regions tenants may be placed from. |
 | **Stalwart Node** | One server (VPS) that runs Stalwart for a cluster. Nodes share the same stores, so any node can serve any user. |
 | **Egress Gateway** and **Egress IP Pool** | Optional extra servers used only for sending. A pool is a set of IP addresses; a domain, a tenant or a whole cluster can be told to send through it. |
 | **DNS Record** | One record Suite Cloud keeps in a zone (a node's address, the cluster's round-robin entry, the SPF list, and so on). Records are created and removed together with the thing that needs them. |
@@ -88,7 +88,7 @@ Installing creates two roles and one user:
    `c2` and so on. The label and the zone make the hostname, `mail.c1.frappemail.com`, and the
    default domain `c1.frappemail.com` that nodes, gateways and pools get their names under. The
    label is only a namespace: a cluster may have servers in several regions. List the regions
-   Frappe Cloud may place tenants from, or none to serve every region. Copy the SSH public key.
+   tenants may be placed from, or none to serve every region. Copy the SSH public key.
 5. **First node.** Put that public key on a fresh VPS and set the reverse DNS (PTR) of its IP to the
    node's hostname. Create a Stalwart Node (`n1.c1.frappemail.com` with its IPv4), click
    **Verify SSH**, then **Provision**. The first Verify SSH records the server's host keys; every

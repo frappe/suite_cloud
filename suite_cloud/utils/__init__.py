@@ -80,7 +80,7 @@ def dkim_algorithms() -> tuple[str, ...]:
 def utc_iso(value) -> str | None:
     """A stored datetime as an aware UTC string (``2026-09-09T10:00:00Z``) for API payloads.
 
-    Frappe stores naive system-time values; handing them out naive lets a site in another time
+    Frappe stores naive system-time values; handing them out naive lets a tenant in another time
     zone read them as its own local time and show them hours off.
     """
 

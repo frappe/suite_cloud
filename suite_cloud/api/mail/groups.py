@@ -130,7 +130,7 @@ def delete_group(email: str) -> None:
 
 
 def _resolve_members(members: list[str] | str | None) -> set[str]:
-    """The site's account names behind ``members``; any other address is not found."""
+    """The tenant's account names behind ``members``; any other address is not found."""
 
     wanted = {normalize_name(m) for m in as_list(members, MEMBERSHIP_CAP)}
     if not wanted:

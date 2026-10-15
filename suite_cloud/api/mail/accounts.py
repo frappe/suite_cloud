@@ -52,7 +52,7 @@ QUOTA_LOOKUP_LIMIT = 500
 @frappe.whitelist(methods=["GET"])
 @tenant_api
 def get_quotas(emails: list[str] | str) -> dict:
-    """``{email: {disk_quota_gb, used_disk_bytes}}`` for the site's accounts among ``emails``;
+    """``{email: {disk_quota_gb, used_disk_bytes}}`` for the tenant's accounts among ``emails``;
     a ``disk_quota_gb`` of 0 means no limit.
 
     The quotas are one query; usage is one cluster call per ``maxObjectsInGet`` accounts, so a
@@ -304,7 +304,7 @@ def update_credential(kind: Kind, email: str, id: str, description, expires_at, 
 
 
 def delete_credential(kind: Kind, email: str, id: str) -> None:
-    """Revokes one credential; the site's own app password is rotated, never deleted."""
+    """Revokes one credential; the tenant's own app password is rotated, never deleted."""
 
     doc = owned("Mail Account", email, for_update=True)
     row = account_credentials.row_by_id(doc, kind, id)

@@ -1,6 +1,6 @@
 """One alias at a time on an account, group or mailing list.
 
-The site's dashboard edits aliases one row at a time; doing that through the full-replace
+The tenant's dashboard edits aliases one row at a time; doing that through the full-replace
 ``set_*_aliases`` calls means two admins editing the same object at once lose each other's rows.
 These helpers lock the parent row for the change instead.
 """

@@ -166,7 +166,7 @@
   },
   {
    "default": "0",
-   "description": "Cluster Frappe Cloud uses when it names no cluster and no cluster serves the requested region. Only one cluster can be default.",
+   "description": "Cluster a tenant is placed on when none is named and no cluster serves the requested region. Only one cluster can be default.",
    "fieldname": "is_default",
    "fieldtype": "Check",
    "label": "Is Default"
@@ -464,7 +464,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-16 03:00:00.000000",
+ "modified": "2026-10-16 03:30:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

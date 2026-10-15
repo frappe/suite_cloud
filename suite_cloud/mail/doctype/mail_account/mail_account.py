@@ -206,7 +206,7 @@ class MailAccount(QuotaHolder, Document):
     # --- Suite Cloud credentials ---------------------------------------------------------------
 
     def mint_app_password(self) -> str:
-        """Replaces the Suite site's login; the previous one is revoked once the save commits."""
+        """Replaces the tenant's login; the previous one is revoked once the save commits."""
 
         return account_credentials.rotate_site_login(self, APP_PASSWORDS)
 

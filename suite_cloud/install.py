@@ -19,7 +19,7 @@ def after_migrate() -> None:
 
 
 def setup() -> None:
-    """Creates the roles and the shared site service user; safe to run on every migrate."""
+    """Creates the roles and the shared tenant service user; safe to run on every migrate."""
 
     for role_name, desk_access in ROLES:
         ensure_role(role_name, desk_access)

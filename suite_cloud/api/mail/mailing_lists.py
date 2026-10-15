@@ -123,9 +123,9 @@ def list_recipients(email: str, search: str | None = None, start: int = 0, limit
 @frappe.whitelist(methods=["GET"])
 @tenant_api
 def list_all_recipients(start: int = 0, limit: int = 1000) -> dict:
-    """Every recipient of every list the site owns, ordered by list then address.
+    """Every recipient of every list the tenant owns, ordered by list then address.
 
-    A site mirrors its lists in a handful of calls this way, instead of one call per list, which
+    A tenant mirrors its lists in a handful of calls this way, instead of one call per list, which
     would exhaust its rate limit on its own once it holds a few hundred lists.
     """
 

@@ -1,11 +1,11 @@
-"""Adopts what a cluster already holds into a site's directory.
+"""Adopts what a cluster already holds into a tenant's directory.
 
-For a site whose cluster came from the previous architecture (one Stalwart per site, administered
-by the site itself), the cluster has domains, accounts, groups and lists that Suite Cloud never
+For a tenant whose cluster came from the previous architecture (one Stalwart per tenant, administered
+by the tenant itself), the cluster has domains, accounts, groups and lists that Suite Cloud never
 created. Adoption records them as Mail Domain, Mail Account, Mail Group and Mailing List with the
 ids the cluster already uses, and pushes nothing back: the cluster is the source here.
 
-Rules: the cluster must serve exactly this one site, so nothing can belong to anyone else; an
+Rules: the cluster must serve exactly this one tenant, so nothing can belong to anyone else; an
 object whose record already exists anywhere is skipped; every object is its own transaction, so
 one that fails to import (an alias on a foreign domain, say) is reported and the rest go in.
 """
@@ -30,7 +30,7 @@ def adopt_directory(tenant_name: str) -> dict:
         frappe.get_all("Suite Tenant", {"cluster": cluster.name, "name": ["!=", tenant.name]}, pluck="name")
     )
     for doctype in ("Mail Domain", "Mail Account", "Mail Group", "Mailing List"):
-        # Rows left by a site that moved or was removed still say whose the cluster's objects are.
+        # Rows left by a tenant that moved or was removed still say whose the cluster's objects are.
         others.update(
             frappe.get_all(
                 doctype,

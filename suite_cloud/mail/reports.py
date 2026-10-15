@@ -2,7 +2,7 @@
 
 Stalwart intercepts the DMARC and TLS aggregate reports mailed to ``postmaster@<domain>``,
 parses them and keeps them for a month. The hourly fetch copies the ones it has not seen into a
-DocType per kind, attributed to the site that holds the domain, so a site keeps a history longer
+DocType per kind, attributed to the tenant that holds the domain, so a tenant keeps a history longer
 than the cluster does and reads it through the tenant API without ever touching the cluster.
 """
 
@@ -122,7 +122,7 @@ def envelope_fields(cluster_name: str, obj: dict, policy_domain: str, attributab
     """The fields every received report shares: where it came from, whose domain it is about,
     the message that carried it and the whole object as the cluster answered it.
 
-    ``attributable`` False keeps the report from every site, for one whose content names more
+    ``attributable`` False keeps the report from every tenant, for one whose content names more
     than one domain.
     """
 
@@ -141,8 +141,8 @@ def envelope_fields(cluster_name: str, obj: dict, policy_domain: str, attributab
 
 
 def report_tenant(policy_domain: str, recipients: list[str]) -> str | None:
-    """The site that holds the report's domain, if the report was also addressed to one of that
-    site's domains; otherwise the report is kept for operators and shown to no site.
+    """The tenant that holds the report's domain, if the report was also addressed to one of that
+    tenant's domains; otherwise the report is kept for operators and shown to no tenant.
 
     The domain comes from the report body, which the sender writes. A genuine reporter mails
     the address the domain's own DMARC or TLS-RPT record names (postmaster@ of the domain), so

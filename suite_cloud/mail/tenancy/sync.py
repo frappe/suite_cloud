@@ -56,7 +56,7 @@ def domain_stalwart_id(domain_name: str) -> str:
 
 
 def validate_aliases(doc: Document) -> None:
-    """Aliases must sit on one of the site's domains and be free everywhere."""
+    """Aliases must sit on one of the tenant's domains and be free everywhere."""
 
     seen = set()
     for row in doc.aliases:

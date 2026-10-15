@@ -36,8 +36,8 @@ function rotate_secret(frm) {
 	)
 }
 
-// Records what the cluster already holds (one Stalwart per site, before Suite Cloud) as this
-// site's directory. Nothing is pushed to the cluster; objects that already exist are skipped.
+// Records what the cluster already holds (one Stalwart per tenant, before Suite Cloud) as this
+// tenant's directory. Nothing is pushed to the cluster; objects that already exist are skipped.
 function adopt_directory(frm) {
 	frappe.confirm(
 		__('Record every domain, account, group and mailing list on cluster {0} as belonging to {1}? Objects that already exist are skipped. Nothing is changed on the cluster.', [

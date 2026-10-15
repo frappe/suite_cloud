@@ -86,7 +86,7 @@ class MailDomain(Document):
         self.cluster = tenant.cluster
         if self.is_new() and not self.flags.adopting:
             # Proof of control comes first: only someone who controls the domain's DNS learns
-            # whether another site already holds it.
+            # whether another tenant already holds it.
             if ownership.required():
                 ownership.assert_ownership(tenant, self.domain_name)
             assert_domain_available(self.domain_name, self.tenant)

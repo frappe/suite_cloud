@@ -59,7 +59,7 @@ def delete_node_records(node: Document) -> None:
 
 
 def spf_host(cluster: Document) -> str:
-    """The include target sites use: ``spf.<cluster zone>`` relative to the DNS Zone."""
+    """The include target tenants use: ``spf.<cluster zone>`` relative to the DNS Zone."""
 
     return relative_host(spf_include(cluster), cluster.dns_zone)
 

@@ -1,7 +1,7 @@
-"""Tenant-facing API: what a Frappe Suite site may do with its own slice of the directory.
+"""Tenant-facing API: what a tenant may do with its own slice of the directory.
 
 The tenant sends ``Authorization: Tenant <id>:<secret>``; the ``authenticate`` auth hook checks
-the secret and runs the request as the shared site service user. Every endpoint then resolves
+the secret and runs the request as the shared tenant service user. Every endpoint then resolves
 the calling tenant from the id in the header and only ever touches documents owned by that
 tenant. Objects of other tenants are reported as missing, never as forbidden.
 """
@@ -35,7 +35,7 @@ ERROR_KEYS = ("type", "message", "exception")
 
 OWNED_DOCTYPES = {"Mail Domain", "Mail Account", "Mail Group", "Mailing List"}
 MANAGER_ROLES = ("System Manager", "Suite Cloud Manager")
-RATE_LIMIT = 300  # requests per site per minute
+RATE_LIMIT = 300  # requests per tenant per minute
 ALIAS_CAP = 100  # aliases on one object; more than that is a list, not an account
 MEMBERSHIP_CAP = 500  # groups or members named in one request
 RECIPIENT_BATCH = 5000  # recipients added or removed in one request
@@ -50,7 +50,7 @@ class TenantSuspendedError(frappe.PermissionError):
 
 
 class TenantAddressError(frappe.PermissionError):
-    """The key is valid but the request did not come from one of the site's allowed addresses."""
+    """The secret is valid but the request did not come from one of the tenant's allowed addresses."""
 
 
 class InvalidInputError(frappe.ValidationError):
@@ -120,7 +120,7 @@ def _resolve_tenant():
     if frappe.session.user == service_user:
         name = _credentials_from_header()[0]
     elif frappe.session.user != "Guest" and set(frappe.get_roles()) & set(MANAGER_ROLES):
-        # Operators may act on behalf of a site from the desk or a script.
+        # Operators may act on behalf of a tenant from the desk or a script.
         name = frappe.form_dict.get("tenant") or frappe.get_request_header("X-Suite-Tenant")
     else:
         name = None
@@ -138,8 +138,8 @@ def _resolve_tenant():
             TenantSuspendedError,
         )
     if frappe.session.user == service_user and not tenant.allows_ip(request_ip):
-        # A key copied out of a site's config is worthless from anywhere but the site's own servers.
-        # Either the key has leaked or the site moved servers; operators need to know which.
+        # A secret copied out of a tenant's config is worthless from anywhere but the tenant's own servers.
+        # Either the secret has leaked or the tenant moved servers; operators need to know which.
         log_refusal_once(tenant.name, request_ip, ", ".join((tenant.allowed_ips or "").split("\n")))
         frappe.throw(
             _("Tenant {0} does not accept requests from this address.").format(tenant.name),
@@ -157,7 +157,7 @@ def _credentials_from_header() -> tuple[str, str]:
 
 
 def throttle(subject: str) -> None:
-    """A fixed one-minute window per subject (a site, or an address that failed to authenticate)."""
+    """A fixed one-minute window per subject (a tenant, or an address that failed to authenticate)."""
 
     if not getattr(frappe.local, "request", None):
         return
@@ -177,7 +177,7 @@ def throttle(subject: str) -> None:
 
 
 def log_refusal_once(tenant_name: str, request_ip: str | None, allowed: str) -> None:
-    """One Error Log per site and address per ten minutes: a flood must not drown the signal,
+    """One Error Log per tenant and address per ten minutes: a flood must not drown the signal,
     and the row is inserted on the side so the refusal's rollback cannot discard it."""
 
     key = f"suite_cloud:refused:{tenant_name}:{request_ip or 'unknown'}"
@@ -196,7 +196,7 @@ def log_refusal_once(tenant_name: str, request_ip: str | None, allowed: str) -> 
 
 
 def tenant_api(fn: Callable) -> Callable:
-    """Resolves the site, throttles, and turns refusals into REST-shaped errors."""
+    """Resolves the tenant, throttles, and turns refusals into REST-shaped errors."""
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
@@ -277,7 +277,7 @@ def normalize_name(name: str | None) -> str:
 
 
 def owned(doctype: str, name: str, for_update: bool = False):
-    """Loads one of the site's documents; anything else is a 404.
+    """Loads one of the tenant's documents; anything else is a 404.
 
     ``for_update`` locks the row until the request commits, for read-modify-write changes such
     as adding one alias, so two concurrent edits cannot drop each other's rows.
@@ -313,7 +313,7 @@ def owned_page(
     filters: dict | None = None,
     order_by: str = "name asc",
 ) -> tuple[list[str], int]:
-    """One page of the site's document names by name, plus how many match in all."""
+    """One page of the tenant's document names by name, plus how many match in all."""
 
     filters = {"tenant": current_tenant().name, **(filters or {})}
     or_filters = None
@@ -406,7 +406,7 @@ def as_datetime(value: Any) -> datetime | None:
 @frappe.whitelist(methods=["GET"])
 @tenant_api
 def ping() -> dict:
-    """Confirms the credentials and returns where the site's mail lives."""
+    """Confirms the credentials and returns where the tenant's mail lives."""
 
     return current_tenant().to_api()
 
@@ -414,7 +414,7 @@ def ping() -> dict:
 @frappe.whitelist(methods=["GET"])
 @tenant_api
 def get_disk_usage(fresh: bool = False) -> dict:
-    """The disk the site's accounts and groups use together, served from a short-lived cache;
+    """The disk the tenant's accounts and groups use together, served from a short-lived cache;
     ``fresh`` asks the mail server now."""
 
     return current_tenant().get_disk_usage(sbool(fresh))
@@ -423,7 +423,7 @@ def get_disk_usage(fresh: bool = False) -> dict:
 @frappe.whitelist(methods=["PATCH"])
 @tenant_api
 def update_tenant_profile(title: str | None = None, contact_email: str | None = None) -> dict:
-    """What the site says about itself: its workspace name as the title, and where to reach it.
+    """What the tenant says about itself: its workspace name as the title, and where to reach it.
 
     Only the fields passed change; an empty string clears the contact. The title cannot be empty.
     """

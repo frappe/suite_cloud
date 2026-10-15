@@ -15,8 +15,8 @@ from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
 from suite_cloud.utils import get_config, utc_iso
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
-MAILBOX_DOCTYPES = ("Mail Account", "Mail Group")  # the documents whose disk usage the site sums
-DISK_USAGE_CACHE_TTL = 300  # seconds a site's summed disk usage is served without asking the cluster
+MAILBOX_DOCTYPES = ("Mail Account", "Mail Group")  # the documents whose disk usage the tenant sums
+DISK_USAGE_CACHE_TTL = 300  # seconds a tenant's summed disk usage is served without asking the cluster
 
 
 class SuiteTenant(Document):
@@ -107,7 +107,7 @@ class SuiteTenant(Document):
 
     @frappe.whitelist()
     def adopt_directory(self) -> dict:
-        """Records the domains, accounts, groups and lists the cluster already holds for this site."""
+        """Records the domains, accounts, groups and lists the cluster already holds for this tenant."""
 
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         from suite_cloud.mail.tenancy.adopt import adopt_directory
@@ -127,7 +127,7 @@ class SuiteTenant(Document):
 
     @frappe.whitelist()
     def suspend(self) -> None:
-        # The key keeps authenticating so the site gets a 403 naming the suspension, not a bare 401.
+        # The key keeps authenticating so the tenant gets a 403 naming the suspension, not a bare 401.
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status == "Archived":
             frappe.throw(_("An archived tenant cannot be suspended."))
@@ -142,7 +142,7 @@ class SuiteTenant(Document):
 
     @frappe.whitelist()
     def archive(self, delete_data: bool = False) -> None:
-        """Locks the site out; with ``delete_data`` every directory object is removed from Stalwart too."""
+        """Locks the tenant out; with ``delete_data`` every directory object is removed from Stalwart too."""
 
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         self.db_set({"enabled": 0, "status": "Archived", "archived_at": now()})
@@ -211,7 +211,7 @@ class SuiteTenant(Document):
         return self.get_used_disk_bytes() if self.flags.with_usage else None
 
     def get_used_disk_bytes(self) -> int | None:
-        """A cluster that cannot answer costs the figure, not the form or the site profile."""
+        """A cluster that cannot answer costs the figure, not the form or the tenant profile."""
 
         try:
             return self.get_disk_usage()["used_disk_bytes"]
@@ -222,7 +222,7 @@ class SuiteTenant(Document):
             return None
 
     def get_disk_usage(self, fresh: bool = False) -> dict:
-        """``{used_disk_bytes, fetched_at}`` across the site's accounts and groups, kept for
+        """``{used_disk_bytes, fetched_at}`` across the tenant's accounts and groups, kept for
         ``DISK_USAGE_CACHE_TTL`` seconds; ``fresh`` asks the cluster now."""
 
         key = f"suite_cloud:disk-usage:{self.name}"
@@ -234,7 +234,7 @@ class SuiteTenant(Document):
         return usage
 
     def fetch_used_disk_bytes(self) -> int:
-        """One cluster call per ``maxObjectsInGet`` ids, all on the site's cluster. A cluster that
+        """One cluster call per ``maxObjectsInGet`` ids, all on the tenant's cluster. A cluster that
         cannot answer raises: a partial sum must never be returned or cached."""
 
         ids = []
@@ -248,7 +248,7 @@ class SuiteTenant(Document):
         return sum(cint(o.get("usedDiskQuota")) for o in objects)
 
     def lock(self) -> None:
-        """Serialises this site's limit checks: two requests must not both see room for the last slot."""
+        """Serialises this tenant's limit checks: two requests must not both see room for the last slot."""
 
         if frappe.db.exists("Suite Tenant", self.name):
             frappe.db.get_value("Suite Tenant", self.name, "name", for_update=True)
@@ -265,7 +265,7 @@ class SuiteTenant(Document):
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
 
     def allows_ip(self, ip: str | None) -> bool:
-        """Whether a request from ``ip`` may use the site's key. No list means any address."""
+        """Whether a request from ``ip`` may use the tenant's secret. No list means any address."""
 
         networks = parse_networks(self.allowed_ips)
         if not networks:
@@ -321,7 +321,7 @@ def parse_networks(text: str | None) -> list:
 
 
 def purge_directory(tenant: str) -> None:
-    """Deletes an archived site's directory one document at a time.
+    """Deletes an archived tenant's directory one document at a time.
 
     Each delete is its own transaction: every document destroys its Stalwart object inside its
     delete, so a failure half-way must not resurrect rows whose objects are already gone.

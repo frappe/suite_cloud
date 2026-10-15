@@ -23,10 +23,10 @@ def get_domain(domain: str) -> dict:
 @frappe.whitelist(methods=["GET"])
 @tenant_api
 def check_domain(domain: str) -> dict:
-    """Whether the domain can be added, and the record the site must publish to prove it owns it.
+    """Whether the domain can be added, and the record the tenant must publish to prove it owns it.
 
-    Nothing is stored: the site shows the record to its admin and calls ``create_domain`` once it
-    is published. The record is the same for every domain the site ever adds.
+    Nothing is stored: the tenant shows the record to its admin and calls ``create_domain`` once it
+    is published. The record is the same for every domain the tenant ever adds.
     """
 
     tenant = current_tenant()
@@ -35,7 +35,7 @@ def check_domain(domain: str) -> dict:
         frappe.throw(
             _("Domain {0} is already added to this tenant.").format(domain), frappe.DuplicateEntryError
         )
-    assert_domain_not_reserved(domain)  # whether another site holds it is told only to a proven owner
+    assert_domain_not_reserved(domain)  # whether another tenant holds it is told only to a proven owner
     return {"domain": domain, "ownership_record": ownership_record(tenant, domain)}
 
 

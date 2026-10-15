@@ -1,13 +1,13 @@
-"""Proof that a site controls a domain, required before the domain is added to it.
+"""Proof that a tenant controls a domain, required before the domain is added to it.
 
-Clusters are shared between sites, so a domain claimed by the wrong site would lock its real
-owner out. Nothing is stored for an unverified claim: the site publishes a TXT record carrying
+Clusters are shared between tenants, so a domain claimed by the wrong tenant would lock its real
+owner out. Nothing is stored for an unverified claim: the tenant publishes a TXT record carrying
 its own tenant id at the domain apex, and the Mail Domain is created only once that record
 resolves. The id is fixed for the life of the tenant, so every domain it adds asks for the same
 record and no other tenant can produce it.
 
 The guard is aimed at tenants: it applies to requests made through the tenant API, which run as
-the site service user. Operators adding a domain from the desk vouch for it themselves, and a
+the tenant service user. Operators adding a domain from the desk vouch for it themselves, and a
 development cloud's operator may vouch for every tenant's domains at once with Suite Cloud
 Settings' "Skip Domain Verification" - test domains exist in no public DNS.
 """
@@ -35,7 +35,7 @@ class OwnershipLookupError(frappe.ValidationError):
 
 
 def required() -> bool:
-    """Whether the request has to prove control of the domain: a site's own, on a cloud that
+    """Whether the request has to prove control of the domain: a tenant's own, on a cloud that
     checks."""
 
     return frappe.session.user == get_config("tenant_service_user") and not skipped()

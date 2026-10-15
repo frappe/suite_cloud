@@ -1,4 +1,4 @@
-"""TLS aggregate reports of the site's domains, as the hourly fetch stored them."""
+"""TLS aggregate reports of the tenant's domains, as the hourly fetch stored them."""
 
 import frappe
 from frappe import _
@@ -84,7 +84,7 @@ def get_tls_summary(domain: str | None = None, days: int = 30) -> dict:
 
 
 class ReportScope:
-    """The site's reports since a moment: sessions from the reports, failures from their rows."""
+    """The tenant's reports since a moment: sessions from the reports, failures from their rows."""
 
     def __init__(self, tenant: str, domain: str | None, since) -> None:
         self.tenant = tenant

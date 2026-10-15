@@ -2,7 +2,7 @@
 
 A row without a credential id is created on the cluster when the account saves and its secret is
 shown once; a row taken out is revoked once the save commits. The description "Suite Cloud" is
-reserved for the credential Suite Cloud itself mints: the app password is the Suite site's login
+reserved for the credential Suite Cloud itself mints: the app password is the tenant's login
 and is always present and first; the API key exists only once an operator rotates it.
 """
 
@@ -94,7 +94,7 @@ def append_site_login(doc, kind: Kind):
 
 
 def make_room(doc, kind: Kind, limit: int | None) -> None:
-    """The site's login outranks the oldest of the other credentials when the account is full."""
+    """The tenant's login outranks the oldest of the other credentials when the account is full."""
 
     while limit and len(doc.get(kind.field)) > limit:
         existing = [r for r in doc.get(kind.field) if r.credential_id and r.description != SITE_LOGIN]
@@ -172,7 +172,7 @@ def push_kind(doc, before, kind: Kind) -> None:
         service.update(row.credential_id, patch(row))
     if gone:
         # Only once the save is committed: a rollback would otherwise keep rows for credentials
-        # that no longer exist, and a rotation would cut the site off before it has the new secret.
+        # that no longer exist, and a rotation would cut the tenant off before it has the new secret.
         frappe.db.after_commit.add(lambda: revoke(service, gone))
 
 
