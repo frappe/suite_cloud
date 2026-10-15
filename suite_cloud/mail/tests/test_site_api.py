@@ -98,13 +98,15 @@ class TestSiteResolution(SiteApiTestCase):
         self.assertEqual(page_size(5000, 200), 200)
         self.assertEqual(page_size("x", 200), 200)
 
-    def test_list_params_accept_json_text(self) -> None:
-        from suite_cloud.api.site import as_list
+    def test_list_params_are_json_arrays_or_their_text(self) -> None:
+        from suite_cloud.api.site import InvalidInputError, as_alias_rows, as_list
 
         self.assertEqual(as_list('["a@x.com", "b@x.com"]'), ["a@x.com", "b@x.com"])
-        self.assertEqual(as_list("a@x.com, b@x.com\nc@x.com"), ["a@x.com", "b@x.com", "c@x.com"])
         self.assertEqual(as_list(["a@x.com", " "]), ["a@x.com"])
-        self.assertRaises(frappe.ValidationError, as_list, "[not json")
+        self.assertEqual(as_list(None), [])
+        self.assertEqual(as_alias_rows('[{"email": "a@x.com", "enabled": false}]')[0]["enabled"], 0)
+        for text in ("a@x.com, b@x.com", "a@x.com", "", '{"email": "a@x.com"}'):
+            self.assertRaises(InvalidInputError, as_list, text)
 
     def test_current_site_comes_from_the_authorization_header(self) -> None:
         self.assertEqual(current_site().name, self.site.name)

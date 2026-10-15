@@ -255,17 +255,10 @@ def owned_page(
 
 
 def as_alias_rows(value: Any) -> list[dict]:
-    """Aliases arrive as addresses, or as ``{email, enabled, description}`` objects; rows come out.
+    """Aliases arrive as addresses or as ``{email, enabled, description}`` objects; rows come out."""
 
-    A JSON string is accepted too, so a form can post either shape.
-    """
-
-    if isinstance(value, str) and value.strip().startswith("["):
-        value = frappe.parse_json(value)
-    if isinstance(value, list) and len(value) > ALIAS_CAP:
-        frappe.throw(_("At most {0} aliases per request.").format(ALIAS_CAP), InvalidInputError)
     rows = []
-    for item in as_list(value, ALIAS_CAP) if not isinstance(value, list) else value:
+    for item in as_items(value, ALIAS_CAP):
         if isinstance(item, dict):
             email = str(item.get("email") or item.get("alias_email") or "").strip()
             if not email:
@@ -293,28 +286,26 @@ def page_size(limit: Any, cap: int) -> int:
 
 
 def as_list(value: Any, cap: int | None = None) -> list[str]:
-    """Accepts a JSON list, a comma/newline separated string or None; ``cap`` bounds one request."""
+    """The non-blank entries of a JSON array as text; ``cap`` bounds one request."""
 
-    items = _as_list(value)
-    if cap is not None and len(items) > cap:
-        frappe.throw(_("At most {0} entries per request.").format(cap), InvalidInputError)
-    return items
+    return [str(v).strip() for v in as_items(value, cap) if str(v).strip()]
 
 
-def _as_list(value: Any) -> list[str]:
+def as_items(value: Any, cap: int | None = None) -> list:
+    """A JSON array as a body carries it, or as its text in a query string; None is empty."""
+
     if value is None:
         return []
     if isinstance(value, str):
-        text = value.strip()
-        if text.startswith("["):
-            # Form-encoded clients (FrappeClient, query strings) send lists as JSON text.
-            try:
-                value = json.loads(text)
-            except ValueError:
-                frappe.throw(_("Expected a list."), InvalidInputError)
-        else:
-            value = text.replace("\n", ",").split(",")
-    return [str(v).strip() for v in value if str(v).strip()]
+        try:
+            value = json.loads(value)
+        except ValueError:
+            value = None
+    if not isinstance(value, list):
+        frappe.throw(_("Expected a list."), InvalidInputError)
+    if cap is not None and len(value) > cap:
+        frappe.throw(_("At most {0} entries per request.").format(cap), InvalidInputError)
+    return value
 
 
 def as_datetime(value: Any) -> datetime | None:

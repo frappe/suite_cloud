@@ -164,6 +164,8 @@ def ips_text(value: list[str] | str | None) -> str | None:
 
     if value is None:
         return None
+    if isinstance(value, str) and not value.lstrip().startswith("["):
+        value = value.split("\n")
     return "\n".join(as_list(value))
 
 
