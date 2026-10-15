@@ -96,13 +96,6 @@ def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
     return alias_rows.set_enabled("Mailing List", email, alias, sbool(enabled)).to_api()
 
 
-# The names the pre-v2 Suite client calls; they go once every site runs the v2 client.
-set_mailing_list_aliases = set_aliases
-add_mailing_list_alias = add_alias
-remove_mailing_list_alias = remove_alias
-set_mailing_list_alias_enabled = set_alias_enabled
-
-
 # --- recipients: standalone documents, so large lists page instead of loading whole ---------------
 
 

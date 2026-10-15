@@ -129,14 +129,6 @@ def delete_group(email: str) -> None:
     frappe.local.response["http_status_code"] = 204
 
 
-# The names the pre-v2 Suite client calls; they go once every site runs the v2 client.
-set_group_aliases = set_aliases
-add_group_alias = add_alias
-remove_group_alias = remove_alias
-set_group_alias_enabled = set_alias_enabled
-set_group_members = set_members
-
-
 def _resolve_members(members: list[str] | str | None) -> set[str]:
     """The site's account names behind ``members``; any other address is not found."""
 
