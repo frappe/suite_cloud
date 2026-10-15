@@ -47,8 +47,8 @@ def skipped() -> bool:
     return bool(cint(get_config("skip_domain_verification")))
 
 
-def assert_ownership(site, domain_name: str) -> None:
-    verified = verify_ownership(site, domain_name)
+def assert_ownership(tenant, domain_name: str) -> None:
+    verified = verify_ownership(tenant, domain_name)
     if verified is None:
         frappe.throw(
             _("The DNS records of {0} could not be resolved right now; try again shortly.").format(
@@ -57,7 +57,7 @@ def assert_ownership(site, domain_name: str) -> None:
             OwnershipLookupError,
         )
     if not verified:
-        record = ownership_record(site, domain_name)
+        record = ownership_record(tenant, domain_name)
         frappe.throw(
             _("Publish a TXT record at {0} with the value {1}, then add the domain again.").format(
                 domain_name, record["value"]
@@ -66,16 +66,16 @@ def assert_ownership(site, domain_name: str) -> None:
         )
 
 
-def verify_ownership(site, domain_name: str) -> bool | None:
+def verify_ownership(tenant, domain_name: str) -> bool | None:
     """True/False when public resolvers answered; None when they could not."""
 
-    return verify_dns_record(domain_name, "TXT", ownership_record(site, domain_name)["value"])
+    return verify_dns_record(domain_name, "TXT", ownership_record(tenant, domain_name)["value"])
 
 
-def ownership_record(site, domain_name: str) -> dict:
+def ownership_record(tenant, domain_name: str) -> dict:
     return {
         "type": "TXT",
         "host": "@",
         "fqdn": domain_name,
-        "value": f"{VALUE_PREFIX}{site.name}",
+        "value": f"{VALUE_PREFIX}{tenant.name}",
     }

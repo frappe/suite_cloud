@@ -21,38 +21,41 @@ from suite_cloud.mail.stalwart.directory import RECEIVE_PERMISSION
 SAVEPOINT = "adopt_object"
 
 
-def adopt_directory(site_name: str) -> dict:
+def adopt_directory(tenant_name: str) -> dict:
     """Returns ``{"adopted": {doctype: [names]}, "skipped": {doctype: [[name, reason]]}}``."""
 
-    site = frappe.get_doc("Suite Tenant", site_name)
-    cluster = site.get_cluster()
+    tenant = frappe.get_doc("Suite Tenant", tenant_name)
+    cluster = tenant.get_cluster()
     others = set(
-        frappe.get_all("Suite Tenant", {"cluster": cluster.name, "name": ["!=", site.name]}, pluck="name")
+        frappe.get_all("Suite Tenant", {"cluster": cluster.name, "name": ["!=", tenant.name]}, pluck="name")
     )
     for doctype in ("Mail Domain", "Mail Account", "Mail Group", "Mailing List"):
         # Rows left by a site that moved or was removed still say whose the cluster's objects are.
         others.update(
             frappe.get_all(
-                doctype, {"cluster": cluster.name, "tenant": ["!=", site.name]}, pluck="tenant", distinct=True
+                doctype,
+                {"cluster": cluster.name, "tenant": ["!=", tenant.name]},
+                pluck="tenant",
+                distinct=True,
             )
         )
     if others:
         frappe.throw(
-            _("Cluster {0} also serves {1}; adoption needs a cluster with this one site.").format(
+            _("Cluster {0} also serves {1}; adoption needs a cluster with this one tenant.").format(
                 cluster.name, ", ".join(sorted(others))
             )
         )
 
     client = cluster.get_client()
     report = Report()
-    domain_names = _adopt_domains(site, cluster, client, report)
+    domain_names = _adopt_domains(tenant, cluster, client, report)
     principals = client.accounts.get_all()  # users and groups share one object type
     groups = [p for p in principals if p.get("@type") == "Group"]
     users = [p for p in principals if p.get("@type") == "User"]
-    group_names = _adopt_groups(site, groups, domain_names, report)
+    group_names = _adopt_groups(tenant, groups, domain_names, report)
     disabled_role = client.roles.find_by_description(DISABLED_ROLE_DESCRIPTION)
-    _adopt_accounts(site, users, domain_names, group_names, disabled_role and disabled_role["id"], report)
-    _adopt_mailing_lists(site, client, domain_names, report)
+    _adopt_accounts(tenant, users, domain_names, group_names, disabled_role and disabled_role["id"], report)
+    _adopt_mailing_lists(tenant, client, domain_names, report)
     return report.as_dict()
 
 
@@ -71,7 +74,7 @@ class Report:
         return {"adopted": self.adopted, "skipped": self.skipped}
 
 
-def _adopt_domains(site, cluster, client, report: Report) -> dict[str, str]:
+def _adopt_domains(tenant, cluster, client, report: Report) -> dict[str, str]:
     """``{stalwart id: domain name}`` for every domain of the cluster, adopted or already known."""
 
     names = {}
@@ -101,7 +104,7 @@ def _adopt_domains(site, cluster, client, report: Report) -> dict[str, str]:
             {
                 "doctype": "Mail Domain",
                 "domain_name": name,
-                "tenant": site.name,
+                "tenant": tenant.name,
                 "stalwart_id": live["id"],
                 "enabled": int(enabled),
                 "is_verified": int(enabled),  # working on the cluster: the operator vouches for it
@@ -114,7 +117,7 @@ def _adopt_domains(site, cluster, client, report: Report) -> dict[str, str]:
     return names
 
 
-def _adopt_groups(site, groups: list[dict], domains: dict[str, str], report: Report) -> dict[str, str]:
+def _adopt_groups(tenant, groups: list[dict], domains: dict[str, str], report: Report) -> dict[str, str]:
     """``{stalwart id: group name}`` for every group of the cluster, adopted or already known."""
 
     names = {}
@@ -133,7 +136,7 @@ def _adopt_groups(site, groups: list[dict], domains: dict[str, str], report: Rep
             {
                 "doctype": "Mail Group",
                 "email": email,
-                "tenant": site.name,
+                "tenant": tenant.name,
                 "stalwart_id": live["id"],
                 "description": live.get("description"),
                 "disable_receiving": int(RECEIVE_PERMISSION in _disabled_permissions(live)),
@@ -144,7 +147,7 @@ def _adopt_groups(site, groups: list[dict], domains: dict[str, str], report: Rep
     return names
 
 
-def _adopt_accounts(site, users: list[dict], domains, groups, disabled_role_id, report: Report) -> None:
+def _adopt_accounts(tenant, users: list[dict], domains, groups, disabled_role_id, report: Report) -> None:
     for live in users:
         if live.get("name") in INFRA_ACCOUNTS:
             continue
@@ -163,7 +166,7 @@ def _adopt_accounts(site, users: list[dict], domains, groups, disabled_role_id, 
             {
                 "doctype": "Mail Account",
                 "email": email,
-                "tenant": site.name,
+                "tenant": tenant.name,
                 "stalwart_id": live["id"],
                 "enabled": int(not disabled),
                 "disable_receiving": int(RECEIVE_PERMISSION in _disabled_permissions(live)),
@@ -177,7 +180,7 @@ def _adopt_accounts(site, users: list[dict], domains, groups, disabled_role_id, 
         )
 
 
-def _adopt_mailing_lists(site, client, domains, report: Report) -> None:
+def _adopt_mailing_lists(tenant, client, domains, report: Report) -> None:
     for live in client.mailing_lists.get_all():
         email = _address(live, domains)
         if not email:
@@ -193,7 +196,7 @@ def _adopt_mailing_lists(site, client, domains, report: Report) -> None:
             {
                 "doctype": "Mailing List",
                 "email": email,
-                "tenant": site.name,
+                "tenant": tenant.name,
                 "stalwart_id": live["id"],
                 "description": live.get("description"),
                 "aliases": _alias_rows(live, domains),

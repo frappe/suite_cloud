@@ -44,7 +44,7 @@
    "label": "Domain"
   },
   {
-   "description": "The domain the report is about, as the reporter names it in its policies. It is the Mail Domain's name whenever a site holds the domain.",
+   "description": "The domain the report is about, as the reporter names it in its policies. It is the Mail Domain's name whenever a tenant holds the domain.",
    "fieldname": "policy_domain",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -265,7 +265,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 01:30:00.000000",
+ "modified": "2026-10-16 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "TLS Report",

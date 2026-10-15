@@ -49,7 +49,7 @@ def validate_email_address(value: str | None) -> str:
     return f"{local}@{validate_domain_name(domain)}"
 
 
-def get_tenant_domain(site: str, domain_name: str):
+def get_tenant_domain(tenant: str, domain_name: str):
     """The site's Mail Domain named ``domain_name``; other sites' domains are invisible (404)."""
 
     domain_name = normalize_domain(domain_name)
@@ -58,7 +58,7 @@ def get_tenant_domain(site: str, domain_name: str):
         if frappe.db.exists("Mail Domain", domain_name)
         else None
     )
-    if domain is None or domain.tenant != site:
+    if domain is None or domain.tenant != tenant:
         frappe.throw(_("Domain {0} was not found.").format(domain_name), frappe.DoesNotExistError)
     return domain
 
@@ -74,13 +74,13 @@ def assert_domain_live(domain) -> None:
         )
 
 
-def assert_domain_available(domain_name: str, site: str) -> None:
+def assert_domain_available(domain_name: str, tenant: str) -> None:
     """Free for this site to add: unclaimed, and not a zone of the mail infrastructure itself."""
 
     owner = frappe.db.get_value("Mail Domain", domain_name, "tenant")
-    if owner == site:
+    if owner == tenant:
         frappe.throw(
-            _("Domain {0} is already added to this site.").format(domain_name), frappe.DuplicateEntryError
+            _("Domain {0} is already added to this tenant.").format(domain_name), frappe.DuplicateEntryError
         )
     if owner:
         # Neutral on purpose: another site holding the name is not this site's business.
@@ -94,7 +94,7 @@ def assert_domain_not_reserved(domain_name: str) -> None:
             frappe.throw(_("{0} belongs to the mail service and cannot be added.").format(domain_name))
 
 
-def assert_addresses_deliverable(site: str, emails: list[str]) -> None:
+def assert_addresses_deliverable(tenant: str, emails: list[str]) -> None:
     """Addresses a site may route mail to: its own, or ones outside the platform.
 
     An address under a domain that another site holds is refused as if it did not exist: a list
@@ -105,7 +105,7 @@ def assert_addresses_deliverable(site: str, emails: list[str]) -> None:
     if not domains:
         return
     foreign = frappe.get_all(
-        "Mail Domain", {"name": ["in", list(domains)], "tenant": ["!=", site]}, pluck="name"
+        "Mail Domain", {"name": ["in", list(domains)], "tenant": ["!=", tenant]}, pluck="name"
     )
     if foreign:
         offending = sorted(e for e in emails if e.split("@", 1)[1] in set(foreign))

@@ -135,8 +135,10 @@ def _resolve_members(members: list[str] | str | None) -> set[str]:
     wanted = {normalize_name(m) for m in as_list(members, MEMBERSHIP_CAP)}
     if not wanted:
         return set()
-    site = current_tenant().name
-    known = set(frappe.get_all("Mail Account", {"tenant": site, "name": ["in", list(wanted)]}, pluck="name"))
+    tenant = current_tenant().name
+    known = set(
+        frappe.get_all("Mail Account", {"tenant": tenant, "name": ["in", list(wanted)]}, pluck="name")
+    )
     if missing := sorted(wanted - known):
         frappe.throw(_("Account {0} was not found.").format(missing[0]), frappe.DoesNotExistError)
     return wanted

@@ -94,7 +94,7 @@ def create_account(
 
     validate_password(password)
 
-    site = current_tenant()
+    tenant = current_tenant()
     # Everything the account depends on is resolved first: a refusal after the insert would leave
     # the Stalwart account behind while the database change rolls back.
     lists = [owned("Mailing List", email_) for email_ in as_list(mailing_lists, MEMBERSHIP_CAP)]
@@ -102,7 +102,7 @@ def create_account(
         {
             "doctype": "Mail Account",
             "email": email,
-            "tenant": site.name,
+            "tenant": tenant.name,
             "display_name": display_name,
             "description": description,
             "locale": locale or "en-US",

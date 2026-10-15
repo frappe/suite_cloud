@@ -86,8 +86,8 @@ def get_tls_summary(domain: str | None = None, days: int = 30) -> dict:
 class ReportScope:
     """The site's reports since a moment: sessions from the reports, failures from their rows."""
 
-    def __init__(self, site: str, domain: str | None, since) -> None:
-        self.tenant = site
+    def __init__(self, tenant: str, domain: str | None, since) -> None:
+        self.tenant = tenant
         self.domain = domain
         self.since = since
         self.report = frappe.qb.DocType("TLS Report")

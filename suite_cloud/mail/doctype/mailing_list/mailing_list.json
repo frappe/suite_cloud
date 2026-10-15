@@ -25,7 +25,7 @@
    "reqd": 1,
    "set_only_once": 1,
    "unique": 1,
-   "description": "The list's address, e.g. news@acme.com. Mail sent to it is delivered to every enabled recipient. Its domain must be a Mail Domain of the site. Cannot change after saving."
+   "description": "The list's address, e.g. news@acme.com. Mail sent to it is delivered to every enabled recipient. Its domain must be a Mail Domain of the tenant. Cannot change after saving."
   },
   {
    "fieldname": "domain",
@@ -57,7 +57,7 @@
    "options": "Stalwart Cluster",
    "read_only": 1,
    "search_index": 1,
-   "description": "Cluster the list lives on. Derived from the site."
+   "description": "Cluster the list lives on. Derived from the tenant."
   },
   {
    "fieldname": "column_break_main",
@@ -88,7 +88,7 @@
    "fieldtype": "Table",
    "label": "Aliases",
    "options": "Mail Address Alias",
-   "description": "Other addresses that reach the list. Each must be unique across the cluster and under one of the site's domains."
+   "description": "Other addresses that reach the list. Each must be unique across the cluster and under one of the tenant's domains."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -99,7 +99,7 @@
    "link_fieldname": "mailing_list"
   }
  ],
- "modified": "2026-10-16 01:30:00.000000",
+ "modified": "2026-10-16 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mailing List",

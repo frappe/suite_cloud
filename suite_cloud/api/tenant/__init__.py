@@ -86,12 +86,12 @@ class ClusterMisconfiguredError(frappe.ValidationError):
 def current_tenant():
     """The Suite Tenant behind this request (cached for the request)."""
 
-    if site := getattr(frappe.local, "suite_tenant", None):
-        return site
+    if tenant := getattr(frappe.local, "suite_tenant", None):
+        return tenant
 
-    site = _resolve_tenant()
-    frappe.local.suite_tenant = site
-    return site
+    tenant = _resolve_tenant()
+    frappe.local.suite_tenant = tenant
+    return tenant
 
 
 def authenticate() -> None:
@@ -130,21 +130,22 @@ def _resolve_tenant():
         throttle(f"address:{request_ip or 'unknown'}")  # guessing keys is paced like everything else
         frappe.throw(_("Tenant authentication failed."), TenantAuthError)
 
-    site = frappe.get_cached_doc("Suite Tenant", name)
-    throttle(f"site:{site.name}")  # counted before any refusal, so refusals cannot be free
-    if not site.enabled or site.status != "Active":
+    tenant = frappe.get_cached_doc("Suite Tenant", name)
+    throttle(f"tenant:{tenant.name}")  # counted before any refusal, so refusals cannot be free
+    if not tenant.enabled or tenant.status != "Active":
         frappe.throw(
-            _("Tenant {0} is {1} and cannot use the API.").format(site.name, site.status.lower()),
+            _("Tenant {0} is {1} and cannot use the API.").format(tenant.name, tenant.status.lower()),
             TenantSuspendedError,
         )
-    if frappe.session.user == service_user and not site.allows_ip(request_ip):
+    if frappe.session.user == service_user and not tenant.allows_ip(request_ip):
         # A key copied out of a site's config is worthless from anywhere but the site's own servers.
         # Either the key has leaked or the site moved servers; operators need to know which.
-        log_refusal_once(site.name, request_ip, ", ".join((site.allowed_ips or "").split("\n")))
+        log_refusal_once(tenant.name, request_ip, ", ".join((tenant.allowed_ips or "").split("\n")))
         frappe.throw(
-            _("Tenant {0} does not accept requests from this address.").format(site.name), TenantAddressError
+            _("Tenant {0} does not accept requests from this address.").format(tenant.name),
+            TenantAddressError,
         )
-    return site
+    return tenant
 
 
 def _credentials_from_header() -> tuple[str, str]:
@@ -168,23 +169,23 @@ def throttle(subject: str) -> None:
         frappe.cache.expire(key, 90)
     if count > RATE_LIMIT:
         frappe.throw(
-            _("The site sent more than {0} requests in a minute. Wait a moment and try again.").format(
+            _("The tenant sent more than {0} requests in a minute. Wait a moment and try again.").format(
                 RATE_LIMIT
             ),
             frappe.TooManyRequestsError,
         )
 
 
-def log_refusal_once(site_name: str, request_ip: str | None, allowed: str) -> None:
+def log_refusal_once(tenant_name: str, request_ip: str | None, allowed: str) -> None:
     """One Error Log per site and address per ten minutes: a flood must not drown the signal,
     and the row is inserted on the side so the refusal's rollback cannot discard it."""
 
-    key = f"suite_cloud:refused:{site_name}:{request_ip or 'unknown'}"
+    key = f"suite_cloud:refused:{tenant_name}:{request_ip or 'unknown'}"
     if frappe.cache.get_value(key):
         return
     frappe.cache.set_value(key, 1, expires_in_sec=600)
     frappe.log_error(
-        title=f"[Suite Cloud] {site_name}: request from an address outside its allowed list",
+        title=f"[Suite Cloud] {tenant_name}: request from an address outside its allowed list",
         message=_("Request from {0} to {1}; allowed: {2}").format(
             request_ip or _("an unknown address"),
             getattr(getattr(frappe.local, "request", None), "path", None) or "?",
@@ -282,7 +283,7 @@ def owned(doctype: str, name: str, for_update: bool = False):
     as adding one alias, so two concurrent edits cannot drop each other's rows.
     """
 
-    site = current_tenant()
+    tenant = current_tenant()
     if doctype not in OWNED_DOCTYPES:
         raise ValueError(doctype)
 
@@ -290,7 +291,7 @@ def owned(doctype: str, name: str, for_update: bool = False):
     doc = None
     if name and frappe.db.exists(doctype, name):
         doc = frappe.get_doc(doctype, name, for_update=for_update)
-    if doc is None or doc.tenant != site.name:
+    if doc is None or doc.tenant != tenant.name:
         frappe.throw(
             _("{0} {1} was not found.").format(_(NOUNS[doctype]).capitalize(), name), frappe.DoesNotExistError
         )
@@ -427,10 +428,10 @@ def update_tenant_profile(title: str | None = None, contact_email: str | None = 
     Only the fields passed change; an empty string clears the contact. The title cannot be empty.
     """
 
-    site = current_tenant()
+    tenant = current_tenant()
     if title is not None:
-        site.title = title.strip()
+        tenant.title = title.strip()
     if contact_email is not None:
-        site.contact_email = contact_email.strip() or None
-    site.save(ignore_permissions=True)
-    return site.to_api()
+        tenant.contact_email = contact_email.strip() or None
+    tenant.save(ignore_permissions=True)
+    return tenant.to_api()

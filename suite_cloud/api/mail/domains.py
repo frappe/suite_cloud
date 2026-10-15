@@ -29,14 +29,14 @@ def check_domain(domain: str) -> dict:
     is published. The record is the same for every domain the site ever adds.
     """
 
-    site = current_tenant()
+    tenant = current_tenant()
     domain = validate_domain_name(domain)
-    if frappe.db.get_value("Mail Domain", domain, "tenant") == site.name:
+    if frappe.db.get_value("Mail Domain", domain, "tenant") == tenant.name:
         frappe.throw(
-            _("Domain {0} is already added to this site.").format(domain), frappe.DuplicateEntryError
+            _("Domain {0} is already added to this tenant.").format(domain), frappe.DuplicateEntryError
         )
     assert_domain_not_reserved(domain)  # whether another site holds it is told only to a proven owner
-    return {"domain": domain, "ownership_record": ownership_record(site, domain)}
+    return {"domain": domain, "ownership_record": ownership_record(tenant, domain)}
 
 
 @frappe.whitelist(methods=["POST"])

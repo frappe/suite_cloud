@@ -59,7 +59,7 @@
    "in_standard_filter": 1,
    "reqd": 1,
    "read_only": 1,
-   "description": "The domain the report is about, as the reporter names it. It is the Mail Domain's name whenever a site holds the domain.",
+   "description": "The domain the report is about, as the reporter names it. It is the Mail Domain's name whenever a tenant holds the domain.",
    "search_index": 1
   },
   {
@@ -324,7 +324,7 @@
  ],
  "in_create": 1,
  "links": [],
- "modified": "2026-10-16 01:30:00.000000",
+ "modified": "2026-10-16 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "DMARC Report",

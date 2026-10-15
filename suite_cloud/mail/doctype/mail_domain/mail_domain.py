@@ -82,15 +82,15 @@ class MailDomain(Document):
 
     def validate(self) -> None:
         self.domain_name = validate_domain_name(self.domain_name)
-        site = self.get_site()
-        self.cluster = site.cluster
+        tenant = self.get_site()
+        self.cluster = tenant.cluster
         if self.is_new() and not self.flags.adopting:
             # Proof of control comes first: only someone who controls the domain's DNS learns
             # whether another site already holds it.
             if ownership.required():
-                ownership.assert_ownership(site, self.domain_name)
+                ownership.assert_ownership(tenant, self.domain_name)
             assert_domain_available(self.domain_name, self.tenant)
-            site.assert_can_add_domain()
+            tenant.assert_can_add_domain()
         if self.catch_all_address:
             self.catch_all_address = validate_email_address(self.catch_all_address)
             assert_addresses_deliverable(self.tenant, [self.catch_all_address])
@@ -170,7 +170,7 @@ class MailDomain(Document):
     def stalwart_payload(self) -> Domain:
         return Domain(
             name=self.domain_name,
-            description=self.description or f"Suite site {self.tenant}",
+            description=self.description or f"Suite Tenant {self.tenant}",
             is_enabled=self.is_live(),
             dkim_algorithms=dkim_algorithms(),
             catch_all_address=self.catch_all_address or None,
@@ -181,7 +181,7 @@ class MailDomain(Document):
 
     def stalwart_patch(self) -> dict:
         return {
-            "description": self.description or f"Suite site {self.tenant}",
+            "description": self.description or f"Suite Tenant {self.tenant}",
             "isEnabled": self.is_live(),
             "catchAllAddress": self.catch_all_address or None,
             "subAddressing": {"@type": "Enabled" if self.sub_addressing else "Disabled"},

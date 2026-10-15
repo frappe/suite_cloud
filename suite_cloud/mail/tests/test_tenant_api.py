@@ -76,12 +76,12 @@ class TenantApiTestCase(IntegrationTestCase):
                 frappe.delete_doc(doctype, name, force=True, ignore_permissions=True, ignore_on_trash=True)
         frappe.flags.do_not_enqueue = False
 
-    def act_as(self, site, secret: str = "any") -> None:
+    def act_as(self, tenant, secret: str = "any") -> None:
         """Simulates a request the auth hook already signed in for the tenant."""
 
         frappe.local.suite_tenant = None
         frappe.set_user(frappe.db.get_single_value("Suite Cloud Settings", "tenant_service_user"))
-        frappe.utils.set_request(headers={"Authorization": f"Tenant {site.name}:{secret}"})
+        frappe.utils.set_request(headers={"Authorization": f"Tenant {tenant.name}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 
     @staticmethod

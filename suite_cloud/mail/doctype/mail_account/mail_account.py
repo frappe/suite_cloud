@@ -79,9 +79,9 @@ class MailAccount(QuotaHolder, Document):
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
 
-        site = frappe.get_cached_doc("Suite Tenant", self.tenant)
+        tenant = frappe.get_cached_doc("Suite Tenant", self.tenant)
         if self.is_new() and not self.flags.adopting:
-            site.assert_can_add_account()
+            tenant.assert_can_add_account()
             account_credentials.apply_default_limits(self)
         quotas.validate(self)
         assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
@@ -106,7 +106,7 @@ class MailAccount(QuotaHolder, Document):
                 frappe.throw(_("Group {0} is listed twice.").format(row.group))
             seen.add(row.group)
             if frappe.db.get_value("Mail Group", row.group, "tenant") != self.tenant:
-                frappe.throw(_("Group {0} belongs to another site.").format(row.group))
+                frappe.throw(_("Group {0} belongs to another tenant.").format(row.group))
 
     def after_insert(self) -> None:
         if self.flags.skip_push:  # adopted: the cluster has it, credentials and all
@@ -378,7 +378,7 @@ def account_payloads(names: list[str], with_usage: bool = True) -> list[dict]:
     ]
 
 
-def mailing_lists_by_address(site: str, addresses: dict[str, list[str]]) -> dict[str, list[str]]:
+def mailing_lists_by_address(tenant: str, addresses: dict[str, list[str]]) -> dict[str, list[str]]:
     """``{account name: [list addresses]}`` given each account's addresses, in one query."""
 
     by_address = {address: name for name, found in addresses.items() for address in found}
@@ -386,7 +386,7 @@ def mailing_lists_by_address(site: str, addresses: dict[str, list[str]]) -> dict
         return {}
     rows = frappe.get_all(
         "Mailing List Recipient",
-        {"tenant": site, "email": ["in", list(by_address)]},
+        {"tenant": tenant, "email": ["in", list(by_address)]},
         ["email", "mailing_list"],
     )
     lists: dict[str, set[str]] = {name: set() for name in addresses}

@@ -86,10 +86,10 @@ class TestSuiteTenant(TenancyTestCase):
     def test_site_needs_an_active_cluster(self) -> None:
         self.cluster.db_set("status", "Pending")
         frappe.clear_document_cache("Stalwart Cluster", self.cluster.name)
-        site = frappe.get_doc(
+        tenant = frappe.get_doc(
             {"doctype": "Suite Tenant", "title": "other.frappe.test", "cluster": self.cluster.name}
         )
-        self.assertRaisesRegex(frappe.ValidationError, "not active", site.insert)
+        self.assertRaisesRegex(frappe.ValidationError, "not active", tenant.insert)
 
     def test_rotate_suspend_archive(self) -> None:
         old = self.tenant.get_password("secret")
@@ -1013,12 +1013,12 @@ class TestMailAccount(TenancyTestCase):
         self.assertEqual(self.fake.get("Account", group.stalwart_id)["quotas"]["maxEmails"], 100)
 
     def test_disk_quotas_are_what_the_site_asks_for(self) -> None:
-        site = frappe.get_doc("Suite Tenant", self.tenant.name)
-        site.max_disk_gb = -1
-        self.assertRaisesRegex(frappe.ValidationError, "negative", site.save)
-        site.reload()
-        site.max_disk_gb = 1
-        site.save()
+        tenant = frappe.get_doc("Suite Tenant", self.tenant.name)
+        tenant.max_disk_gb = -1
+        self.assertRaisesRegex(frappe.ValidationError, "negative", tenant.save)
+        tenant.reload()
+        tenant.max_disk_gb = 1
+        tenant.save()
 
         # The site's disk figure is a plan size, not a cap: a quota beyond it is granted as asked.
         account = self.make_account("q1@acme.com", disk_quota_gb=5)

@@ -153,14 +153,14 @@ def report_tenant(policy_domain: str, recipients: list[str]) -> str | None:
     """
 
     # A Mail Domain is named by its domain, so the report's own domain says who holds it.
-    site = frappe.db.get_value("Mail Domain", policy_domain, "tenant") if policy_domain else None
+    tenant = frappe.db.get_value("Mail Domain", policy_domain, "tenant") if policy_domain else None
     addressed = {normalize_domain(r.rpartition("@")[2]) for r in recipients if "@" in r}
     if (
-        site
+        tenant
         and addressed
-        and frappe.db.exists("Mail Domain", {"name": ["in", list(addressed)], "tenant": site})
+        and frappe.db.exists("Mail Domain", {"name": ["in", list(addressed)], "tenant": tenant})
     ):
-        return site
+        return tenant
     return None
 
 

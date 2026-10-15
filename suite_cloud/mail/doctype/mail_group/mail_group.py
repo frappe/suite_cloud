@@ -54,9 +54,9 @@ class MailGroup(QuotaHolder, Document):
         self.cluster = domain.cluster
         if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
-        site = frappe.get_cached_doc("Suite Tenant", self.tenant)
+        tenant = frappe.get_cached_doc("Suite Tenant", self.tenant)
         if self.is_new() and not self.flags.adopting:
-            site.assert_can_add_group()
+            tenant.assert_can_add_group()
         quotas.validate(self)
         assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
         sync.validate_aliases(self)

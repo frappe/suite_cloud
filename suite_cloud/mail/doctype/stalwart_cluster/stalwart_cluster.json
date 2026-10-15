@@ -82,7 +82,7 @@
   },
   {
    "default": "1",
-   "description": "Untick to stop placing new sites here and mark the cluster Disabled. Existing sites keep working.",
+   "description": "Untick to stop placing new tenants here and mark the cluster Disabled. Existing tenants keep working.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
@@ -93,7 +93,7 @@
   },
   {
    "default": "Pending",
-   "description": "Pending: no node yet. Bootstrapping: first node provisioned, waiting for the certificate. Active: ready for sites. Failed: the first node did not come up; provision it again.",
+   "description": "Pending: no node yet. Bootstrapping: first node provisioned, waiting for the certificate. Active: ready for tenants. Failed: the first node did not come up; provision it again.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -136,7 +136,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Public address of the cluster and its document name, built from the label and the zone, e.g. mail.blr.frappemail.com. Mail clients, MX records and sites all use it.",
+   "description": "Public address of the cluster and its document name, built from the label and the zone, e.g. mail.blr.frappemail.com. Mail clients, MX records and tenants all use it.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -153,7 +153,7 @@
    "read_only": 1
   },
   {
-   "description": "JMAP URL handed to sites: https:// plus the hostname.",
+   "description": "JMAP URL handed to tenants: https:// plus the hostname.",
    "fieldname": "base_url",
    "fieldtype": "Data",
    "label": "Base URL",
@@ -172,7 +172,7 @@
    "label": "Is Default"
   },
   {
-   "description": "Region codes Frappe Cloud may place sites from, e.g. blr, sfo. Leave empty to serve any region. Placement policy only: the cluster's servers may sit anywhere.",
+   "description": "Region codes a tenant may be placed from, e.g. blr, sfo. Leave empty to serve any region. Placement policy only: the cluster's servers may sit anywhere.",
    "fieldname": "regions",
    "fieldtype": "Table",
    "label": "Regions Served",
@@ -344,7 +344,7 @@
    "label": "Egress"
   },
   {
-   "description": "Everything the cluster sends leaves through this pool, bounces and reports included, unless a site or domain names another pool. Leave blank for direct delivery from the nodes.",
+   "description": "Everything the cluster sends leaves through this pool, bounces and reports included, unless a tenant or domain names another pool. Leave blank for direct delivery from the nodes.",
    "fieldname": "default_egress_pool",
    "fieldtype": "Link",
    "label": "Default Egress Pool",
@@ -464,7 +464,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-15 21:00:00.000000",
+ "modified": "2026-10-16 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

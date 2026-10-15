@@ -444,13 +444,13 @@ class TestEgress(IntegrationTestCase):
             egress_pool=pool.name,
         )
 
-        site = make_tenant(other, "other.frappe.test")
-        self.addCleanup(frappe.db.delete, "Suite Tenant", {"name": site.name})
+        tenant = make_tenant(other, "other.frappe.test")
+        self.addCleanup(frappe.db.delete, "Suite Tenant", {"name": tenant.name})
         domain = frappe.get_doc(
             {
                 "doctype": "Mail Domain",
                 "domain_name": "other.com",
-                "tenant": site.name,
+                "tenant": tenant.name,
                 "egress_pool": pool.name,
             }
         )

@@ -87,8 +87,8 @@ def get_dmarc_summary(domain: str | None = None, days: int = 30) -> dict:
 class ReportScope:
     """The site's reports since a moment, aggregated from the per-source rows."""
 
-    def __init__(self, site: str, domain: str | None, since) -> None:
-        self.tenant = site
+    def __init__(self, tenant: str, domain: str | None, since) -> None:
+        self.tenant = tenant
         self.domain = domain
         self.since = since
         self.report = frappe.qb.DocType("DMARC Report")

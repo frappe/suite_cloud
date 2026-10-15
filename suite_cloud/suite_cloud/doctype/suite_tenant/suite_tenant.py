@@ -130,14 +130,14 @@ class SuiteTenant(Document):
         # The key keeps authenticating so the site gets a 403 naming the suspension, not a bare 401.
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status == "Archived":
-            frappe.throw(_("An archived site cannot be suspended."))
+            frappe.throw(_("An archived tenant cannot be suspended."))
         self.db_set({"status": "Suspended"})
 
     @frappe.whitelist()
     def resume(self) -> None:
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
         if self.status == "Archived":
-            frappe.throw(_("An archived site cannot be resumed."))
+            frappe.throw(_("An archived tenant cannot be resumed."))
         self.db_set({"enabled": 1, "status": "Active"})
 
     @frappe.whitelist()
@@ -152,9 +152,9 @@ class SuiteTenant(Document):
             else:
                 frappe.enqueue(
                     purge_directory,
-                    site=self.name,
+                    tenant=self.name,
                     queue="long",
-                    job_id=f"purge-site:{self.name}",
+                    job_id=f"purge-tenant:{self.name}",
                     deduplicate=True,
                     enqueue_after_commit=True,
                 )
@@ -320,7 +320,7 @@ def parse_networks(text: str | None) -> list:
     return networks
 
 
-def purge_directory(site: str) -> None:
+def purge_directory(tenant: str) -> None:
     """Deletes an archived site's directory one document at a time.
 
     Each delete is its own transaction: every document destroys its Stalwart object inside its
@@ -328,7 +328,7 @@ def purge_directory(site: str) -> None:
     """
 
     for doctype in DIRECTORY_DOCTYPES:
-        for name in frappe.get_all(doctype, {"tenant": site}, pluck="name"):
+        for name in frappe.get_all(doctype, {"tenant": tenant}, pluck="name"):
             frappe.delete_doc(doctype, name, ignore_permissions=True)
             if not frappe.in_test:
                 frappe.db.commit()
