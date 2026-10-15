@@ -1,4 +1,4 @@
-"""Site-facing API: what a Frappe Suite site may do with its own slice of the directory.
+"""Tenant-facing API: what a Frappe Suite site may do with its own slice of the directory.
 
 Authentication is Frappe's own API-key scheme pointed at the Suite Tenant DocType: the site
 sends ``Authorization: token <api_key>:<api_secret>`` plus ``Frappe-Authorization-Source:
@@ -41,15 +41,15 @@ MEMBERSHIP_CAP = 500  # groups or members named in one request
 RECIPIENT_BATCH = 5000  # recipients added or removed in one request
 
 
-class SiteAuthError(frappe.AuthenticationError):
+class TenantAuthError(frappe.AuthenticationError):
     pass
 
 
-class SiteSuspendedError(frappe.PermissionError):
+class TenantSuspendedError(frappe.PermissionError):
     pass
 
 
-class SiteAddressError(frappe.PermissionError):
+class TenantAddressError(frappe.PermissionError):
     """The key is valid but the request did not come from one of the site's allowed addresses."""
 
 
@@ -83,18 +83,18 @@ class ClusterMisconfiguredError(frappe.ValidationError):
     http_status_code = 502
 
 
-def current_site():
+def current_tenant():
     """The Suite Tenant behind this request (cached for the request)."""
 
     if site := getattr(frappe.local, "suite_tenant", None):
         return site
 
-    site = _resolve_site()
+    site = _resolve_tenant()
     frappe.local.suite_tenant = site
     return site
 
 
-def _resolve_site():
+def _resolve_tenant():
     api_key = _api_key_from_header()
     service_user = get_config("site_service_user")
 
@@ -102,28 +102,28 @@ def _resolve_site():
         name = frappe.db.get_value("Suite Tenant", {"api_key": api_key})
     elif frappe.session.user != "Guest" and set(frappe.get_roles()) & set(MANAGER_ROLES):
         # Operators may act on behalf of a site from the desk or a script.
-        name = frappe.form_dict.get("site") or frappe.get_request_header("X-Suite-Site")
+        name = frappe.form_dict.get("tenant") or frappe.get_request_header("X-Suite-Tenant")
     else:
         name = None
 
     request_ip = getattr(frappe.local, "request_ip", None)
     if not name or not frappe.db.exists("Suite Tenant", name):
         throttle(f"address:{request_ip or 'unknown'}")  # guessing keys is paced like everything else
-        frappe.throw(_("Site authentication failed."), SiteAuthError)
+        frappe.throw(_("Tenant authentication failed."), TenantAuthError)
 
     site = frappe.get_cached_doc("Suite Tenant", name)
     throttle(f"site:{site.name}")  # counted before any refusal, so refusals cannot be free
     if not site.enabled or site.status != "Active":
         frappe.throw(
-            _("Site {0} is {1} and cannot use the API.").format(site.name, site.status.lower()),
-            SiteSuspendedError,
+            _("Tenant {0} is {1} and cannot use the API.").format(site.name, site.status.lower()),
+            TenantSuspendedError,
         )
     if frappe.session.user == service_user and not site.allows_ip(request_ip):
         # A key copied out of a site's config is worthless from anywhere but the site's own servers.
         # Either the key has leaked or the site moved servers; operators need to know which.
         log_refusal_once(site.name, request_ip, ", ".join((site.allowed_ips or "").split("\n")))
         frappe.throw(
-            _("Site {0} does not accept requests from this address.").format(site.name), SiteAddressError
+            _("Tenant {0} does not accept requests from this address.").format(site.name), TenantAddressError
         )
     return site
 
@@ -179,12 +179,12 @@ def log_refusal_once(site_name: str, request_ip: str | None, allowed: str) -> No
     )
 
 
-def site_api(fn: Callable) -> Callable:
+def tenant_api(fn: Callable) -> Callable:
     """Resolves the site, throttles, and turns refusals into REST-shaped errors."""
 
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
-        current_site()  # resolves and throttles once per request
+        current_tenant()  # resolves and throttles once per request
         assert_arguments(fn, args, kwargs)
         with api_errors():
             return fn(*args, **kwargs)
@@ -267,7 +267,7 @@ def owned(doctype: str, name: str, for_update: bool = False):
     as adding one alias, so two concurrent edits cannot drop each other's rows.
     """
 
-    site = current_site()
+    site = current_tenant()
     if doctype not in OWNED_DOCTYPES:
         raise ValueError(doctype)
 
@@ -283,7 +283,7 @@ def owned(doctype: str, name: str, for_update: bool = False):
 
 
 def owned_names(doctype: str, filters: dict | None = None, **kwargs) -> list[str]:
-    filters = {"site": current_site().name, **(filters or {})}
+    filters = {"site": current_tenant().name, **(filters or {})}
     return frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", **kwargs)
 
 
@@ -299,7 +299,7 @@ def owned_page(
 ) -> tuple[list[str], int]:
     """One page of the site's document names by name, plus how many match in all."""
 
-    filters = {"site": current_site().name, **(filters or {})}
+    filters = {"site": current_tenant().name, **(filters or {})}
     or_filters = None
     if search and search.strip():
         like = f"%{search.strip()}%"
@@ -388,32 +388,32 @@ def as_datetime(value: Any) -> datetime | None:
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def ping() -> dict:
     """Confirms the credentials and returns where the site's mail lives."""
 
-    return current_site().to_api()
+    return current_tenant().to_api()
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_disk_usage(fresh: bool = False) -> dict:
     """The disk the site's accounts and groups use together, served from a short-lived cache;
     ``fresh`` asks the mail server now."""
 
-    return current_site().get_disk_usage(sbool(fresh))
+    return current_tenant().get_disk_usage(sbool(fresh))
 
 
 @frappe.whitelist(methods=["PATCH"])
-@site_api
-def update_site_profile(title: str | None = None, contact_email: str | None = None) -> dict:
+@tenant_api
+def update_tenant_profile(title: str | None = None, contact_email: str | None = None) -> dict:
     """What the site says about itself: its workspace name as the title, and where to reach it.
 
     Only the fields passed change; an empty string clears the contact and resets the title to the
     site name.
     """
 
-    site = current_site()
+    site = current_tenant()
     if title is not None:
         site.title = title.strip()
     if contact_email is not None:

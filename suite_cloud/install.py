@@ -41,7 +41,7 @@ def ensure_role(role_name: str, desk_access: int) -> None:
 
 
 def ensure_site_service_user() -> None:
-    """The user every Suite Tenant API request runs as (see suite_cloud.api.site)."""
+    """The user every Suite Tenant API request runs as (see suite_cloud.api.tenant)."""
 
     if not frappe.db.exists("User", SITE_SERVICE_USER):
         user = frappe.get_doc(

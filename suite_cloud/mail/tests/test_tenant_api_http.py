@@ -1,4 +1,4 @@
-"""The site API over HTTP: the v2 route, the verb rule, the envelopes and the status codes."""
+"""The tenant API over HTTP: the v2 route, the verb rule, the envelopes and the status codes."""
 
 from unittest.mock import patch
 
@@ -6,12 +6,12 @@ import frappe
 from frappe.utils import get_test_client
 
 from suite_cloud.api.mail import domains
-from suite_cloud.mail.tests.test_site_api import SiteApiTestCase
+from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
 
 API = "/api/v2/method/suite_cloud.api."
 
 
-class TestHttpContract(SiteApiTestCase):
+class TestHttpContract(TenantApiTestCase):
     def request(self, verb: str, method: str, **params):
         """One request through the WSGI app on this test's own connection.
 
@@ -40,15 +40,15 @@ class TestHttpContract(SiteApiTestCase):
         return response.status_code, response.get_json(silent=True)
 
     def test_a_read_answers_under_data(self) -> None:
-        status, body = self.request("GET", "site.ping")
+        status, body = self.request("GET", "tenant.ping")
         self.assertEqual(status, 200)
         self.assertEqual(body["data"]["site"], self.site.name)
 
     def test_another_verb_is_refused(self) -> None:
         for verb, method in (
-            ("POST", "site.ping"),
+            ("POST", "tenant.ping"),
             ("GET", "mail.domains.delete_domain"),
-            ("POST", "site.update_site_profile"),
+            ("POST", "tenant.update_tenant_profile"),
         ):
             with self.subTest(f"{verb} {method}"):
                 status, body = self.request(verb, method)

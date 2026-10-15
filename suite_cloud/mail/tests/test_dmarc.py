@@ -9,7 +9,7 @@ from suite_cloud.mail import reports
 from suite_cloud.mail.doctype.dmarc_report import dmarc_report
 from suite_cloud.mail.tenancy import sync
 from suite_cloud.mail.tests.fixtures import error_log_count, latest_error_log_method
-from suite_cloud.mail.tests.test_site_api import SiteApiTestCase
+from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
 
 
 def stalwart_report(
@@ -70,7 +70,7 @@ NOW = datetime(2026, 9, 18, 12, 0, 0)
 CLOCK = "suite_cloud.mail.reports.now_datetime"
 
 
-class TestDmarcReports(SiteApiTestCase):
+class TestDmarcReports(TenantApiTestCase):
     def setUp(self) -> None:
         super().setUp()
         frozen = patch(CLOCK, return_value=NOW)
@@ -205,7 +205,7 @@ class TestDmarcReports(SiteApiTestCase):
         self.assertEqual(error_log_count(), errors_before + 1)
         self.assertIn(broken, latest_error_log_method())
 
-    def test_site_api_shows_only_the_site_s_reports(self) -> None:
+    def test_tenant_api_shows_only_the_tenant_s_reports(self) -> None:
         self.fake._add("DmarcExternalReport", stalwart_report("acme.com"))
         self.fake._add(
             "DmarcExternalReport",

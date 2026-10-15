@@ -6,7 +6,7 @@ its own token at the domain apex, and the Mail Domain is created only once that 
 resolves. The token is fixed for the life of the site, so every domain it adds asks for the
 same record and no other site can produce it.
 
-The guard is aimed at tenants: it applies to requests made through the site API, which run as
+The guard is aimed at tenants: it applies to requests made through the tenant API, which run as
 the site service user. Operators adding a domain from the desk vouch for it themselves, and a
 development cloud's operator may vouch for every tenant's domains at once with Suite Cloud
 Settings' "Skip Domain Verification" - test domains exist in no public DNS.

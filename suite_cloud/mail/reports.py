@@ -3,7 +3,7 @@
 Stalwart intercepts the DMARC and TLS aggregate reports mailed to ``postmaster@<domain>``,
 parses them and keeps them for a month. The hourly fetch copies the ones it has not seen into a
 DocType per kind, attributed to the site that holds the domain, so a site keeps a history longer
-than the cluster does and reads it through the site API without ever touching the cluster.
+than the cluster does and reads it through the tenant API without ever touching the cluster.
 """
 
 import json

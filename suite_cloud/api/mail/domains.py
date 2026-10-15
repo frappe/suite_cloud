@@ -2,26 +2,26 @@ import frappe
 from frappe import _
 from frappe.utils import sbool
 
-from suite_cloud.api.site import current_site, owned, owned_names, site_api
+from suite_cloud.api.tenant import current_tenant, owned, owned_names, tenant_api
 from suite_cloud.mail.doctype.mail_domain.mail_domain import domain_payloads
 from suite_cloud.mail.tenancy.addresses import assert_domain_not_reserved, validate_domain_name
 from suite_cloud.mail.tenancy.ownership import ownership_record
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_domains() -> list[dict]:
     return domain_payloads(owned_names("Mail Domain"))
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_domain(domain: str) -> dict:
     return owned("Mail Domain", domain).to_api()
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def check_domain(domain: str) -> dict:
     """Whether the domain can be added, and the record the site must publish to prove it owns it.
 
@@ -29,7 +29,7 @@ def check_domain(domain: str) -> dict:
     is published. The record is the same for every domain the site ever adds.
     """
 
-    site = current_site()
+    site = current_tenant()
     domain = validate_domain_name(domain)
     if frappe.db.get_value("Mail Domain", domain, "site") == site.name:
         frappe.throw(
@@ -40,7 +40,7 @@ def check_domain(domain: str) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def create_domain(
     domain: str,
     description: str | None = None,
@@ -55,7 +55,7 @@ def create_domain(
         {
             "doctype": "Mail Domain",
             "domain_name": domain,
-            "site": current_site().name,
+            "site": current_tenant().name,
             "description": description,
             "catch_all_address": catch_all_address,
             "sub_addressing": int(sbool(sub_addressing)),
@@ -69,7 +69,7 @@ def create_domain(
 
 
 @frappe.whitelist(methods=["PATCH"])
-@site_api
+@tenant_api
 def update_domain(
     domain: str,
     description: str | None = None,
@@ -97,20 +97,20 @@ def update_domain(
 
 
 @frappe.whitelist(methods=["DELETE"])
-@site_api
+@tenant_api
 def delete_domain(domain: str) -> None:
     owned("Mail Domain", domain).delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_dns_records(domain: str) -> dict:
     return _records(owned("Mail Domain", domain))
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def refresh_dns_records(domain: str) -> dict:
     """Re-reads the records Stalwart expects (new DKIM selectors after a rotation, for instance)."""
 
@@ -124,6 +124,6 @@ def _records(doc) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def verify_dns_records(domain: str) -> dict:
     return owned("Mail Domain", domain).verify_dns_records()

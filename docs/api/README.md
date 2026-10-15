@@ -1,10 +1,10 @@
 # Suite Cloud API
 
-Suite Cloud exposes one REST API over Frappe's v2 method endpoint. The **site API** lets a Frappe Suite site manage its own slice of the mail directory: domains, accounts, groups, mailing lists and the DMARC and TLS reports of its domains.
+Suite Cloud exposes one REST API over Frappe's v2 method endpoint. The **tenant API** lets a Frappe Suite site manage its own slice of the mail directory: domains, accounts, groups, mailing lists and the DMARC and TLS reports of its domains.
 
 | Page | Covers |
 | --- | --- |
-| [Site](site.md) | `ping`, `update_site_profile`, `get_disk_usage` |
+| [Tenant](tenant.md) | `ping`, `update_tenant_profile`, `get_disk_usage` |
 | [Domains](domains.md) | Adding a domain, its DNS records and verification |
 | [Accounts](accounts.md) | Mailboxes, passwords, quotas, aliases, group membership, account options |
 | [Groups](groups.md) | Groups, their members and aliases |
@@ -26,9 +26,9 @@ Frappe-Authorization-Source: Suite Tenant
 
 Frappe resolves the key against the Suite Tenant record, so the request runs as the shared site service user and every method acts only on that site's documents. Anything that belongs to another site is reported as not found (404), never as forbidden.
 
-When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `SiteAddressError`, and Suite Cloud logs it for the operators. A key copied out of a site's configuration is worthless anywhere else.
+When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its key. A request from elsewhere gets a 403 with the type `TenantAddressError`, and Suite Cloud logs it for the operators. A key copied out of a site's configuration is worthless anywhere else.
 
-An operator with the System Manager or Suite Cloud Manager role may call the site API from the desk or a script on behalf of a site. The site is named by the `site` parameter or the `X-Suite-Site` header.
+An operator with the System Manager or Suite Cloud Manager role may call the tenant API from the desk or a script on behalf of a site. The tenant is named by the `tenant` parameter or the `X-Suite-Tenant` header.
 
 ## Verbs
 
@@ -69,11 +69,11 @@ An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` wi
 | Status | Type | Meaning |
 | --- | --- | --- |
 | 400 | `InvalidInputError` | A required parameter left out, or a value the API could not parse: a list that is not a JSON array, a date that is not a date, a list over its cap |
-| 401 | `AuthenticationError` | The key or secret is wrong; Frappe rejects it before the site API runs |
-| 401 | `SiteAuthError` | The caller is logged in but is no site: a session without a key, or an operator naming an unknown site |
+| 401 | `AuthenticationError` | The key or secret is wrong; Frappe rejects it before the tenant API runs |
+| 401 | `TenantAuthError` | The caller is logged in but is no site: a session without a key, or an operator naming an unknown site |
 | 403 | `PermissionError` | No credentials at all, a verb that does not match the method, or a caller without the role |
-| 403 | `SiteSuspendedError` | The site is suspended or archived |
-| 403 | `SiteAddressError` | The request did not come from one of the site's allowed addresses |
+| 403 | `TenantSuspendedError` | The site is suspended or archived |
+| 403 | `TenantAddressError` | The request did not come from one of the site's allowed addresses |
 | 404 | `DoesNotExistError` | The object does not exist, or belongs to another site |
 | 409 | `DuplicateEntryError` | The address or domain is already taken |
 | 422 | `ValidationError` | Suite Cloud refused the change: a limit, a rule, an inactive domain |

@@ -5,15 +5,15 @@ from frappe import _
 from frappe.utils import sbool
 
 from suite_cloud.api.mail import aliases
-from suite_cloud.api.site import (
+from suite_cloud.api.tenant import (
     MEMBERSHIP_CAP,
     as_alias_rows,
     as_list,
-    current_site,
+    current_tenant,
     owned,
     owned_page,
     page_size,
-    site_api,
+    tenant_api,
 )
 from suite_cloud.mail.doctype.mail_account.mail_account import (
     account_payloads,
@@ -29,7 +29,7 @@ ACCOUNT_PAGE_CAP = 200
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_accounts(
     domain: str | None = None, search: str | None = None, start: int = 0, limit: int = 50
 ) -> dict:
@@ -41,7 +41,7 @@ def list_accounts(
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_account(email: str) -> dict:
     return owned("Mail Account", email).to_api(with_usage=True)
 
@@ -50,7 +50,7 @@ QUOTA_LOOKUP_LIMIT = 500
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def get_quotas(emails: list[str] | str) -> dict:
     """``{email: {disk_quota_gb, used_disk_bytes}}`` for the site's accounts among ``emails``;
     a ``disk_quota_gb`` of 0 means no limit.
@@ -64,7 +64,7 @@ def get_quotas(emails: list[str] | str) -> dict:
         return {}
     rows = frappe.get_all(
         "Mail Account",
-        filters={"site": current_site().name, "name": ["in", wanted]},
+        filters={"site": current_tenant().name, "name": ["in", wanted]},
         fields=["name", "stalwart_id", "cluster"],
     )
     quotas = quota_rows.disk_quota_gb_by_name("Mail Account", [row.name for row in rows])
@@ -75,7 +75,7 @@ def get_quotas(emails: list[str] | str) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def create_account(
     email: str,
     password: str,
@@ -94,7 +94,7 @@ def create_account(
 
     validate_password(password)
 
-    site = current_site()
+    site = current_tenant()
     # Everything the account depends on is resolved first: a refusal after the insert would leave
     # the Stalwart account behind while the database change rolls back.
     lists = [owned("Mailing List", email_) for email_ in as_list(mailing_lists, MEMBERSHIP_CAP)]
@@ -138,7 +138,7 @@ def create_account(
 
 
 @frappe.whitelist(methods=["PATCH"])
-@site_api
+@tenant_api
 def update_account(
     email: str,
     display_name: str | None = None,
@@ -170,7 +170,7 @@ def update_account(
 
 
 @frappe.whitelist(methods=["PUT"])
-@site_api
+@tenant_api
 def set_account_enabled(email: str, enabled: bool) -> dict:
     doc = owned("Mail Account", email)
     doc.set_enabled(sbool(enabled))
@@ -178,13 +178,13 @@ def set_account_enabled(email: str, enabled: bool) -> dict:
 
 
 @frappe.whitelist(methods=["PUT"])
-@site_api
+@tenant_api
 def set_password(email: str, password: str) -> None:
     owned("Mail Account", email).set_password(password)
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def rotate_app_password(email: str) -> dict:
     """Mints a new app password for the account, revokes the previous one, and returns it once."""
 
@@ -192,13 +192,13 @@ def rotate_app_password(email: str) -> dict:
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_app_passwords(email: str) -> dict:
     return list_credentials(APP_PASSWORDS, email)
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def create_app_password(
     email: str,
     description: str = "Suite",
@@ -209,7 +209,7 @@ def create_app_password(
 
 
 @frappe.whitelist(methods=["PATCH"])
-@site_api
+@tenant_api
 def update_app_password(
     email: str,
     id: str,
@@ -221,19 +221,19 @@ def update_app_password(
 
 
 @frappe.whitelist(methods=["DELETE"])
-@site_api
+@tenant_api
 def delete_app_password(email: str, id: str) -> None:
     delete_credential(APP_PASSWORDS, email, id)
 
 
 @frappe.whitelist(methods=["GET"])
-@site_api
+@tenant_api
 def list_api_keys(email: str) -> dict:
     return list_credentials(API_KEYS, email)
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def create_api_key(
     email: str,
     description: str,
@@ -244,7 +244,7 @@ def create_api_key(
 
 
 @frappe.whitelist(methods=["PATCH"])
-@site_api
+@tenant_api
 def update_api_key(
     email: str,
     id: str,
@@ -256,7 +256,7 @@ def update_api_key(
 
 
 @frappe.whitelist(methods=["DELETE"])
-@site_api
+@tenant_api
 def delete_api_key(email: str, id: str) -> None:
     delete_credential(API_KEYS, email, id)
 
@@ -318,7 +318,7 @@ def delete_credential(kind: Kind, email: str, id: str) -> None:
 
 
 @frappe.whitelist(methods=["PUT"])
-@site_api
+@tenant_api
 def set_aliases(email: str, aliases: list | str | None = None) -> dict:
     doc = owned("Mail Account", email)
     doc.set("aliases", as_alias_rows(aliases))
@@ -327,25 +327,25 @@ def set_aliases(email: str, aliases: list | str | None = None) -> dict:
 
 
 @frappe.whitelist(methods=["POST"])
-@site_api
+@tenant_api
 def add_alias(email: str, alias: str, description: str | None = None) -> dict:
     return aliases.add("Mail Account", email, alias, description).to_api()
 
 
 @frappe.whitelist(methods=["DELETE"])
-@site_api
+@tenant_api
 def remove_alias(email: str, alias: str) -> dict:
     return aliases.remove("Mail Account", email, alias).to_api()
 
 
 @frappe.whitelist(methods=["PUT"])
-@site_api
+@tenant_api
 def set_alias_enabled(email: str, alias: str, enabled: bool) -> dict:
     return aliases.set_enabled("Mail Account", email, alias, sbool(enabled)).to_api()
 
 
 @frappe.whitelist(methods=["PUT"])
-@site_api
+@tenant_api
 def set_groups(email: str, groups: list[str] | str | None = None) -> dict:
     doc = owned("Mail Account", email)
     doc.set("groups", [{"group": owned("Mail Group", g).name} for g in as_list(groups, MEMBERSHIP_CAP)])
@@ -354,7 +354,7 @@ def set_groups(email: str, groups: list[str] | str | None = None) -> dict:
 
 
 @frappe.whitelist(methods=["DELETE"])
-@site_api
+@tenant_api
 def delete_account(email: str) -> None:
     owned("Mail Account", email).delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204

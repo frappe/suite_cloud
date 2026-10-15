@@ -8,7 +8,7 @@ These helpers lock the parent row for the change instead.
 import frappe
 from frappe import _
 
-from suite_cloud.api.site import normalize_name, owned
+from suite_cloud.api.tenant import normalize_name, owned
 
 
 def add(doctype: str, email: str, alias: str, description: str | None = None):

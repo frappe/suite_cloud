@@ -35,7 +35,7 @@ The app has two modules, so one CODEOWNERS line can cover each product:
 | **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Tenant, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
 | **Mail** | `suite_cloud/mail` | The mail product: Stalwart Store, Cluster, Node, Egress Gateway and IP Pool, the mail directory (Mail Domain, Mail Account, Mail Group, Mailing List), and the `stalwart`, `cluster` and `tenancy` packages. |
 
-The site-facing API is split the same way: `suite_cloud.api.site` for what any product needs
+The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what any product needs
 (authentication, `ping`, the site profile) and `suite_cloud.api.mail` for the mail directory.
 
 ## The pieces
@@ -137,7 +137,7 @@ message takes.
 
 Suite Cloud serves one REST API at `/api/v2/method/suite_cloud.api.<module>.<method>`, documented in [docs/api](docs/api/README.md).
 
-The **site API** lets a Frappe Suite site manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The site authenticates with its API key and secret and the `Frappe-Authorization-Source: Suite Tenant` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
+The **tenant API** lets a Frappe Suite site manage its own domains, accounts, groups, mailing lists and DMARC and TLS reports. The site authenticates with its API key and secret and the `Frappe-Authorization-Source: Suite Tenant` header; it only ever sees its own objects, and a request from outside its allowed addresses is refused.
 
 The verb follows the method name (`list_` and `get_` are GETs, `update_` a PATCH, `set_` a PUT, `delete_` and `remove_` a DELETE, the rest POSTs), parameters travel as JSON, the result sits under `data`, and an error answers `{"errors": [{"type", "message"}]}` with a REST status code. Each site may make 300 requests per minute.
 

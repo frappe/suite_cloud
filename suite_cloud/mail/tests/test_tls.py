@@ -8,7 +8,7 @@ from suite_cloud.api.mail import domains, tls
 from suite_cloud.mail import reports
 from suite_cloud.mail.doctype.tls_report.tls_report import TLS_REPORTS
 from suite_cloud.mail.tests.fixtures import error_log_count, latest_error_log_method
-from suite_cloud.mail.tests.test_site_api import SiteApiTestCase
+from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
 
 MX = "mail.c1.example.test"
 
@@ -68,7 +68,7 @@ def failure(result_type: str, count: int) -> dict:
 NOW = datetime(2026, 9, 18, 12, 0, 0)
 
 
-class TestTlsReports(SiteApiTestCase):
+class TestTlsReports(TenantApiTestCase):
     def setUp(self) -> None:
         super().setUp()
         frozen = patch("suite_cloud.mail.reports.now_datetime", return_value=NOW)
@@ -186,7 +186,7 @@ class TestTlsReports(SiteApiTestCase):
         self.assertEqual(error_log_count(), errors_before + 1)
         self.assertIn(broken, latest_error_log_method())
 
-    def test_site_api_shows_only_the_site_s_reports(self) -> None:
+    def test_tenant_api_shows_only_the_tenant_s_reports(self) -> None:
         self.add(stalwart_report("acme.com"))
         self.add(
             stalwart_report(
@@ -228,7 +228,7 @@ class TestTlsReports(SiteApiTestCase):
         self.assertRaises(frappe.DoesNotExistError, tls.get_tls_report, other_report)
         # Ids, domains and searches are strings: Frappe refuses a filter in their place, and a
         # string is matched as is. By keyword, as a request passes them; the type check cannot see
-        # through site_api by position.
+        # through tenant_api by position.
         self.assertRaises(frappe.FrappeTypeError, tls.get_tls_report, report=["like", "%"])
         self.assertRaises(frappe.DoesNotExistError, tls.get_tls_report, report='["like", "%"]')
         self.assertRaises(frappe.FrappeTypeError, tls.list_tls_reports, domain=["!=", ""])

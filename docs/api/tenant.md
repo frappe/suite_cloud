@@ -1,10 +1,10 @@
-# Site
+# Tenant
 
-Module `suite_cloud.api.site`. The conventions are in the [overview](README.md).
+Module `suite_cloud.api.tenant`. The conventions are in the [overview](README.md).
 
 ## `ping`
 
-`GET site.ping`
+`GET tenant.ping`
 
 Confirms the credentials and returns the site profile, including where its mail lives.
 
@@ -40,7 +40,7 @@ Confirms the credentials and returns the site profile, including where its mail 
 
 ## `get_disk_usage`
 
-`GET site.get_disk_usage`
+`GET tenant.get_disk_usage`
 
 | Parameter | Type | Default | Meaning |
 | --- | --- | --- | --- |
@@ -57,9 +57,9 @@ Answers the disk the site's accounts and groups use together, as the mail server
 
 Suite Cloud asks the mail server for every account and group of the site in as few calls as the server allows, then keeps the sum for 5 minutes. A call inside that time answers the kept figure and `fetched_at` says when it was read. `fresh` reads the mail server again and replaces the kept figure. When the mail server cannot answer, the call fails with a 503 and nothing is kept, so a partial sum is never served.
 
-## `update_site_profile`
+## `update_tenant_profile`
 
-`PATCH site.update_site_profile`
+`PATCH tenant.update_tenant_profile`
 
 | Parameter | Type | Meaning |
 | --- | --- | --- |

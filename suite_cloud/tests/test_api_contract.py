@@ -5,9 +5,9 @@ from datetime import datetime
 import frappe
 from frappe.tests import UnitTestCase
 
-from suite_cloud.api import site
+from suite_cloud.api import tenant
 from suite_cloud.api.mail import accounts, dmarc, domains, groups, mailing_lists, meta, tls
-from suite_cloud.api.site import InvalidInputError, api_errors, as_datetime, as_list
+from suite_cloud.api.tenant import InvalidInputError, api_errors, as_datetime, as_list
 from suite_cloud.mail.stalwart.errors import (
     StalwartError,
     StalwartRejectedError,
@@ -15,7 +15,7 @@ from suite_cloud.mail.stalwart.errors import (
     StalwartUnavailableError,
 )
 
-MODULES = (site, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
+MODULES = (tenant, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
 VERB_BY_PREFIX = {
     "list_": "GET",
     "get_": "GET",
@@ -29,7 +29,7 @@ VERB_BY_PREFIX = {
 
 
 def api_functions():
-    """Every whitelisted function of the site API."""
+    """Every whitelisted function of the tenant API."""
 
     for module in MODULES:
         for name, member in vars(module).items():
