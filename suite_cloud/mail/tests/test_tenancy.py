@@ -259,7 +259,7 @@ class TestMailDomain(TenancyTestCase):
         self.assertTrue(domain.authentication_records)  # the published zone was read in
         group = frappe.get_doc("Mail Group", "team@legacy.com")
         self.assertEqual(
-            (group.stalwart_id, group.allotted_disk_gb(), group.disable_receiving), (group_id, 2, 1)
+            (group.stalwart_id, group.disk_quota_bytes(), group.disable_receiving), (group_id, 2 * gb, 1)
         )
         self.assertEqual([a.alias_email for a in group.aliases], ["crew@legacy.com"])
         alice = frappe.get_doc("Mail Account", "alice@legacy.com")

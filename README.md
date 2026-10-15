@@ -120,8 +120,7 @@ alias on a domain the site does not own, say) is reported while the rest go in. 
 are marked verified; adopted accounts and groups keep the cluster's quotas. Passwords and app
 passwords stay on the cluster and keep working.
 
-### Sending
- through dedicated IPs
+### Sending through dedicated IPs
 
 1. Create an Egress Gateway (`out1.c1.frappemail.com`) on a VPS that already has the extra public
    IPs configured, and provision it.

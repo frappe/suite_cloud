@@ -64,13 +64,15 @@ def changed(before: Document, after: Document) -> bool:
 def apply(doc: Document, disk_quota_gb: float | None, quotas: Any) -> None:
     """API input: ``quotas`` replaces the other rows (the disk row stays unless it names one),
     ``disk_quota_gb`` sets the disk row and wins over a ``maxDiskQuota`` inside ``quotas``.
-    A limit of 0 in either lifts it."""
+    A limit of 0 in either lifts it; the names lifted are kept on ``doc.flags.lifted_quotas`` so
+    a default is not put back in their place."""
 
     if isinstance(quotas, str) and not quotas.strip():
         quotas = None  # a form field left empty is not a request to lift every limit
     if quotas is not None:
         wanted = as_map(quotas)
         disk = doc.disk_row()
+        doc.flags.lifted_quotas = {name for name, limit in wanted.items() if limit <= 0}
         rows = [{"quota": name, "value": limit} for name, limit in wanted.items() if limit > 0]
         if DISK_QUOTA not in wanted and disk is not None:
             rows.append({"quota": DISK_QUOTA, "value": disk.value})

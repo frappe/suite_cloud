@@ -597,6 +597,9 @@ class TestDirectoryApi(SiteApiTestCase):
         account = accounts.create_account("alice@acme.com", "secret-pw", quotas='{"maxEmails": 1000}')
         self.assertEqual(account["quotas"], {"maxEmails": 1000, "maxAppPasswords": 10, "maxApiKeys": 10})
         self.assertEqual(account["disk_quota_gb"], 0)  # none asked for, so none: unlimited
+        # A credential limit lifted on creation stays lifted; the default fills only what is unnamed.
+        lifted = accounts.create_account("bob@acme.com", "secret-pw", quotas={"maxAppPasswords": 0})
+        self.assertEqual(lifted["quotas"], {"maxApiKeys": 10})
         self.assertEqual(self.fake.find("Account", name="alice")["quotas"]["maxEmails"], 1000)
 
         # Replacing the other rows keeps the disk row; disk_quota_gb changes it in GB.
