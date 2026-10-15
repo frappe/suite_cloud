@@ -10,9 +10,9 @@ from frappe.utils import cint, flt
 
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.mail.stalwart import get_account_client
-from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB, Account
-from suite_cloud.mail.tenancy import app_passwords, quotas, sync
+from suite_cloud.mail.tenancy import account_credentials, quotas, sync
+from suite_cloud.mail.tenancy.account_credentials import API_KEYS, APP_PASSWORDS
 from suite_cloud.mail.tenancy.addresses import (
     assert_address_available,
     assert_domain_live,
@@ -23,7 +23,6 @@ from suite_cloud.mail.tenancy.quotas import QuotaHolder
 from suite_cloud.mail.tenancy.usage import used_disk_by_name
 from suite_cloud.utils import alias_payloads, child_rows, utc_iso
 
-CREDENTIAL_DESCRIPTION = "Suite Cloud"
 MIN_PASSWORD_LENGTH = 8
 
 
@@ -37,12 +36,13 @@ class MailAccount(QuotaHolder, Document):
         from frappe.types import DF
 
         from suite_cloud.mail.doctype.mail_address_alias.mail_address_alias import MailAddressAlias
-        from suite_cloud.mail.doctype.mail_app_password.mail_app_password import MailAppPassword
+        from suite_cloud.mail.doctype.mail_credential.mail_credential import MailCredential
         from suite_cloud.mail.doctype.mail_group_member.mail_group_member import MailGroupMember
         from suite_cloud.mail.doctype.mail_quota.mail_quota import MailQuota
 
         aliases: DF.Table[MailAddressAlias]
-        app_passwords: DF.Table[MailAppPassword]
+        api_keys: DF.Table[MailCredential]
+        app_passwords: DF.Table[MailCredential]
         cluster: DF.Link | None
         description: DF.Data | None
         disable_receiving: DF.Check
@@ -82,14 +82,14 @@ class MailAccount(QuotaHolder, Document):
         site = frappe.get_cached_doc("Suite Site", self.site)
         if self.is_new() and not self.flags.adopting:
             site.assert_can_add_account()
-            app_passwords.apply_default_limit(self)
+            account_credentials.apply_default_limits(self)
         quotas.validate(self)
         site.validate_quota_of(self)
         assert_address_available(self.email, exclude=None if self.is_new() else (self.doctype, self.name))
         sync.validate_aliases(self)
         self.validate_groups()
         if not self.flags.adopting:
-            app_passwords.validate(self)
+            account_credentials.validate(self)
         self.take_password()
 
     def take_password(self) -> None:
@@ -114,7 +114,7 @@ class MailAccount(QuotaHolder, Document):
             return
         sync.push_create(self, "accounts", self.stalwart_payload(self.flags.password))
         try:
-            app_passwords.push(self, before=None)
+            account_credentials.push(self, before=None)
             if not self.enabled:
                 self.push_enabled()
         except Exception:
@@ -147,7 +147,7 @@ class MailAccount(QuotaHolder, Document):
             patch["permissions"] = sync.receiving_permissions(self, "accounts")
         if patch:
             sync.push_update(self, "accounts", patch)
-        app_passwords.push(self, before)
+        account_credentials.push(self, before)
         if bool(before.enabled) != bool(self.enabled):
             self.push_enabled()
         if self.flags.password:
@@ -209,10 +209,7 @@ class MailAccount(QuotaHolder, Document):
     def mint_app_password(self) -> str:
         """Replaces the Suite site's login; the previous one is revoked once the save commits."""
 
-        self.app_passwords = [r for r in self.app_passwords if r.description != app_passwords.SITE_LOGIN]
-        self.flags.secrets_in_response = True
-        self.save(ignore_permissions=True)
-        return app_passwords.site_login_secret(self)
+        return account_credentials.rotate_site_login(self, APP_PASSWORDS)
 
     @frappe.whitelist()
     def rotate_app_password(self) -> str:
@@ -224,12 +221,7 @@ class MailAccount(QuotaHolder, Document):
         """Mints the account's Suite Cloud API key, revokes the previous one, and returns it once."""
 
         frappe.only_for(("System Manager", "Suite Cloud Manager"))
-        service = self.account_client().api_keys
-        old_ids = [c["id"] for c in service.get_all() if c.get("description") == CREDENTIAL_DESCRIPTION]
-        _, secret = service.create_secret(Credential(description=CREDENTIAL_DESCRIPTION))
-        if old_ids:
-            frappe.db.after_commit.add(lambda: service.delete(old_ids))
-        return secret
+        return account_credentials.rotate_site_login(self, API_KEYS)
 
     def account_client(self):
         """Acts as the account itself (master-user login): app passwords and API keys need that."""
@@ -247,7 +239,7 @@ class MailAccount(QuotaHolder, Document):
 
     def onload(self) -> None:
         self.flags.with_usage = True  # the form shows the live figure
-        app_passwords.refresh(self)
+        account_credentials.refresh(self)
 
     @property
     def used_disk_bytes(self) -> int | None:

@@ -538,13 +538,53 @@ class TestDirectoryApi(SiteApiTestCase):
         self.act_as(self.other)
         self.assertRaises(frappe.DoesNotExistError, accounts.list_app_passwords, "alice@acme.com")
 
+    def test_api_keys_are_managed_per_account_except_the_reserved_one(self) -> None:
+        domains.create_domain("acme.com")
+        self.verify("acme.com")
+        accounts.create_account("alice@acme.com", "secret-pw")
+        self.assertEqual(accounts.list_api_keys("alice@acme.com")["items"], [])
+        self.assertRaisesRegex(
+            frappe.ValidationError, "reserved", accounts.create_api_key, "alice@acme.com", "Suite Cloud"
+        )
+
+        created = accounts.create_api_key("alice@acme.com", "Reporting", allowed_ips='["198.51.100.7"]')
+        self.assertEqual(frappe.local.response["http_status_code"], 201)
+        self.assertTrue(created["secret"].startswith("apikey-"))
+        self.assertEqual(created["allowed_ips"], ["198.51.100.7"])
+        self.assertIn(created["secret"], self.fake.tokens)
+        updated = accounts.update_api_key(
+            "alice@acme.com", created["id"], description="Reports", allowed_ips=[]
+        )
+        self.assertEqual((updated["description"], updated["allowed_ips"]), ("Reports", []))
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "reserved",
+            accounts.update_api_key,
+            "alice@acme.com",
+            created["id"],
+            description="Suite Cloud",
+        )
+        listed = accounts.list_api_keys("alice@acme.com")["items"]
+        self.assertEqual([k["description"] for k in listed], ["Reports"])
+        accounts.delete_api_key("alice@acme.com", created["id"])
+        self.assertEqual(frappe.local.response["http_status_code"], 204)
+        frappe.db.after_commit.run()
+        self.assertEqual(accounts.list_api_keys("alice@acme.com")["items"], [])
+
+        for number in range(10):
+            accounts.create_api_key("alice@acme.com", f"Key {number}")
+        self.assertRaisesRegex(
+            frappe.ValidationError, "at most 10", accounts.create_api_key, "alice@acme.com", "One too many"
+        )
+
     def test_quotas_travel_as_a_map_with_disk_always_present(self) -> None:
         domains.create_domain("acme.com")
         self.verify("acme.com")
         default_bytes = int(self.site.default_disk_quota_gb * 1024**3)
         account = accounts.create_account("alice@acme.com", "secret-pw", quotas='{"maxEmails": 1000}')
         self.assertEqual(
-            account["quotas"], {"maxEmails": 1000, "maxDiskQuota": default_bytes, "maxAppPasswords": 10}
+            account["quotas"],
+            {"maxEmails": 1000, "maxDiskQuota": default_bytes, "maxAppPasswords": 10, "maxApiKeys": 10},
         )
         self.assertEqual(account["disk_quota_gb"], self.site.default_disk_quota_gb)
         self.assertEqual(self.fake.find("Account", name="alice")["quotas"]["maxEmails"], 1000)

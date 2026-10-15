@@ -14,7 +14,7 @@ from suite_cloud.mail.tests.fixtures import (
     make_cluster,
     make_site,
 )
-from suite_cloud.patches.v1_0 import add_app_password_quota
+from suite_cloud.patches.v1_0 import add_credential_quotas
 
 
 class TenancyTestCase(IntegrationTestCase):
@@ -703,7 +703,11 @@ class TestMailAccount(TenancyTestCase):
         self.assertEqual(live["aliases"]["0"]["domainId"], self.domain.stalwart_id)
         self.assertEqual(
             live["quotas"],
-            {"maxDiskQuota": int(self.site.default_disk_quota_gb * 1024**3), "maxAppPasswords": 10},
+            {
+                "maxDiskQuota": int(self.site.default_disk_quota_gb * 1024**3),
+                "maxAppPasswords": 10,
+                "maxApiKeys": 10,
+            },
         )
         self.assertEqual(live["description"], "Alice")
         self.assertEqual(live["roles"], {"@type": "User"})
@@ -723,7 +727,8 @@ class TestMailAccount(TenancyTestCase):
         live = self.fake.get("Account", account.stalwart_id)
         self.assertEqual(live["description"], "Bob")
         self.assertEqual(
-            live["quotas"], {"maxDiskQuota": 2 * 1024**3, "maxEmails": 5000, "maxAppPasswords": 10}
+            live["quotas"],
+            {"maxDiskQuota": 2 * 1024**3, "maxEmails": 5000, "maxAppPasswords": 10, "maxApiKeys": 10},
         )
         # The whole map travels, so dropping a row lifts that limit on the cluster.
         account.quotas = [row for row in account.quotas if row.quota == "maxDiskQuota"]
@@ -756,10 +761,13 @@ class TestMailAccount(TenancyTestCase):
         stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
         self.assertEqual([c["description"] for c in stored.values()], ["Suite Cloud"])
 
+        # No API key exists until an operator rotates one; it then shows as the first row.
+        self.assertEqual(account.api_keys, [])
         key = account.rotate_api_key()
         self.assertTrue(key.startswith("apikey-"))
         self.assertEqual(stored_credential_fields(account.name), [])
         self.assertIn(key, self.fake.tokens)
+        self.assertEqual([r.description for r in account.api_keys], ["Suite Cloud"])
         frappe.db.after_commit.run()
         self.assertNotEqual(account.rotate_api_key(), key)
         frappe.db.after_commit.run()
@@ -788,7 +796,7 @@ class TestMailAccount(TenancyTestCase):
         # The site's login is minted with the account and its secret handed over once.
         login = account.app_passwords[0]
         self.assertEqual(login.description, "Suite Cloud")
-        secret = account.flags.app_password_secrets[login.name]
+        secret = account.flags.credential_secrets[login.name]
         self.assertTrue(secret.startswith("apppassword-"))
         stored = self.fake.objects[f"AppPassword:{account.stalwart_id}"]
         self.assertEqual([c["description"] for c in stored.values()], ["Suite Cloud"])
@@ -802,7 +810,7 @@ class TestMailAccount(TenancyTestCase):
         account.save()
         phone = account.app_passwords[1]
         self.assertEqual(stored[phone.credential_id]["allowedIps"], ["203.0.113.0/24", "198.51.100.7"])
-        self.assertIn(account.flags.app_password_secrets[phone.name], str(frappe.get_message_log()))
+        self.assertIn(account.flags.credential_secrets[phone.name], str(frappe.get_message_log()))
 
         # Edits travel as updates; a removed row is revoked once the save commits.
         phone.description = "Old phone"
@@ -863,17 +871,49 @@ class TestMailAccount(TenancyTestCase):
         frappe.db.after_commit.run()
         self.assertEqual(sorted(c["description"] for c in stored.values()), ["Laptop", "Suite Cloud"])
 
-    def test_patch_adds_the_app_password_limit_to_older_accounts(self) -> None:
-        account = self.make_account("erin@acme.com")
-        frappe.db.delete("Mail Quota", {"parent": account.name, "quota": "maxAppPasswords"})
-        self.fake.objects["Account"][account.stalwart_id]["quotas"].pop("maxAppPasswords")
+    def test_api_keys_are_a_table_with_a_reserved_description(self) -> None:
+        account = self.make_account("frank@acme.com")
+        self.assertEqual(account.quota_map()["maxApiKeys"], 10)
+        account.append("api_keys", {"description": "Suite Cloud"})
+        self.assertRaisesRegex(frappe.ValidationError, "reserved", account.save)
+        account.reload()
 
-        add_app_password_quota.execute()
-        add_app_password_quota.execute()  # a second run changes nothing
-        self.assertEqual(frappe.get_doc("Mail Account", account.name).quota_map()["maxAppPasswords"], 10)
-        self.assertEqual(self.fake.objects["Account"][account.stalwart_id]["quotas"]["maxAppPasswords"], 10)
+        # Rows travel like app passwords; the operator's rotation adds the Suite Cloud key on top.
+        account.append("api_keys", {"description": "Reporting", "expires_at": "2027-01-01 00:00:00"})
+        account.save()
+        reporting = account.api_keys[0]
+        keys = self.fake.objects[f"ApiKey:{account.stalwart_id}"]
+        self.assertTrue(keys[reporting.credential_id]["expiresAt"].startswith("20"))
+        self.assertIn(account.flags.credential_secrets[reporting.name], self.fake.tokens)
+        account.rotate_api_key()
+        self.assertEqual([r.description for r in account.api_keys], ["Suite Cloud", "Reporting"])
+        account.remove(reporting)
+        account.save()
+        frappe.db.after_commit.run()
+        self.assertEqual([k["description"] for k in keys.values()], ["Suite Cloud"])
+
+        account.quotas = [row for row in account.quotas if row.quota != "maxApiKeys"]
+        account.append("quotas", {"quota": "maxApiKeys", "value": 1})
+        account.append("api_keys", {"description": "One too many"})
+        self.assertRaisesRegex(frappe.ValidationError, "at most 1 API key", account.save)
+
+    def test_patch_adds_the_credential_limits_to_older_accounts(self) -> None:
+        account = self.make_account("erin@acme.com")
+        frappe.db.delete(
+            "Mail Quota", {"parent": account.name, "quota": ["in", ["maxAppPasswords", "maxApiKeys"]]}
+        )
+        live = self.fake.objects["Account"][account.stalwart_id]["quotas"]
+        live.pop("maxAppPasswords")
+        live.pop("maxApiKeys")
+
+        add_credential_quotas.execute()
+        add_credential_quotas.execute()  # a second run changes nothing
+        quota_map = frappe.get_doc("Mail Account", account.name).quota_map()
+        self.assertEqual((quota_map["maxAppPasswords"], quota_map["maxApiKeys"]), (10, 10))
+        live = self.fake.objects["Account"][account.stalwart_id]["quotas"]
+        self.assertEqual((live["maxAppPasswords"], live["maxApiKeys"]), (10, 10))
         self.assertEqual(
-            len(frappe.get_all("Mail Quota", {"parent": account.name, "quota": "maxAppPasswords"})), 1
+            len(frappe.get_all("Mail Quota", {"parent": account.name, "quota": ["like", "max%Keys"]})), 1
         )
 
     def test_address_uniqueness_and_ownership(self) -> None:

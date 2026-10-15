@@ -19,6 +19,8 @@
   "new_password",
   "app_passwords_section",
   "app_passwords",
+  "api_keys_section",
+  "api_keys",
   "settings_section",
   "locale",
   "column_break_settings",
@@ -132,11 +134,23 @@
    "label": "App Passwords"
   },
   {
-   "description": "The account's app passwords on the cluster, refreshed when the form opens. A new row is created on save and its secret shown once; a removed row is revoked. The maxAppPasswords quota caps the rows.",
+   "description": "The account's app passwords on the cluster, refreshed when the form opens. A new row is created on save and its secret shown once; a removed row is revoked. Suite Cloud is the Suite site's own login and stays first. The maxAppPasswords quota caps the rows.",
    "fieldname": "app_passwords",
    "fieldtype": "Table",
    "label": "App Passwords",
-   "options": "Mail App Password"
+   "options": "Mail Credential"
+  },
+  {
+   "fieldname": "api_keys_section",
+   "fieldtype": "Section Break",
+   "label": "API Keys"
+  },
+  {
+   "description": "Bearer tokens for the account's JMAP access, handled like the app passwords. Suite Cloud is reserved for Rotate API Key. The maxApiKeys quota caps the rows.",
+   "fieldname": "api_keys",
+   "fieldtype": "Table",
+   "label": "API Keys",
+   "options": "Mail Credential"
   },
   {
    "fieldname": "settings_section",
