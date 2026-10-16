@@ -8,7 +8,7 @@ from datetime import timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import get_datetime, now, now_datetime
+from frappe.utils import flt, get_datetime, now, now_datetime
 
 from suite_cloud.hosting import (
     begin_step,
@@ -279,7 +279,7 @@ def resolve_server_arguments(vm) -> None:
     vm.plan = (
         vm.plan
         or get_config("central_plan")
-        or first_plan(client.eligible_plans(vm.region, vm.image_offering, vm.image_id))
+        or cheapest_plan(client.eligible_plans(vm.region, vm.image_offering, vm.image_id))
     )
 
 
@@ -292,11 +292,14 @@ def newest_image(images: list[dict]) -> str:
     return max(usable, key=lambda i: i.get("created_at") or 0)["id"]
 
 
-def first_plan(catalog: dict) -> str:
-    for rows in (catalog.get("plans") or {}).values():
-        for row in rows:
-            return row["name"]
-    frappe.throw(_("Central offers no plan for this image in the region."))
+def cheapest_plan(catalog: dict) -> str:
+    """Central groups its rows by sub-category, cheapest first within a group only; a row's id is
+    ``plan``."""
+
+    rows = [row for group in (catalog.get("plans") or {}).values() for row in group]
+    if not rows:
+        frappe.throw(_("Central offers no plan for this image in the region within the team's spend limit."))
+    return min(rows, key=lambda row: flt(row.get("rate")))["plan"]
 
 
 def server_arguments(vm) -> dict:

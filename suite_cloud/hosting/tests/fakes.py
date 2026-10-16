@@ -57,7 +57,13 @@ class FakeCentral:
         return self.images
 
     def eligible_plans(self, region: str, offering: str, image_id: str) -> dict:
-        return {"plans": {"standard": [{"name": "plan-small"}]}}
+        # Central's shape: rows grouped by sub-category, the id under "plan".
+        return {
+            "plans": {
+                "General": [{"plan": "plan-general", "title": "General 4 GB", "rate": 20.0}],
+                "Compute": [{"plan": "plan-small", "title": "Compute 2 GB", "rate": 12.0}],
+            }
+        }
 
     def create_server(self, **arguments) -> dict:
         self.calls.append(("create_server", arguments))
