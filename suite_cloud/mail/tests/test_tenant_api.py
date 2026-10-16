@@ -34,6 +34,7 @@ from suite_cloud.mail.tests.fixtures import (
     make_tenant,
     verified_ownership,
 )
+from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError
 
 MAIL_DOMAIN = "suite_cloud.mail.doctype.mail_domain.mail_domain"
 SUITE_TENANT = "suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant"
@@ -209,6 +210,14 @@ class TestTenantResolution(TenantApiTestCase):
         self.tenant.db_set("enabled", 0)
         frappe.set_user("Guest")
         self.assertRaises(frappe.AuthenticationError, authenticate)
+
+    def test_mail_endpoints_wait_for_a_cluster(self) -> None:
+        tenant = frappe.get_doc({"doctype": "Suite Tenant", "title": "new.frappe.test"}).insert()
+        self.act_as(tenant)
+        self.assertIsNone(ping()["cluster"])
+        with self.assertRaises(MailNotConfiguredError) as ctx:
+            domains.list_domains()
+        self.assertEqual(ctx.exception.http_status_code, 422)
 
     def test_requests_must_come_from_an_allowed_address_when_set(self) -> None:
         self.tenant.allowed_ips = "203.0.113.10\n2001:db8::/32\n 10.0.0.0/8 "

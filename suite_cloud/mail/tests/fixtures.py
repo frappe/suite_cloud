@@ -104,7 +104,9 @@ def activate_cluster(cluster, token: str = "test-token"):
 
 def make_tenant(cluster, title: str = "acme.frappe.test", **fields):
     frappe.db.delete("Suite Tenant", {"title": title})
-    tenant = frappe.get_doc({"doctype": "Suite Tenant", "title": title, "cluster": cluster.name, **fields})
+    tenant = frappe.get_doc(
+        {"doctype": "Suite Tenant", "title": title, "stalwart_cluster": cluster.name, **fields}
+    )
     tenant.insert()
     return tenant
 

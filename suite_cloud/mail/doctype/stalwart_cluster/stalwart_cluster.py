@@ -116,8 +116,14 @@ class StalwartCluster(Document):
             egress.resync_cluster(self)
 
     def on_trash(self) -> None:
-        for doctype in ("Stalwart Node", "Suite Tenant", "Egress Gateway", "Egress IP Pool"):
-            if frappe.db.exists("DocType", doctype) and frappe.db.exists(doctype, {"cluster": self.name}):
+        dependants = (
+            ("Stalwart Node", "cluster"),
+            ("Suite Tenant", "stalwart_cluster"),
+            ("Egress Gateway", "cluster"),
+            ("Egress IP Pool", "cluster"),
+        )
+        for doctype, field in dependants:
+            if frappe.db.exists("DocType", doctype) and frappe.db.exists(doctype, {field: self.name}):
                 frappe.throw(_("Remove every {0} of this cluster first.").format(_(doctype)))
         dns.delete_cluster_records(self)
 

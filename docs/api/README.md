@@ -76,6 +76,7 @@ An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` wi
 | 404 | `DoesNotExistError` | The object does not exist, or belongs to another tenant |
 | 409 | `DuplicateEntryError` | The address or domain is already taken |
 | 422 | `ValidationError` | Suite Cloud refused the change: a limit, a rule, an inactive domain |
+| 422 | `MailNotConfiguredError` | The tenant is not set up for Mail yet: it has no Stalwart cluster, so there is nothing to act on |
 | 422 | `ClusterRejectedError` | The mail server refused the change; the message carries its reason |
 | 429 | `TooManyRequestsError` | The tenant made more than 300 requests in the current minute |
 | 502 | `ClusterFailedError` | The mail server failed in a way the caller cannot fix; Suite Cloud logged it for the operators |

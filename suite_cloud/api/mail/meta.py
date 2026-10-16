@@ -1,6 +1,6 @@
 import frappe
 
-from suite_cloud.api.tenant import current_tenant, tenant_api
+from suite_cloud.api.tenant import current_tenant, mail_api
 from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA
 
@@ -8,7 +8,7 @@ SCHEMA_CACHE_TTL = 3600
 
 
 @frappe.whitelist(methods=["GET"])
-@tenant_api
+@mail_api
 def get_account_options() -> dict:
     """Locales and time zones the cluster accepts for accounts (from Stalwart's schema)."""
 

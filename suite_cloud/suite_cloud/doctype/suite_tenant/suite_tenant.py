@@ -15,8 +15,15 @@ from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
 from suite_cloud.utils import get_config, utc_iso
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
+REPORT_DOCTYPES = ("DMARC Report", "TLS Report")
 MAILBOX_DOCTYPES = ("Mail Account", "Mail Group")  # the documents whose disk usage the tenant sums
 DISK_USAGE_CACHE_TTL = 300  # seconds a tenant's summed disk usage is served without asking the cluster
+
+
+class MailNotConfiguredError(frappe.ValidationError):
+    """The tenant has no Stalwart cluster yet, so there is no mail to act on."""
+
+    http_status_code = 422
 
 
 class SuiteTenant(Document):
@@ -29,7 +36,6 @@ class SuiteTenant(Document):
         from frappe.types import DF
 
         archived_at: DF.Datetime | None
-        cluster: DF.Link
         contact_email: DF.Data | None
         egress_pool: DF.Link | None
         enabled: DF.Check
@@ -39,6 +45,7 @@ class SuiteTenant(Document):
         max_groups: DF.Int
         max_mailing_lists: DF.Int
         secret: DF.Password | None
+        stalwart_cluster: DF.Link | None
         title: DF.Data
         status: DF.Literal["Active", "Suspended", "Archived"]
         user: DF.Link | None
@@ -66,22 +73,28 @@ class SuiteTenant(Document):
         if not self.user:
             frappe.throw(_("The tenant service user is missing; run bench migrate."))
         self.validate_limits()
+        self.validate_stalwart_cluster()
 
-        if self.is_new():
-            cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
-            if not cluster.enabled or cluster.status != "Active":
-                frappe.throw(_("Cluster {0} is not active.").format(self.cluster))
-        elif self.has_value_changed("cluster") and self.directory_size():
-            # Ids and mailboxes live on the old cluster; moving them is a migration, not a field edit.
+    def validate_stalwart_cluster(self) -> None:
+        """The cluster may be set, changed or cleared only while nothing of the tenant lives on it."""
+
+        if not self.is_new() and self.has_value_changed("stalwart_cluster") and self.has_mail_data():
+            # Ids, mailboxes and reports live on the old cluster; moving them is a migration.
             frappe.throw(
-                _("Tenant {0} has a directory on cluster {1}; it cannot be moved.").format(
-                    self.name, self.get_doc_before_save().cluster
+                _("Tenant {0} has mail data on cluster {1}; the cluster cannot be changed.").format(
+                    self.name, self.get_doc_before_save().stalwart_cluster
                 )
             )
-
+        if not self.stalwart_cluster:
+            self.egress_pool = None
+            return
+        if self.has_value_changed("stalwart_cluster"):
+            cluster = self.get_cluster()
+            if not cluster.enabled or cluster.status != "Active":
+                frappe.throw(_("Cluster {0} is not active.").format(self.stalwart_cluster))
         if (
             self.egress_pool
-            and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.cluster
+            and frappe.db.get_value("Egress IP Pool", self.egress_pool, "cluster") != self.stalwart_cluster
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.egress_pool))
 
@@ -90,7 +103,8 @@ class SuiteTenant(Document):
         if before and before.egress_pool != self.egress_pool:
             from suite_cloud.mail.cluster import egress
 
-            egress.resync_cluster(self.get_cluster())
+            for name in {before.stalwart_cluster, self.stalwart_cluster} - {None}:
+                egress.resync_cluster(frappe.get_cached_doc("Stalwart Cluster", name))
 
     def on_trash(self) -> None:
         if self.status != "Archived":
@@ -198,8 +212,13 @@ class SuiteTenant(Document):
         self.lock()
         self.assert_within_limit(self.max_mailing_lists, self.mailing_list_count(), _("mailing lists"))
 
-    def directory_size(self) -> int:
-        return sum(frappe.db.count(doctype, {"tenant": self.name}) for doctype in DIRECTORY_DOCTYPES)
+    def has_mail_data(self) -> bool:
+        """Whether any directory object or report is recorded for the tenant."""
+
+        return any(
+            frappe.db.exists(doctype, {"tenant": self.name})
+            for doctype in DIRECTORY_DOCTYPES + REPORT_DOCTYPES
+        )
 
     def onload(self) -> None:
         self.flags.with_usage = True  # the form shows the figure
@@ -261,8 +280,15 @@ class SuiteTenant(Document):
 
     # --- helpers ----------------------------------------------------------------
 
+    def assert_mail_configured(self) -> None:
+        if not self.stalwart_cluster:
+            frappe.throw(
+                _("Tenant {0} is not set up for Mail yet.").format(self.name), MailNotConfiguredError
+            )
+
     def get_cluster(self) -> Document:
-        return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+        self.assert_mail_configured()
+        return frappe.get_cached_doc("Stalwart Cluster", self.stalwart_cluster)
 
     def allows_ip(self, ip: str | None) -> bool:
         """Whether a request from ``ip`` may use the tenant's secret. No list means any address."""
@@ -277,17 +303,17 @@ class SuiteTenant(Document):
         return any(address in network for network in networks)
 
     def to_api(self) -> dict:
-        cluster = self.get_cluster()
+        cluster = self.get_cluster() if self.stalwart_cluster else None
         return {
             "tenant": self.name,
-            "cluster": self.cluster,
+            "cluster": self.stalwart_cluster,
             "status": self.status,
             "title": self.title,
             "contact_email": self.contact_email,
             "enabled": bool(self.enabled),
             "allowed_ips": self.allowed_ips.split("\n") if self.allowed_ips else [],
-            "jmap_url": cluster.base_url,
-            "mail_hostname": cluster.hostname,
+            "jmap_url": cluster.base_url if cluster else None,
+            "mail_hostname": cluster.hostname if cluster else None,
             "limits": {
                 "max_domains": self.max_domains,
                 "max_accounts": self.max_accounts,

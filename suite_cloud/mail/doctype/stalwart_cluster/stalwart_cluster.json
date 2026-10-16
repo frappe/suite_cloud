@@ -441,7 +441,7 @@
   {
    "group": "Tenancy",
    "link_doctype": "Suite Tenant",
-   "link_fieldname": "cluster"
+   "link_fieldname": "stalwart_cluster"
   },
   {
    "group": "Tenancy",

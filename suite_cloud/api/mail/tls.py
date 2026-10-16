@@ -5,7 +5,7 @@ from frappe import _
 from frappe.query_builder.functions import Count, Sum
 from frappe.utils import cint
 
-from suite_cloud.api.tenant import as_datetime, current_tenant, owned, owned_page, tenant_api
+from suite_cloud.api.tenant import as_datetime, current_tenant, mail_api, owned, owned_page
 from suite_cloud.mail.doctype.tls_report.tls_report import report_payloads
 from suite_cloud.mail.reports import report_window
 from suite_cloud.utils import utc_iso
@@ -15,7 +15,7 @@ TOP_FAILURES = 20
 
 
 @frappe.whitelist(methods=["GET"])
-@tenant_api
+@mail_api
 def list_tls_reports(
     domain: str | None = None,
     search: str | None = None,
@@ -57,7 +57,7 @@ def list_tls_reports(
 
 
 @frappe.whitelist(methods=["GET"])
-@tenant_api
+@mail_api
 def get_tls_report(report: str) -> dict:
     name = frappe.db.get_value("TLS Report", {"name": report, "tenant": current_tenant().name})
     if not name:
@@ -66,7 +66,7 @@ def get_tls_report(report: str) -> dict:
 
 
 @frappe.whitelist(methods=["GET"])
-@tenant_api
+@mail_api
 def get_tls_summary(domain: str | None = None, days: int = 30) -> dict:
     """Session totals over the reports whose period ended in the last ``days``, by domain and
     reporter, and the failed sessions by result type; ``days`` of 0 counts everything still held."""

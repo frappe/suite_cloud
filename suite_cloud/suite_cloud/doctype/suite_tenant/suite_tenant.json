@@ -10,6 +10,8 @@
   "enabled",
   "status",
   "archived_at",
+  "plan_section",
+  "max_disk_gb",
   "access_section",
   "secret",
   "allowed_ips",
@@ -17,7 +19,7 @@
   "user",
   "mail_tab",
   "cluster_section",
-  "cluster",
+  "stalwart_cluster",
   "column_break_cluster",
   "egress_pool",
   "limits_section",
@@ -26,7 +28,6 @@
   "max_groups",
   "max_mailing_lists",
   "column_break_limits",
-  "max_disk_gb",
   "used_disk_bytes"
  ],
  "fields": [
@@ -75,6 +76,18 @@
    "read_only": 1
   },
   {
+   "fieldname": "plan_section",
+   "fieldtype": "Section Break",
+   "label": "Plan"
+  },
+  {
+   "default": "0",
+   "description": "Disk the tenant's plan includes, in gigabytes, across every service the tenant uses; shown to the tenant next to its usage. 0 means unlimited. It does not cap the quotas of its mail accounts and groups.",
+   "fieldname": "max_disk_gb",
+   "fieldtype": "Float",
+   "label": "Total Disk Quota (GB)"
+  },
+  {
    "fieldname": "access_section",
    "fieldtype": "Section Break",
    "label": "API Access"
@@ -115,27 +128,26 @@
    "label": "Cluster"
   },
   {
-   "description": "The Stalwart cluster hosting every mail domain and account of the tenant. Fixed once the tenant exists; the cluster must be active at creation.",
-   "fieldname": "cluster",
+   "description": "The Stalwart cluster hosting every mail domain and account of the tenant. Empty, the tenant is not set up for Mail and no mail action is possible. Fixed once the tenant holds a domain, account, group, list or report; the cluster must be active when set.",
+   "fieldname": "stalwart_cluster",
    "fieldtype": "Link",
    "in_list_view": 1,
    "in_standard_filter": 1,
-   "label": "Cluster",
+   "label": "Stalwart Cluster",
    "options": "Stalwart Cluster",
-   "reqd": 1,
-   "search_index": 1,
-   "set_only_once": 1
+   "search_index": 1
   },
   {
    "fieldname": "column_break_cluster",
    "fieldtype": "Column Break"
   },
   {
-   "description": "Outbound mail of this tenant's domains leaves through this pool instead of the cluster default. A domain may name its own pool. The pool must belong to the tenant's cluster.",
+   "description": "Outbound mail of this tenant's domains leaves through this pool instead of the cluster default. A domain may name its own pool. The pool must belong to the tenant's Stalwart cluster; without a cluster it is cleared.",
    "fieldname": "egress_pool",
    "fieldtype": "Link",
    "label": "Egress Pool",
-   "options": "Egress IP Pool"
+   "options": "Egress IP Pool",
+   "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
   {
    "fieldname": "limits_section",
@@ -147,6 +159,7 @@
    "description": "Mail Domains the tenant may hold. Adding one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_domains",
    "fieldtype": "Int",
+   "read_only_depends_on": "eval:!doc.stalwart_cluster",
    "label": "Max Domains"
   },
   {
@@ -154,6 +167,7 @@
    "description": "Mail Accounts the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_accounts",
    "fieldtype": "Int",
+   "read_only_depends_on": "eval:!doc.stalwart_cluster",
    "label": "Max Accounts"
   },
   {
@@ -161,6 +175,7 @@
    "description": "Mail Groups the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_groups",
    "fieldtype": "Int",
+   "read_only_depends_on": "eval:!doc.stalwart_cluster",
    "label": "Max Groups"
   },
   {
@@ -168,18 +183,12 @@
    "description": "Mailing Lists the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_mailing_lists",
    "fieldtype": "Int",
+   "read_only_depends_on": "eval:!doc.stalwart_cluster",
    "label": "Max Mailing Lists"
   },
   {
    "fieldname": "column_break_limits",
    "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "description": "Disk the tenant's plan includes, in gigabytes, shown to the tenant next to its usage. 0 means unlimited. It does not cap the quotas of its accounts and groups.",
-   "fieldname": "max_disk_gb",
-   "fieldtype": "Float",
-   "label": "Total Disk Quota (GB)"
   },
   {
    "description": "Disk used by the tenant's accounts and groups together, as the cluster last reported it (kept for 5 minutes); nothing is stored.",

@@ -6,8 +6,8 @@ tenants share one cluster safely.
 
 ## How it works, in short
 
-- **A Suite Tenant** records each Suite tenant: the cluster it uses, its limits and the key and
-  secret the tenant authenticates with.
+- **A Suite Tenant** records each Suite tenant: its limits, the key and secret it authenticates
+  with, and, once it is set up for Mail, the Stalwart cluster it uses.
 - **A Suite tenant** never talks to the mail server's admin API itself. When it wants to add a
   domain, create a mailbox, change a password and so on, it asks Suite Cloud. Suite Cloud checks
   that the tenant owns what it is touching, saves the change in its own records, and pushes it to
@@ -49,7 +49,7 @@ The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what a
 | **Egress Gateway** and **Egress IP Pool** | Optional extra servers used only for sending. A pool is a set of IP addresses; a domain, a tenant or a whole cluster can be told to send through it. |
 | **DNS Record** | One record Suite Cloud keeps in a zone (a node's address, the cluster's round-robin entry, the SPF list, and so on). Records are created and removed together with the thing that needs them. |
 | **Server Job** | One run of an install or update script on a node or gateway, with the result of every step. Secrets are looked up when the job runs and never stored in it. |
-| **Suite Tenant** | One hosted Frappe Suite site: which cluster it uses, its secret, its title and contact email, and its limits (domains, accounts, groups, lists, total disk). Its id is the TXT value its domains are verified with. |
+| **Suite Tenant** | One hosted Frappe Suite site: its secret, its title and contact email, its total disk quota, and, once set up for Mail, its Stalwart cluster and mail limits (domains, accounts, groups, lists). Without a cluster every mail call is refused. Its id is the TXT value its domains are verified with. |
 | **Mail Domain, Mail Account, Mail Group, Mailing List** | The mail directory of a tenant. Saving one of these pushes it to the cluster in the same step, so the records and the cluster never drift apart. Each carries the id Stalwart gave it. |
 | **DMARC Report** | One DMARC aggregate report another receiver sent about a domain, copied hourly from the cluster that intercepted it (Stalwart parses reports mailed to `postmaster@`). Attributed to the tenant that holds the domain, and only when the report was addressed to one of that tenant's domains; kept for the configured retention, and read by tenants through the API. |
 | **TLS Report** | One TLS aggregate report (RFC 8460) a sending server made about delivering to a domain: sessions that negotiated TLS as the domain's MTA-STS or DANE policy asks, sessions that failed and why. Copied, attributed, kept and served the same way as DMARC reports, with its own retention; a report whose policies name more than one domain is shown to no tenant. |

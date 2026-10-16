@@ -83,7 +83,7 @@ class MailDomain(Document):
     def validate(self) -> None:
         self.domain_name = validate_domain_name(self.domain_name)
         tenant = self.get_site()
-        self.cluster = tenant.cluster
+        self.cluster = tenant.get_cluster().name
         if self.is_new() and not self.flags.adopting:
             # Proof of control comes first: only someone who controls the domain's DNS learns
             # whether another tenant already holds it.
@@ -331,7 +331,9 @@ class MailDomain(Document):
         return frappe.get_cached_doc("Suite Tenant", self.tenant)
 
     def get_cluster(self) -> Document:
-        return frappe.get_cached_doc("Stalwart Cluster", self.cluster or self.get_site().cluster)
+        if self.cluster:
+            return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+        return self.get_site().get_cluster()
 
     def to_api(self, with_records: bool = True) -> dict:
         payload = domain_payload(self)

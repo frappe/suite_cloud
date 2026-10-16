@@ -208,6 +208,17 @@ def tenant_api(fn: Callable) -> Callable:
     return wrapper
 
 
+def mail_api(fn: Callable) -> Callable:
+    """A ``tenant_api`` for the mail endpoints: a tenant without a Stalwart cluster has no mail to act on."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        current_tenant().assert_mail_configured()
+        return fn(*args, **kwargs)
+
+    return tenant_api(wrapper)
+
+
 def assert_arguments(fn: Callable, args: tuple, kwargs: dict) -> None:
     """A required parameter the request left out is a 400 that names it, not Python's TypeError."""
 
@@ -361,7 +372,7 @@ def page_size(limit: Any, cap: int) -> int:
 
     try:
         wanted = int(limit)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         wanted = cap
     return max(1, min(wanted, cap))
 
@@ -396,7 +407,7 @@ def as_datetime(value: Any) -> datetime | None:
         return None
     try:
         return get_datetime(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         frappe.throw(
             _("{0} is not a date. Use ISO 8601, for example 2026-03-04T05:06:07.").format(value),
             InvalidInputError,

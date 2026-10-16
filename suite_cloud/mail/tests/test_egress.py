@@ -456,6 +456,14 @@ class TestEgress(IntegrationTestCase):
         )
         self.assertRaisesRegex(frappe.ValidationError, "another cluster", domain.insert)
 
+    def test_a_tenant_without_a_cluster_keeps_no_pool(self) -> None:
+        pool = self.make_pool()
+        tenant = make_tenant(self.cluster, "other.frappe.test", egress_pool=pool.name)
+        self.addCleanup(frappe.db.delete, "Suite Tenant", {"name": tenant.name})
+        tenant.stalwart_cluster = None
+        tenant.save()
+        self.assertIsNone(tenant.egress_pool)
+
     def test_pool_deletion_is_blocked_while_used(self) -> None:
         pool = self.make_pool()
         self.tenant.db_set("egress_pool", pool.name)

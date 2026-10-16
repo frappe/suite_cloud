@@ -18,6 +18,7 @@ from suite_cloud.mail.tests.fixtures import (
     make_tenant,
 )
 from suite_cloud.patches.v1_0 import add_credential_quotas
+from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError
 
 
 class TenancyTestCase(IntegrationTestCase):
@@ -87,9 +88,32 @@ class TestSuiteTenant(TenancyTestCase):
         self.cluster.db_set("status", "Pending")
         frappe.clear_document_cache("Stalwart Cluster", self.cluster.name)
         tenant = frappe.get_doc(
-            {"doctype": "Suite Tenant", "title": "other.frappe.test", "cluster": self.cluster.name}
+            {"doctype": "Suite Tenant", "title": "other.frappe.test", "stalwart_cluster": self.cluster.name}
         )
         self.assertRaisesRegex(frappe.ValidationError, "not active", tenant.insert)
+
+    def test_mail_waits_for_a_cluster(self) -> None:
+        tenant = frappe.get_doc({"doctype": "Suite Tenant", "title": "other.frappe.test"}).insert()
+        profile = tenant.to_api()
+        self.assertEqual(
+            (profile["cluster"], profile["jmap_url"], profile["mail_hostname"]), (None, None, None)
+        )
+        self.assertEqual(profile["usage"]["used_disk_bytes"], 0)
+        domain = {
+            "doctype": "Mail Domain",
+            "domain_name": "other.com",
+            "tenant": tenant.name,
+            "is_verified": 1,
+        }
+        self.assertRaisesRegex(MailNotConfiguredError, "not set up for Mail", frappe.get_doc(domain).insert)
+
+        # Set once nothing of the tenant exists, fixed as soon as something does.
+        tenant.stalwart_cluster = self.cluster.name
+        tenant.save()
+        frappe.get_doc(domain).insert()
+        tenant.reload()
+        tenant.stalwart_cluster = None
+        self.assertRaisesRegex(frappe.ValidationError, "cannot be changed", tenant.save)
 
     def test_rotate_suspend_archive(self) -> None:
         old = self.tenant.get_password("secret")
