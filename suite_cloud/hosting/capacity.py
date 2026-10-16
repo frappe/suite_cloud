@@ -96,9 +96,7 @@ def ensure_capacity() -> None:
 def ensure_region_capacity(region: str) -> str | None:
     if free_slots(region) >= cint(get_config("min_free_site_slots")):
         return None
-    vm = frappe.get_doc(
-        {"doctype": "Virtual Machine", "region": region, "max_sites": cint(get_config("max_sites_per_vm"))}
-    )
+    vm = frappe.get_doc({"doctype": "Virtual Machine", "region": region})
     vm.insert(ignore_permissions=True)
     return vm.name
 

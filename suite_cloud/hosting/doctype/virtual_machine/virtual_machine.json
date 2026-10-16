@@ -17,6 +17,9 @@
   "image_offering",
   "image_id",
   "plan",
+  "vcpus",
+  "memory_mb",
+  "disk_gb",
   "column_break_server",
   "has_public_ipv4",
   "has_public_ipv6",
@@ -65,11 +68,11 @@
    "set_only_once": 1
   },
   {
-   "description": "Sites this server takes, Suite sites and others together. Defaults to Sites per Server in Suite Cloud Settings.",
+   "description": "Sites this server takes, Suite sites and others together: worked out from its memory and disk (Server Sizing in Suite Cloud Settings), up to Max Sites per Server. Recalculated whenever Central reports its size. Until then it is Max Sites per Server.",
    "fieldname": "max_sites",
    "fieldtype": "Int",
    "label": "Max Sites",
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "column_break_main",
@@ -131,6 +134,24 @@
    "fieldname": "plan",
    "fieldtype": "Data",
    "label": "Plan",
+   "read_only": 1
+  },
+  {
+   "fieldname": "vcpus",
+   "fieldtype": "Float",
+   "label": "vCPUs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "memory_mb",
+   "fieldtype": "Int",
+   "label": "Memory (MB)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "disk_gb",
+   "fieldtype": "Float",
+   "label": "Disk (GB)",
    "read_only": 1
   },
   {
@@ -306,7 +327,7 @@
    "link_fieldname": "virtual_machine"
   }
  ],
- "modified": "2026-10-17 03:00:00.000000",
+ "modified": "2026-10-17 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Virtual Machine",

@@ -49,6 +49,12 @@
   "max_sites_per_vm",
   "min_free_site_slots",
   "auto_create_vms",
+  "sizing_section",
+  "reserved_memory_mb",
+  "memory_per_site_mb",
+  "column_break_sizing",
+  "reserved_disk_gb",
+  "disk_per_site_gb",
   "suite_app_section",
   "suite_app_repo",
   "column_break_suite_app",
@@ -325,10 +331,10 @@
   },
   {
    "default": "10",
-   "description": "How many sites a new server takes, Suite sites and any others on it together.",
+   "description": "The most sites any server takes, Suite sites and others together, whatever its size. Each server's Max Sites is worked out from its memory and disk below and never exceeds this.",
    "fieldname": "max_sites_per_vm",
    "fieldtype": "Int",
-   "label": "Sites per Server",
+   "label": "Max Sites per Server",
    "reqd": 1
   },
   {
@@ -345,6 +351,46 @@
    "fieldname": "auto_create_vms",
    "fieldtype": "Check",
    "label": "Create Servers Automatically"
+  },
+  {
+   "description": "A server takes as many sites as both its memory and its disk allow, after what the server itself needs: (memory − reserved) ÷ memory per site, and the same for disk. Recalculated whenever Central reports the server's size, so a resize on the dashboard counts.",
+   "fieldname": "sizing_section",
+   "fieldtype": "Section Break",
+   "label": "Server Sizing"
+  },
+  {
+   "default": "1024",
+   "description": "Memory the bench needs before any site: Frappe, the Suite app, MariaDB, Redis and the workers.",
+   "fieldname": "reserved_memory_mb",
+   "fieldtype": "Int",
+   "label": "Memory Reserved for the Server (MB)",
+   "reqd": 1
+  },
+  {
+   "default": "512",
+   "fieldname": "memory_per_site_mb",
+   "fieldtype": "Int",
+   "label": "Memory per Site (MB)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_sizing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "8",
+   "description": "Disk the system, the bench and its apps take before any site.",
+   "fieldname": "reserved_disk_gb",
+   "fieldtype": "Int",
+   "label": "Disk Reserved for the Server (GB)",
+   "reqd": 1
+  },
+  {
+   "default": "2",
+   "fieldname": "disk_per_site_gb",
+   "fieldtype": "Int",
+   "label": "Disk per Site (GB)",
+   "reqd": 1
   },
   {
    "fieldname": "suite_app_section",
@@ -421,7 +467,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-17 07:30:00.000000",
+ "modified": "2026-10-17 09:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

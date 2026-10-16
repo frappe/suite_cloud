@@ -24,6 +24,7 @@ class VirtualMachine(Document):
         booted_at: DF.Datetime | None
         central_action: DF.Data | None
         central_resource_id: DF.Data | None
+        disk_gb: DF.Float
         enabled: DF.Check
         error: DF.SmallText | None
         foreign_site_count: DF.Int
@@ -37,6 +38,7 @@ class VirtualMachine(Document):
         last_synced_at: DF.Datetime | None
         letsencrypt_email_set: DF.Check
         max_sites: DF.Int
+        memory_mb: DF.Int
         pilot_audience: DF.Data | None
         plan: DF.Data | None
         public_ipv4: DF.Data | None
@@ -52,14 +54,13 @@ class VirtualMachine(Document):
         suite_app_status: DF.Literal["Pending", "Installing", "Installed", "Failed"]
         suite_app_task: DF.Data | None
         title: DF.Data | None
+        vcpus: DF.Float
         wildcard_zone: DF.Data | None
     # end: auto-generated types
 
     def before_insert(self) -> None:
         self.status = "Pending"
-        self.max_sites = cint(self.max_sites) or cint(
-            frappe.db.get_single_value("Suite Cloud Settings", "max_sites_per_vm")
-        )
+        self.max_sites = cint(frappe.db.get_single_value("Suite Cloud Settings", "max_sites_per_vm"))
         machines.resolve_server_arguments(self)
 
     def validate(self) -> None:
@@ -67,8 +68,6 @@ class VirtualMachine(Document):
             # Central derives the server's digest from the title, so it carries the unique name.
             self.title = f"suite-{self.region}-{self.name}"
             self.request_key = f"suite-cloud-{self.name}"
-        if cint(self.max_sites) < 1:
-            frappe.throw(_("A server must take at least one site."))
 
     def after_insert(self) -> None:
         machines.enqueue_provision(self.name)

@@ -33,12 +33,16 @@ class SuiteCloudSettings(Document):
         central_url: DF.Data | None
         default_dns_ttl: DF.Int
         default_region: DF.Link | None
+        disk_per_site_gb: DF.Int
         dmarc_report_retention_days: DF.Int
         max_sites_per_vm: DF.Int
+        memory_per_site_mb: DF.Int
         min_free_site_slots: DF.Int
         notification_mailbox_local_part: DF.Data
         public_url: DF.Data | None
         ready_sites_per_region: DF.Int
+        reserved_disk_gb: DF.Int
+        reserved_memory_mb: DF.Int
         server_job_timeout: DF.Int
         sign_with_ed25519: DF.Check
         site_dns_zone: DF.Link | None
@@ -91,7 +95,16 @@ class SuiteCloudSettings(Document):
                     self.default_region
                 )
             )
-        for field in ("max_sites_per_vm", "ready_sites_per_region", "min_free_site_slots"):
+        for field in ("memory_per_site_mb", "disk_per_site_gb"):
+            if cint(self.get(field)) < 1:
+                frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
+        for field in (
+            "max_sites_per_vm",
+            "ready_sites_per_region",
+            "min_free_site_slots",
+            "reserved_memory_mb",
+            "reserved_disk_gb",
+        ):
             if cint(self.get(field)) < 0:
                 frappe.throw(_("{0} cannot be negative.").format(_(self.meta.get_label(field))))
         if cint(self.max_sites_per_vm) < 1:

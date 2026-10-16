@@ -8,7 +8,7 @@ from datetime import timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import flt, get_datetime, now, now_datetime
+from frappe.utils import cint, flt, get_datetime, now, now_datetime
 
 from suite_cloud.hosting import (
     begin_step,
@@ -361,7 +361,29 @@ def apply_server(vm, server: dict) -> None:
         values["status"] = server["status"]
     if values.get("status") == "Running" and not vm.booted_at:
         values["booted_at"] = now()
-    vm.db_set({**values, "last_synced_at": now()})
+    vm.db_set({**values, **server_size(server), "last_synced_at": now()})
+
+
+def server_size(server: dict) -> dict:
+    """The server's size and the sites it fits; nothing until Central reports it."""
+
+    memory_mb, disk_gb = cint(server.get("memory_megabytes")), flt(server.get("disk_gigabytes"))
+    if not memory_mb or not disk_gb:
+        return {}
+    return {
+        "vcpus": flt(server.get("vcpus")),
+        "memory_mb": memory_mb,
+        "disk_gb": disk_gb,
+        "max_sites": sites_that_fit(memory_mb, disk_gb),
+    }
+
+
+def sites_that_fit(memory_mb: int, disk_gb: float) -> int:
+    """As many sites as both memory and disk allow after the server's own share, up to the cap."""
+
+    by_memory = (memory_mb - cint(get_config("reserved_memory_mb"))) // cint(get_config("memory_per_site_mb"))
+    by_disk = int((disk_gb - cint(get_config("reserved_disk_gb"))) // cint(get_config("disk_per_site_gb")))
+    return max(0, min(cint(get_config("max_sites_per_vm")), by_memory, by_disk))
 
 
 def has_booted(vm) -> bool:

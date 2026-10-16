@@ -23,6 +23,7 @@ class FakeCentral:
         self.servers: dict[str, dict] = {}
         self.calls: list[tuple] = []
         self.fail_creations = False
+        self.size = {"vcpus": 2.0, "memory_megabytes": 8192, "disk_gigabytes": 80.0}  # of new servers
         self.boot = True
         self.images = [
             {"id": "img-old", "created_at": 1, "tags": {}},
@@ -100,6 +101,7 @@ class FakeCentral:
                 "status": "Running" if self.boot else "Provisioning",
                 "gateway_url": f"https://{resource_id}.gateway.test" if self.boot else None,
                 "pilot_audience": "audience" if self.boot else None,
+                **self.size,
                 "ipv6_address": "fd00::1",
                 "public_ipv4": None,
                 "public_ipv6": None,

@@ -148,6 +148,27 @@ class TestVirtualMachine(HostingFixtures, IntegrationTestCase):
         self.assertEqual(frappe.db.get_value("Virtual Machine", kept.name, "status"), "Running")
         self.assertEqual(frappe.db.get_value("Region", REGION, "display_name"), "Test Region")
 
+    def test_max_sites_follow_the_servers_size(self) -> None:
+        self.set_setting("max_sites_per_vm", 10)
+        self.central.size = {"vcpus": 0.5, "memory_megabytes": 2048, "disk_gigabytes": 15.0}
+        vm = self.make_vm()
+        # Memory: (2048 - 1024) // 512 = 2; disk: (15 - 8) // 2 = 3; the smaller wins.
+        self.assertEqual((vm.vcpus, vm.memory_mb, vm.disk_gb, vm.max_sites), (0.5, 2048, 15.0, 2))
+
+        self.central.servers[vm.central_resource_id].update(
+            {"memory_megabytes": 8192, "disk_gigabytes": 40.0}
+        )
+        vm.sync_status()  # resized on the dashboard
+        self.assertEqual(frappe.db.get_value("Virtual Machine", vm.name, "max_sites"), 10)  # the cap
+
+        self.central.servers[vm.central_resource_id].update(
+            {"memory_megabytes": 1024, "disk_gigabytes": 10.0}
+        )
+        vm.sync_status()
+        vm.reload()
+        self.assertEqual(vm.max_sites, 0)  # too small for any site
+        self.assertFalse(vm.has_free_slot)
+
     def test_open_pilot_asks_for_a_fresh_link(self) -> None:
         vm = self.make_vm()
         with user_context("Administrator"):

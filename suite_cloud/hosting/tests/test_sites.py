@@ -205,7 +205,8 @@ class TestCapacity(HostingFixtures, IntegrationTestCase):
 
     def test_the_pool_stops_at_the_server_limit(self) -> None:
         self.set_setting("ready_sites_per_region", 5)
-        self.make_vm(max_sites=2)
+        self.central.size = {"vcpus": 0.5, "memory_megabytes": 2048, "disk_gigabytes": 15.0}  # fits 2
+        self.make_vm()
 
         capacity.ensure_site_pool()
 
