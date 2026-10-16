@@ -62,6 +62,7 @@
   "sites_section",
   "ready_sites_per_region",
   "allow_signup",
+  "allow_subaddressed_signups",
   "column_break_sites",
   "site_dns_zone",
   "tenant_mail_zone",
@@ -438,6 +439,13 @@
    "label": "Allow Signup"
   },
   {
+   "default": "0",
+   "description": "Accept a signup email with a +tag, e.g. sagar+test@frappe.io. Off, such an email is refused: every tag of one mailbox could sign up again. On, the owner's account on the site leaves the tag out, e.g. sagar@acme.example.com.",
+   "fieldname": "allow_subaddressed_signups",
+   "fieldtype": "Check",
+   "label": "Allow Sub-addressed Emails at Signup"
+  },
+  {
    "fieldname": "column_break_sites",
    "fieldtype": "Column Break"
   },
@@ -468,7 +476,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-17 13:00:00.000000",
+ "modified": "2026-10-17 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

@@ -101,11 +101,13 @@ class SuiteSite(Document):
     @property
     def login_email(self) -> str:
         """The owner's account on the site: their own local part at the tenant's mail domain, e.g.
-        sagar.s@acme.frappesuite.com for sagar.s@frappe.io."""
+        sagar.s@acme.frappesuite.com for sagar.s@frappe.io. A +tag is left out: Suite takes no
+        sub-addressed account."""
 
         if not (domain := labels.mail_domain(self.label)):
             frappe.throw(_("Set the Tenant Mail Zone in Suite Cloud Settings."))
-        return validate_email_address(f"{self.owner_email.split('@', 1)[0]}@{domain}")
+        local = self.owner_email.split("@", 1)[0].split("+", 1)[0]
+        return validate_email_address(f"{local}@{domain}")
 
     @property
     def follow_up_skip_reason(self) -> str | None:

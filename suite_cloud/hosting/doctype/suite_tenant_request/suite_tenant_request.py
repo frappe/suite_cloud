@@ -8,7 +8,7 @@ from uuid import uuid7
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_to_date, now, now_datetime
+from frappe.utils import add_to_date, cint, now, now_datetime
 
 from suite_cloud.hosting import begin_step, commit, labels, run_in_background, undo_step
 from suite_cloud.mail.tenancy.addresses import validate_email_address
@@ -63,7 +63,10 @@ class SuiteTenantRequest(Document):
         self.label = labels.validate_label(self.label)
         labels.assert_label_available(self.label)
         self.timezone = (self.timezone or "").strip() or None
-        if self.email.split("@", 1)[0] == get_config("notification_mailbox_local_part"):
+        local = self.email.split("@", 1)[0]
+        if "+" in local and not cint(get_config("allow_subaddressed_signups")):
+            frappe.throw(_("{0} is a sub-address; sign up with the address itself.").format(self.email))
+        if local.split("+", 1)[0] == get_config("notification_mailbox_local_part"):
             # The owner's account would be the site's own notification account.
             frappe.throw(
                 _("{0} cannot sign up: its name is kept for the site's notifications.").format(self.email)

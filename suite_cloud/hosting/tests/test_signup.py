@@ -90,6 +90,24 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(len(self.site_api.invites()), 1)
         self.assertEqual(frappe.db.get_value("Suite Site", request.suite_site, "status"), "Active")
 
+    def test_sub_addressed_emails_are_refused_unless_allowed(self) -> None:
+        values = {"doctype": "Suite Tenant Request", "full_name": "Ada Lovelace", "label": "acme"}
+        doc = frappe.get_doc({**values, "email": "new-signup+test@frappe.test"})
+        self.assertRaisesRegex(frappe.ValidationError, "sub-address", doc.insert)
+
+        self.set_setting("allow_subaddressed_signups", 1)
+        frappe.db.delete("User", {"name": "new-signup+test@frappe.test"})
+        request = frappe.get_doc({**values, "email": "new-signup+test@frappe.test"}).insert()
+
+        (invite,) = self.site_api.invites()
+        self.assertEqual(invite["account"], f"new-signup@acme.{MAIL_ZONE}")  # the tag is left out
+        self.assertEqual(invite["backup_email"], "new-signup+test@frappe.test")
+        self.assertEqual(frappe.db.get_value("Suite Tenant Request", request.name, "status"), "Completed")
+        notification = frappe.get_doc({**values, "label": "beta", "email": "notification+x@frappe.test"})
+        self.assertRaisesRegex(
+            frappe.ValidationError, "kept for the site's notifications", notification.insert
+        )
+
     def test_the_notification_local_part_cannot_sign_up(self) -> None:
         values = {"doctype": "Suite Tenant Request", "full_name": "Ada Lovelace", "label": "acme"}
         doc = frappe.get_doc({**values, "email": "notification@frappe.test"})

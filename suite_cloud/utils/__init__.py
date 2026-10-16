@@ -42,6 +42,7 @@ CONFIG_KEYS = (
     "suite_app_ref",
     "ready_sites_per_region",
     "allow_signup",
+    "allow_subaddressed_signups",
     "site_dns_zone",
     "tenant_mail_zone",
     "notification_mailbox_local_part",

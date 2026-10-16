@@ -24,6 +24,7 @@ class SuiteCloudSettings(Document):
         acme_contact_email: DF.Data
         acme_directory_url: DF.Data
         allow_signup: DF.Check
+        allow_subaddressed_signups: DF.Check
         auto_create_vms: DF.Check
         central_api_key: DF.Data | None
         central_api_secret: DF.Password | None
