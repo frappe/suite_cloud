@@ -111,6 +111,8 @@ class DNSProvider:
         return None
 
     def create_dns_record(self, type: str, host: str, value: str, ttl: int, priority: int = 0) -> bool:
+        if type == "MX":
+            return self.create_mx_record(host, value, ttl, priority)
         config = {
             "action": "create",
             "type": type,
@@ -120,6 +122,37 @@ class DNSProvider:
             "priority": priority,
         }
         return self.get_client(config).execute()
+
+    def create_mx_record(self, host: str, value: str, ttl: int, priority: int) -> bool:
+        """Lexicon drops an MX record's priority for every provider but Cloudflare, which reads it
+        as text; DigitalOcean then refuses the record (HTTP 422)."""
+
+        if self.provider == "digitalocean":
+            return self.create_digitalocean_record(
+                {
+                    "type": "MX",
+                    "name": host,
+                    "data": value.rstrip(".") + ".",
+                    "priority": priority,
+                    "ttl": ttl,
+                }
+            )
+        if self.provider == "cloudflare":
+            config = {"action": "create", "type": "MX", "name": host, "content": value, "ttl": ttl}
+            return self.get_client({**config, "priority": str(priority)}).execute()
+        raise NotImplementedError(f"MX records through {self.provider} are not supported yet.")
+
+    def create_digitalocean_record(self, record: dict) -> bool:
+        import requests
+
+        response = requests.post(
+            f"https://api.digitalocean.com/v2/domains/{self.domain}/records",
+            headers={"Authorization": f"Bearer {self.__token}"},
+            json=record,
+            timeout=30,
+        )
+        response.raise_for_status()
+        return True
 
     def update_dns_record(
         self, record_id: int | str, type: str, host: str, value: str, ttl: int, priority: int = 0
