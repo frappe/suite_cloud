@@ -66,13 +66,10 @@ class SuiteTenant(Document):
         self.place_on_cluster()
 
     def place_on_cluster(self) -> None:
-        """A hosted tenant without a cluster gets the one serving its region (``flags.region``)."""
+        """A Suite Site tenant without a cluster gets the one serving its region (``flags.region``),
+        else the default cluster."""
 
-        if (
-            self.stalwart_cluster
-            or self.tenant_type != "Suite Site"
-            or not cint(get_config("auto_place_tenants"))
-        ):
+        if self.stalwart_cluster or self.tenant_type != "Suite Site":
             return
         self.stalwart_cluster = pick_cluster(self.flags.region or get_config("default_region"))
 

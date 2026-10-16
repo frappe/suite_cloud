@@ -55,7 +55,6 @@
   "suite_app_ref",
   "sites_section",
   "ready_sites_per_region",
-  "auto_place_tenants",
   "allow_signup",
   "column_break_sites",
   "site_dns_zone",
@@ -386,13 +385,6 @@
    "reqd": 1
   },
   {
-   "default": "1",
-   "description": "A new Suite Site tenant without a Stalwart cluster gets the active cluster that serves its region, else the default cluster.",
-   "fieldname": "auto_place_tenants",
-   "fieldtype": "Check",
-   "label": "Place New Tenants on a Cluster"
-  },
-  {
    "default": "0",
    "description": "Accept signups through the public signup API. Each one creates a tenant and claims a site.",
    "fieldname": "allow_signup",
@@ -429,7 +421,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-17 00:30:00.000000",
+ "modified": "2026-10-17 04:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

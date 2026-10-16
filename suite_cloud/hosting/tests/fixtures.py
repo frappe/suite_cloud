@@ -5,7 +5,7 @@ from unittest.mock import patch
 import frappe
 
 from suite_cloud.hosting.tests.fakes import PROXY_ZONE, REGION, FakeCentral, FakePilot, FakeSite, install
-from suite_cloud.tests.fixtures import configure_settings, make_zone, no_dns_provider
+from suite_cloud.tests.fixtures import ROOT_DOMAIN, configure_settings, make_zone, no_dns_provider
 from suite_cloud.utils import clear_config_cache
 
 SITE_ZONE = "sites.test"
@@ -39,8 +39,10 @@ class HostingFixtures:
             }
         )
         remove_hosting_data()
-        # Regions of the site the tests run on would get servers and pooled sites too (rolled back).
+        # The site's own regions would get servers and pooled sites, and its clusters would take the
+        # test tenants (Suite Site tenants are placed at once): both are switched off (rolled back).
         frappe.db.set_value("Region", {"name": ["!=", REGION]}, "enabled", 0)
+        frappe.db.set_value("Stalwart Cluster", {"name": ["not like", f"%.{ROOT_DOMAIN}"]}, "enabled", 0)
         make_region()
         self.set_setting("default_region", REGION)
 

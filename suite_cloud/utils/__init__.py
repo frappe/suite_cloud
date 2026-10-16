@@ -37,7 +37,6 @@ CONFIG_KEYS = (
     "suite_app_repo",
     "suite_app_ref",
     "ready_sites_per_region",
-    "auto_place_tenants",
     "allow_signup",
     "site_dns_zone",
     "tenant_mail_zone",

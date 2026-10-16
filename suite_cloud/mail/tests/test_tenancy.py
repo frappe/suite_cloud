@@ -157,8 +157,14 @@ class TestSuiteTenant(TenancyTestCase):
         self.assertRaisesRegex(frappe.ValidationError, "not active", tenant.insert)
 
     def test_mail_waits_for_a_cluster(self) -> None:
+        # A Suite Site tenant is placed on a cluster at once; a team waits for one to be named.
         tenant = frappe.get_doc(
-            {"doctype": "Suite Tenant", "title": "other.frappe.test", "user": TENANT_OWNER}
+            {
+                "doctype": "Suite Tenant",
+                "title": "other.frappe.test",
+                "tenant_type": "Team",
+                "user": TENANT_OWNER,
+            }
         ).insert()
         profile = tenant.to_api()
         self.assertEqual(

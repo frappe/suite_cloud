@@ -25,7 +25,6 @@ class SuiteCloudSettings(Document):
         acme_directory_url: DF.Data
         allow_signup: DF.Check
         auto_create_vms: DF.Check
-        auto_place_tenants: DF.Check
         central_api_key: DF.Data | None
         central_api_secret: DF.Password | None
         central_image_offering: DF.Data

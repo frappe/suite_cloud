@@ -114,8 +114,6 @@ class TestRegionSync(HostingFixtures, IntegrationTestCase):
 class TestPlacement(HostingFixtures, IntegrationTestCase):
     def setUp(self) -> None:
         self.setup_hosting()
-        # Clusters of the site the tests run on would compete; the transaction is rolled back.
-        frappe.db.set_value("Stalwart Cluster", {"name": ["not like", f"%.{ROOT_DOMAIN}"]}, "enabled", 0)
 
     def test_a_cluster_listing_the_region_wins_else_the_default(self) -> None:
         serving = activate_cluster(make_cluster("blr", hostname=f"mail.blr.{ROOT_DOMAIN}"))
@@ -143,11 +141,8 @@ class TestPlacement(HostingFixtures, IntegrationTestCase):
 
         self.assertEqual(pick_cluster(REGION), default.name)  # its own code, zz1, no cluster lists
 
-    def test_a_new_hosted_tenant_is_placed_only_when_asked(self) -> None:
+    def test_a_new_suite_site_tenant_is_always_placed(self) -> None:
         cluster = activate_cluster(make_cluster())
-        self.assertFalse(self.make_hosted_tenant().stalwart_cluster)  # the fixture default is off
-
-        self.set_setting("auto_place_tenants", 1)
         self.assertEqual(self.make_hosted_tenant().stalwart_cluster, cluster.name)
         self.assertFalse(self.make_hosted_tenant(tenant_type="Team").stalwart_cluster)
 
