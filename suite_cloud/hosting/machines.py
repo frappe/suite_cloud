@@ -320,9 +320,12 @@ def find_server(registry: dict, resource_id: str | None) -> dict | None:
 
 
 def apply_server(vm, server: dict) -> None:
+    """Central's view of the server. The plan too: a resize on the dashboard changes it there, and
+    Suite Cloud's own value only mattered for create_server, which never runs again."""
+
     values = {
         field: server.get(field)
-        for field in ("gateway_url", "pilot_audience", "ipv6_address", "public_ipv4", "public_ipv6")
+        for field in ("gateway_url", "pilot_audience", "ipv6_address", "public_ipv4", "public_ipv6", "plan")
     }
     if server.get("status") in SERVER_STATUSES:
         values["status"] = server["status"]

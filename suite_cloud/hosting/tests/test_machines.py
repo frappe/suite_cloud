@@ -119,12 +119,14 @@ class TestVirtualMachine(HostingFixtures, IntegrationTestCase):
 
     def test_refresh_reads_every_server_and_counts_foreign_sites(self) -> None:
         vm = self.make_vm()
-        self.central.servers[vm.central_resource_id]["public_ipv6"] = "2001:db8::5"
+        self.assertEqual(vm.plan, "plan-small")
+        server = self.central.servers[vm.central_resource_id]
+        server.update({"public_ipv6": "2001:db8::5", "plan": "plan-general"})  # resized on the dashboard
 
-        machines.refresh_fleet()
+        vm.sync_status()
 
         vm.reload()
-        self.assertEqual(vm.public_ipv6, "2001:db8::5")
+        self.assertEqual((vm.public_ipv6, vm.plan), ("2001:db8::5", "plan-general"))
         self.assertEqual(vm.foreign_site_count, 1)  # the baked site.local
         self.assertEqual(vm.free_slots, 2)
 

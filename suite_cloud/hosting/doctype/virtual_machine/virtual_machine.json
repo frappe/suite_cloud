@@ -127,6 +127,7 @@
    "read_only": 1
   },
   {
+   "description": "The server's plan on Central. Set when the server is created; Sync Status and the five-minute refresh read it back, so a resize on the Frappe Cloud dashboard shows here. Blank for a custom size.",
    "fieldname": "plan",
    "fieldtype": "Data",
    "label": "Plan",
@@ -305,7 +306,7 @@
    "link_fieldname": "virtual_machine"
   }
  ],
- "modified": "2026-10-16 18:00:00.000000",
+ "modified": "2026-10-17 03:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Virtual Machine",

@@ -95,6 +95,7 @@ class FakeCentral:
             action.update(status="Succeeded", resource_id=resource_id)
             self.servers[resource_id] = {
                 "resource_id": resource_id,
+                "plan": self.arguments[action["key"]]["plan"],
                 "name": resource_id,
                 "status": "Running" if self.boot else "Provisioning",
                 "gateway_url": f"https://{resource_id}.gateway.test" if self.boot else None,
