@@ -4,6 +4,7 @@
 frappe.ui.form.on('Suite Tenant', {
 	setup(frm) {
 		frm.set_query('egress_pool', () => ({ filters: { cluster: frm.doc.stalwart_cluster || '' } }))
+		frm.set_query('user', () => ({ query: 'suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant.owner_query' }))
 	},
 
 	refresh(frm) {

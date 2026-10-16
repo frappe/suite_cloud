@@ -11,7 +11,7 @@ from frappe.utils import cint, flt, now, now_datetime
 
 from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.errors import StalwartError
-from suite_cloud.mail.tenancy.permissions import assert_can_own
+from suite_cloud.mail.tenancy.permissions import TENANT_ROLE, assert_can_own
 from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
 from suite_cloud.utils import utc_iso
 
@@ -329,6 +329,26 @@ class SuiteTenant(Document):
                 "used_disk_bytes": self.get_mail_used_disk_bytes(),
             },
         }
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def owner_query(
+    doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | None
+) -> list:
+    """Link search for the owner: enabled users holding the Suite Tenant role."""
+
+    return frappe.get_all(
+        "User",
+        filters=[["Has Role", "role", "=", TENANT_ROLE], ["User", "enabled", "=", 1]],
+        or_filters=[["User", "name", "like", f"%{txt}%"], ["User", "full_name", "like", f"%{txt}%"]],
+        fields=["name", "full_name"],
+        order_by="name",
+        start=start,
+        page_length=page_len,
+        as_list=True,
+        distinct=True,
+    )
 
 
 def parse_networks(text: str | None) -> list:

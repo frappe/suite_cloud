@@ -20,7 +20,7 @@ from suite_cloud.mail.tests.fixtures import (
     make_tenant,
 )
 from suite_cloud.patches.v1_0 import add_credential_quotas
-from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError
+from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError, owner_query
 from suite_cloud.utils import user_context
 
 
@@ -102,6 +102,11 @@ class TestSuiteTenant(TenancyTestCase):
         owner = frappe.get_doc("User", TENANT_OWNER)
         owner.set("roles", [])
         self.assertRaisesRegex(frappe.ValidationError, "must keep", owner.save)
+
+        # The form offers only users who may own a tenant.
+        offered = [row[0] for row in owner_query("User", "frappe.test", "name", 0, 20, None)]
+        self.assertIn(TENANT_OWNER, offered)
+        self.assertNotIn(plain, offered)
 
     def test_owners_reach_only_their_own_tenants_documents(self) -> None:
         mine = self.make_domain()
