@@ -64,6 +64,6 @@ Suite Cloud asks the mail server for every account and group of the tenant in as
 | Parameter | Type | Meaning |
 | --- | --- | --- |
 | `title` | string | The tenant's workspace name, shown to operators. It cannot be empty. |
-| `contact_email` | string | Where Suite Cloud sends tenant-specific notices. An empty string clears it. |
+| `contact_email` | string | Where Suite Cloud sends tenant-specific notices. An empty string puts it back to the owner's email. |
 
 Only the fields passed change. Returns the tenant profile as `ping` does. The Suite app sends both fields whenever its settings change.

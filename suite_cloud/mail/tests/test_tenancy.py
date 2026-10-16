@@ -82,7 +82,8 @@ class TestSuiteTenant(TenancyTestCase):
         self.assertEqual(len(self.tenant.new_secret), 40)
         self.assertEqual(self.tenant.get_password("secret"), self.tenant.new_secret)
         self.assertEqual(self.tenant.owner_user, TENANT_OWNER)
-        self.assertEqual(self.tenant.status, "Active")
+        self.assertEqual(self.tenant.contact_email, TENANT_OWNER)  # the owner's email until set
+        self.assertEqual((self.tenant.tenant_type, self.tenant.status), ("Suite Site", "Active"))
         self.assertEqual(self.tenant.to_api()["jmap_url"], self.cluster.base_url)
 
         # One user may own several tenants; a tenant without an owner is refused.
@@ -90,6 +91,13 @@ class TestSuiteTenant(TenancyTestCase):
         self.assertEqual(other.owner_user, TENANT_OWNER)
         orphan = frappe.get_doc({"doctype": "Suite Tenant", "title": "orphan.frappe.test"})
         self.assertRaises(frappe.MandatoryError, orphan.insert)
+
+    def test_tenants_from_before_the_type_existed_are_suite_sites(self) -> None:
+        from suite_cloud.patches.v1_0 import fill_tenant_type
+
+        self.tenant.db_set("tenant_type", "", update_modified=False)
+        fill_tenant_type.execute()
+        self.assertEqual(frappe.db.get_value("Suite Tenant", self.tenant.name, "tenant_type"), "Suite Site")
 
     def test_site_needs_an_active_cluster(self) -> None:
         self.cluster.db_set("status", "Pending")

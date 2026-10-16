@@ -143,9 +143,9 @@ class TestTenantResolution(TenantApiTestCase):
         profile = update_tenant_profile(title="  Acme Corp ", contact_email="Ops@Acme.test")
         self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", "ops@acme.test"))
         self.assertEqual(frappe.db.get_value("Suite Tenant", self.tenant.name, "title"), "Acme Corp")
-        # Only the fields passed change; a blank clears the contact.
+        # Only the fields passed change; a blank puts the contact back to the owner's email.
         profile = update_tenant_profile(contact_email="")
-        self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", None))
+        self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", self.tenant.owner_user))
         # A notice address follows the general email rules, not the mail server's local-part rules.
         self.assertEqual(
             update_tenant_profile(contact_email="ops/team@acme.test")["contact_email"], "ops/team@acme.test"

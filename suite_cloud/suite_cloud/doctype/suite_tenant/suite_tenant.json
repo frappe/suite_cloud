@@ -5,6 +5,7 @@
  "engine": "InnoDB",
  "field_order": [
   "title",
+  "tenant_type",
   "owner_user",
   "contact_email",
   "column_break_main",
@@ -41,6 +42,17 @@
    "reqd": 1
   },
   {
+   "default": "Suite Site",
+   "description": "What the tenant is: a hosted Frappe Suite site, a team workspace, or one person's account.",
+   "fieldname": "tenant_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Type",
+   "options": "Suite Site\nTeam\nPersonal",
+   "reqd": 1
+  },
+  {
    "description": "The user who owns the tenant. Requests authenticated with the tenant's secret run as this user. One user may own several tenants.",
    "fieldname": "owner_user",
    "fieldtype": "Link",
@@ -50,7 +62,9 @@
    "search_index": 1
   },
   {
-   "description": "Where tenant-specific notices go, such as downtime or a domain losing verification. Set by the tenant through the API.",
+   "description": "Where tenant-specific notices go, such as downtime or a domain losing verification. Set by the tenant through the API; the owner's email when left empty.",
+   "fetch_from": "owner_user.email",
+   "fetch_if_empty": 1,
    "fieldname": "contact_email",
    "fieldtype": "Data",
    "label": "Contact Email",

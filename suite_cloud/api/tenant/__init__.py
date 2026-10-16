@@ -446,7 +446,8 @@ def get_disk_usage(fresh: bool = False) -> dict:
 def update_tenant_profile(title: str | None = None, contact_email: str | None = None) -> dict:
     """What the tenant says about itself: its workspace name as the title, and where to reach it.
 
-    Only the fields passed change; an empty string clears the contact. The title cannot be empty.
+    Only the fields passed change; an empty string puts the contact back to the owner's email. The
+    title cannot be empty.
     """
 
     tenant = current_tenant()
