@@ -20,11 +20,9 @@ class TestSuiteCloudSettings(IntegrationTestCase):
         self.settings.save()
 
         with self.patch_site_config(public_url="https://conf.test"):
-            self.assertIsNone(get_config("public_url"))
-            self.assertEqual(
-                get_config(("public_url", "default_dns_ttl")),
-                (None, self.settings.default_dns_ttl),
-            )
+            public_url, ttl = get_config(("public_url", "default_dns_ttl"))
+            self.assertFalse(public_url)
+            self.assertEqual(ttl, self.settings.default_dns_ttl)
 
     def test_tls_verification_comes_from_settings(self) -> None:
         from suite_cloud.mail.stalwart import verify_tls

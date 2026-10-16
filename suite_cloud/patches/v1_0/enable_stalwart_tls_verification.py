@@ -7,6 +7,6 @@ FIELD = "verify_stalwart_tls"
 
 
 def execute() -> None:
-    if frappe.db.exists("Singles", {"doctype": SETTINGS, "field": FIELD}):
+    if FIELD in frappe.db.get_singles_dict(SETTINGS):
         return
     frappe.db.set_single_value(SETTINGS, FIELD, 1)
