@@ -11,6 +11,7 @@ from suite_cloud.mail.stalwart.errors import StalwartRejectedError
 from suite_cloud.mail.tenancy.addresses import get_tenant_domain
 from suite_cloud.mail.tests.fake_stalwart import FakeError, FakeStalwart
 from suite_cloud.mail.tests.fixtures import (
+    TENANT_OWNER,
     activate_cluster,
     clear_request_cache,
     configure_settings,
@@ -76,13 +77,19 @@ class TenancyTestCase(IntegrationTestCase):
 
 
 class TestSuiteTenant(TenancyTestCase):
-    def test_site_gets_credentials_and_service_user(self) -> None:
+    def test_site_gets_credentials_and_an_owner(self) -> None:
         self.assertEqual(UUID(self.tenant.name).version, 7)
         self.assertEqual(len(self.tenant.new_secret), 40)
         self.assertEqual(self.tenant.get_password("secret"), self.tenant.new_secret)
-        self.assertEqual(self.tenant.user, "suite-tenant@suite-cloud.internal")
+        self.assertEqual(self.tenant.owner_user, TENANT_OWNER)
         self.assertEqual(self.tenant.status, "Active")
         self.assertEqual(self.tenant.to_api()["jmap_url"], self.cluster.base_url)
+
+        # One user may own several tenants; a tenant without an owner is refused.
+        other = make_tenant(self.cluster, "other.frappe.test")
+        self.assertEqual(other.owner_user, TENANT_OWNER)
+        orphan = frappe.get_doc({"doctype": "Suite Tenant", "title": "orphan.frappe.test"})
+        self.assertRaises(frappe.MandatoryError, orphan.insert)
 
     def test_site_needs_an_active_cluster(self) -> None:
         self.cluster.db_set("status", "Pending")

@@ -25,7 +25,6 @@ class SuiteCloudSettings(Document):
         public_url: DF.Data | None
         server_job_timeout: DF.Int
         sign_with_ed25519: DF.Check
-        tenant_service_user: DF.Link | None
         skip_domain_verification: DF.Check
         spam_filter_rules_version: DF.Data | None
         stalwart_cli_download_url_template: DF.Data

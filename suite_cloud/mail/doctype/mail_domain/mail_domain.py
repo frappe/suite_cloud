@@ -87,7 +87,7 @@ class MailDomain(Document):
         if self.is_new() and not self.flags.adopting:
             # Proof of control comes first: only someone who controls the domain's DNS learns
             # whether another tenant already holds it.
-            if ownership.required():
+            if ownership.required(tenant):
                 ownership.assert_ownership(tenant, self.domain_name)
             assert_domain_available(self.domain_name, self.tenant)
             tenant.assert_can_add_domain()

@@ -23,7 +23,7 @@ A tenant authenticates with its id, the name of its Suite Tenant record, and the
 Authorization: Tenant <id>:<secret>
 ```
 
-Suite Cloud checks the secret against the Suite Tenant record, so the request runs as the shared tenant service user and every method acts only on that tenant's documents. Anything that belongs to another tenant is reported as not found (404), never as forbidden.
+Suite Cloud checks the secret against the Suite Tenant record, so the request runs as the tenant's owner and every method acts only on that tenant's documents. Anything that belongs to another tenant is reported as not found (404), never as forbidden.
 
 When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its secret. A request from elsewhere gets a 403 with the type `TenantAddressError`, and Suite Cloud logs it for the operators. A secret copied out of a tenant's configuration is worthless anywhere else.
 

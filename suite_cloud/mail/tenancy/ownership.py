@@ -7,7 +7,7 @@ resolves. The id is fixed for the life of the tenant, so every domain it adds as
 record and no other tenant can produce it.
 
 The guard is aimed at tenants: it applies to requests made through the tenant API, which run as
-the tenant service user. Operators adding a domain from the desk vouch for it themselves, and a
+the tenant's owner. Operators adding a domain from the desk vouch for it themselves, and a
 development cloud's operator may vouch for every tenant's domains at once with Suite Cloud
 Settings' "Skip Domain Verification" - test domains exist in no public DNS.
 """
@@ -34,11 +34,11 @@ class OwnershipLookupError(frappe.ValidationError):
     http_status_code = 503
 
 
-def required() -> bool:
-    """Whether the request has to prove control of the domain: a tenant's own, on a cloud that
-    checks."""
+def required(tenant) -> bool:
+    """Whether the request has to prove control of the domain: the tenant acting for itself, on a
+    cloud that checks."""
 
-    return frappe.session.user == get_config("tenant_service_user") and not skipped()
+    return frappe.session.user == tenant.owner_user and not skipped()
 
 
 def skipped() -> bool:

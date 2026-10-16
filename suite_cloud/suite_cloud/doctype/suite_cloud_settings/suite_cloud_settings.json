@@ -8,7 +8,6 @@
   "suite_cloud_section",
   "public_url",
   "column_break_general",
-  "tenant_service_user",
   "skip_domain_verification",
   "jobs_section",
   "server_job_timeout",
@@ -57,14 +56,6 @@
   {
    "fieldname": "column_break_general",
    "fieldtype": "Column Break"
-  },
-  {
-   "description": "Every tenant request runs as this user. It is created on install and needs no changes.",
-   "fieldname": "tenant_service_user",
-   "fieldtype": "Link",
-   "label": "Tenant Service User",
-   "options": "User",
-   "read_only": 1
   },
   {
    "default": "0",

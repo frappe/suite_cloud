@@ -1,9 +1,9 @@
 """Tenant-facing API: what a tenant may do with its own slice of the directory.
 
 The tenant sends ``Authorization: Tenant <id>:<secret>``; the ``authenticate`` auth hook checks
-the secret and runs the request as the shared tenant service user. Every endpoint then resolves
-the calling tenant from the id in the header and only ever touches documents owned by that
-tenant. Objects of other tenants are reported as missing, never as forbidden.
+the secret and runs the request as the tenant's owner. Every endpoint then resolves the calling
+tenant from the id in the header and only ever touches documents owned by that tenant. Objects
+of other tenants are reported as missing, never as forbidden.
 """
 
 import functools
@@ -28,7 +28,6 @@ from suite_cloud.mail.stalwart.errors import (
     StalwartUnavailableError,
 )
 from suite_cloud.mail.tenancy.addresses import NOUNS
-from suite_cloud.utils import get_config
 
 API_PATH = "/api/v2/method/suite_cloud.api."
 ERROR_KEYS = ("type", "message", "exception")
@@ -95,14 +94,15 @@ def current_tenant():
 
 
 def authenticate() -> None:
-    """Frappe auth hook: ``Authorization: Tenant <id>:<secret>`` signs in the service user."""
+    """Frappe auth hook: ``Authorization: Tenant <id>:<secret>`` signs in the tenant's owner."""
 
     name, secret = _credentials_from_header()
     if not name:
         return
 
     stored = None
-    if frappe.db.get_value("Suite Tenant", name, "enabled"):
+    tenant = frappe.db.get_value("Suite Tenant", name, ["enabled", "owner_user"], as_dict=True)
+    if tenant and tenant.enabled:
         stored = get_decrypted_password("Suite Tenant", name, "secret", raise_exception=False)
     if not stored or not secrets.compare_digest(stored, secret):
         request_ip = getattr(frappe.local, "request_ip", None)
@@ -110,20 +110,30 @@ def authenticate() -> None:
         raise frappe.AuthenticationError(_("Tenant authentication failed."))
 
     form_dict = frappe.local.form_dict
-    frappe.set_user(get_config("tenant_service_user"))
+    frappe.set_user(tenant.owner_user)
     frappe.local.form_dict = form_dict  # set_user clears the request body Frappe already parsed
 
 
-def _resolve_tenant():
-    service_user = get_config("tenant_service_user")
+def _tenant_from_secret() -> str | None:
+    """The tenant whose secret signed this request in: the auth hook ran it as the tenant's owner."""
 
-    if frappe.session.user == service_user:
-        name = _credentials_from_header()[0]
-    elif frappe.session.user != "Guest" and set(frappe.get_roles()) & set(MANAGER_ROLES):
-        # Operators may act on behalf of a tenant from the desk or a script.
-        name = frappe.form_dict.get("tenant") or frappe.get_request_header("X-Suite-Tenant")
-    else:
-        name = None
+    name = _credentials_from_header()[0]
+    if name and frappe.session.user == frappe.db.get_value("Suite Tenant", name, "owner_user"):
+        return name
+    return None
+
+
+def _tenant_from_operator() -> str | None:
+    """Operators may act on behalf of a tenant from the desk or a script."""
+
+    if frappe.session.user == "Guest" or not set(frappe.get_roles()) & set(MANAGER_ROLES):
+        return None
+    return frappe.form_dict.get("tenant") or frappe.get_request_header("X-Suite-Tenant")
+
+
+def _resolve_tenant():
+    via_secret = _tenant_from_secret()
+    name = via_secret or _tenant_from_operator()
 
     request_ip = getattr(frappe.local, "request_ip", None)
     if not name or not frappe.db.exists("Suite Tenant", name):
@@ -137,7 +147,7 @@ def _resolve_tenant():
             _("Tenant {0} is {1} and cannot use the API.").format(tenant.name, tenant.status.lower()),
             TenantSuspendedError,
         )
-    if frappe.session.user == service_user and not tenant.allows_ip(request_ip):
+    if via_secret and not tenant.allows_ip(request_ip):
         # A secret copied out of a tenant's config is worthless from anywhere but the tenant's own servers.
         # Either the secret has leaked or the tenant moved servers; operators need to know which.
         log_refusal_once(tenant.name, request_ip, ", ".join((tenant.allowed_ips or "").split("\n")))

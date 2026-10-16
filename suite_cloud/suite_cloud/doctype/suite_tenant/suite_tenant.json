@@ -5,6 +5,7 @@
  "engine": "InnoDB",
  "field_order": [
   "title",
+  "owner_user",
   "contact_email",
   "column_break_main",
   "enabled",
@@ -16,7 +17,6 @@
   "secret",
   "allowed_ips",
   "column_break_access",
-  "user",
   "mail_tab",
   "cluster_section",
   "stalwart_cluster",
@@ -39,6 +39,15 @@
    "in_list_view": 1,
    "label": "Title",
    "reqd": 1
+  },
+  {
+   "description": "The user who owns the tenant. Requests authenticated with the tenant's secret run as this user. One user may own several tenants.",
+   "fieldname": "owner_user",
+   "fieldtype": "Link",
+   "label": "Owner",
+   "options": "User",
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "description": "Where tenant-specific notices go, such as downtime or a domain losing verification. Set by the tenant through the API.",
@@ -109,14 +118,6 @@
   {
    "fieldname": "column_break_access",
    "fieldtype": "Column Break"
-  },
-  {
-   "description": "Requests authenticated with the tenant's secret run as this service user. Taken from Suite Cloud Settings on every save.",
-   "fieldname": "user",
-   "fieldtype": "Link",
-   "label": "Service User",
-   "options": "User",
-   "read_only": 1
   },
   {
    "fieldname": "mail_tab",

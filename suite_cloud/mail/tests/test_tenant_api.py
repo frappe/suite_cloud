@@ -81,7 +81,7 @@ class TenantApiTestCase(IntegrationTestCase):
         """Simulates a request the auth hook already signed in for the tenant."""
 
         frappe.local.suite_tenant = None
-        frappe.set_user(frappe.db.get_single_value("Suite Cloud Settings", "tenant_service_user"))
+        frappe.set_user(tenant.owner_user)
         frappe.utils.set_request(headers={"Authorization": f"Tenant {tenant.name}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 
@@ -221,7 +221,7 @@ class TestTenantResolution(TenantApiTestCase):
 
     def test_requests_must_come_from_an_allowed_address_when_set(self) -> None:
         self.tenant.allowed_ips = "203.0.113.10\n2001:db8::/32\n 10.0.0.0/8 "
-        self.tenant.save(ignore_permissions=True)  # the fixture request runs as the service user
+        self.tenant.save(ignore_permissions=True)  # the fixture request runs as the tenant's owner
         self.assertEqual(self.tenant.allowed_ips, "203.0.113.10/32\n2001:db8::/32\n10.0.0.0/8")
         self.assertIn("allowed_ips", self.tenant.to_api())
 

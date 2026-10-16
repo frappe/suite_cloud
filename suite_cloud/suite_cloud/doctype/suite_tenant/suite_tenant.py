@@ -12,7 +12,7 @@ from frappe.utils import cint, flt, now, now_datetime
 from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.errors import StalwartError
 from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
-from suite_cloud.utils import get_config, utc_iso
+from suite_cloud.utils import utc_iso
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
 REPORT_DOCTYPES = ("DMARC Report", "TLS Report")
@@ -44,11 +44,11 @@ class SuiteTenant(Document):
         max_domains: DF.Int
         max_groups: DF.Int
         max_mailing_lists: DF.Int
+        owner_user: DF.Link
         secret: DF.Password | None
         stalwart_cluster: DF.Link | None
         title: DF.Data
         status: DF.Literal["Active", "Suspended", "Archived"]
-        user: DF.Link | None
         mail_used_disk_bytes: DF.Int
     # end: auto-generated types
 
@@ -68,10 +68,6 @@ class SuiteTenant(Document):
             if not frappe.utils.validate_email_address(self.contact_email):
                 frappe.throw(_("{0} is not a valid email address.").format(self.contact_email))
         self.allowed_ips = "\n".join(str(n) for n in parse_networks(self.allowed_ips))
-
-        self.user = get_config("tenant_service_user")
-        if not self.user:
-            frappe.throw(_("The tenant service user is missing; run bench migrate."))
         self.validate_limits()
         self.validate_stalwart_cluster()
 

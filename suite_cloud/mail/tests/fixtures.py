@@ -102,8 +102,22 @@ def activate_cluster(cluster, token: str = "test-token"):
     return cluster
 
 
+TENANT_OWNER = "owner@frappe.test"
+
+
+def make_owner(email: str = TENANT_OWNER) -> str:
+    """A plain user without any role, as a tenant's owner is: the API checks ownership, not roles."""
+
+    if not frappe.db.exists("User", email):
+        frappe.get_doc(
+            {"doctype": "User", "email": email, "first_name": "Owner", "send_welcome_email": 0}
+        ).insert(ignore_permissions=True)
+    return email
+
+
 def make_tenant(cluster, title: str = "acme.frappe.test", **fields):
     frappe.db.delete("Suite Tenant", {"title": title})
+    fields.setdefault("owner_user", make_owner())
     tenant = frappe.get_doc(
         {"doctype": "Suite Tenant", "title": title, "stalwart_cluster": cluster.name, **fields}
     )

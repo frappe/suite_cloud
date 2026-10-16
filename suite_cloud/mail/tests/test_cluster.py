@@ -4,13 +4,13 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.install import TENANT_SERVICE_USER
 from suite_cloud.mail.cluster import dns, plan
 from suite_cloud.mail.tests.fixtures import (
     ROOT_DOMAIN,
     configure_settings,
     make_cluster,
     make_node,
+    make_owner,
     make_store,
     make_zone,
     no_dns_provider,
@@ -67,7 +67,7 @@ class TestStalwartCluster(IntegrationTestCase):
         node = make_node(cluster, "203.0.113.1")
 
         # Dropping the pin lets the next Verify SSH trust any server, so other users are refused.
-        with user_context(TENANT_SERVICE_USER), self.assertRaises(frappe.PermissionError):
+        with user_context(make_owner()), self.assertRaises(frappe.PermissionError):
             node.reset_ssh_host_keys()
         self.assertEqual(frappe.db.get_value("Stalwart Node", node.name, "ssh_host_keys"), node.ssh_host_keys)
 
