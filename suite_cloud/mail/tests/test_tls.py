@@ -321,5 +321,4 @@ class TestTlsReports(TenantApiTestCase):
         self.assertRaises(frappe.ValidationError, settings.save, ignore_permissions=True)
         settings = frappe.get_doc("Suite Cloud Settings")
         settings.tls_report_retention_days = None
-        settings.save(ignore_permissions=True)
-        self.assertEqual(settings.tls_report_retention_days, reports.DEFAULT_RETENTION_DAYS)
+        self.assertRaises(frappe.ValidationError, settings.save, ignore_permissions=True)

@@ -92,17 +92,19 @@
   },
   {
    "default": "90",
-   "description": "How long fetched DMARC reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
+   "description": "How long fetched DMARC reports are kept. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
    "fieldname": "dmarc_report_retention_days",
    "fieldtype": "Int",
-   "label": "DMARC Report Retention (Days)"
+   "label": "DMARC Report Retention (Days)",
+   "reqd": 1
   },
   {
    "default": "90",
-   "description": "How long fetched TLS reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
+   "description": "How long fetched TLS reports are kept. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
    "fieldname": "tls_report_retention_days",
    "fieldtype": "Int",
-   "label": "TLS Report Retention (Days)"
+   "label": "TLS Report Retention (Days)",
+   "reqd": 1
   },
   {
    "fieldname": "stalwart_tab",

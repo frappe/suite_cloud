@@ -92,10 +92,10 @@ class ReceivedReports:
         self.delete(names)
 
     def retention_days(self) -> int:
-        """The configured retention; a missing or negative value falls back to the default.
+        """The configured retention; anything under a day falls back to the default.
 
-        Settings refuse a value under one day, but site_config is not validated, and a negative
-        number would move the cutoff into the future and delete the whole history.
+        Settings refuse such a value, but a negative number reaching here would move the cutoff
+        into the future and delete the whole history.
         """
 
         days = cint(get_config(self.retention_key))

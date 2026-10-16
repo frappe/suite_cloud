@@ -56,6 +56,19 @@ class TestSuiteCloudSettings(IntegrationTestCase):
         patch.execute()
         self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), "v3.0.0")
 
+    def test_report_retention_is_backfilled_for_existing_sites(self) -> None:
+        from suite_cloud.patches.v1_0 import fill_report_retention_defaults as patch
+
+        for field in patch.FIELDS:
+            frappe.db.set_single_value(patch.SETTINGS, field, 0)
+        patch.execute()
+        for field in patch.FIELDS:
+            self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, field), 90)
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELDS[0], 30)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELDS[0]), 30)
+
     def test_tls_verification_is_backfilled_for_existing_sites(self) -> None:
         from suite_cloud.patches.v1_0 import enable_stalwart_tls_verification as patch
 
