@@ -41,6 +41,16 @@ class TestSiteDomains(HostingFixtures, IntegrationTestCase):
         )
         self.assertEqual(self.pilot.primary[site.hostname], domain)
 
+    def test_the_site_domain_choice_is_fixed_once_the_domain_is_added(self) -> None:
+        site = self.claim()
+        site.assign_site_domain = 0
+        self.assertRaisesRegex(frappe.ValidationError, "already assigned", site.save)
+
+        pooled = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+        pooled.reload()
+        pooled.assign_site_domain = 0
+        pooled.save()  # nothing assigned yet: the operator may opt the site out
+
     def test_records_not_visible_yet_wait(self) -> None:
         with patch("suite_cloud.hosting.domains.verify_dns_record", return_value=False):
             site = self.claim()

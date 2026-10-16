@@ -178,10 +178,11 @@
   },
   {
    "default": "1",
-   "description": "Give the site its label under the site DNS zone, e.g. acme.sites.example.com, as its primary domain once it is active.",
+   "description": "Give the site its label under the site DNS zone, e.g. acme.sites.example.com, as its primary domain once it is active. Fixed once the domain is added: the site may already be reached under it.",
    "fieldname": "assign_site_domain",
    "fieldtype": "Check",
-   "label": "Assign Site Domain"
+   "label": "Assign Site Domain",
+   "read_only_depends_on": "eval:(doc.domains || []).some((row) => row.managed)"
   },
   {
    "fieldname": "domains",
@@ -196,10 +197,11 @@
   },
   {
    "default": "1",
-   "description": "Give the tenant its label under the tenant mail zone, e.g. acme.example.com, and send the site's mail from its notification account.",
+   "description": "Give the tenant its label under the tenant mail zone, e.g. acme.example.com, and send the site's mail from its notification account. Fixed once the mail domain exists: it may hold the tenant's mailboxes, and only Drop Site removes it.",
    "fieldname": "assign_mail_domain",
    "fieldtype": "Check",
-   "label": "Assign Mail Domain"
+   "label": "Assign Mail Domain",
+   "read_only_depends_on": "eval:doc.mail_domain"
   },
   {
    "fieldname": "mail_domain",
@@ -230,7 +232,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 18:00:00.000000",
+ "modified": "2026-10-17 06:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

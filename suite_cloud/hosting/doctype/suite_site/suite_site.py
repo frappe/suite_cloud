@@ -53,6 +53,27 @@ class SuiteSite(Document):
         else:
             sites.place(self)  # no server with room: the site waits for one
 
+    def validate(self) -> None:
+        self.validate_assignments()
+
+    def validate_assignments(self) -> None:
+        """A domain step that has begun cannot be opted out of; unticking would not undo it."""
+
+        before = None if self.is_new() else self.get_doc_before_save()
+        if not before:
+            return
+        started = {
+            "assign_site_domain": any(row.managed for row in before.domains),
+            "assign_mail_domain": bool(before.mail_domain),
+        }
+        for field, has_started in started.items():
+            if has_started and self.has_value_changed(field):
+                frappe.throw(
+                    _("{0} cannot change: the domain is already assigned.").format(
+                        _(self.meta.get_label(field))
+                    )
+                )
+
     def after_insert(self) -> None:
         sites.enqueue_provision(self.name)
 

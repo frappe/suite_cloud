@@ -35,6 +35,12 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertEqual((account["default_outgoing"], account["enable_outgoing"]), (1, 1))
         self.assertTrue(account["password"])
 
+    def test_the_mail_domain_choice_is_fixed_once_the_domain_exists(self) -> None:
+        site = self.claim()
+
+        site.assign_mail_domain = 0
+        self.assertRaisesRegex(frappe.ValidationError, "already assigned", site.save)
+
     def test_the_domain_records_are_published_in_the_mail_zone(self) -> None:
         site = self.claim()
 
