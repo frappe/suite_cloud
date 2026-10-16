@@ -25,9 +25,10 @@
   "limits_section",
   "max_domains",
   "max_accounts",
+  "column_break_limits",
   "max_groups",
   "max_mailing_lists",
-  "column_break_limits",
+  "usage_section",
   "mail_used_disk_bytes"
  ],
  "fields": [
@@ -189,6 +190,11 @@
   {
    "fieldname": "column_break_limits",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "usage_section",
+   "fieldtype": "Section Break",
+   "label": "Usage"
   },
   {
    "description": "Disk used by the tenant's mail accounts and groups together, as the Stalwart cluster last reported it (kept for 5 minutes); nothing is stored.",
