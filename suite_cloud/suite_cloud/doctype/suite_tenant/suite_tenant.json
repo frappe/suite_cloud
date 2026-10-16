@@ -50,8 +50,8 @@
    "in_standard_filter": 1,
    "label": "Type",
    "options": "Suite Site\nTeam\nDevelopment",
-   "reqd": 1,
-   "permlevel": 1
+   "permlevel": 1,
+   "reqd": 1
   },
   {
    "description": "The user who owns the tenant; it needs the Suite Tenant role and keeps it while it owns one. Requests authenticated with the tenant's secret run as this user. One user may own several tenants.",
@@ -59,9 +59,9 @@
    "fieldtype": "Link",
    "label": "User",
    "options": "User",
+   "permlevel": 1,
    "reqd": 1,
-   "search_index": 1,
-   "permlevel": 1
+   "search_index": 1
   },
   {
    "description": "Where tenant-specific notices go, such as downtime or a domain losing verification. Set by the tenant through the API; the owner's email when left empty.",
@@ -93,16 +93,16 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Active\nSuspended\nArchived",
-   "read_only": 1,
-   "permlevel": 1
+   "permlevel": 1,
+   "read_only": 1
   },
   {
    "description": "When the tenant was archived. Set by the Archive action; the tenant cannot be resumed after this.",
    "fieldname": "archived_at",
    "fieldtype": "Datetime",
    "label": "Archived At",
-   "read_only": 1,
-   "permlevel": 1
+   "permlevel": 1,
+   "read_only": 1
   },
   {
    "fieldname": "plan_section",
@@ -159,8 +159,8 @@
    "in_standard_filter": 1,
    "label": "Stalwart Cluster",
    "options": "Stalwart Cluster",
-   "search_index": 1,
-   "permlevel": 1
+   "permlevel": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_cluster",
@@ -172,8 +172,8 @@
    "fieldtype": "Link",
    "label": "Egress Pool",
    "options": "Egress IP Pool",
-   "read_only_depends_on": "eval:!doc.stalwart_cluster",
-   "permlevel": 1
+   "permlevel": 1,
+   "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
   {
    "fieldname": "limits_section",
@@ -185,36 +185,36 @@
    "description": "Mail Domains the tenant may hold. Adding one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_domains",
    "fieldtype": "Int",
-   "read_only_depends_on": "eval:!doc.stalwart_cluster",
    "label": "Max Domains",
-   "permlevel": 1
+   "permlevel": 1,
+   "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
   {
    "default": "500",
    "description": "Mail Accounts the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_accounts",
    "fieldtype": "Int",
-   "read_only_depends_on": "eval:!doc.stalwart_cluster",
    "label": "Max Accounts",
-   "permlevel": 1
+   "permlevel": 1,
+   "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
   {
    "default": "50",
    "description": "Mail Groups the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_groups",
    "fieldtype": "Int",
-   "read_only_depends_on": "eval:!doc.stalwart_cluster",
    "label": "Max Groups",
-   "permlevel": 1
+   "permlevel": 1,
+   "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
   {
    "default": "50",
    "description": "Mailing Lists the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
    "fieldname": "max_mailing_lists",
    "fieldtype": "Int",
-   "read_only_depends_on": "eval:!doc.stalwart_cluster",
    "label": "Max Mailing Lists",
-   "permlevel": 1
+   "permlevel": 1,
+   "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
   {
    "fieldname": "column_break_limits",
@@ -232,12 +232,17 @@
    "is_virtual": 1,
    "label": "Mail Disk Used",
    "options": "File Size",
-   "read_only": 1,
-   "permlevel": 1
+   "permlevel": 1,
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [
+  {
+   "group": "Hosting",
+   "link_doctype": "Suite Site",
+   "link_fieldname": "tenant"
+  },
   {
    "group": "Directory",
    "link_doctype": "Mail Domain",
@@ -269,7 +274,7 @@
    "link_fieldname": "tenant"
   }
  ],
- "modified": "2026-10-16 03:00:00.000000",
+ "modified": "2026-10-16 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Tenant",

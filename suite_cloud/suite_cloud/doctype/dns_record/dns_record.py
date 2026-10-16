@@ -30,7 +30,13 @@ class DNSRecord(Document):
         last_checked_at: DF.Datetime | None
         managed_by: DF.DynamicLink | None
         managed_by_doctype: DF.Literal[
-            "", "Stalwart Cluster", "Stalwart Node", "Egress Gateway", "Egress IP Pool"
+            "",
+            "Stalwart Cluster",
+            "Stalwart Node",
+            "Egress Gateway",
+            "Egress IP Pool",
+            "Mail Domain",
+            "Suite Site",
         ]
         priority: DF.Int
         ttl: DF.Int

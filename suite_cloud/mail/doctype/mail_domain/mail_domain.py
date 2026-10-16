@@ -18,9 +18,11 @@ from suite_cloud.mail.tenancy.addresses import (
     NOUNS,
     assert_addresses_deliverable,
     assert_domain_available,
+    assert_hosted_domain,
     validate_domain_name,
     validate_email_address,
 )
+from suite_cloud.suite_cloud.doctype.dns_record.dns_record import delete_managed_records
 from suite_cloud.utils import dkim_algorithms, get_config, log_exception, utc_iso
 
 # A change to any of these reaches the cluster; is_verified is set by hand only by managers.
@@ -59,6 +61,7 @@ class MailDomain(Document):
         domain_name: DF.Data
         egress_pool: DF.Link | None
         enabled: DF.Check
+        hosted: DF.Check
         is_verified: DF.Check
         last_refreshed_at: DF.Datetime | None
         last_verified_at: DF.Datetime | None
@@ -85,11 +88,7 @@ class MailDomain(Document):
         tenant = self.get_site()
         self.cluster = tenant.get_cluster().name
         if self.is_new() and not self.flags.adopting:
-            # Proof of control comes first: only someone who controls the domain's DNS learns
-            # whether another tenant already holds it.
-            if ownership.required(tenant):
-                ownership.assert_ownership(tenant, self.domain_name)
-            assert_domain_available(self.domain_name, self.tenant)
+            self.assert_can_be_added(tenant)
             tenant.assert_can_add_domain()
         if self.catch_all_address:
             self.catch_all_address = validate_email_address(self.catch_all_address)
@@ -112,6 +111,16 @@ class MailDomain(Document):
         if not self.is_new() and self.has_value_changed("publish_client_discovery_records"):
             # The zone already holds the certificate-bound records; only which tables list them changes.
             self.rebuild_dns_records(self.dns_zone_file or "")
+
+    def assert_can_be_added(self, tenant: Document) -> None:
+        if self.hosted:
+            assert_hosted_domain(self.domain_name, self.tenant)  # the zone is Suite Cloud's own
+            return
+        # Proof of control comes first: only someone who controls the domain's DNS learns
+        # whether another tenant already holds it.
+        if ownership.required(tenant):
+            ownership.assert_ownership(tenant, self.domain_name)
+        assert_domain_available(self.domain_name, self.tenant)
 
     def after_insert(self) -> None:
         payload = self.stalwart_payload()
@@ -154,6 +163,7 @@ class MailDomain(Document):
         for reports in (DMARC_REPORTS, TLS_REPORTS):
             reports.detach_domain(self.name)
         sync.push_destroy(self, "domains")
+        delete_managed_records(self.doctype, self.name)
 
     def after_delete(self) -> None:
         on_a_pool = self.egress_pool or frappe.db.get_value("Suite Tenant", self.tenant, "egress_pool")

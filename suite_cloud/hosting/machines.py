@@ -1,0 +1,338 @@
+"""Servers on Central: created, booted, checked and given the Suite app, one re-entrant step at a time.
+
+``status`` mirrors Central. Suite Cloud's own setup lives in ``host_verified``, ``suite_app_status``
+and ``ready_since``; an ``error`` stops it until an operator runs Retry.
+"""
+
+from datetime import timedelta
+
+import frappe
+from frappe import _
+from frappe.utils import get_datetime, now, now_datetime
+
+from suite_cloud.hosting import (
+    begin_step,
+    central,
+    commit,
+    output_tail,
+    run_in_background,
+    undo_step,
+    wait_for_task,
+)
+from suite_cloud.hosting.central import CentralRejectedError, CentralUnavailableError
+from suite_cloud.hosting.central.pilot import PilotNotReady, is_finished, task_id
+from suite_cloud.utils import get_config, log_error, log_exception
+
+PILOT_BOOT_DEADLINE = timedelta(minutes=30)
+FAILED_ACTION_STATUSES = ("Failed", "Timed Out")
+SERVER_STATUSES = (
+    "Pending",
+    "Provisioning",
+    "Deploying",
+    "Running",
+    "Paused",
+    "Stopped",
+    "Failed",
+    "Terminated",
+)
+SUITE_APP = "suite"
+
+
+def enqueue_provision(vm: str) -> None:
+    run_in_background("suite_cloud.hosting.machines.provision", f"virtual-machine:{vm}", vm=vm)
+
+
+def provision(vm: str) -> None:
+    """Runs the steps in order until one has to wait; the 5-minute fleet refresh comes back."""
+
+    for step in (create, accept, boot, verify_host, install_suite):
+        doc = frappe.get_doc("Virtual Machine", vm, for_update=True)
+        if doc.error or doc.status in ("Failed", "Terminated") or doc.ready_since:
+            return
+        if not run_step(doc, step):
+            return
+    frappe.get_doc("Virtual Machine", vm).db_set("ready_since", now())
+    commit()
+
+
+def run_step(doc, step) -> bool:
+    begin_step()
+    try:
+        done = step(doc)
+    except (PilotNotReady, CentralUnavailableError):
+        done = False
+    except CentralRejectedError as e:
+        stop(doc, central_message(e))
+        done = False
+    except Exception:
+        undo_step()
+        log_exception(f"Server {doc.name} failed at {step.__name__}", doc)
+        stop(doc, _("{0} failed; see the Error Log.").format(step.__name__))
+        done = False
+    commit()
+    return done
+
+
+# --- steps ----------------------------------------------------------------------
+
+
+def create(vm) -> bool:
+    """The same request key and arguments on a retry return the creation Central already has."""
+
+    if vm.central_action:
+        return True
+    status = central.get_central_client().create_server(**server_arguments(vm))
+    other = frappe.db.get_value(
+        "Virtual Machine", {"central_action": status["action"], "name": ["!=", vm.name]}
+    )
+    if other:
+        # Central folds identical pending creations into one, whatever their keys.
+        vm.db_set({"status": "Failed", "error": _("Central collapsed this creation into {0}.").format(other)})
+        return False
+    vm.db_set("central_action", status["action"])
+    return True
+
+
+def accept(vm) -> bool:
+    if vm.central_resource_id:
+        return True
+    status = central.get_central_client().action_status(vm.central_action)
+    if status.get("resource_id"):
+        vm.db_set({"central_resource_id": status["resource_id"], "status": "Provisioning"})
+        return True
+    if status.get("status") in FAILED_ACTION_STATUSES:
+        vm.db_set({"status": "Failed", "error": action_error_text(status)})
+    return False
+
+
+def boot(vm) -> bool:
+    if not has_booted(vm):
+        server = find_server(central.get_central_client().registry(), vm.central_resource_id)
+        if server:
+            apply_server(vm, server)
+    return has_booted(vm)
+
+
+def verify_host(vm) -> bool:
+    """Pilot registers sites under the region's proxy zone, in production mode."""
+
+    if vm.host_verified:
+        return True
+    pilot = vm.get_pilot_client()
+    try:
+        domains, settings = pilot.wildcard_domains(), pilot.settings()
+    except PilotNotReady:
+        if vm.booted_at and now_datetime() - get_datetime(vm.booted_at) > PILOT_BOOT_DEADLINE:
+            stop(vm, _("Pilot did not answer within 30 minutes of the server booting."))
+        return False
+    zone = domains[0].lstrip(".") if domains else None
+    vm.db_set(
+        {
+            "wildcard_zone": zone,
+            "letsencrypt_email_set": int(bool((settings.get("letsencrypt") or {}).get("email"))),
+        }
+    )
+    if problem := host_problem(vm, zone, settings):
+        stop(vm, problem)
+        return False
+    vm.db_set("host_verified", 1)
+    return True
+
+
+def host_problem(vm, zone: str | None, settings: dict) -> str | None:
+    proxy_zone = frappe.db.get_value("Region", vm.region, "proxy_zone")
+    if not zone:
+        return _("Pilot lists no wildcard domain, so sites on this server cannot be routed.")
+    if not proxy_zone:
+        return _("Set the proxy zone of region {0}.").format(vm.region)
+    if zone != proxy_zone:
+        return _("Pilot registers sites under {0}, but region {1} serves {2}.").format(
+            zone, vm.region, proxy_zone
+        )
+    if not (settings.get("production") or {}).get("enabled"):
+        return _("Pilot is not in production mode.")
+    return None
+
+
+def install_suite(vm) -> bool:
+    if vm.suite_app_status == "Installed":
+        return True
+    pilot = vm.get_pilot_client()
+    if not vm.suite_app_task:
+        if app := find_app(pilot.list_apps()):
+            return mark_installed(vm, app)
+        task = pilot.install_app(get_config("suite_app_repo"), get_config("suite_app_ref"))
+        vm.db_set({"suite_app_status": "Installing", "suite_app_task": task_id(task)})
+    task = wait_for_task(pilot, vm.suite_app_task)
+    if not is_finished(task):
+        return False
+    if task["status"] != "success":
+        vm.db_set({"suite_app_status": "Failed", "error": output_tail(pilot, vm.suite_app_task)})
+        return False
+    app = find_app(pilot.list_apps())
+    if not app:
+        vm.db_set({"suite_app_status": "Failed", "error": _("The install finished without the Suite app.")})
+        return False
+    return mark_installed(vm, app)
+
+
+def mark_installed(vm, app: dict) -> bool:
+    vm.db_set(
+        {
+            "suite_app_status": "Installed",
+            "suite_app_commit": app.get("current_commit"),
+            "suite_app_task": None,
+        }
+    )
+    return True
+
+
+# --- fleet ------------------------------------------------------------------------
+
+
+def refresh_fleet() -> None:
+    """Cron: one registry call updates every server, then unfinished ones are driven on."""
+
+    if not frappe.get_cached_doc("Suite Cloud Settings").is_central_configured:
+        return
+    try:
+        registry = central.get_central_client().registry()
+    except CentralUnavailableError:
+        return
+    vms = [frappe.get_doc("Virtual Machine", n) for n in frappe.get_all("Virtual Machine", pluck="name")]
+    for vm in vms:
+        if vm.central_resource_id and (server := find_server(registry, vm.central_resource_id)):
+            apply_server(vm, server)
+    report_unknown_creations(registry, {vm.central_action for vm in vms})
+    commit()
+    for vm in vms:
+        if vm.is_building:
+            enqueue_provision(vm.name)
+        elif vm.is_ready:
+            refresh_foreign_sites(vm)
+
+
+def refresh_foreign_sites(vm) -> None:
+    """Sites Pilot lists that are not Suite Sites take slots too."""
+
+    try:
+        names = set(vm.get_pilot_client().list_sites())
+    except PilotNotReady:
+        return
+    ours = set(
+        frappe.get_all(
+            "Suite Site", {"virtual_machine": vm.name, "hostname": ["is", "set"]}, pluck="hostname"
+        )
+    )
+    vm.db_set("foreign_site_count", len(names - ours))
+    commit()
+
+
+def report_unknown_creations(registry: dict, known: set) -> None:
+    """A creation in the team that no Virtual Machine started is someone else's spend."""
+
+    for creation in registry.get("creations") or []:
+        action = creation.get("action")
+        if action in known or frappe.cache.get_value(f"suite_cloud:unknown-creation:{action}"):
+            continue
+        frappe.cache.set_value(f"suite_cloud:unknown-creation:{action}", 1, expires_in_sec=86400)
+        log_error("Unknown Central server creation", frappe.as_json(creation))
+
+
+def retry(vm) -> None:
+    """Clears the error; a failed Central creation is asked to run again."""
+
+    if vm.central_action and not vm.central_resource_id and vm.status == "Failed":
+        try:
+            status = central.get_central_client().retry_action(vm.central_action)
+        except CentralRejectedError as e:
+            vm.db_set("error", central_message(e))
+            return
+        vm.db_set({"central_action": status.get("action") or vm.central_action})
+    vm.db_set({"status": "Pending" if vm.status == "Failed" else vm.status, "error": None})
+    enqueue_provision(vm.name)
+
+
+# --- Central --------------------------------------------------------------------------
+
+
+def resolve_server_arguments(vm) -> None:
+    """Fixed on insert, so a retried create_server sends exactly what the first one did."""
+
+    client = central.get_central_client()
+    vm.image_offering = vm.image_offering or get_config("central_image_offering")
+    vm.image_id = vm.image_id or newest_image(client.list_images(vm.region, vm.image_offering))
+    vm.plan = (
+        vm.plan
+        or get_config("central_plan")
+        or first_plan(client.eligible_plans(vm.region, vm.image_offering, vm.image_id))
+    )
+
+
+def newest_image(images: list[dict]) -> str:
+    """The newest image without a baked site: Suite sites are created on the server."""
+
+    usable = [i for i in images if str((i.get("tags") or {}).get("has_site")) != "1"]
+    if not usable:
+        frappe.throw(_("Central offers no image without a baked site for this region."))
+    return max(usable, key=lambda i: i.get("created_at") or 0)["id"]
+
+
+def first_plan(catalog: dict) -> str:
+    for rows in (catalog.get("plans") or {}).values():
+        for row in rows:
+            return row["name"]
+    frappe.throw(_("Central offers no plan for this image in the region."))
+
+
+def server_arguments(vm) -> dict:
+    return {
+        "region": vm.region,
+        "title": vm.title,
+        "request_key": vm.request_key,
+        "plan": vm.plan,
+        "offering": vm.image_offering,
+        "image_id": vm.image_id,
+        "has_public_ipv4": bool(vm.has_public_ipv4),
+        "has_public_ipv6": bool(vm.has_public_ipv6),
+    }
+
+
+def find_server(registry: dict, resource_id: str | None) -> dict | None:
+    return next((s for s in registry.get("servers") or [] if s.get("resource_id") == resource_id), None)
+
+
+def apply_server(vm, server: dict) -> None:
+    values = {
+        field: server.get(field)
+        for field in ("gateway_url", "pilot_audience", "ipv6_address", "public_ipv4", "public_ipv6")
+    }
+    if server.get("status") in SERVER_STATUSES:
+        values["status"] = server["status"]
+    if values.get("status") == "Running" and not vm.booted_at:
+        values["booted_at"] = now()
+    vm.db_set({**values, "last_synced_at": now()})
+
+
+def has_booted(vm) -> bool:
+    return vm.status == "Running" and bool(vm.gateway_url and vm.pilot_audience)
+
+
+def action_error_text(status: dict) -> str:
+    error = status.get("error") or {}
+    parts = [error.get("message") or _("Central reports the creation {0}.").format(status.get("status"))]
+    if error.get("remediation"):
+        parts.append(error["remediation"])
+    return " ".join(parts)
+
+
+def central_message(error: CentralRejectedError) -> str:
+    return " ".join(part for part in (str(error), error.remediation) if part)
+
+
+def find_app(apps: list[dict]) -> dict | None:
+    return next((app for app in apps if app.get("name") == SUITE_APP), None)
+
+
+def stop(vm, message: str) -> None:
+    vm.db_set("error", message)

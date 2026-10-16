@@ -25,6 +25,23 @@ CONFIG_KEYS = (
     "verify_stalwart_tls",
     "dmarc_report_retention_days",
     "tls_report_retention_days",
+    "central_url",
+    "central_team",
+    "central_api_key",
+    "default_region",
+    "central_image_offering",
+    "central_plan",
+    "max_sites_per_vm",
+    "min_free_site_slots",
+    "auto_create_vms",
+    "suite_app_repo",
+    "suite_app_ref",
+    "ready_sites_per_region",
+    "auto_place_tenants",
+    "allow_signup",
+    "site_dns_zone",
+    "tenant_mail_zone",
+    "notification_mailbox_local_part",
 )
 
 

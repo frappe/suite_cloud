@@ -1,0 +1,265 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-16 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "hostname",
+  "region",
+  "virtual_machine",
+  "column_break_main",
+  "status",
+  "tenant",
+  "label",
+  "primary_domain",
+  "progress_section",
+  "site_created",
+  "suite_configured",
+  "tenant_user_created",
+  "column_break_progress",
+  "pilot_task",
+  "attempts",
+  "activated_at",
+  "dropped_at",
+  "error_section",
+  "error",
+  "domains_tab",
+  "assign_site_domain",
+  "domains",
+  "mail_tab",
+  "assign_mail_domain",
+  "mail_domain",
+  "column_break_mail",
+  "notification_account",
+  "email_account_created"
+ ],
+ "fields": [
+  {
+   "description": "The site's name on Pilot, suite-<hex>.<server wildcard zone>.",
+   "fieldname": "hostname",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Hostname",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "region",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Region",
+   "options": "Region",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Chosen when the site is created: the server of the region with most free slots.",
+   "fieldname": "virtual_machine",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Server",
+   "options": "Virtual Machine",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nCreating\nReady\nAssigned\nConfiguring\nActive\nFailed\nDropped",
+   "read_only": 1
+  },
+  {
+   "description": "Empty while the site waits in the pool.",
+   "fieldname": "tenant",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Tenant",
+   "options": "Suite Tenant",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "The tenant's label: acme gives acme.<site zone> and acme.<tenant mail zone>.",
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "label": "Label",
+   "read_only": 1
+  },
+  {
+   "fieldname": "primary_domain",
+   "fieldtype": "Data",
+   "label": "Primary Domain",
+   "read_only": 1
+  },
+  {
+   "fieldname": "progress_section",
+   "fieldtype": "Section Break",
+   "label": "Progress"
+  },
+  {
+   "default": "0",
+   "fieldname": "site_created",
+   "fieldtype": "Check",
+   "label": "Site Created",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "suite_configured",
+   "fieldtype": "Check",
+   "label": "Suite Configured",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "tenant_user_created",
+   "fieldtype": "Check",
+   "label": "Tenant User Created",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_progress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "pilot_task",
+   "fieldtype": "Data",
+   "label": "Pilot Task",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Hostnames tried; one is taken by another server now and then.",
+   "fieldname": "attempts",
+   "fieldtype": "Int",
+   "label": "Attempts",
+   "read_only": 1
+  },
+  {
+   "fieldname": "activated_at",
+   "fieldtype": "Datetime",
+   "label": "Activated At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "dropped_at",
+   "fieldtype": "Datetime",
+   "label": "Dropped At",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.error",
+   "fieldname": "error_section",
+   "fieldtype": "Section Break",
+   "label": "Error"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "domains_tab",
+   "fieldtype": "Tab Break",
+   "label": "Domains"
+  },
+  {
+   "default": "1",
+   "description": "Give the site <label>.<site zone> as its primary domain once it is active.",
+   "fieldname": "assign_site_domain",
+   "fieldtype": "Check",
+   "label": "Assign Site Domain"
+  },
+  {
+   "fieldname": "domains",
+   "fieldtype": "Table",
+   "label": "Domains",
+   "options": "Suite Site Domain"
+  },
+  {
+   "fieldname": "mail_tab",
+   "fieldtype": "Tab Break",
+   "label": "Mail"
+  },
+  {
+   "default": "1",
+   "description": "Give the tenant <label>.<tenant mail zone> and send the site's mail from its notification account.",
+   "fieldname": "assign_mail_domain",
+   "fieldtype": "Check",
+   "label": "Assign Mail Domain"
+  },
+  {
+   "fieldname": "mail_domain",
+   "fieldtype": "Link",
+   "label": "Mail Domain",
+   "options": "Mail Domain",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_mail",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "notification_account",
+   "fieldtype": "Link",
+   "label": "Notification Account",
+   "options": "Mail Account",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "The site sends through the notification account by default.",
+   "fieldname": "email_account_created",
+   "fieldtype": "Check",
+   "label": "Email Account Created",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-16 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hosting",
+ "name": "Suite Site",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Suite Tenant"
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "hostname,label",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "hostname",
+ "track_changes": 1
+}

@@ -1,0 +1,178 @@
+from unittest.mock import patch
+
+import frappe
+from frappe.tests import IntegrationTestCase
+
+from suite_cloud.hosting import capacity, sites
+from suite_cloud.hosting.tests.fakes import REGION
+from suite_cloud.hosting.tests.fixtures import SITE_ZONE, HostingFixtures
+
+
+class TestSuiteSite(HostingFixtures, IntegrationTestCase):
+    def setUp(self) -> None:
+        self.setup_hosting(tenant_mail_zone=None)  # mail has its own tests
+        self.vm = self.make_vm()
+        self.tenant = self.make_hosted_tenant()
+
+    def test_a_pooled_site_stops_at_ready(self) -> None:
+        site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+
+        site.reload()
+        self.assertEqual(site.virtual_machine, self.vm.name)
+        self.assertRegex(site.hostname, rf"^suite-[0-9a-f]{{8}}\.{REGION}\.frappe\.test$")
+        self.assertEqual((site.status, site.site_created), ("Ready", 1))
+        self.assertIn(site.hostname, self.pilot.sites)
+        self.assertEqual(self.pilot.calls[-1][2], f"{site.name}:0")
+
+    def test_a_claimed_site_is_configured_and_turns_active(self) -> None:
+        pooled = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+
+        name = capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        site = self.site(name)
+        self.assertEqual(name, pooled.name)
+        self.assertEqual((site.status, site.tenant, site.label), ("Active", self.tenant.name, "acme"))
+        settings = self.site_api.singles["Suite Settings"]
+        self.assertEqual(settings["suite_cloud_tenant"], self.tenant.name)
+        self.assertEqual(settings["suite_cloud_secret"], self.tenant.get_password("secret"))
+        methods = [call[0] for call in self.site_api.calls]
+        self.assertEqual(methods, ["suite.api.account.mark_onboarded", "validate_suite_cloud_credentials"])
+        user = self.site_api.docs[("User", self.tenant.user)]
+        self.assertEqual({r["role"] for r in user["roles"]}, set(sites.TENANT_SITE_ROLES))
+        self.assertNotIn("new_password", user)  # no signup, no password
+
+    def test_without_a_ready_site_one_is_created_for_the_tenant(self) -> None:
+        name = capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        self.assertEqual(self.site(name).status, "Active")
+
+    def test_a_site_with_no_room_waits_and_a_server_is_added(self) -> None:
+        self.set_setting("auto_create_vms", 1)
+        self.vm.db_set("enabled", 0)
+
+        name = capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        new_vm = frappe.get_all(
+            "Virtual Machine", {"region": REGION, "name": ["!=", self.vm.name]}, pluck="name"
+        )
+        self.assertEqual(len(new_vm), 1)
+        site = self.site(name)
+        self.assertEqual(site.status, "Pending")  # placed by the next poll, once the server is ready
+        sites.poll_pending_sites()
+        self.assertEqual(self.site(name).virtual_machine, new_vm[0])
+        self.assertEqual(self.site(name).status, "Active")
+
+    def test_a_hostname_taken_elsewhere_is_rerolled(self) -> None:
+        self.pilot.taken.add("suite-aaaaaaaa")
+        with patch("suite_cloud.hosting.sites.secrets.token_hex", side_effect=["aaaaaaaa", "bbbbbbbb"]):
+            site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+
+        site.reload()
+        self.assertEqual((site.status, site.attempts), ("Ready", 1))
+        self.assertTrue(site.hostname.startswith("suite-bbbbbbbb."))
+        keys = [call[2] for call in self.pilot.calls if call[0] == "create_site"]
+        self.assertEqual(keys, [f"{site.name}:0", f"{site.name}:1"])
+
+    def test_crash_after_the_site_exists_is_picked_up(self) -> None:
+        site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+        site.db_set({"status": "Creating", "site_created": 0, "pilot_task": None})
+
+        sites.provision(site.name)
+
+        self.assertEqual(self.site(site.name).status, "Ready")
+        creates = [call for call in self.pilot.calls if call[0] == "create_site"]
+        self.assertEqual(len(creates), 1)  # found on the server, not created twice
+
+    def test_a_lost_task_answer_returns_the_same_task(self) -> None:
+        self.pilot.hold_tasks = True
+        site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+        task = self.site(site.name).pilot_task
+        site.db_set("pilot_task", None)  # as if the answer to create_site was lost
+        tasks = len(self.pilot.tasks)
+
+        sites.provision(site.name)
+
+        self.assertEqual(self.site(site.name).pilot_task, task)
+        self.assertEqual(len(self.pilot.tasks), tasks)
+        self.pilot.finish(task)
+        sites.provision(site.name)
+        self.assertEqual(self.site(site.name).status, "Ready")
+
+    def test_a_failed_create_fails_the_site_and_retry_resumes(self) -> None:
+        self.pilot.create_site = lambda name, apps, key: self.pilot.task("failed", "Error: disk full")
+        site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+
+        site.reload()
+        self.assertEqual(site.status, "Failed")
+        self.assertIn("disk full", site.error)
+
+        del self.pilot.create_site
+        site.retry()
+        self.assertEqual(self.site(site.name).status, "Ready")
+
+    def test_active_comes_before_the_site_domain(self) -> None:
+        self.pilot.attached = None  # any domain call would fail
+        name = capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        site = self.site(name)
+        self.assertEqual(site.status, "Active")
+        self.assertIn("Site domain", site.error)
+
+    def test_the_site_domain_is_skipped_without_a_letsencrypt_email(self) -> None:
+        self.vm.db_set("letsencrypt_email_set", 0)
+        name = capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        site = self.site(name)
+        self.assertEqual(site.status, "Active")
+        self.assertIn("Let's Encrypt", site.error)
+        self.assertFalse(site.pending_follow_ups())
+        self.assertFalse(site.domains)
+
+    def test_drop_site_frees_the_slot(self) -> None:
+        name = capacity.claim_site(self.tenant.name, "acme", REGION)
+        hostname = self.site(name).hostname
+        self.assertTrue(frappe.db.exists("DNS Record", {"managed_by": name, "dns_zone": SITE_ZONE}))
+
+        self.site(name).drop_site()
+
+        site = self.site(name)
+        self.assertEqual(site.status, "Dropped")
+        self.assertNotIn(hostname, self.pilot.sites)
+        self.assertFalse(frappe.db.exists("DNS Record", {"managed_by": name}))
+        self.assertEqual(frappe.get_doc("Virtual Machine", self.vm.name).site_count, 0)
+
+
+class TestCapacity(HostingFixtures, IntegrationTestCase):
+    def setUp(self) -> None:
+        self.setup_hosting(tenant_mail_zone=None)
+
+    def test_the_pool_is_kept_full_without_duplicates(self) -> None:
+        self.set_setting("ready_sites_per_region", 2)
+        self.make_vm()
+
+        capacity.ensure_site_pool()
+        capacity.ensure_site_pool()
+
+        statuses = frappe.get_all("Suite Site", {"region": REGION}, pluck="status")
+        self.assertEqual(statuses, ["Ready", "Ready"])
+
+    def test_the_pool_stops_at_the_server_limit(self) -> None:
+        self.set_setting("ready_sites_per_region", 5)
+        self.make_vm(max_sites=2)
+
+        capacity.ensure_site_pool()
+
+        self.assertEqual(frappe.db.count("Suite Site", {"region": REGION}), 2)
+
+    def test_capacity_adds_one_server_per_run_below_the_threshold(self) -> None:
+        self.set_setting("auto_create_vms", 1)
+        self.central.boot = False  # stays building
+
+        capacity.ensure_capacity()
+        capacity.ensure_capacity()  # the building server's slots count
+
+        self.assertEqual(frappe.db.count("Virtual Machine", {"region": REGION}), 1)
+
+    def test_capacity_does_nothing_when_off(self) -> None:
+        capacity.ensure_capacity()
+        self.assertEqual(frappe.db.count("Virtual Machine", {"region": REGION}), 0)

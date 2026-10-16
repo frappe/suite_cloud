@@ -33,7 +33,34 @@
   "acme_contact_email",
   "dns_tab",
   "dns_section",
-  "default_dns_ttl"
+  "default_dns_ttl",
+  "frappe_cloud_tab",
+  "central_section",
+  "central_url",
+  "central_team",
+  "column_break_central",
+  "central_api_key",
+  "central_api_secret",
+  "servers_section",
+  "default_region",
+  "central_image_offering",
+  "central_plan",
+  "column_break_servers",
+  "max_sites_per_vm",
+  "min_free_site_slots",
+  "auto_create_vms",
+  "suite_app_section",
+  "suite_app_repo",
+  "column_break_suite_app",
+  "suite_app_ref",
+  "sites_section",
+  "ready_sites_per_region",
+  "auto_place_tenants",
+  "allow_signup",
+  "column_break_sites",
+  "site_dns_zone",
+  "tenant_mail_zone",
+  "notification_mailbox_local_part"
  ],
  "fields": [
   {
@@ -225,12 +252,180 @@
    "fieldtype": "Int",
    "label": "Default DNS TTL (Seconds)",
    "reqd": 1
+  },
+  {
+   "fieldname": "frappe_cloud_tab",
+   "fieldtype": "Tab Break",
+   "label": "Frappe Cloud"
+  },
+  {
+   "fieldname": "central_section",
+   "fieldtype": "Section Break",
+   "label": "Central"
+  },
+  {
+   "description": "Address of Frappe Cloud's control plane, e.g. https://central.frappe.cloud. Suite Cloud creates its servers there.",
+   "fieldname": "central_url",
+   "fieldtype": "Data",
+   "label": "Central URL",
+   "options": "URL"
+  },
+  {
+   "description": "The team that owns Suite Cloud's servers. The API key's user needs a team-wide role with server:create, server:view, cluster:view and server:console in it.",
+   "fieldname": "central_team",
+   "fieldtype": "Data",
+   "label": "Central Team"
+  },
+  {
+   "fieldname": "column_break_central",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "central_api_key",
+   "fieldtype": "Data",
+   "label": "Central API Key"
+  },
+  {
+   "fieldname": "central_api_secret",
+   "fieldtype": "Password",
+   "label": "Central API Secret"
+  },
+  {
+   "fieldname": "servers_section",
+   "fieldtype": "Section Break",
+   "label": "Servers"
+  },
+  {
+   "description": "Where a tenant's site goes when its signup names no region.",
+   "fieldname": "default_region",
+   "fieldtype": "Link",
+   "label": "Default Region",
+   "options": "Region"
+  },
+  {
+   "default": "pilot",
+   "description": "Central image offering new servers boot from; its newest image without a baked site is used.",
+   "fieldname": "central_image_offering",
+   "fieldtype": "Data",
+   "label": "Image Offering",
+   "reqd": 1
+  },
+  {
+   "description": "Central plan of new servers. Blank takes the first plan Central offers in the region.",
+   "fieldname": "central_plan",
+   "fieldtype": "Data",
+   "label": "Plan"
+  },
+  {
+   "fieldname": "column_break_servers",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "10",
+   "description": "How many sites a new server takes, Suite sites and any others on it together.",
+   "fieldname": "max_sites_per_vm",
+   "fieldtype": "Int",
+   "label": "Sites per Server",
+   "reqd": 1
+  },
+  {
+   "default": "2",
+   "description": "With Create Servers Automatically on, a region with fewer free slots than this gets one more server, at most one per hour.",
+   "fieldname": "min_free_site_slots",
+   "fieldtype": "Int",
+   "label": "Minimum Free Site Slots",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Add a server to a region that runs short of free site slots. Each server is billed to the Central team.",
+   "fieldname": "auto_create_vms",
+   "fieldtype": "Check",
+   "label": "Create Servers Automatically"
+  },
+  {
+   "fieldname": "suite_app_section",
+   "fieldtype": "Section Break",
+   "label": "Suite App"
+  },
+  {
+   "default": "https://github.com/frappe/suite",
+   "description": "Git repository of the Suite app each server installs.",
+   "fieldname": "suite_app_repo",
+   "fieldtype": "Data",
+   "label": "Repository",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_suite_app",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "develop",
+   "description": "What new servers install. Servers already set up keep the commit they installed.",
+   "fieldname": "suite_app_ref",
+   "fieldtype": "Data",
+   "label": "Branch or Tag",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sites_section",
+   "fieldtype": "Section Break",
+   "label": "Sites"
+  },
+  {
+   "default": "2",
+   "description": "Sites with Suite installed kept waiting in each enabled region, so a signup gets one at once. 0 creates every site on demand.",
+   "fieldname": "ready_sites_per_region",
+   "fieldtype": "Int",
+   "label": "Ready Sites per Region",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "A new Suite Site tenant without a Stalwart cluster gets the active cluster that serves its region, else the default cluster.",
+   "fieldname": "auto_place_tenants",
+   "fieldtype": "Check",
+   "label": "Place New Tenants on a Cluster"
+  },
+  {
+   "default": "0",
+   "description": "Accept signups through the public signup API. Each one creates a tenant and claims a site.",
+   "fieldname": "allow_signup",
+   "fieldtype": "Check",
+   "label": "Allow Signup"
+  },
+  {
+   "fieldname": "column_break_sites",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Zone under which each site gets <label>.<zone> as its primary domain. It needs a DNS provider and must differ from the tenant mail zone: a CNAME cannot share a name with MX and TXT records.",
+   "fieldname": "site_dns_zone",
+   "fieldtype": "Link",
+   "label": "Site DNS Zone",
+   "options": "DNS Zone"
+  },
+  {
+   "description": "Zone under which each tenant gets <label>.<zone> as its mail domain. It needs a DNS provider and must not be the zone of a Stalwart cluster.",
+   "fieldname": "tenant_mail_zone",
+   "fieldtype": "Link",
+   "label": "Tenant Mail Zone",
+   "options": "DNS Zone"
+  },
+  {
+   "default": "notification",
+   "description": "Local part of the account each site sends its own mail from, e.g. notification for notification@acme.<tenant mail zone>.",
+   "fieldname": "notification_mailbox_local_part",
+   "fieldtype": "Data",
+   "label": "Notification Mailbox",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-16 02:30:00.000000",
+ "modified": "2026-10-16 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

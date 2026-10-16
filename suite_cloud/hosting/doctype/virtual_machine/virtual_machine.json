@@ -1,0 +1,336 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-16 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "region",
+  "max_sites",
+  "column_break_main",
+  "enabled",
+  "status",
+  "site_count",
+  "foreign_site_count",
+  "server_section",
+  "image_offering",
+  "image_id",
+  "plan",
+  "column_break_server",
+  "has_public_ipv4",
+  "has_public_ipv6",
+  "central_section",
+  "request_key",
+  "central_action",
+  "central_resource_id",
+  "column_break_central",
+  "gateway_url",
+  "pilot_audience",
+  "ipv6_address",
+  "public_ipv4",
+  "public_ipv6",
+  "host_section",
+  "wildcard_zone",
+  "host_verified",
+  "letsencrypt_email_set",
+  "column_break_host",
+  "suite_app_status",
+  "suite_app_task",
+  "suite_app_commit",
+  "state_section",
+  "ready_since",
+  "booted_at",
+  "last_synced_at",
+  "column_break_state",
+  "error"
+ ],
+ "fields": [
+  {
+   "description": "suite-<region>-<name>, the server's name on Central.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "read_only": 1
+  },
+  {
+   "fieldname": "region",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Region",
+   "options": "Region",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Sites this server takes, Suite sites and others together. Defaults to Sites per Server in Suite Cloud Settings.",
+   "fieldname": "max_sites",
+   "fieldtype": "Int",
+   "label": "Max Sites",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "New sites may be placed here. Decommission clears it; existing sites stay.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Accepts Sites"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nProvisioning\nDeploying\nRunning\nPaused\nStopped\nFailed\nTerminated",
+   "read_only": 1
+  },
+  {
+   "description": "Suite Sites on this server that are not dropped.",
+   "fieldname": "site_count",
+   "fieldtype": "Int",
+   "is_virtual": 1,
+   "label": "Suite Sites",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Sites Pilot lists that are not Suite Sites, such as the baked site.local.",
+   "fieldname": "foreign_site_count",
+   "fieldtype": "Int",
+   "label": "Other Sites",
+   "read_only": 1
+  },
+  {
+   "fieldname": "server_section",
+   "fieldtype": "Section Break",
+   "label": "Server"
+  },
+  {
+   "fieldname": "image_offering",
+   "fieldtype": "Data",
+   "label": "Image Offering",
+   "read_only": 1
+  },
+  {
+   "fieldname": "image_id",
+   "fieldtype": "Data",
+   "label": "Image",
+   "read_only": 1
+  },
+  {
+   "fieldname": "plan",
+   "fieldtype": "Data",
+   "label": "Plan",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_server",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Sites are reached through Central's proxy; a public address is optional. IPv4 needs an IP rate in the region.",
+   "fieldname": "has_public_ipv4",
+   "fieldtype": "Check",
+   "label": "Public IPv4",
+   "set_only_once": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "has_public_ipv6",
+   "fieldtype": "Check",
+   "label": "Public IPv6",
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "central_section",
+   "fieldtype": "Section Break",
+   "label": "Central"
+  },
+  {
+   "description": "Sent with create_server, so a retried call returns the same creation.",
+   "fieldname": "request_key",
+   "fieldtype": "Data",
+   "label": "Request Key",
+   "read_only": 1
+  },
+  {
+   "fieldname": "central_action",
+   "fieldtype": "Data",
+   "label": "Central Action",
+   "read_only": 1
+  },
+  {
+   "fieldname": "central_resource_id",
+   "fieldtype": "Data",
+   "label": "Central Server",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_central",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "gateway_url",
+   "fieldtype": "Data",
+   "label": "Gateway URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "pilot_audience",
+   "fieldtype": "Data",
+   "label": "Pilot Audience",
+   "read_only": 1
+  },
+  {
+   "fieldname": "ipv6_address",
+   "fieldtype": "Data",
+   "label": "Private IPv6",
+   "read_only": 1
+  },
+  {
+   "fieldname": "public_ipv4",
+   "fieldtype": "Data",
+   "label": "Public IPv4 Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "public_ipv6",
+   "fieldtype": "Data",
+   "label": "Public IPv6 Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "host_section",
+   "fieldtype": "Section Break",
+   "label": "Host"
+  },
+  {
+   "description": "The zone Pilot registers new sites under.",
+   "fieldname": "wildcard_zone",
+   "fieldtype": "Data",
+   "label": "Wildcard Zone",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "The wildcard zone matches the region's proxy zone and production mode is on.",
+   "fieldname": "host_verified",
+   "fieldtype": "Check",
+   "label": "Host Verified",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Pilot can request certificates, which custom domains need.",
+   "fieldname": "letsencrypt_email_set",
+   "fieldtype": "Check",
+   "label": "Let's Encrypt Email Set",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_host",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "fieldname": "suite_app_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Suite App",
+   "options": "Pending\nInstalling\nInstalled\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suite_app_task",
+   "fieldtype": "Data",
+   "label": "Suite App Task",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suite_app_commit",
+   "fieldtype": "Data",
+   "label": "Suite App Commit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "state_section",
+   "fieldtype": "Section Break",
+   "label": "State"
+  },
+  {
+   "fieldname": "ready_since",
+   "fieldtype": "Datetime",
+   "label": "Ready Since",
+   "read_only": 1
+  },
+  {
+   "description": "When Central first reported the server running. Pilot gets 30 minutes from then to answer.",
+   "fieldname": "booted_at",
+   "fieldtype": "Datetime",
+   "label": "Booted At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_synced_at",
+   "fieldtype": "Datetime",
+   "label": "Last Synced At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_state",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Suite Site",
+   "link_fieldname": "virtual_machine"
+  }
+ ],
+ "modified": "2026-10-16 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hosting",
+ "name": "Virtual Machine",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "title",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

@@ -29,6 +29,7 @@ TENANT_OWNED_DOCTYPES = (
     "Mailing List Recipient",
     "DMARC Report",
     "TLS Report",
+    "Suite Site",
 )
 permission_query_conditions = {
     "Suite Tenant": f"{PERMISSIONS}.tenant_query_conditions",
@@ -49,6 +50,9 @@ scheduler_events = {
             "suite_cloud.suite_cloud.doctype.server_job.server_job.retry_failed_jobs",
             "suite_cloud.mail.doctype.stalwart_node.stalwart_node.poll_pending_nodes",
             "suite_cloud.mail.doctype.egress_gateway.egress_gateway.poll_pending_gateways",
+            "suite_cloud.hosting.machines.refresh_fleet",
+            "suite_cloud.hosting.sites.poll_pending_sites",
+            "suite_cloud.hosting.capacity.ensure_site_pool",
         ],
     },
     "hourly": [
@@ -56,6 +60,7 @@ scheduler_events = {
         "suite_cloud.mail.doctype.mail_domain.mail_domain.verify_unverified_domains",
         "suite_cloud.mail.doctype.dmarc_report.dmarc_report.fetch_all_clusters",
         "suite_cloud.mail.doctype.tls_report.tls_report.fetch_all_clusters",
+        "suite_cloud.hosting.capacity.ensure_capacity",
     ],
     "daily": [
         "suite_cloud.suite_cloud.doctype.dns_record.dns_record.verify_all_dns_records",
@@ -64,6 +69,8 @@ scheduler_events = {
         "suite_cloud.mail.doctype.egress_ip_pool.egress_ip_pool.verify_all_ptr_records",
         "suite_cloud.mail.doctype.dmarc_report.dmarc_report.prune_expired_reports",
         "suite_cloud.mail.doctype.tls_report.tls_report.prune_expired_reports",
+        "suite_cloud.hosting.doctype.region.region.sync_regions",
+        "suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request.expire_requests",
     ],
 }
 

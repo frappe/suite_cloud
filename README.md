@@ -28,12 +28,13 @@ Suite Cloud ── DNS provider API ──▶ publishes records in each DNS Zone
 Suite Cloud ── public resolvers ──▶ checks the records a customer domain must carry
 ```
 
-The app has two modules, so one CODEOWNERS line can cover each product:
+The app has three modules, so one CODEOWNERS line can cover each product:
 
 | Module | Folder | Holds |
 | --- | --- | --- |
 | **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Tenant, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
 | **Mail** | `suite_cloud/mail` | The mail product: Stalwart Store, Cluster, Node, Egress Gateway and IP Pool, the mail directory (Mail Domain, Mail Account, Mail Group, Mailing List), and the `stalwart`, `cluster` and `tenancy` packages. |
+| **Hosting** | `suite_cloud/hosting` | Suite sites on Frappe Cloud: Region, Virtual Machine, Suite Site, Suite Tenant Request, the `central` clients (Central, Pilot, the site's REST API) and the `machines`, `sites`, `domains` and `capacity` steps. |
 
 The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what any product needs
 (authentication, `ping`, the tenant profile) and `suite_cloud.api.mail` for the mail directory.
@@ -53,6 +54,10 @@ The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what a
 | **Mail Domain, Mail Account, Mail Group, Mailing List** | The mail directory of a tenant. Saving one of these pushes it to the cluster in the same step, so the records and the cluster never drift apart. Each carries the id Stalwart gave it. |
 | **DMARC Report** | One DMARC aggregate report another receiver sent about a domain, copied hourly from the cluster that intercepted it (Stalwart parses reports mailed to `postmaster@`). Attributed to the tenant that holds the domain, and only when the report was addressed to one of that tenant's domains; kept for the configured retention, and read by tenants through the API. |
 | **TLS Report** | One TLS aggregate report (RFC 8460) a sending server made about delivering to a domain: sessions that negotiated TLS as the domain's MTA-STS or DANE policy asks, sessions that failed and why. Copied, attributed, kept and served the same way as DMARC reports, with its own retention; a report whose policies name more than one domain is shown to no tenant. |
+| **Region** | A Frappe Cloud region, synced from Central. Sites and servers go only to regions an operator enabled; the operator also enters the proxy zone Central serves the region's sites under. |
+| **Virtual Machine** | A Frappe Cloud server Suite Cloud created in its Central team. Each one boots Pilot, is checked against its region's proxy zone and gets the Suite app from git; it then takes up to its Max Sites sites. |
+| **Suite Site** | A Suite site on a server: waiting in the region's pool, or assigned to a tenant, connected to Suite Cloud, given the tenant's user, the domain `<label>.<site zone>` and a mail domain `<label>.<tenant mail zone>` with a `notification@` account the site sends from. |
+| **Suite Tenant Request** | One signup through the public signup API: the email, the label, the password until the site's user exists, and the one-time code check. |
 | **Suite Cloud Settings** | Defaults: DNS time-to-live, Stalwart version and download URLs, certificate settings, the public URL of this Suite Cloud, job timeout. |
 
 ## Install
@@ -133,6 +138,18 @@ connection and leaves from the pool's addresses. The `spf.c1.frappemail.com` rec
 domains include always lists every node and pool address, so SPF stays valid whichever path a
 message takes.
 
+## Hosting Suite sites on Frappe Cloud
+
+Frappe Cloud's control plane, Central, creates servers; Pilot, the bench agent on each server, creates sites on it. Central has no API for sites, so Suite Cloud asks Central for a bench token (`get_bench_link`) and drives Pilot's Admin API with it.
+
+1. **Central.** Create a user for Suite Cloud with an API key, and a team where that user holds a team-wide role with `server:create`, `server:view`, `cluster:view` and `server:console`. The team's spend limit bounds how many servers Suite Cloud can create. Enter the URL, team, key and secret in the **Frappe Cloud** tab of Suite Cloud Settings and run **Test Central Connection**.
+2. **Regions.** Run **Sync Regions**, then enable the regions to host in and enter each one's proxy zone, `<region>.<Central wildcard domain>`. Pick the default region.
+3. **Zones.** Pick a site DNS zone and a tenant mail zone, two different DNS Zones with a DNS provider: `acme.<site zone>` is a CNAME, which cannot sit next to the MX and TXT records of `acme.<tenant mail zone>`. The tenant mail zone must not be a cluster's zone.
+4. **Servers.** Create a Virtual Machine in a region, or turn on **Create Servers Automatically**. Each one is created on Central, waits for Pilot, is checked (its wildcard zone must equal the region's proxy zone, production mode on), and installs Suite from the repository and branch in Settings. A server without a Let's Encrypt email on Pilot takes sites but no custom domains.
+5. **Sites.** Each enabled region keeps **Ready Sites per Region** sites with Suite installed. **Create Hosted Site** on a Suite Tenant, or a signup, claims the oldest one, else creates one. The site is connected to Suite Cloud (Suite Settings, Mail Settings, onboarding), gets the tenant's user and turns **Active**; the site domain and the mail domain follow and never hold up Active.
+
+**Login as Administrator** on a Suite Site opens a fresh session; **Drop Site** deletes the site, its mail domain and its records. Signup is off until **Allow Signup** is checked; see [docs/api/signup.md](docs/api/signup.md).
+
 ## API
 
 Suite Cloud serves one REST API at `/api/v2/method/suite_cloud.api.<module>.<method>`, documented in [docs/api](docs/api/README.md).
@@ -192,9 +209,9 @@ All configuration lives in Suite Cloud Settings; `site_config.json` is not consu
 
 | When | What |
 | --- | --- |
-| Every 5 minutes | Retry failed Server Jobs; poll nodes that are provisioning or draining. |
-| Hourly | Verify unverified domains, except those set to skip it; refresh the DNS records of domains whose DKIM keys are not all stored yet; copy the DMARC and TLS reports each cluster received since the last run. |
-| Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses; drop DMARC and TLS reports older than their retention. |
+| Every 5 minutes | Retry failed Server Jobs; poll nodes that are provisioning or draining; read every Virtual Machine from Central and drive unfinished ones on; drive Suite Sites that are mid-way; top up each region's pool of ready sites. |
+| Hourly | Verify unverified domains, except those set to skip it; refresh the DNS records of domains whose DKIM keys are not all stored yet; copy the DMARC and TLS reports each cluster received since the last run; add a server to a region short of free site slots, when servers are created automatically. |
+| Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses; drop DMARC and TLS reports older than their retention; sync regions from Central; expire stale signups and forget their passwords. |
 
 ## Development
 
@@ -203,6 +220,7 @@ bench --site yoursite run-tests --app suite_cloud --test-category all
 ```
 
 Tests live next to their module: `suite_cloud/tests` for the generic app (settings, fixtures)
+`suite_cloud/hosting/tests` for hosting, with fakes of Central, Pilot and the site's REST API,
 and `suite_cloud/mail/tests` for mail, including the fake Stalwart
 (`suite_cloud/mail/tests/fake_stalwart.py`), an in-process JMAP management server the real
 client talks to unchanged. Nothing reaches a real server or a real DNS provider. Tests that create
@@ -214,7 +232,7 @@ of its own to see where they take a message: from a temporary directory, on loop
 a local sink as its only way out. It needs a `stalwart` on `PATH` of the version new clusters
 install and is skipped without one; CI installs it.
 
-CI (`.github/workflows/ci.yml`) runs one job per module folder (Core, Mail) plus Ruff, so a
+CI (`.github/workflows/ci.yml`) runs one job per module folder (Core, Mail, Hosting) plus Ruff, so a
 future product adds a matrix entry rather than a workflow.
 
 The bootstrap path has been run end to end against a real single-node cluster on Stalwart

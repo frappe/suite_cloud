@@ -10,6 +10,7 @@ Suite Cloud exposes one REST API over Frappe's v2 method endpoint. The **tenant 
 | [Groups](groups.md) | Groups, their members and aliases |
 | [Mailing lists](mailing-lists.md) | Lists, their aliases and recipients |
 | [Reports](reports.md) | DMARC and TLS reports and summaries |
+| [Signup](signup.md) | The public signup that creates a tenant and its hosted site |
 
 ## Base URL
 

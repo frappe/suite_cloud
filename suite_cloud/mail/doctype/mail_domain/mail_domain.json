@@ -12,6 +12,7 @@
   "enabled",
   "description",
   "stalwart_id",
+  "hosted",
   "settings_section",
   "catch_all_address",
   "sub_addressing",
@@ -93,6 +94,15 @@
    "label": "Stalwart ID",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "The tenant's mail domain under the tenant mail zone, created with its hosted site. Suite Cloud publishes its records; the tenant cannot change or delete it.",
+   "fieldname": "hosted",
+   "fieldtype": "Check",
+   "label": "Hosted",
+   "read_only": 1,
+   "set_only_once": 1
   },
   {
    "fieldname": "settings_section",
@@ -275,7 +285,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-10-16 03:00:00.000000",
+ "modified": "2026-10-16 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Domain",

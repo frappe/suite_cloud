@@ -22,6 +22,7 @@ from suite_cloud.mail.doctype.mail_account.mail_account import (
 from suite_cloud.mail.tenancy import account_credentials, sync
 from suite_cloud.mail.tenancy import quotas as quota_rows
 from suite_cloud.mail.tenancy.account_credentials import API_KEYS, APP_PASSWORDS, Kind
+from suite_cloud.mail.tenancy.hosted_domain import assert_not_hosted
 from suite_cloud.mail.tenancy.usage import used_disk_by_name
 from suite_cloud.utils import local_datetime
 
@@ -154,6 +155,7 @@ def update_account(
     makes the account send-only or lets it receive again; left out, it stays as it is."""
 
     doc = owned("Mail Account", email)
+    assert_not_hosted(doc)
     for field, value in {
         "display_name": display_name,
         "description": description,
@@ -173,6 +175,7 @@ def update_account(
 @mail_api
 def set_account_enabled(email: str, enabled: bool) -> dict:
     doc = owned("Mail Account", email)
+    assert_not_hosted(doc)
     doc.set_enabled(sbool(enabled))
     return doc.to_api()
 
@@ -180,7 +183,9 @@ def set_account_enabled(email: str, enabled: bool) -> dict:
 @frappe.whitelist(methods=["PUT"])
 @mail_api
 def set_password(email: str, password: str) -> None:
-    owned("Mail Account", email).set_password(password)
+    doc = owned("Mail Account", email)
+    assert_not_hosted(doc)
+    doc.set_password(password)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -356,5 +361,7 @@ def set_groups(email: str, groups: list[str] | str | None = None) -> dict:
 @frappe.whitelist(methods=["DELETE"])
 @mail_api
 def delete_account(email: str) -> None:
-    owned("Mail Account", email).delete(ignore_permissions=True)
+    doc = owned("Mail Account", email)
+    assert_not_hosted(doc)
+    doc.delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204

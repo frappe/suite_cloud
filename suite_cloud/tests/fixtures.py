@@ -13,6 +13,7 @@ def configure_settings(**overrides) -> None:
     settings.sign_with_ed25519 = 0  # tests assume the default; the local site may have it on
     settings.skip_domain_verification = 0  # likewise: a development cloud may have it on
     settings.spam_filter_rules_version = "v3.0.1"  # a site set up before the field has it empty
+    settings.auto_place_tenants = 0  # tests that need a cluster name it; hosting tests turn this on
     for key, value in overrides.items():
         settings.set(key, value)
     settings.save()
