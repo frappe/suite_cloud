@@ -2,7 +2,7 @@
 
 Module `suite_cloud.api.signup`. A visitor asks for a Frappe Suite workspace, proves their email address, and gets a hosted site. These methods need no credentials. They answer only while **Allow Signup** is checked in Suite Cloud Settings; otherwise they answer 403 with the type `SignupClosedError`.
 
-Every method is a POST, whatever its name: the password, the code and the request key travel in the JSON body, never in a URL. Each method is rate limited per IP address.
+Every method is a POST, whatever its name: the code and the request key travel in the JSON body, never in a URL. Each method is rate limited per IP address. The user does not choose a password: Suite Cloud generates one and mails it, with the site's link, once the site is ready.
 
 ## `create_request`
 
@@ -13,7 +13,6 @@ Every method is a POST, whatever its name: the password, the code and the reques
 | `email` | string | Receives the one-time code and becomes the owner's login |
 | `full_name` | string | Required |
 | `label` | string | Lowercase letters, digits and dashes. Names the site `<label>.<site zone>` and the mail domain `<label>.<tenant mail zone>` |
-| `password` | string | The password for the new site; checked against the site's minimum password score |
 | `timezone` | string | Optional, e.g. `Asia/Kolkata`; the site's time zone |
 
 Mails a six-digit code to `email` and answers `{"request": "<id>"}`. A label that is reserved, or that a site, an open signup, a cluster or a record in either zone already uses, answers 409 with the type `LabelNotAvailableError`. Five requests per hour per address.
@@ -42,4 +41,4 @@ Starts creating the workspace and answers `{"request_key": "<key>"}`. Keep the k
 {"status": "Completed", "stage": "Active", "site_url": "https://acme.sites.example.com"}
 ```
 
-`status` is `Pending`, `Verified`, `Processing`, `Completed`, `Failed` or `Expired`. `stage` is the status of the site while it is set up. `site_url` is set once the request is `Completed`; the user logs in there with the email and password from `create_request`. A wrong key answers 404.
+`status` is `Pending`, `Verified`, `Processing`, `Completed`, `Failed` or `Expired`. `stage` is the status of the site while it is set up. `site_url` is set once the request is `Completed`; by then the user has been mailed the password to log in there with. A wrong key answers 404.

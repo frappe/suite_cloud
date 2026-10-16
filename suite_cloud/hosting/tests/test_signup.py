@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils.password import get_decrypted_password
 
 from suite_cloud.api import signup
 from suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request import expire_requests
@@ -10,7 +11,6 @@ from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fixtures import SITE_ZONE, HostingFixtures
 
 EMAIL = "new-signup@frappe.test"
-PASSWORD = "correct-horse-battery-staple-91"
 
 
 class TestSignup(HostingFixtures, IntegrationTestCase):
@@ -24,16 +24,19 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         mailer.start()
         self.addCleanup(mailer.stop)
 
-    def create(self, label: str = "acme", password: str = PASSWORD) -> str:
-        return signup.create_request(email=EMAIL, full_name="Ada Lovelace", label=label, password=password)[
-            "request"
-        ]
+    def create(self, label: str = "acme") -> str:
+        return signup.create_request(email=EMAIL, full_name="Ada Lovelace", label=label)["request"]
 
     def code(self) -> str:
         return re.search(r"\d{6}", self.mails[-1]["message"]).group()
 
-    def test_a_signup_ends_with_an_active_site_and_the_users_password(self) -> None:
+    def stored_password(self, request: str) -> str | None:
+        return get_decrypted_password("Suite Tenant Request", request, "password", raise_exception=False)
+
+    def test_a_signup_ends_with_an_active_site_and_mailed_login_details(self) -> None:
         request = self.create()
+        password = self.stored_password(request)
+        self.assertEqual(len(password), 24)  # generated, never typed
         key = signup.verify_otp(request, self.code())["request_key"]
 
         status = signup.get_status(request, key)
@@ -45,12 +48,31 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual((tenant.user, tenant.tenant_type), (EMAIL, "Suite Site"))
         self.assertIn("Suite Tenant", frappe.get_roles(EMAIL))
         self.assertEqual(frappe.db.get_value("User", EMAIL, "user_type"), "Website User")
-        self.assertEqual(self.site_api.docs[("User", EMAIL)]["new_password"], PASSWORD)
-        self.assertIsNone(
-            frappe.utils.password.get_decrypted_password(
-                "Suite Tenant Request", request, "password", raise_exception=False
-            )
-        )
+        self.assertEqual(self.site_api.docs[("User", EMAIL)]["new_password"], password)
+        details = self.mails[-1]
+        self.assertEqual((details["recipients"], details["delayed"]), ([EMAIL], False))  # never queued
+        self.assertIn(password, details["message"])
+        self.assertIn(frappe.db.get_value("Suite Site", doc.suite_site, "hostname"), details["message"])
+        self.assertIsNone(self.stored_password(request))  # forgotten once mailed
+
+    def test_a_failed_mail_keeps_the_password_for_resending(self) -> None:
+        request = self.create()
+        password = self.stored_password(request)
+        code = self.code()
+        with patch("frappe.sendmail", side_effect=ConnectionError("SMTP is down")):
+            signup.verify_otp(request, code)
+
+        doc = frappe.get_doc("Suite Tenant Request", request)
+        self.assertEqual(doc.status, "Completed")
+        self.assertIn("Resend Login Details", doc.error)
+        self.assertEqual(self.stored_password(request), password)
+
+        doc.resend_login_details()
+
+        self.assertIn(password, self.mails[-1]["message"])
+        self.assertIsNone(self.stored_password(request))
+        self.assertFalse(frappe.db.get_value("Suite Tenant Request", request, "error"))
+        self.assertRaisesRegex(frappe.ValidationError, "is gone", doc.resend_login_details)
 
     def test_a_wrong_code_is_refused_and_tries_are_capped(self) -> None:
         request = self.create()
@@ -72,14 +94,31 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.create("acme")
         self.assertRaises(LabelNotAvailableError, self.create, "acme")  # an open signup holds it
 
-    def test_a_weak_password_is_refused(self) -> None:
-        self.assertRaisesRegex(frappe.ValidationError, "too weak", self.create, "acme", "password")
-
     def test_signup_is_closed_unless_allowed(self) -> None:
         self.set_setting("allow_signup", 0)
         with self.assertRaises(signup.SignupClosedError) as ctx:
             self.create()
         self.assertEqual(ctx.exception.http_status_code, 403)
+
+    def test_a_request_made_in_the_desk_is_processed_without_a_code(self) -> None:
+        request = frappe.get_doc(
+            {"doctype": "Suite Tenant Request", "email": EMAIL, "full_name": "Ada Lovelace", "label": "acme"}
+        ).insert()
+
+        request.reload()
+        self.assertEqual(request.status, "Completed")
+        self.assertEqual(len(self.mails), 1)  # the login details only, no code
+        self.assertIn(self.site_api.docs[("User", EMAIL)]["new_password"], self.mails[0]["message"])
+        self.assertEqual(frappe.db.get_value("Suite Site", request.suite_site, "status"), "Active")
+
+    def test_a_request_made_in_the_desk_is_checked_like_a_signup(self) -> None:
+        def request(**fields):
+            values = {"email": EMAIL, "full_name": "Ada Lovelace", "label": "acme", **fields}
+            return frappe.get_doc({"doctype": "Suite Tenant Request", **values})
+
+        self.assertRaises(LabelNotAvailableError, request(label="www").insert)
+        self.assertRaises(frappe.ValidationError, request(email="not-an-address").insert)
+        self.assertRaises(frappe.ValidationError, request(full_name=" ").insert)
 
     def test_stale_requests_expire_and_forget_their_password(self) -> None:
         request = self.create()
@@ -90,11 +129,7 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         expire_requests()
 
         self.assertEqual(frappe.db.get_value("Suite Tenant Request", request, "status"), "Expired")
-        self.assertIsNone(
-            frappe.utils.password.get_decrypted_password(
-                "Suite Tenant Request", request, "password", raise_exception=False
-            )
-        )
+        self.assertIsNone(self.stored_password(request))
 
 
 class TestSignupContract(IntegrationTestCase):

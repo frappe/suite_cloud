@@ -2,6 +2,7 @@
  "actions": [],
  "autoname": "hash",
  "creation": "2026-10-16 12:00:00.000000",
+ "description": "A request for a hosted Suite workspace. Signups through the public API confirm their email with a one-time code; a request created here is taken on the operator's word and processed at once. Either way the user gets a generated password by email when the site is ready.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -27,34 +28,36 @@
    "in_list_view": 1,
    "label": "Email",
    "options": "Email",
-   "read_only": 1,
    "reqd": 1,
-   "search_index": 1
+   "search_index": 1,
+   "set_only_once": 1
   },
   {
    "fieldname": "full_name",
    "fieldtype": "Data",
    "label": "Full Name",
-   "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "set_only_once": 1
   },
   {
+   "description": "Names the tenant's site and mail domains, e.g. acme. Lowercase letters, digits and dashes.",
    "fieldname": "label",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Label",
-   "read_only": 1,
    "reqd": 1,
-   "search_index": 1
+   "search_index": 1,
+   "set_only_once": 1
   },
   {
+   "description": "The site's time zone, e.g. Asia/Kolkata. Blank keeps the site's default.",
    "fieldname": "timezone",
    "fieldtype": "Data",
    "label": "Time Zone",
-   "read_only": 1
+   "set_only_once": 1
   },
   {
-   "description": "Kept only until the tenant's user exists on the site.",
+   "description": "Generated when the request is created and mailed to the user with the site's link once the site is ready; forgotten after that.",
    "fieldname": "password",
    "fieldtype": "Password",
    "hidden": 1,
@@ -124,7 +127,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-17 02:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request",

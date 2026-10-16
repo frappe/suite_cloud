@@ -9,12 +9,14 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_to_date, now, now_datetime
 
-from suite_cloud.hosting import begin_step, commit, run_in_background, undo_step
+from suite_cloud.hosting import begin_step, commit, labels, run_in_background, undo_step
+from suite_cloud.mail.tenancy.addresses import validate_email_address
 from suite_cloud.utils import get_config, log_exception
 
 OTP_TTL = 600
 OTP_ATTEMPTS = 5
 REQUEST_TTL_HOURS = 24
+PASSWORD_BYTES = 18  # 24 URL-safe characters
 OPEN_STATUSES = ("Pending", "Verified", "Processing")
 
 
@@ -45,6 +47,29 @@ class SuiteTenantRequest(Document):
         self.status = "Pending"
         self.request_key = secrets.token_urlsafe(32)
         self.expires_at = add_to_date(now_datetime(), hours=REQUEST_TTL_HOURS)
+        self.password = secrets.token_urlsafe(PASSWORD_BYTES)  # mailed once the site is ready
+
+    def validate(self) -> None:
+        if self.is_new():
+            self.validate_request()
+
+    def validate_request(self) -> None:
+        """The same checks for a signup and for an operator creating the request in the desk."""
+
+        self.email = validate_email_address(self.email)
+        self.full_name = (self.full_name or "").strip()
+        if not self.full_name:
+            frappe.throw(_("Enter the name of the person signing up."))
+        self.label = labels.validate_label(self.label)
+        labels.assert_label_available(self.label)
+        self.timezone = (self.timezone or "").strip() or None
+
+    def after_insert(self) -> None:
+        """A signup proves its email with a code; an operator's request is taken on their word."""
+
+        if not self.flags.verify_by_otp:
+            self.db_set("status", "Verified")
+            enqueue_processing(self.name)
 
     # --- one-time code --------------------------------------------------------
 
@@ -74,6 +99,36 @@ class SuiteTenantRequest(Document):
         self.db_set("status", "Verified")
         enqueue_processing(self.name)
 
+    # --- completion -------------------------------------------------------------
+
+    def complete(self, site) -> None:
+        """The site is ready: the user gets its link and their password, which is then forgotten."""
+
+        self.db_set({"status": "Completed", "error": None})
+        self.send_login_details(site)
+
+    def send_login_details(self, site) -> None:
+        """Sent at once, never queued: a queued mail would keep the password in the Email Queue."""
+
+        password = self.get_password("password", raise_exception=False)
+        if not password:
+            frappe.throw(_("The password of {0} is gone; reset it on the site instead.").format(self.email))
+        try:
+            frappe.sendmail(
+                recipients=[self.email],
+                subject=_("Your Frappe Suite workspace is ready"),
+                message=login_details_message(site.url, self.email, password),
+                delayed=False,
+            )
+        except Exception:
+            log_exception(f"Login details for signup {self.name} could not be mailed", self)
+            self.db_set("error", _("The login details could not be mailed; run Resend Login Details."))
+            return
+        from suite_cloud.hosting.sites import forget_password
+
+        forget_password(self.name)
+        self.db_set("error", None)
+
     # --- actions ----------------------------------------------------------------
 
     @frappe.whitelist()
@@ -83,6 +138,13 @@ class SuiteTenantRequest(Document):
             frappe.throw(_("Only a failed request can be retried."))
         self.db_set({"status": "Verified", "error": None})
         enqueue_processing(self.name)
+
+    @frappe.whitelist()
+    def resend_login_details(self) -> None:
+        frappe.only_for("System Manager")
+        if self.status != "Completed" or not self.suite_site:
+            frappe.throw(_("The site of this request is not ready yet."))
+        self.send_login_details(frappe.get_doc("Suite Site", self.suite_site))
 
 
 def enqueue_processing(request: str) -> None:
@@ -175,6 +237,14 @@ def expire_requests() -> None:
     for name in set(stale) | set(done):
         forget_password(name)
     commit()
+
+
+def login_details_message(url: str, email: str, password: str) -> str:
+    escape = frappe.utils.escape_html
+    return _(
+        "Your workspace is ready at <a href='{0}'>{0}</a>.<br><br>Log in with<br>Email: {1}<br>Password: {2}"
+        "<br><br>Change the password after your first login."
+    ).format(escape(url), escape(email), escape(password))
 
 
 def otp_key(request: str) -> str:

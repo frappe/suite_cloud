@@ -155,7 +155,7 @@ def push_tenant_credentials(client, tenant) -> None:
 
 
 def create_tenant_user(site, client) -> None:
-    """The tenant's owner on the site, with the password typed at signup; it is then forgotten."""
+    """The tenant's owner on the site, with the password generated for its signup."""
 
     user = frappe.get_doc("User", frappe.db.get_value("Suite Tenant", site.tenant, "user"))
     request = site.get_request()
@@ -171,14 +171,12 @@ def create_tenant_user(site, client) -> None:
         values["new_password"] = request.get_password("password")
     client.ensure_user(values)
     site.db_set("tenant_user_created", 1)
-    if request:
-        forget_password(request.name)
 
 
 def activate(site) -> None:
     site.db_set({"status": "Active", "activated_at": now(), "error": site.follow_up_skip_reason})
     if request := site.get_request():
-        frappe.db.set_value("Suite Tenant Request", request.name, "status", "Completed")
+        request.complete(site)
 
 
 def follow_up(site) -> bool:
