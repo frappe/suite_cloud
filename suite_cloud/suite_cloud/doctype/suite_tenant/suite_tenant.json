@@ -6,7 +6,7 @@
  "field_order": [
   "title",
   "tenant_type",
-  "owner_user",
+  "user",
   "contact_email",
   "column_break_main",
   "enabled",
@@ -54,16 +54,16 @@
   },
   {
    "description": "The user who owns the tenant. Requests authenticated with the tenant's secret run as this user. One user may own several tenants.",
-   "fieldname": "owner_user",
+   "fieldname": "user",
    "fieldtype": "Link",
-   "label": "Owner",
+   "label": "User",
    "options": "User",
    "reqd": 1,
    "search_index": 1
   },
   {
    "description": "Where tenant-specific notices go, such as downtime or a domain losing verification. Set by the tenant through the API; the owner's email when left empty.",
-   "fetch_from": "owner_user.email",
+   "fetch_from": "user.email",
    "fetch_if_empty": 1,
    "fieldname": "contact_email",
    "fieldtype": "Data",

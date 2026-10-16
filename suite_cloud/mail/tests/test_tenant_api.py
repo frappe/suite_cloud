@@ -81,7 +81,7 @@ class TenantApiTestCase(IntegrationTestCase):
         """Simulates a request the auth hook already signed in for the tenant."""
 
         frappe.local.suite_tenant = None
-        frappe.set_user(tenant.owner_user)
+        frappe.set_user(tenant.user)
         frappe.utils.set_request(headers={"Authorization": f"Tenant {tenant.name}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 
@@ -145,7 +145,7 @@ class TestTenantResolution(TenantApiTestCase):
         self.assertEqual(frappe.db.get_value("Suite Tenant", self.tenant.name, "title"), "Acme Corp")
         # Only the fields passed change; a blank puts the contact back to the owner's email.
         profile = update_tenant_profile(contact_email="")
-        self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", self.tenant.owner_user))
+        self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", self.tenant.user))
         # A notice address follows the general email rules, not the mail server's local-part rules.
         self.assertEqual(
             update_tenant_profile(contact_email="ops/team@acme.test")["contact_email"], "ops/team@acme.test"

@@ -81,14 +81,14 @@ class TestSuiteTenant(TenancyTestCase):
         self.assertEqual(UUID(self.tenant.name).version, 7)
         self.assertEqual(len(self.tenant.new_secret), 40)
         self.assertEqual(self.tenant.get_password("secret"), self.tenant.new_secret)
-        self.assertEqual(self.tenant.owner_user, TENANT_OWNER)
+        self.assertEqual(self.tenant.user, TENANT_OWNER)
         self.assertEqual(self.tenant.contact_email, TENANT_OWNER)  # the owner's email until set
         self.assertEqual((self.tenant.tenant_type, self.tenant.status), ("Suite Site", "Active"))
         self.assertEqual(self.tenant.to_api()["jmap_url"], self.cluster.base_url)
 
         # One user may own several tenants; a tenant without an owner is refused.
         other = make_tenant(self.cluster, "other.frappe.test")
-        self.assertEqual(other.owner_user, TENANT_OWNER)
+        self.assertEqual(other.user, TENANT_OWNER)
         orphan = frappe.get_doc({"doctype": "Suite Tenant", "title": "orphan.frappe.test"})
         self.assertRaises(frappe.MandatoryError, orphan.insert)
 

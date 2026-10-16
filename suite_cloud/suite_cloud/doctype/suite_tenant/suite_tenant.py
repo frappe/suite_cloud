@@ -44,7 +44,7 @@ class SuiteTenant(Document):
         max_domains: DF.Int
         max_groups: DF.Int
         max_mailing_lists: DF.Int
-        owner_user: DF.Link
+        user: DF.Link
         secret: DF.Password | None
         stalwart_cluster: DF.Link | None
         title: DF.Data

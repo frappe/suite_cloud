@@ -101,7 +101,7 @@ def authenticate() -> None:
         return
 
     stored = None
-    tenant = frappe.db.get_value("Suite Tenant", name, ["enabled", "owner_user"], as_dict=True)
+    tenant = frappe.db.get_value("Suite Tenant", name, ["enabled", "user"], as_dict=True)
     if tenant and tenant.enabled:
         stored = get_decrypted_password("Suite Tenant", name, "secret", raise_exception=False)
     if not stored or not secrets.compare_digest(stored, secret):
@@ -110,7 +110,7 @@ def authenticate() -> None:
         raise frappe.AuthenticationError(_("Tenant authentication failed."))
 
     form_dict = frappe.local.form_dict
-    frappe.set_user(tenant.owner_user)
+    frappe.set_user(tenant.user)
     frappe.local.form_dict = form_dict  # set_user clears the request body Frappe already parsed
 
 
@@ -118,7 +118,7 @@ def _tenant_from_secret() -> str | None:
     """The tenant whose secret signed this request in: the auth hook ran it as the tenant's owner."""
 
     name = _credentials_from_header()[0]
-    if name and frappe.session.user == frappe.db.get_value("Suite Tenant", name, "owner_user"):
+    if name and frappe.session.user == frappe.db.get_value("Suite Tenant", name, "user"):
         return name
     return None
 

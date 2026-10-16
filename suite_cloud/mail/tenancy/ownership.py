@@ -38,7 +38,7 @@ def required(tenant) -> bool:
     """Whether the request has to prove control of the domain: the tenant acting for itself, on a
     cloud that checks."""
 
-    return frappe.session.user == tenant.owner_user and not skipped()
+    return frappe.session.user == tenant.user and not skipped()
 
 
 def skipped() -> bool:

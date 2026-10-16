@@ -16,5 +16,4 @@ suite_cloud.patches.v1_0.drop_frappe_cloud_role
 suite_cloud.patches.v1_0.enable_stalwart_tls_verification
 suite_cloud.patches.v1_0.fill_report_retention_defaults
 suite_cloud.patches.v1_0.rename_tenant_cluster_field
-suite_cloud.patches.v1_0.rename_tenant_user_to_owner
 suite_cloud.patches.v1_0.fill_tenant_type

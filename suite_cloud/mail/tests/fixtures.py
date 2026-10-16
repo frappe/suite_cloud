@@ -117,7 +117,7 @@ def make_owner(email: str = TENANT_OWNER) -> str:
 
 def make_tenant(cluster, title: str = "acme.frappe.test", **fields):
     frappe.db.delete("Suite Tenant", {"title": title})
-    fields.setdefault("owner_user", make_owner())
+    fields.setdefault("user", make_owner())
     tenant = frappe.get_doc(
         {"doctype": "Suite Tenant", "title": title, "stalwart_cluster": cluster.name, **fields}
     )
