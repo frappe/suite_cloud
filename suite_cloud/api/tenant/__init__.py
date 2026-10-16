@@ -33,7 +33,7 @@ API_PATH = "/api/v2/method/suite_cloud.api."
 ERROR_KEYS = ("type", "message", "exception")
 
 OWNED_DOCTYPES = {"Mail Domain", "Mail Account", "Mail Group", "Mailing List"}
-MANAGER_ROLES = ("System Manager", "Suite Cloud Manager")
+MANAGER_ROLES = ("System Manager",)
 RATE_LIMIT = 300  # requests per tenant per minute
 ALIAS_CAP = 100  # aliases on one object; more than that is a list, not an account
 MEMBERSHIP_CAP = 500  # groups or members named in one request
@@ -455,5 +455,5 @@ def update_tenant_profile(title: str | None = None, contact_email: str | None = 
         tenant.title = title.strip()
     if contact_email is not None:
         tenant.contact_email = contact_email.strip() or None
-    tenant.save(ignore_permissions=True)
+    tenant.save()
     return tenant.to_api()

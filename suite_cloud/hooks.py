@@ -18,6 +18,29 @@ after_request = ["suite_cloud.api.tenant.trim_errors"]
 auth_hooks = ["suite_cloud.api.tenant.authenticate"]
 
 # ============================================================================
+# Permissions: tenant owners reach only the rows of the tenants they own
+# ============================================================================
+PERMISSIONS = "suite_cloud.mail.tenancy.permissions"
+TENANT_OWNED_DOCTYPES = (
+    "Mail Domain",
+    "Mail Account",
+    "Mail Group",
+    "Mailing List",
+    "Mailing List Recipient",
+    "DMARC Report",
+    "TLS Report",
+)
+permission_query_conditions = {
+    "Suite Tenant": f"{PERMISSIONS}.tenant_query_conditions",
+    **{doctype: f"{PERMISSIONS}.tenant_document_query_conditions" for doctype in TENANT_OWNED_DOCTYPES},
+}
+has_permission = {
+    "Suite Tenant": f"{PERMISSIONS}.has_tenant_permission",
+    **{doctype: f"{PERMISSIONS}.has_tenant_document_permission" for doctype in TENANT_OWNED_DOCTYPES},
+}
+doc_events = {"User": {"validate": f"{PERMISSIONS}.keep_owner_role"}}
+
+# ============================================================================
 # Scheduled tasks
 # ============================================================================
 scheduler_events = {

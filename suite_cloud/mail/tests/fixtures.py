@@ -105,12 +105,19 @@ def activate_cluster(cluster, token: str = "test-token"):
 TENANT_OWNER = "owner@frappe.test"
 
 
-def make_owner(email: str = TENANT_OWNER) -> str:
-    """A plain user without any role, as a tenant's owner is: the API checks ownership, not roles."""
+def make_owner(email: str = TENANT_OWNER, with_role: bool = True) -> str:
+    """A user holding the Suite Tenant role, as a tenant's owner must; nothing else."""
 
+    roles = [{"role": "Suite Tenant"}] if with_role else []
     if not frappe.db.exists("User", email):
         frappe.get_doc(
-            {"doctype": "User", "email": email, "first_name": "Owner", "send_welcome_email": 0}
+            {
+                "doctype": "User",
+                "email": email,
+                "first_name": "Owner",
+                "send_welcome_email": 0,
+                "roles": roles,
+            }
         ).insert(ignore_permissions=True)
     return email
 

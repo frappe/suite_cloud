@@ -11,6 +11,7 @@ from frappe.utils import cint, flt, now, now_datetime
 
 from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.errors import StalwartError
+from suite_cloud.mail.tenancy.permissions import assert_can_own
 from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
 from suite_cloud.utils import utc_iso
 
@@ -69,6 +70,8 @@ class SuiteTenant(Document):
             if not frappe.utils.validate_email_address(self.contact_email):
                 frappe.throw(_("{0} is not a valid email address.").format(self.contact_email))
         self.allowed_ips = "\n".join(str(n) for n in parse_networks(self.allowed_ips))
+        if self.is_new() or self.has_value_changed("user"):
+            assert_can_own(self.user)
         self.validate_limits()
         self.validate_stalwart_cluster()
 
@@ -120,7 +123,7 @@ class SuiteTenant(Document):
     def adopt_directory(self) -> dict:
         """Records the domains, accounts, groups and lists the cluster already holds for this tenant."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         from suite_cloud.mail.tenancy.adopt import adopt_directory
 
         return adopt_directory(self.name)
@@ -129,7 +132,7 @@ class SuiteTenant(Document):
     def rotate_secret(self) -> str:
         """Returns the new secret once; it is stored encrypted and never shown again."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         secret = self.generate_secret()
         self.save(ignore_permissions=True)
         return secret
@@ -139,14 +142,14 @@ class SuiteTenant(Document):
     @frappe.whitelist()
     def suspend(self) -> None:
         # The key keeps authenticating so the tenant gets a 403 naming the suspension, not a bare 401.
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if self.status == "Archived":
             frappe.throw(_("An archived tenant cannot be suspended."))
         self.db_set({"status": "Suspended"})
 
     @frappe.whitelist()
     def resume(self) -> None:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if self.status == "Archived":
             frappe.throw(_("An archived tenant cannot be resumed."))
         self.db_set({"enabled": 1, "status": "Active"})
@@ -155,7 +158,7 @@ class SuiteTenant(Document):
     def archive(self, delete_data: bool = False) -> None:
         """Locks the tenant out; with ``delete_data`` every directory object is removed from Stalwart too."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         self.db_set({"enabled": 0, "status": "Archived", "archived_at": now()})
         if delete_data:
             if frappe.flags.do_not_enqueue:

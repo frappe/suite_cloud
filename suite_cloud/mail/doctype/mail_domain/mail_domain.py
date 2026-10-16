@@ -197,7 +197,7 @@ class MailDomain(Document):
         mail signed with the old keys stops verifying as soon as they do.
         """
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         self.assert_saved()
         algorithms = dkim_algorithms()
         sync.client_for(self).domains.replace_dkim_keys(self.stalwart_id, algorithms)

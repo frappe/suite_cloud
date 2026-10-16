@@ -16,10 +16,12 @@ from suite_cloud.mail.tests.fixtures import (
     clear_request_cache,
     configure_settings,
     make_cluster,
+    make_owner,
     make_tenant,
 )
 from suite_cloud.patches.v1_0 import add_credential_quotas
 from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError
+from suite_cloud.utils import user_context
 
 
 class TenancyTestCase(IntegrationTestCase):
@@ -91,6 +93,34 @@ class TestSuiteTenant(TenancyTestCase):
         self.assertEqual(other.user, TENANT_OWNER)
         orphan = frappe.get_doc({"doctype": "Suite Tenant", "title": "orphan.frappe.test"})
         self.assertRaises(frappe.MandatoryError, orphan.insert)
+
+    def test_owners_need_and_keep_the_tenant_role(self) -> None:
+        plain = make_owner("plain@frappe.test", with_role=False)
+        tenant = frappe.get_doc({"doctype": "Suite Tenant", "title": "other.frappe.test", "user": plain})
+        self.assertRaisesRegex(frappe.ValidationError, "Suite Tenant role", tenant.insert)
+
+        owner = frappe.get_doc("User", TENANT_OWNER)
+        owner.set("roles", [])
+        self.assertRaisesRegex(frappe.ValidationError, "must keep", owner.save)
+
+    def test_owners_reach_only_their_own_tenants_documents(self) -> None:
+        mine = self.make_domain()
+        other = make_tenant(self.cluster, "other.frappe.test", user=make_owner("other@frappe.test"))
+        theirs = frappe.get_doc(
+            {"doctype": "Mail Domain", "domain_name": "other.com", "tenant": other.name, "is_verified": 1}
+        ).insert()
+
+        with user_context(TENANT_OWNER):
+            self.assertEqual(frappe.get_list("Mail Domain", pluck="name"), [mine.name])
+            self.assertTrue(frappe.has_permission("Mail Domain", "write", mine))
+            self.assertFalse(frappe.has_permission("Mail Domain", "read", theirs))
+            self.assertEqual(frappe.get_list("Suite Tenant", pluck="name"), [self.tenant.name])
+            self.assertFalse(frappe.has_permission("Suite Tenant", "read", other))
+            # Level 0 holds what a tenant may change about itself; the rest is the operator's.
+            tenant = frappe.get_doc("Suite Tenant", self.tenant.name)
+            tenant.title, tenant.max_domains = "Renamed", 99
+            tenant.save()
+            self.assertEqual((tenant.title, tenant.max_domains), ("Renamed", 10))
 
     def test_tenants_from_before_the_type_existed_are_suite_sites(self) -> None:
         from suite_cloud.patches.v1_0 import fill_tenant_type

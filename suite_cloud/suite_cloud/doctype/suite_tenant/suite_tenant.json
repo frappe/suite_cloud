@@ -50,16 +50,18 @@
    "in_standard_filter": 1,
    "label": "Type",
    "options": "Suite Site\nTeam\nDevelopment",
-   "reqd": 1
+   "reqd": 1,
+   "permlevel": 1
   },
   {
-   "description": "The user who owns the tenant. Requests authenticated with the tenant's secret run as this user. One user may own several tenants.",
+   "description": "The user who owns the tenant; it needs the Suite Tenant role and keeps it while it owns one. Requests authenticated with the tenant's secret run as this user. One user may own several tenants.",
    "fieldname": "user",
    "fieldtype": "Link",
    "label": "User",
    "options": "User",
    "reqd": 1,
-   "search_index": 1
+   "search_index": 1,
+   "permlevel": 1
   },
   {
    "description": "Where tenant-specific notices go, such as downtime or a domain losing verification. Set by the tenant through the API; the owner's email when left empty.",
@@ -79,7 +81,8 @@
    "description": "Unchecked, the tenant's secret stops authenticating. Archive clears it and Resume sets it again; Suspend leaves it checked so the tenant gets a 403 naming the suspension instead of a bare 401.",
    "fieldname": "enabled",
    "fieldtype": "Check",
-   "label": "Enabled"
+   "label": "Enabled",
+   "permlevel": 1
   },
   {
    "default": "Active",
@@ -90,14 +93,16 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Active\nSuspended\nArchived",
-   "read_only": 1
+   "read_only": 1,
+   "permlevel": 1
   },
   {
    "description": "When the tenant was archived. Set by the Archive action; the tenant cannot be resumed after this.",
    "fieldname": "archived_at",
    "fieldtype": "Datetime",
    "label": "Archived At",
-   "read_only": 1
+   "read_only": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "plan_section",
@@ -109,7 +114,8 @@
    "description": "Disk the tenant's plan includes, in gigabytes, across every service the tenant uses; shown to the tenant next to its usage. 0 means unlimited. It does not cap the quotas of its mail accounts and groups.",
    "fieldname": "max_disk_gb",
    "fieldtype": "Float",
-   "label": "Total Disk Quota (GB)"
+   "label": "Total Disk Quota (GB)",
+   "permlevel": 1
   },
   {
    "fieldname": "access_section",
@@ -121,13 +127,15 @@
    "fieldname": "secret",
    "fieldtype": "Password",
    "hidden": 1,
-   "label": "Secret"
+   "label": "Secret",
+   "permlevel": 1
   },
   {
    "description": "One per line: the IPv4 or IPv6 addresses, or CIDR ranges, the tenant's server sends from. Set, only requests from these addresses may use the tenant's secret; a leaked secret is useless elsewhere. Blank accepts any address.",
    "fieldname": "allowed_ips",
    "fieldtype": "Small Text",
-   "label": "Allowed IP Addresses"
+   "label": "Allowed IP Addresses",
+   "permlevel": 1
   },
   {
    "fieldname": "column_break_access",
@@ -151,7 +159,8 @@
    "in_standard_filter": 1,
    "label": "Stalwart Cluster",
    "options": "Stalwart Cluster",
-   "search_index": 1
+   "search_index": 1,
+   "permlevel": 1
   },
   {
    "fieldname": "column_break_cluster",
@@ -163,7 +172,8 @@
    "fieldtype": "Link",
    "label": "Egress Pool",
    "options": "Egress IP Pool",
-   "read_only_depends_on": "eval:!doc.stalwart_cluster"
+   "read_only_depends_on": "eval:!doc.stalwart_cluster",
+   "permlevel": 1
   },
   {
    "fieldname": "limits_section",
@@ -176,7 +186,8 @@
    "fieldname": "max_domains",
    "fieldtype": "Int",
    "read_only_depends_on": "eval:!doc.stalwart_cluster",
-   "label": "Max Domains"
+   "label": "Max Domains",
+   "permlevel": 1
   },
   {
    "default": "500",
@@ -184,7 +195,8 @@
    "fieldname": "max_accounts",
    "fieldtype": "Int",
    "read_only_depends_on": "eval:!doc.stalwart_cluster",
-   "label": "Max Accounts"
+   "label": "Max Accounts",
+   "permlevel": 1
   },
   {
    "default": "50",
@@ -192,7 +204,8 @@
    "fieldname": "max_groups",
    "fieldtype": "Int",
    "read_only_depends_on": "eval:!doc.stalwart_cluster",
-   "label": "Max Groups"
+   "label": "Max Groups",
+   "permlevel": 1
   },
   {
    "default": "50",
@@ -200,7 +213,8 @@
    "fieldname": "max_mailing_lists",
    "fieldtype": "Int",
    "read_only_depends_on": "eval:!doc.stalwart_cluster",
-   "label": "Max Mailing Lists"
+   "label": "Max Mailing Lists",
+   "permlevel": 1
   },
   {
    "fieldname": "column_break_limits",
@@ -218,7 +232,8 @@
    "is_virtual": 1,
    "label": "Mail Disk Used",
    "options": "File Size",
-   "read_only": 1
+   "read_only": 1,
+   "permlevel": 1
   }
  ],
  "index_web_pages_for_search": 1,
@@ -273,15 +288,14 @@
    "write": 1
   },
   {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
+   "permlevel": 1,
    "read": 1,
-   "report": 1,
-   "role": "Suite Cloud Manager",
-   "share": 1,
+   "role": "System Manager",
+   "write": 1
+  },
+  {
+   "read": 1,
+   "role": "Suite Tenant",
    "write": 1
   }
  ],

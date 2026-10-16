@@ -198,7 +198,7 @@ class MailAccount(QuotaHolder, Document):
     def reset_password(self, password: str | None = None) -> str:
         """Sets a new password on the cluster and returns it; a blank one is generated."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         password = password or generate_password()
         self.set_password(password)
         return password
@@ -212,14 +212,14 @@ class MailAccount(QuotaHolder, Document):
 
     @frappe.whitelist()
     def rotate_app_password(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return self.mint_app_password()
 
     @frappe.whitelist()
     def rotate_api_key(self) -> str:
         """Mints the account's Suite Cloud API key, revokes the previous one, and returns it once."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return account_credentials.rotate_site_login(self, API_KEYS)
 
     def account_client(self):

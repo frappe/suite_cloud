@@ -341,14 +341,8 @@
    "role": "System Manager"
   },
   {
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
    "read": 1,
-   "report": 1,
-   "share": 1,
-   "role": "Suite Cloud Manager"
+   "role": "Suite Tenant"
   }
  ],
  "row_format": "Dynamic",

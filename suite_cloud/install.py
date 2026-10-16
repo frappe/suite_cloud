@@ -1,8 +1,8 @@
 import frappe
 
-# Desk role for operators. Tenant requests run as the tenant's owner and the endpoints check
-# ownership themselves, so no role is needed for them.
-ROLES = (("Suite Cloud Manager", 1),)
+# The role every tenant owner holds: no desk, and on each DocType only what a tenant owns
+# (see suite_cloud.mail.tenancy.permissions). Operators are System Managers.
+ROLES = (("Suite Tenant", 0),)
 
 
 def after_install() -> None:
@@ -23,12 +23,12 @@ def setup() -> None:
 
 
 def ensure_role(role_name: str, desk_access: int) -> None:
-    if frappe.db.exists("Role", role_name):
-        return
-
-    frappe.get_doc(
-        {"doctype": "Role", "role_name": role_name, "desk_access": desk_access, "is_custom": 0}
-    ).insert(ignore_permissions=True)
+    if not frappe.db.exists("Role", role_name):
+        frappe.get_doc(
+            {"doctype": "Role", "role_name": role_name, "desk_access": desk_access, "is_custom": 0}
+        ).insert(ignore_permissions=True)
+    elif frappe.db.get_value("Role", role_name, "desk_access") != desk_access:
+        frappe.db.set_value("Role", role_name, "desk_access", desk_access)
 
 
 def ensure_setting_defaults() -> None:

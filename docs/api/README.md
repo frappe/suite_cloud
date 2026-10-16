@@ -27,7 +27,7 @@ Suite Cloud checks the secret against the Suite Tenant record, so the request ru
 
 When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its secret. A request from elsewhere gets a 403 with the type `TenantAddressError`, and Suite Cloud logs it for the operators. A secret copied out of a tenant's configuration is worthless anywhere else.
 
-An operator with the System Manager or Suite Cloud Manager role may call the tenant API from the desk or a script on behalf of a tenant. The tenant is named by the `tenant` parameter or the `X-Suite-Tenant` header.
+An operator with the System Manager role may call the tenant API from the desk or a script on behalf of a tenant. The tenant is named by the `tenant` parameter or the `X-Suite-Tenant` header.
 
 ## Verbs
 

@@ -67,9 +67,12 @@ firewall steps use, and Server Jobs run that copy even when the host has its own
 only needs an SSH client (`apt install openssh-client`; Frappe Cloud installs it from
 `pyproject.toml`).
 
-Installing creates one role, **Suite Cloud Manager**, for operators who use the desk. Every Suite
-Tenant names an owner, a User; requests signed with the tenant's secret run as that owner, and the
-API endpoints check ownership themselves, so the owner needs no role.
+Operators are System Managers. Installing creates one role, **Suite Tenant**, without desk access:
+every Suite Tenant names an owner, a User holding that role, and requests signed with the tenant's
+secret run as that owner. The role opens the tenant-owned DocTypes (domains, accounts, groups,
+lists, reports) and the owner's own Suite Tenant, and the app narrows each of them to the rows of
+the tenants the user owns. On the Suite Tenant itself an owner may change only the title and the
+contact email; everything else sits at permission level 1, for System Managers.
 
 ## Setting up a cluster, step by step
 
