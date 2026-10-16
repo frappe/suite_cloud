@@ -178,12 +178,12 @@ def is_reachable_url(url: str) -> bool:
 
 
 def create_tenant_user(site, client) -> None:
-    """The tenant's owner on the site, with the password generated for its signup."""
+    """The tenant's owner on the site (see ``login_email``), with the password generated for its signup."""
 
     user = frappe.get_doc("User", frappe.db.get_value("Suite Tenant", site.tenant, "user"))
     request = site.get_request()
     values = {
-        "email": user.email,
+        "email": site.login_email,
         "first_name": user.first_name,
         "last_name": user.last_name,
         "user_type": "System User",

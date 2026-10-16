@@ -8,7 +8,7 @@ from frappe.utils.password import get_decrypted_password
 from suite_cloud.api import signup
 from suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request import expire_requests
 from suite_cloud.hosting.labels import LabelNotAvailableError
-from suite_cloud.hosting.tests.fixtures import SITE_ZONE, HostingFixtures
+from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, SITE_ZONE, HostingFixtures
 
 EMAIL = "new-signup@frappe.test"
 
@@ -110,6 +110,34 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(len(self.mails), 1)  # the login details only, no code
         self.assertIn(self.site_api.docs[("User", EMAIL)]["new_password"], self.mails[0]["message"])
         self.assertEqual(frappe.db.get_value("Suite Site", request.suite_site, "status"), "Active")
+
+    def test_the_site_user_is_named_after_the_tenant_mail_domain(self) -> None:
+        self.set_setting("tenant_mail_zone", MAIL_ZONE)
+        request = frappe.get_doc(
+            {"doctype": "Suite Tenant Request", "email": EMAIL, "full_name": "Ada Lovelace", "label": "acme"}
+        ).insert()
+        request.reload()
+
+        login = f"new-signup@acme.{MAIL_ZONE}"
+        self.assertIn(("User", login), self.site_api.docs)
+        self.assertNotIn(("User", EMAIL), self.site_api.docs)
+        self.assertEqual(frappe.db.get_value("Suite Tenant", request.tenant, "user"), EMAIL)
+        details = self.mails[-1]
+        self.assertEqual(details["recipients"], [EMAIL])  # mailed where they signed up
+        self.assertIn(login, details["message"])
+        site = frappe.get_doc("Suite Site", request.suite_site)
+        site.assign_mail_domain = 0
+        self.assertRaisesRegex(frappe.ValidationError, "already assigned", site.save)
+
+    def test_a_notification_local_part_keeps_the_signup_address(self) -> None:
+        self.set_setting("tenant_mail_zone", MAIL_ZONE)
+        email = "notification@frappe.test"
+        frappe.db.delete("User", {"name": email})
+        frappe.get_doc(
+            {"doctype": "Suite Tenant Request", "email": email, "full_name": "Ada Lovelace", "label": "acme"}
+        ).insert()
+
+        self.assertIn(("User", email), self.site_api.docs)
 
     def test_a_request_made_in_the_desk_is_checked_like_a_signup(self) -> None:
         def request(**fields):

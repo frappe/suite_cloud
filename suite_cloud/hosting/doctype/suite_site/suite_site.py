@@ -7,6 +7,7 @@ from frappe.model.document import Document
 
 from suite_cloud.hosting import domains, labels, sites
 from suite_cloud.hosting.central import site as site_api
+from suite_cloud.mail.tenancy.addresses import validate_email_address
 from suite_cloud.utils import get_config
 
 
@@ -64,7 +65,8 @@ class SuiteSite(Document):
             return
         started = {
             "assign_site_domain": any(row.managed for row in before.domains),
-            "assign_mail_domain": bool(before.mail_domain),
+            # The tenant's user is named after the mail domain (login_email) once it exists.
+            "assign_mail_domain": bool(before.mail_domain or before.tenant_user_created),
         }
         for field, has_started in started.items():
             if has_started and self.has_value_changed(field):
@@ -90,6 +92,21 @@ class SuiteSite(Document):
     @property
     def site_domain(self) -> str | None:
         return labels.site_domain(self.label) if self.label else None
+
+    @property
+    def login_email(self) -> str:
+        """The tenant user's address on the site: their own local part at the tenant's mail
+        domain, e.g. sagar.s@acme.frappesuite.com. Their signup address when the site gets no
+        mail domain, or when the local part is the notification mailbox's."""
+
+        request = self.get_request()
+        owner = frappe.db.get_value("Suite Tenant", self.tenant, "user")
+        email = request.email if request else frappe.db.get_value("User", owner, "email")
+        local = email.split("@", 1)[0]
+        domain = labels.mail_domain(self.label) if self.assign_mail_domain and self.label else None
+        if not domain or local == get_config("notification_mailbox_local_part"):
+            return email
+        return validate_email_address(f"{local}@{domain}")
 
     @property
     def follow_up_skip_reason(self) -> str | None:

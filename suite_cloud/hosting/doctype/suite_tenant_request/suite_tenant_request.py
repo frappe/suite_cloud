@@ -117,7 +117,7 @@ class SuiteTenantRequest(Document):
             frappe.sendmail(
                 recipients=[self.email],
                 subject=_("Your Frappe Suite workspace is ready"),
-                message=login_details_message(site.url, self.email, password),
+                message=login_details_message(site.url, site.login_email, password),
                 delayed=False,
             )
         except Exception:

@@ -197,11 +197,11 @@
   },
   {
    "default": "1",
-   "description": "Give the tenant its label under the tenant mail zone, e.g. acme.example.com, and send the site's mail from its notification account. Fixed once the mail domain exists: it may hold the tenant's mailboxes, and only Drop Site removes it.",
+   "description": "Give the tenant its label under the tenant mail zone, e.g. acme.example.com, and send the site's mail from its notification account. The tenant's user on the site is then named after it, e.g. sagar.s@acme.example.com. Fixed once that user or the mail domain exists: the domain may hold the tenant's mailboxes, and only Drop Site removes it.",
    "fieldname": "assign_mail_domain",
    "fieldtype": "Check",
    "label": "Assign Mail Domain",
-   "read_only_depends_on": "eval:doc.mail_domain"
+   "read_only_depends_on": "eval:doc.mail_domain || doc.tenant_user_created"
   },
   {
    "fieldname": "mail_domain",
@@ -232,7 +232,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 06:00:00.000000",
+ "modified": "2026-10-17 08:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",
