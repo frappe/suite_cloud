@@ -20,6 +20,10 @@ class TestHostingSettings(HostingFixtures, IntegrationTestCase):
         self.settings.tenant_mail_zone = SITE_ZONE
         self.settings.save()  # one zone for both: site domains go under sites
 
+    def test_every_hosted_site_needs_the_mail_zone(self) -> None:
+        self.settings.tenant_mail_zone = None
+        self.assertRaisesRegex(frappe.MandatoryError, "Tenant Mail Zone", self.settings.save)
+
     def test_zones_need_a_provider(self) -> None:
         frappe.db.set_value("DNS Zone", MAIL_ZONE, "dns_provider", "")
         self.assertRaisesRegex(frappe.ValidationError, "needs a DNS provider", self.settings.save)
@@ -149,7 +153,7 @@ class TestPlacement(HostingFixtures, IntegrationTestCase):
 
 class TestTenantGuards(HostingFixtures, IntegrationTestCase):
     def setUp(self) -> None:
-        self.setup_hosting(tenant_mail_zone=None)
+        self.setup_hosting()
         self.make_vm()
         self.tenant = self.make_hosted_tenant()
 

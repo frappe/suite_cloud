@@ -1,7 +1,7 @@
 {
  "actions": [],
  "creation": "2026-10-16 12:00:00.000000",
- "description": "A request for a hosted Suite workspace. Signups through the public API confirm their email with a one-time code; a request created here is taken on the operator's word and processed at once. Either way the user gets a generated password by email when the site is ready.",
+ "description": "A request for a hosted Suite workspace. Signups through the public API confirm their email with a one-time code; a request created here is taken on the operator's word and processed at once. Either way the owner is invited from the new site and chooses their own password.",
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
@@ -9,7 +9,6 @@
   "full_name",
   "label",
   "timezone",
-  "password",
   "column_break_main",
   "status",
   "request_key",
@@ -22,7 +21,7 @@
  ],
  "fields": [
   {
-   "description": "Where the one-time code and the login details go. Its local part names the user on the site, e.g. sagar.s for sagar.s@acme.example.com.",
+   "description": "Where the one-time code and the owner's invite go. Its local part names the owner's account on the site, e.g. sagar.s for sagar.s@acme.example.com.",
    "fieldname": "email",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -58,20 +57,12 @@
    "set_only_once": 1
   },
   {
-   "description": "Generated when the request is created and mailed to the user with the site's link once the site is ready; forgotten after that.",
-   "fieldname": "password",
-   "fieldtype": "Password",
-   "hidden": 1,
-   "label": "Password",
-   "read_only": 1
-  },
-  {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
   },
   {
    "default": "Pending",
-   "description": "Pending: waiting for the email code. Verified: the code was correct. Processing: the tenant and its site are being set up. Completed: the site is ready and the login details are mailed (Error says if that failed). Failed: stopped on an error; run Retry. Expired: no code within 24 hours.",
+   "description": "Pending: waiting for the email code. Verified: the code was correct. Processing: the tenant and its site are being set up. Completed: the site is ready and its owner invited; they choose their password when they accept. Failed: stopped on an error; run Retry. Expired: no code within 24 hours.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -112,7 +103,7 @@
    "read_only": 1
   },
   {
-   "description": "A request still waiting for its code after this expires, and its password is forgotten.",
+   "description": "A request still waiting for its code after this expires.",
    "fieldname": "expires_at",
    "fieldtype": "Datetime",
    "label": "Expires At",
@@ -135,7 +126,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 12:00:00.000000",
+ "modified": "2026-10-17 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request",

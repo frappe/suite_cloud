@@ -449,10 +449,11 @@
    "options": "DNS Zone"
   },
   {
-   "description": "Zone under which each tenant gets its label as its mail domain, e.g. acme.example.com. It may be the site DNS zone. It needs a DNS provider and must not be the zone of a Stalwart cluster.",
+   "description": "Zone under which each tenant gets its label as its mail domain, e.g. acme.example.com. Every hosted site gets one, so it is required once Central is set. It may be the site DNS zone. It needs a DNS provider and must not be the zone of a Stalwart cluster.",
    "fieldname": "tenant_mail_zone",
    "fieldtype": "Link",
    "label": "Tenant Mail Zone",
+   "mandatory_depends_on": "eval:doc.central_url",
    "options": "DNS Zone"
   },
   {
@@ -467,7 +468,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-17 09:00:00.000000",
+ "modified": "2026-10-17 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

@@ -4,6 +4,7 @@ import frappe
 
 from suite_cloud.api.mail import accounts as accounts_api
 from suite_cloud.api.mail import domains as domains_api
+from suite_cloud.api.mail import groups as groups_api
 from suite_cloud.hosting import capacity, sites
 from suite_cloud.hosting.tests.fakes import REGION
 from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, HostingFixtures
@@ -18,7 +19,7 @@ NOTIFICATION = f"notification@{DOMAIN}"
 class TestHostedMail(HostingFixtures, TenancyTestCase):
     def setUp(self) -> None:
         super().setUp()
-        self.setup_hosting(site_dns_zone=None)  # the site domain has its own tests
+        self.setup_hosting(real_mail=True, site_dns_zone=None)  # the site domain has its own tests
         self.vm = self.make_vm()
 
     def claim(self):
@@ -39,11 +40,22 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertEqual((account["default_outgoing"], account["enable_outgoing"]), (1, 1))
         self.assertTrue(account["password"])
 
-    def test_the_mail_domain_choice_is_fixed_once_the_domain_exists(self) -> None:
+    def test_the_notification_account_is_a_send_only_system_account(self) -> None:
+        self.tenant.db_set("max_accounts", 1)
+        self.make_domain()
+        self.make_account("someone@acme.com")  # the tenant's one account
         site = self.claim()
 
-        site.assign_mail_domain = 0
-        self.assertRaisesRegex(frappe.ValidationError, "already assigned", site.save)
+        account = frappe.get_doc("Mail Account", NOTIFICATION)  # created despite the full limit
+        self.assertEqual((account.is_system_account, account.disable_receiving), (1, 1))
+        tenant = frappe.get_doc("Suite Tenant", self.tenant.name)
+        self.assertEqual(tenant.account_count(), 1)
+        self.fake.objects["Account"][account.stalwart_id]["usedDiskQuota"] = 10**9
+        self.assertEqual(tenant.fetch_mail_used_disk_bytes(), 0)  # Suite Cloud's own disk
+        # Once it sends, the site invites the owner from it.
+        (invite,) = self.site_api.invites()
+        self.assertEqual(invite["account"], f"owner@{DOMAIN}")
+        self.assertEqual(site.owner_invite, invite["name"])
 
     def test_the_domain_is_checked_only_once_the_provider_has_its_records(self) -> None:
         with (
@@ -111,14 +123,28 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         )
         self.assertRaisesRegex(frappe.ValidationError, "belongs to the mail service", doc.insert)
 
-    def test_the_tenant_api_cannot_change_the_hosted_domain_or_notification_account(self) -> None:
+    def test_the_tenant_api_cannot_change_the_hosted_domain(self) -> None:
         self.claim()
         self.act_as_tenant()
 
         self.assertRaises(HostedObjectError, domains_api.update_domain, DOMAIN, description="x")
         self.assertRaises(HostedObjectError, domains_api.delete_domain, DOMAIN)
-        self.assertRaises(HostedObjectError, accounts_api.delete_account, NOTIFICATION)
-        self.assertRaises(HostedObjectError, accounts_api.set_password, NOTIFICATION, "another-secret-pw")
+
+    def test_the_tenant_api_does_not_see_the_notification_account(self) -> None:
+        self.claim()
+        self.act_as_tenant()
+
+        self.assertEqual(accounts_api.list_accounts()["items"], [])
+        self.assertEqual(accounts_api.list_accounts(domain=DOMAIN)["total"], 0)
+        self.assertEqual(accounts_api.get_quotas([NOTIFICATION]), {})
+        for call in (
+            lambda: accounts_api.get_account(NOTIFICATION),
+            lambda: accounts_api.set_password(NOTIFICATION, "another-secret-pw"),
+            lambda: accounts_api.delete_account(NOTIFICATION),
+            lambda: groups_api.create_group(email=f"team@{DOMAIN}", members=[NOTIFICATION]),
+        ):
+            with self.subTest(call):
+                self.assertRaises(frappe.DoesNotExistError, call)
 
     def test_record_rows_map_hosts_to_the_zone(self) -> None:
         site = self.claim()

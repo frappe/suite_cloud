@@ -1,7 +1,7 @@
 """Public signup: a visitor asks for a Suite workspace, proves their email and gets a site.
 
 Every method is a guest POST: the code and the request key travel in the body, never in a URL.
-The user's password is generated and mailed to them once the site is ready.
+The owner is invited from their new site and chooses their own password there.
 """
 
 import secrets
@@ -54,7 +54,7 @@ def verify_otp(request: str, otp: str) -> dict:
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=120, seconds=60)
 def get_status(request: str, request_key: str) -> dict:
-    """Where the workspace stands. Once Completed the user has been mailed the password for ``site_url``."""
+    """Where the workspace stands. Once Completed the owner has been invited from ``site_url``."""
 
     doc = get_request(request)
     if not secrets.compare_digest(doc.request_key or "", request_key or ""):

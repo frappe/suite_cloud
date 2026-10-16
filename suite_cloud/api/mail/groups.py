@@ -12,6 +12,7 @@ from suite_cloud.api.tenant import (
     normalize_name,
     owned,
     owned_page,
+    visible,
 )
 from suite_cloud.mail.doctype.mail_group.mail_group import group_payloads
 from suite_cloud.mail.tenancy import quotas as quota_rows
@@ -135,9 +136,8 @@ def _resolve_members(members: list[str] | str | None) -> set[str]:
     wanted = {normalize_name(m) for m in as_list(members, MEMBERSHIP_CAP)}
     if not wanted:
         return set()
-    tenant = current_tenant().name
     known = set(
-        frappe.get_all("Mail Account", {"tenant": tenant, "name": ["in", list(wanted)]}, pluck="name")
+        frappe.get_all("Mail Account", visible("Mail Account", {"name": ["in", list(wanted)]}), pluck="name")
     )
     if missing := sorted(wanted - known):
         frappe.throw(_("Account {0} was not found.").format(missing[0]), frappe.DoesNotExistError)

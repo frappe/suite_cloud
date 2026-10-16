@@ -15,7 +15,8 @@
   "progress_section",
   "site_created",
   "suite_configured",
-  "tenant_user_created",
+  "owner_invite",
+  "owner_invited_at",
   "column_break_progress",
   "pilot_task",
   "attempts",
@@ -27,7 +28,6 @@
   "assign_site_domain",
   "domains",
   "mail_tab",
-  "assign_mail_domain",
   "mail_domain",
   "column_break_mail",
   "notification_account",
@@ -126,11 +126,17 @@
    "read_only": 1
   },
   {
-   "default": "0",
-   "description": "The tenant's user exists on the site, e.g. sagar.s@acme.example.com.",
-   "fieldname": "tenant_user_created",
-   "fieldtype": "Check",
-   "label": "Tenant User Created",
+   "description": "The Mail Account Request on the site inviting the tenant's owner, e.g. for sagar.s@acme.example.com. They choose their password when they accept it.",
+   "fieldname": "owner_invite",
+   "fieldtype": "Data",
+   "label": "Owner Invite",
+   "read_only": 1
+  },
+  {
+   "description": "When the invite was last sent. It stays valid for 7 days; Resend Owner Invite sends it again, or a fresh one once it expired.",
+   "fieldname": "owner_invited_at",
+   "fieldtype": "Datetime",
+   "label": "Owner Invited At",
    "read_only": 1
   },
   {
@@ -206,14 +212,6 @@
    "label": "Mail"
   },
   {
-   "default": "1",
-   "description": "Give the tenant its label under the tenant mail zone, e.g. acme.example.com, and send the site's mail from its notification account. The tenant's user on the site is then named after it, e.g. sagar.s@acme.example.com. Fixed once that user or the mail domain exists: the domain may hold the tenant's mailboxes, and only Drop Site removes it.",
-   "fieldname": "assign_mail_domain",
-   "fieldtype": "Check",
-   "label": "Assign Mail Domain",
-   "read_only_depends_on": "eval:doc.mail_domain || doc.tenant_user_created"
-  },
-  {
    "description": "The tenant's hosted mail domain, e.g. acme.example.com. Suite Cloud publishes its records and keeps the tenant API from changing it.",
    "fieldname": "mail_domain",
    "fieldtype": "Link",
@@ -244,7 +242,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 12:00:00.000000",
+ "modified": "2026-10-17 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

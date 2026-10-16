@@ -2,7 +2,7 @@
 
 Module `suite_cloud.api.signup`. A visitor asks for a Frappe Suite workspace, proves their email address, and gets a hosted site. These methods need no credentials. They answer only while **Allow Signup** is checked in Suite Cloud Settings; otherwise they answer 403 with the type `SignupClosedError`.
 
-Every method is a POST, whatever its name: the code and the request key travel in the JSON body, never in a URL. Each method is rate limited per IP address. The user does not choose a password: Suite Cloud generates one and mails it, with the site's link, once the site is ready.
+Every method is a POST, whatever its name: the code and the request key travel in the JSON body, never in a URL. Each method is rate limited per IP address. Once the site is ready, it invites the owner from its own notification address. The invite is for an account at the tenant's mail domain, e.g. `sagar.s@acme.example.com` for `sagar.s@frappe.io`, and the owner chooses their password when they accept it. No password is ever mailed.
 
 ## `create_request`
 
@@ -41,4 +41,4 @@ Starts creating the workspace and answers `{"request_key": "<key>"}`. Keep the k
 {"status": "Completed", "stage": "Active", "site_url": "https://acme.sites.example.com"}
 ```
 
-`status` is `Pending`, `Verified`, `Processing`, `Completed`, `Failed` or `Expired`. `stage` is the status of the site while it is set up. `site_url` is set once the request is `Completed`; by then the user has been mailed the password to log in there with. A wrong key answers 404.
+`status` is `Pending`, `Verified`, `Processing`, `Completed`, `Failed` or `Expired`. `stage` is the status of the site while it is set up. `site_url` is set once the request is `Completed`; by then the owner's invite is on its way. An invite stays valid for 7 days. A wrong key answers 404.

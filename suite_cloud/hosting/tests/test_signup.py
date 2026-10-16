@@ -4,7 +4,6 @@ from uuid import UUID
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils.password import get_decrypted_password
 
 from suite_cloud.api import signup
 from suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request import expire_requests
@@ -16,7 +15,7 @@ EMAIL = "new-signup@frappe.test"
 
 class TestSignup(HostingFixtures, IntegrationTestCase):
     def setUp(self) -> None:
-        self.setup_hosting(tenant_mail_zone=None)
+        self.setup_hosting()
         self.make_vm()
         frappe.db.delete("Suite Tenant", {"user": EMAIL})
         frappe.db.delete("User", {"name": EMAIL})
@@ -31,14 +30,9 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
     def code(self) -> str:
         return re.search(r"\d{6}", self.mails[-1]["message"]).group()
 
-    def stored_password(self, request: str) -> str | None:
-        return get_decrypted_password("Suite Tenant Request", request, "password", raise_exception=False)
-
-    def test_a_signup_ends_with_an_active_site_and_mailed_login_details(self) -> None:
+    def test_a_signup_ends_with_the_owner_invited_from_the_site(self) -> None:
         request = self.create()
         self.assertEqual(UUID(request).version, 7)
-        password = self.stored_password(request)
-        self.assertEqual(len(password), 24)  # generated, never typed
         key = signup.verify_otp(request, self.code())["request_key"]
 
         status = signup.get_status(request, key)
@@ -50,31 +44,17 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual((tenant.user, tenant.tenant_type), (EMAIL, "Suite Site"))
         self.assertIn("Suite Tenant", frappe.get_roles(EMAIL))
         self.assertEqual(frappe.db.get_value("User", EMAIL, "user_type"), "Website User")
-        self.assertEqual(self.site_api.docs[("User", EMAIL)]["new_password"], password)
-        details = self.mails[-1]
-        self.assertEqual((details["recipients"], details["delayed"]), ([EMAIL], False))  # never queued
-        self.assertIn(password, details["message"])
-        self.assertIn(frappe.db.get_value("Suite Site", doc.suite_site, "hostname"), details["message"])
-        self.assertIsNone(self.stored_password(request))  # forgotten once mailed
+        # The site invites its owner to their account at the mail domain; they choose the password.
+        (invite,) = self.site_api.invites()
+        self.assertEqual((invite["account"], invite["backup_email"]), (f"new-signup@acme.{MAIL_ZONE}", EMAIL))
+        self.assertFalse([key for key in self.site_api.docs if key[0] == "User"])
+        self.assertEqual(len(self.mails), 1)  # Suite Cloud mailed the code only; the site mails the invite
 
-    def test_a_failed_mail_keeps_the_password_for_resending(self) -> None:
-        request = self.create()
-        password = self.stored_password(request)
-        code = self.code()
-        with patch("frappe.sendmail", side_effect=ConnectionError("SMTP is down")):
-            signup.verify_otp(request, code)
+    def test_resend_invite_goes_through_the_site(self) -> None:
+        request = frappe.get_doc("Suite Tenant Request", self.create_in_desk())
+        request.resend_invite()
 
-        doc = frappe.get_doc("Suite Tenant Request", request)
-        self.assertEqual(doc.status, "Completed")
-        self.assertIn("Resend Login Details", doc.error)
-        self.assertEqual(self.stored_password(request), password)
-
-        doc.resend_login_details()
-
-        self.assertIn(password, self.mails[-1]["message"])
-        self.assertIsNone(self.stored_password(request))
-        self.assertFalse(frappe.db.get_value("Suite Tenant Request", request, "error"))
-        self.assertRaisesRegex(frappe.ValidationError, "is gone", doc.resend_login_details)
+        self.assertIn(("send_verification_email", self.site_api.invites()[0]["name"]), self.site_api.calls)
 
     def test_a_wrong_code_is_refused_and_tries_are_capped(self) -> None:
         request = self.create()
@@ -89,7 +69,7 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertRaises(frappe.DoesNotExistError, signup.get_status, request, "guess")
 
     def test_labels_are_checked(self) -> None:
-        for label in ("www", "spf3", "proxy-eu", "site-1", "a-vm-b"):
+        for label in ("www", "spf3", "proxy-eu", "site-1", "a-vm-b", "sites"):
             with self.subTest(label):
                 self.assertRaises(LabelNotAvailableError, self.create, label)
         self.assertRaises(frappe.ValidationError, self.create, "Not Valid!")
@@ -103,43 +83,17 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(ctx.exception.http_status_code, 403)
 
     def test_a_request_made_in_the_desk_is_processed_without_a_code(self) -> None:
-        request = frappe.get_doc(
-            {"doctype": "Suite Tenant Request", "email": EMAIL, "full_name": "Ada Lovelace", "label": "acme"}
-        ).insert()
+        request = frappe.get_doc("Suite Tenant Request", self.create_in_desk())
 
-        request.reload()
         self.assertEqual(request.status, "Completed")
-        self.assertEqual(len(self.mails), 1)  # the login details only, no code
-        self.assertIn(self.site_api.docs[("User", EMAIL)]["new_password"], self.mails[0]["message"])
+        self.assertEqual(self.mails, [])  # no code, and no password: the site invites the owner
+        self.assertEqual(len(self.site_api.invites()), 1)
         self.assertEqual(frappe.db.get_value("Suite Site", request.suite_site, "status"), "Active")
 
-    def test_the_site_user_is_named_after_the_tenant_mail_domain(self) -> None:
-        self.set_setting("tenant_mail_zone", MAIL_ZONE)
-        request = frappe.get_doc(
-            {"doctype": "Suite Tenant Request", "email": EMAIL, "full_name": "Ada Lovelace", "label": "acme"}
-        ).insert()
-        request.reload()
-
-        login = f"new-signup@acme.{MAIL_ZONE}"
-        self.assertIn(("User", login), self.site_api.docs)
-        self.assertNotIn(("User", EMAIL), self.site_api.docs)
-        self.assertEqual(frappe.db.get_value("Suite Tenant", request.tenant, "user"), EMAIL)
-        details = self.mails[-1]
-        self.assertEqual(details["recipients"], [EMAIL])  # mailed where they signed up
-        self.assertIn(login, details["message"])
-        site = frappe.get_doc("Suite Site", request.suite_site)
-        site.assign_mail_domain = 0
-        self.assertRaisesRegex(frappe.ValidationError, "already assigned", site.save)
-
-    def test_a_notification_local_part_keeps_the_signup_address(self) -> None:
-        self.set_setting("tenant_mail_zone", MAIL_ZONE)
-        email = "notification@frappe.test"
-        frappe.db.delete("User", {"name": email})
-        frappe.get_doc(
-            {"doctype": "Suite Tenant Request", "email": email, "full_name": "Ada Lovelace", "label": "acme"}
-        ).insert()
-
-        self.assertIn(("User", email), self.site_api.docs)
+    def test_the_notification_local_part_cannot_sign_up(self) -> None:
+        values = {"doctype": "Suite Tenant Request", "full_name": "Ada Lovelace", "label": "acme"}
+        doc = frappe.get_doc({**values, "email": "notification@frappe.test"})
+        self.assertRaisesRegex(frappe.ValidationError, "kept for the site's notifications", doc.insert)
 
     def test_a_request_made_in_the_desk_is_checked_like_a_signup(self) -> None:
         def request(**fields):
@@ -150,7 +104,7 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertRaises(frappe.ValidationError, request(email="not-an-address").insert)
         self.assertRaises(frappe.ValidationError, request(full_name=" ").insert)
 
-    def test_stale_requests_expire_and_forget_their_password(self) -> None:
+    def test_stale_requests_expire(self) -> None:
         request = self.create()
         frappe.db.set_value(
             "Suite Tenant Request", request, "expires_at", frappe.utils.add_to_date(None, hours=-1)
@@ -159,7 +113,15 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         expire_requests()
 
         self.assertEqual(frappe.db.get_value("Suite Tenant Request", request, "status"), "Expired")
-        self.assertIsNone(self.stored_password(request))
+
+    def create_in_desk(self) -> str:
+        doc = {
+            "doctype": "Suite Tenant Request",
+            "email": EMAIL,
+            "full_name": "Ada Lovelace",
+            "label": "acme",
+        }
+        return frappe.get_doc(doc).insert().name
 
 
 class TestSignupContract(IntegrationTestCase):

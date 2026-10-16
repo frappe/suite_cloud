@@ -12,7 +12,7 @@ from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, SITE_ZONE, HostingFixt
 
 class TestSiteDomains(HostingFixtures, IntegrationTestCase):
     def setUp(self) -> None:
-        self.setup_hosting(tenant_mail_zone=None)
+        self.setup_hosting()
         self.vm = self.make_vm()
         self.tenant = self.make_hosted_tenant()
 

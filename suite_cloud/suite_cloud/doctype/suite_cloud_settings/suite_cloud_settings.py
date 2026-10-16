@@ -89,6 +89,10 @@ class SuiteCloudSettings(Document):
         if self.central_url:
             self.central_url = self.central_url.strip().rstrip("/")
         self.validate_central_connection()
+        if self.central_url and not self.tenant_mail_zone:
+            frappe.throw(
+                _("Set the Tenant Mail Zone: every hosted site gets a mail domain."), frappe.MandatoryError
+            )
         if self.default_region and not frappe.db.get_value("Region", self.default_region, "enabled"):
             frappe.throw(
                 _("Region {0} is not enabled; enable it before making it the default.").format(

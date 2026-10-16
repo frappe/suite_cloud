@@ -10,6 +10,10 @@ frappe.ui.form.on('Suite Site', {
 				frm.call('login_as_administrator').then((r) => window.open(r.message, '_blank')),
 			)
 		}
+		if (frm.doc.owner_invite) {
+			// The same invite while it is valid, a fresh one once it expired.
+			frm.add_custom_button(__('Resend Owner Invite'), () => frm.events.call(frm, 'resend_owner_invite', {}, __('Sending...')), __('Actions'))
+		}
 		if (frm.doc.status === 'Failed' || frm.doc.error) {
 			frm.add_custom_button(__('Retry'), () => frm.events.call(frm, 'retry', {}, __('Retrying...')), __('Actions'))
 		}

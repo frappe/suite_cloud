@@ -228,7 +228,9 @@ class SuiteTenant(Document):
         return frappe.db.count("Mail Domain", {"tenant": self.name})
 
     def account_count(self) -> int:
-        return frappe.db.count("Mail Account", {"tenant": self.name})
+        """The tenant's own accounts: system accounts are Suite Cloud's and count for nothing."""
+
+        return frappe.db.count("Mail Account", {"tenant": self.name, "is_system_account": 0})
 
     def group_count(self) -> int:
         return frappe.db.count("Mail Group", {"tenant": self.name})
@@ -298,9 +300,10 @@ class SuiteTenant(Document):
 
         ids = []
         for doctype in MAILBOX_DOCTYPES:
-            ids += frappe.get_all(
-                doctype, {"tenant": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
-            )
+            filters = {"tenant": self.name, "stalwart_id": ["is", "set"]}
+            if doctype == "Mail Account":
+                filters["is_system_account"] = 0  # Suite Cloud's own, not the tenant's usage
+            ids += frappe.get_all(doctype, filters, pluck="stalwart_id")
         if not ids:
             return 0  # building a client already fetches the session
         objects = get_client(self.get_cluster()).accounts.get_many(ids, properties=USAGE_PROPERTIES)

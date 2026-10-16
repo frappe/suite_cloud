@@ -252,13 +252,22 @@ class FakePilot:
 
 
 class FakeSite:
-    """What Configure and Mail write to a site, keyed by hostname."""
+    """What Configure, Mail and the owner's invite write to a site."""
 
     def __init__(self) -> None:
+        self.ids = itertools.count(1)
         self.singles: dict[str, dict] = {}
         self.docs: dict[tuple[str, str], dict] = {}
         self.calls: list[tuple] = []
         self.smtp_failures = 0
+
+    def create_doc(self, doctype: str, values: dict) -> dict:
+        name = f"{doctype.lower().replace(' ', '-')}-{next(self.ids)}"
+        self.docs[(doctype, name)] = {**values, "name": name, "is_verified": 0}
+        return self.docs[(doctype, name)]
+
+    def invites(self) -> list[dict]:
+        return [doc for (doctype, _name), doc in self.docs.items() if doctype == "Mail Account Request"]
 
     def get_doc(self, doctype: str, name: str) -> dict | None:
         return self.docs.get((doctype, name))
@@ -270,11 +279,8 @@ class FakeSite:
         self.calls.append((method, kwargs))
 
     def run_doc_method(self, doctype: str, name: str, method: str, **kwargs) -> dict:
-        self.calls.append((method, kwargs))
+        self.calls.append((method, kwargs) if doctype == "Suite Settings" else (method, name))
         return {"title": "ok"}
-
-    def ensure_user(self, values: dict) -> None:
-        self.docs.setdefault(("User", values["email"]), values)
 
     def ensure_email_account(self, values: dict) -> None:
         if self.smtp_failures:

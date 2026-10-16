@@ -11,8 +11,7 @@ from urllib.parse import urlparse
 
 import frappe
 from frappe import _
-from frappe.utils import cint, now
-from frappe.utils.password import remove_encrypted_password
+from frappe.utils import add_to_date, cint, get_datetime, now, now_datetime
 
 from suite_cloud.hosting import begin_step, commit, output_tail, run_in_background, undo_step, wait_for_task
 from suite_cloud.hosting.central import CentralUnavailableError
@@ -22,7 +21,7 @@ from suite_cloud.suite_cloud.doctype.dns_record.dns_record import delete_managed
 from suite_cloud.utils import get_config, log_exception
 
 MAX_HOSTNAME_ATTEMPTS = 5
-TENANT_SITE_ROLES = ("System Manager", "Suite Admin", "Suite User")
+INVITE_DAYS = 7
 WAITING_ERRORS = (PilotNotReady, SiteUnavailableError, CentralUnavailableError)
 
 
@@ -120,16 +119,14 @@ def mark_created(site) -> bool:
 
 
 def configure(site) -> bool:
-    """Connects the site to its tenant and creates the tenant's user; the site is then Active."""
+    """Connects the site to its tenant; the site is then Active. Its owner is invited once the
+    site can send mail (``invite_owner``)."""
 
     site.db_set("status", "Configuring")
-    client = site.get_site_client()
     if not site.suite_configured:
-        configure_suite(site, client)
+        configure_suite(site, site.get_site_client())
         site.db_set("suite_configured", 1)
         commit()
-    if not site.tenant_user_created:
-        create_tenant_user(site, client)
     activate(site)
     return True
 
@@ -177,35 +174,53 @@ def is_reachable_url(url: str) -> bool:
     return address.is_global
 
 
-def create_tenant_user(site, client) -> None:
-    """The tenant's owner on the site (see ``login_email``), with the password generated for its signup."""
-
-    user = frappe.get_doc("User", frappe.db.get_value("Suite Tenant", site.tenant, "user"))
-    request = site.get_request()
-    values = {
-        "email": site.login_email,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
-        "user_type": "System User",
-        "send_welcome_email": 0,
-        "roles": [{"role": role} for role in TENANT_SITE_ROLES],
-    }
-    if request and request.password:
-        values["new_password"] = request.get_password("password")
-    client.ensure_user(values)
-    site.db_set("tenant_user_created", 1)
-
-
 def activate(site) -> None:
     site.db_set({"status": "Active", "activated_at": now(), "error": site.follow_up_skip_reason})
+
+
+def invite_owner(site) -> bool:
+    """Suite's own invite to the owner, from the site's notification account: they choose their
+    password when they accept, so none is ever sent."""
+
+    invite = site.get_site_client().create_doc(
+        "Mail Account Request",
+        {
+            "account": site.login_email,
+            "backup_email": site.owner_email,
+            "is_admin": 1,  # Suite Admin; no desk access
+            "send_invite": 1,
+            "expires_at": str(add_to_date(now_datetime(), days=INVITE_DAYS)),
+        },
+    )
+    site.db_set({"owner_invite": invite["name"], "owner_invited_at": now()})
     if request := site.get_request():
-        request.complete(site)
+        request.complete()
+    return True
+
+
+def resend_owner_invite(site) -> None:
+    """The same invite again while it is valid; a fresh one once it expired or is gone."""
+
+    client = site.get_site_client()
+    invite = client.get_doc("Mail Account Request", site.owner_invite) if site.owner_invite else None
+    if invite and invite.get("is_verified"):
+        frappe.throw(_("The owner already accepted the invite."))
+    if invite and get_datetime(invite.get("expires_at")) > now_datetime():
+        client.run_doc_method("Mail Account Request", site.owner_invite, "send_verification_email")
+        site.db_set("owner_invited_at", now())
+        return
+    invite_owner(site)
 
 
 def follow_up(site) -> bool:
-    """The site domain and mail: each failure is noted on the site, which stays Active."""
+    """The site domain, mail and the owner's invite: each failure is noted on the site, which stays
+    Active."""
 
-    for label, step in site.pending_follow_ups():
+    attempted = set()
+    # Read again after each step: the owner's invite waits for the mail step before it.
+    while steps := [(label, step) for label, step in site.pending_follow_ups() if label not in attempted]:
+        label, step = steps[0]
+        attempted.add(label)
         begin_step()
         try:
             done = step(site)
@@ -271,7 +286,7 @@ def resume_status(site) -> str:
         return "Pending"
     if not site.tenant:
         return "Ready"
-    return "Active" if site.tenant_user_created else "Assigned"
+    return "Active" if site.suite_configured else "Assigned"
 
 
 def enqueue_drop(site: str) -> None:
@@ -326,8 +341,3 @@ def poll_pending_sites() -> None:
     for name in frappe.get_all("Suite Site", {"status": "Active"}, pluck="name"):
         if frappe.get_doc("Suite Site", name).pending_follow_ups():
             enqueue_provision(name)
-
-
-def forget_password(request: str) -> None:
-    remove_encrypted_password("Suite Tenant Request", request, "password")
-    frappe.db.set_value("Suite Tenant Request", request, "password", None, update_modified=False)

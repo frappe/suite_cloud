@@ -3,8 +3,11 @@
 
 frappe.ui.form.on('Suite Tenant Request', {
 	refresh(frm) {
-		if (frm.doc.status === 'Completed' && frm.doc.error) {
-			frm.add_custom_button(__('Resend Login Details'), () => frm.call('resend_login_details').then(() => frm.reload_doc()))
+		if (frm.doc.status === 'Completed') {
+			// The same invite while it is valid, a fresh one once it expired.
+			frm.add_custom_button(__('Resend Invite'), () =>
+				frm.call('resend_invite').then(() => frappe.show_alert({ message: __('Invite sent.'), indicator: 'green' })),
+			)
 		}
 		if (frm.doc.status === 'Failed') {
 			frm.add_custom_button(__('Retry'), () => frm.call('retry').then(() => frm.reload_doc()))

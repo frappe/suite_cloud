@@ -103,6 +103,8 @@ def ensure_account(site, domain) -> str:
                 "email": email,
                 "tenant": site.tenant,
                 "display_name": "Notifications",
+                "is_system_account": 1,
+                "disable_receiving": 1,  # it only sends the site's mail
             }
         )
         account.flags.password = password
@@ -155,14 +157,10 @@ def remove(site) -> None:
 
 
 def assert_not_hosted(doc) -> None:
-    """The tenant API's guard: the hosted domain and the notification account are Suite Cloud's."""
+    """The tenant API's guard for the hosted domain, which is Suite Cloud's. The notification
+    account is a system account, which the tenant API does not see at all."""
 
-    hosted = (
-        doc.hosted
-        if doc.doctype == "Mail Domain"
-        else frappe.db.exists("Suite Site", {"notification_account": doc.name, "status": ["!=", "Dropped"]})
-    )
-    if hosted:
+    if doc.hosted:
         frappe.throw(
             _("{0} is managed by Suite Cloud and cannot be changed.").format(doc.name), HostedObjectError
         )

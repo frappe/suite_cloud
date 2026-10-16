@@ -16,7 +16,10 @@ OWNER = "hosting-owner@frappe.test"
 class HostingFixtures:
     """Mixed into a test case; call ``setup_hosting`` from setUp."""
 
-    def setup_hosting(self, **settings) -> None:
+    def setup_hosting(self, real_mail: bool = False, **settings) -> None:
+        """``real_mail`` runs the mail step itself, which needs a cluster and a fake Stalwart; left
+        off, the site's mail is taken as ready, so the owner's invite follows."""
+
         frappe.flags.do_not_enqueue = True
         self.addCleanup(setattr, frappe.flags, "do_not_enqueue", False)
         for zone in (SITE_ZONE, MAIL_ZONE):
@@ -61,6 +64,7 @@ class HostingFixtures:
             confirming_dns_provider(),
             patch("suite_cloud.hosting.domains.verify_dns_record", return_value=True),
             patch("suite_cloud.mail.doctype.mail_domain.mail_domain.verify_dns_record", return_value=True),
+            *([] if real_mail else [patch("suite_cloud.mail.tenancy.hosted_domain.ensure", new=mail_ready)]),
         ):
             context.__enter__()
             self.addCleanup(context.__exit__, None, None, None)
@@ -123,3 +127,10 @@ def confirming_dns_provider():
     return patch(
         "suite_cloud.suite_cloud.doctype.dns_record.dns_record.get_dns_provider", return_value=provider
     )
+
+
+def mail_ready(site) -> bool:
+    """The mail step's outcome without a cluster: the site sends through its notification account."""
+
+    site.db_set("email_account_created", 1)
+    return True

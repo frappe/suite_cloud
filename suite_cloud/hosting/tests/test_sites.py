@@ -7,12 +7,12 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.hosting import capacity, sites
 from suite_cloud.hosting.central.site import SiteUnavailableError
 from suite_cloud.hosting.tests.fakes import REGION
-from suite_cloud.hosting.tests.fixtures import SITE_ZONE, HostingFixtures
+from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, SITE_ZONE, HostingFixtures
 
 
 class TestSuiteSite(HostingFixtures, IntegrationTestCase):
     def setUp(self) -> None:
-        self.setup_hosting(tenant_mail_zone=None)  # mail has its own tests
+        self.setup_hosting()
         self.vm = self.make_vm()
         self.tenant = self.make_hosted_tenant()
 
@@ -40,9 +40,37 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
         self.assertEqual(settings["suite_cloud_secret"], self.tenant.get_password("secret"))
         methods = [call[0] for call in self.site_api.calls]
         self.assertEqual(methods, ["suite.api.account.mark_onboarded", "validate_suite_cloud_credentials"])
-        user = self.site_api.docs[("User", self.tenant.user)]
-        self.assertEqual({r["role"] for r in user["roles"]}, set(sites.TENANT_SITE_ROLES))
-        self.assertNotIn("new_password", user)  # no signup, no password
+        self.assertFalse([key for key in self.site_api.docs if key[0] == "User"])  # Suite creates the owner
+
+    def test_the_owner_is_invited_once_the_site_can_send_mail(self) -> None:
+        name = capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        site = self.site(name)
+        (invite,) = self.site_api.invites()
+        self.assertEqual(invite["account"], f"hosting-owner@acme.{MAIL_ZONE}")
+        self.assertEqual(invite["backup_email"], self.tenant.user)  # no signup: the owner's own address
+        self.assertEqual((invite["is_admin"], invite["send_invite"]), (1, 1))
+        days = (frappe.utils.get_datetime(invite["expires_at"]) - frappe.utils.now_datetime()).days
+        self.assertEqual(days, 6)  # 7 days less the seconds the test took
+        self.assertEqual(site.owner_invite, invite["name"])
+
+    def test_resending_reuses_a_valid_invite_and_replaces_an_expired_one(self) -> None:
+        site = self.site(capacity.claim_site(self.tenant.name, "acme", REGION))
+
+        site.resend_owner_invite()
+        self.assertIn(("send_verification_email", site.owner_invite), self.site_api.calls)
+        self.assertEqual(len(self.site_api.invites()), 1)
+
+        self.site_api.invites()[0]["expires_at"] = str(frappe.utils.add_to_date(None, days=-1))
+        expired = site.owner_invite
+        site.resend_owner_invite()
+        self.assertEqual(len(self.site_api.invites()), 2)
+        self.assertNotEqual(self.site(site.name).owner_invite, expired)
+
+        self.site_api.invites()[1]["is_verified"] = 1
+        self.assertRaisesRegex(
+            frappe.ValidationError, "already accepted", self.site(site.name).resend_owner_invite
+        )
 
     def test_without_a_ready_site_one_is_created_for_the_tenant(self) -> None:
         name = capacity.claim_site(self.tenant.name, "acme", REGION)
@@ -193,7 +221,7 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
 
 class TestCapacity(HostingFixtures, IntegrationTestCase):
     def setUp(self) -> None:
-        self.setup_hosting(tenant_mail_zone=None)
+        self.setup_hosting()
 
     def test_the_pool_is_kept_full_without_duplicates(self) -> None:
         self.set_setting("ready_sites_per_region", 2)

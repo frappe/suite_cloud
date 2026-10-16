@@ -25,7 +25,6 @@ class SuiteSite(Document):
         from suite_cloud.hosting.doctype.suite_site_domain.suite_site_domain import SuiteSiteDomain
 
         activated_at: DF.Datetime | None
-        assign_mail_domain: DF.Check
         assign_site_domain: DF.Check
         attempts: DF.Int
         domains: DF.Table[SuiteSiteDomain]
@@ -36,6 +35,8 @@ class SuiteSite(Document):
         label: DF.Data | None
         mail_domain: DF.Link | None
         notification_account: DF.Link | None
+        owner_invite: DF.Data | None
+        owner_invited_at: DF.Datetime | None
         pilot_task: DF.Data | None
         primary_domain: DF.Data | None
         region: DF.Link
@@ -45,7 +46,6 @@ class SuiteSite(Document):
         ]
         suite_configured: DF.Check
         tenant: DF.Link | None
-        tenant_user_created: DF.Check
         virtual_machine: DF.Link | None
     # end: auto-generated types
 
@@ -63,23 +63,15 @@ class SuiteSite(Document):
         self.validate_assignments()
 
     def validate_assignments(self) -> None:
-        """A domain step that has begun cannot be opted out of; unticking would not undo it."""
+        """The site domain cannot be opted out of once it was added; unticking would not undo it."""
 
         before = None if self.is_new() else self.get_doc_before_save()
-        if not before:
-            return
-        started = {
-            "assign_site_domain": any(row.managed for row in before.domains),
-            # The tenant's user is named after the mail domain (login_email) once it exists.
-            "assign_mail_domain": bool(before.mail_domain or before.tenant_user_created),
-        }
-        for field, has_started in started.items():
-            if has_started and self.has_value_changed(field):
-                frappe.throw(
-                    _("{0} cannot change: the domain is already assigned.").format(
-                        _(self.meta.get_label(field))
-                    )
-                )
+        if (
+            before
+            and any(row.managed for row in before.domains)
+            and self.has_value_changed("assign_site_domain")
+        ):
+            frappe.throw(_("Assign Site Domain cannot change: the domain is already assigned."))
 
     def after_insert(self) -> None:
         sites.enqueue_provision(self.name)
@@ -99,19 +91,21 @@ class SuiteSite(Document):
         return labels.site_domain(self.label) if self.label else None
 
     @property
-    def login_email(self) -> str:
-        """The tenant user's address on the site: their own local part at the tenant's mail
-        domain, e.g. sagar.s@acme.frappesuite.com. Their signup address when the site gets no
-        mail domain, or when the local part is the notification mailbox's."""
+    def owner_email(self) -> str:
+        """Where the tenant's owner reads mail: their signup address, else their Suite Cloud user's."""
 
-        request = self.get_request()
-        owner = frappe.db.get_value("Suite Tenant", self.tenant, "user")
-        email = request.email if request else frappe.db.get_value("User", owner, "email")
-        local = email.split("@", 1)[0]
-        domain = labels.mail_domain(self.label) if self.assign_mail_domain and self.label else None
-        if not domain or local == get_config("notification_mailbox_local_part"):
-            return email
-        return validate_email_address(f"{local}@{domain}")
+        if request := self.get_request():
+            return request.email
+        return frappe.db.get_value("User", frappe.db.get_value("Suite Tenant", self.tenant, "user"), "email")
+
+    @property
+    def login_email(self) -> str:
+        """The owner's account on the site: their own local part at the tenant's mail domain, e.g.
+        sagar.s@acme.frappesuite.com for sagar.s@frappe.io."""
+
+        if not (domain := labels.mail_domain(self.label)):
+            frappe.throw(_("Set the Tenant Mail Zone in Suite Cloud Settings."))
+        return validate_email_address(f"{self.owner_email.split('@', 1)[0]}@{domain}")
 
     @property
     def follow_up_skip_reason(self) -> str | None:
@@ -134,8 +128,10 @@ class SuiteSite(Document):
             and not self.follow_up_skip_reason
         ):
             steps.append((_("Site domain"), domains.ensure_site_domain))
-        if self.assign_mail_domain and get_config("tenant_mail_zone") and not self.email_account_created:
+        if not self.email_account_created:
             steps.append((_("Mail"), hosted_domain.ensure))
+        elif not self.owner_invite:
+            steps.append((_("Owner invite"), sites.invite_owner))  # sent from the notification account
         return steps
 
     # --- related --------------------------------------------------------------------
@@ -174,6 +170,11 @@ class SuiteSite(Document):
         frappe.only_for("System Manager")
         self.assert_created()
         return self.get_pilot_client().site_login_url(self.hostname)
+
+    @frappe.whitelist()
+    def resend_owner_invite(self) -> None:
+        frappe.only_for("System Manager")
+        sites.resend_owner_invite(self)
 
     @frappe.whitelist()
     def retry(self) -> None:

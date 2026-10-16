@@ -17,8 +17,6 @@ from suite_cloud.utils import get_config, log_exception
 OTP_TTL = 600
 OTP_ATTEMPTS = 5
 REQUEST_TTL_HOURS = 24
-PASSWORD_BYTES = 18  # 24 URL-safe characters
-OPEN_STATUSES = ("Pending", "Verified", "Processing")
 
 
 class SuiteTenantRequest(Document):
@@ -36,7 +34,6 @@ class SuiteTenantRequest(Document):
         full_name: DF.Data
         ip_address: DF.Data | None
         label: DF.Data
-        password: DF.Password | None
         request_key: DF.Data | None
         status: DF.Literal["Pending", "Verified", "Processing", "Completed", "Failed", "Expired"]
         suite_site: DF.Link | None
@@ -51,7 +48,6 @@ class SuiteTenantRequest(Document):
         self.status = "Pending"
         self.request_key = secrets.token_urlsafe(32)
         self.expires_at = add_to_date(now_datetime(), hours=REQUEST_TTL_HOURS)
-        self.password = secrets.token_urlsafe(PASSWORD_BYTES)  # mailed once the site is ready
 
     def validate(self) -> None:
         if self.is_new():
@@ -67,6 +63,11 @@ class SuiteTenantRequest(Document):
         self.label = labels.validate_label(self.label)
         labels.assert_label_available(self.label)
         self.timezone = (self.timezone or "").strip() or None
+        if self.email.split("@", 1)[0] == get_config("notification_mailbox_local_part"):
+            # The owner's account would be the site's own notification account.
+            frappe.throw(
+                _("{0} cannot sign up: its name is kept for the site's notifications.").format(self.email)
+            )
 
     def after_insert(self) -> None:
         """A signup proves its email with a code; an operator's request is taken on their word."""
@@ -105,33 +106,10 @@ class SuiteTenantRequest(Document):
 
     # --- completion -------------------------------------------------------------
 
-    def complete(self, site) -> None:
-        """The site is ready: the user gets its link and their password, which is then forgotten."""
+    def complete(self) -> None:
+        """The site is ready and its owner invited from it: they choose their password there."""
 
         self.db_set({"status": "Completed", "error": None})
-        self.send_login_details(site)
-
-    def send_login_details(self, site) -> None:
-        """Sent at once, never queued: a queued mail would keep the password in the Email Queue."""
-
-        password = self.get_password("password", raise_exception=False)
-        if not password:
-            frappe.throw(_("The password of {0} is gone; reset it on the site instead.").format(self.email))
-        try:
-            frappe.sendmail(
-                recipients=[self.email],
-                subject=_("Your Frappe Suite workspace is ready"),
-                message=login_details_message(site.url, site.login_email, password),
-                delayed=False,
-            )
-        except Exception:
-            log_exception(f"Login details for signup {self.name} could not be mailed", self)
-            self.db_set("error", _("The login details could not be mailed; run Resend Login Details."))
-            return
-        from suite_cloud.hosting.sites import forget_password
-
-        forget_password(self.name)
-        self.db_set("error", None)
 
     # --- actions ----------------------------------------------------------------
 
@@ -144,11 +122,13 @@ class SuiteTenantRequest(Document):
         enqueue_processing(self.name)
 
     @frappe.whitelist()
-    def resend_login_details(self) -> None:
+    def resend_invite(self) -> None:
+        """The owner's invite again, or a fresh one once it expired."""
+
         frappe.only_for("System Manager")
         if self.status != "Completed" or not self.suite_site:
-            frappe.throw(_("The site of this request is not ready yet."))
-        self.send_login_details(frappe.get_doc("Suite Site", self.suite_site))
+            frappe.throw(_("The site of this request has not invited its owner yet."))
+        frappe.get_doc("Suite Site", self.suite_site).resend_owner_invite()
 
 
 def enqueue_processing(request: str) -> None:
@@ -224,31 +204,14 @@ def ensure_tenant(request, user: str, region: str) -> str:
 
 
 def expire_requests() -> None:
-    """Daily: stale signups expire, and no password outlives its request."""
-
-    from suite_cloud.hosting.sites import forget_password
+    """Daily: signups that never confirmed their email expire."""
 
     stale = frappe.get_all(
         "Suite Tenant Request", {"status": "Pending", "expires_at": ["<", now()]}, pluck="name"
     )
     for name in stale:
         frappe.db.set_value("Suite Tenant Request", name, "status", "Expired")
-    done = frappe.get_all(
-        "Suite Tenant Request",
-        {"status": ["not in", OPEN_STATUSES], "password": ["is", "set"]},
-        pluck="name",
-    )
-    for name in set(stale) | set(done):
-        forget_password(name)
     commit()
-
-
-def login_details_message(url: str, email: str, password: str) -> str:
-    escape = frappe.utils.escape_html
-    return _(
-        "Your workspace is ready at <a href='{0}'>{0}</a>.<br><br>Log in with<br>Email: {1}<br>Password: {2}"
-        "<br><br>Change the password after your first login."
-    ).format(escape(url), escape(email), escape(password))
 
 
 def otp_key(request: str) -> str:
