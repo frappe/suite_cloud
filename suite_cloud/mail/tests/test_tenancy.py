@@ -132,9 +132,9 @@ class TestSuiteTenant(TenancyTestCase):
             self.assertFalse(frappe.has_permission("Suite Tenant", "read", other))
             # Level 0 holds what a tenant may change about itself; the rest is the operator's.
             tenant = frappe.get_doc("Suite Tenant", self.tenant.name)
-            tenant.title, tenant.max_domains = "Renamed", 99
+            tenant.title, tenant.max_domains = "renamed.frappe.test", 99  # the suffix keeps tearDown's eye
             tenant.save()
-            self.assertEqual((tenant.title, tenant.max_domains), ("Renamed", 10))
+            self.assertEqual((tenant.title, tenant.max_domains), ("renamed.frappe.test", 10))
 
     def test_tenants_from_before_the_type_existed_are_suite_sites(self) -> None:
         from suite_cloud.patches.v1_0 import fill_tenant_type
