@@ -4,7 +4,7 @@ import frappe
 
 
 def pick_cluster(region: str | None) -> str | None:
-    """An active cluster that lists the region, else one that serves any region, else the default.
+    """An active cluster that lists the region's Stalwart region, else the default cluster.
 
     ``region`` names a Region; its ``stalwart_region`` (or its own code) is what a cluster lists.
     """
@@ -17,7 +17,7 @@ def pick_cluster(region: str | None) -> str | None:
         order_by="is_default desc, creation asc",
     )
     clusters = [frappe.get_cached_doc("Stalwart Cluster", name) for name in names]
-    for cluster in sorted(clusters, key=lambda c: not c.regions):  # listing the region comes first
-        if cluster.serves(code):
+    for cluster in clusters:
+        if code and cluster.regions and cluster.serves(code):
             return cluster.name
     return next((c.name for c in clusters if c.is_default), None)
