@@ -268,13 +268,15 @@
    "fieldname": "central_url",
    "fieldtype": "Data",
    "label": "Central URL",
+   "mandatory_depends_on": "eval:doc.central_url || doc.central_team || doc.central_api_key || doc.central_api_secret",
    "options": "URL"
   },
   {
-   "description": "The team that owns Suite Cloud's servers. The API key's user needs a team-wide role with server:create, server:view, cluster:view and server:console in it.",
+   "description": "The team that owns Suite Cloud's servers, picked from the teams the API key's user belongs to; enter the URL, key and secret first. The key's user needs a team-wide role with server:create, server:view, cluster:view and server:console in it.",
    "fieldname": "central_team",
-   "fieldtype": "Data",
-   "label": "Central Team"
+   "fieldtype": "Autocomplete",
+   "label": "Central Team",
+   "mandatory_depends_on": "eval:doc.central_url || doc.central_team || doc.central_api_key || doc.central_api_secret"
   },
   {
    "fieldname": "column_break_central",
@@ -283,12 +285,14 @@
   {
    "fieldname": "central_api_key",
    "fieldtype": "Data",
-   "label": "Central API Key"
+   "label": "Central API Key",
+   "mandatory_depends_on": "eval:doc.central_url || doc.central_team || doc.central_api_key || doc.central_api_secret"
   },
   {
    "fieldname": "central_api_secret",
    "fieldtype": "Password",
-   "label": "Central API Secret"
+   "label": "Central API Secret",
+   "mandatory_depends_on": "eval:doc.central_url || doc.central_team || doc.central_api_key || doc.central_api_secret"
   },
   {
    "fieldname": "servers_section",
@@ -296,7 +300,7 @@
    "label": "Servers"
   },
   {
-   "description": "Where a tenant's site goes when its signup names no region.",
+   "description": "Where a tenant's site goes when its signup names no region. Only enabled regions are offered: run Sync Regions under Frappe Cloud, then enable a region and set its proxy zone.",
    "fieldname": "default_region",
    "fieldtype": "Link",
    "label": "Default Region",
@@ -400,14 +404,14 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Zone under which each site gets <label>.<zone> as its primary domain. It needs a DNS provider and must differ from the tenant mail zone: a CNAME cannot share a name with MX and TXT records.",
+   "description": "Zone under which each site gets its label as its primary domain, e.g. acme.example.app. It may be the tenant mail zone: site domains then go under sites, e.g. acme.sites.example.com beside the mail domain acme.example.com. It needs a DNS provider.",
    "fieldname": "site_dns_zone",
    "fieldtype": "Link",
    "label": "Site DNS Zone",
    "options": "DNS Zone"
   },
   {
-   "description": "Zone under which each tenant gets <label>.<zone> as its mail domain. It needs a DNS provider and must not be the zone of a Stalwart cluster.",
+   "description": "Zone under which each tenant gets its label as its mail domain, e.g. acme.example.com. It may be the site DNS zone. It needs a DNS provider and must not be the zone of a Stalwart cluster.",
    "fieldname": "tenant_mail_zone",
    "fieldtype": "Link",
    "label": "Tenant Mail Zone",
@@ -415,7 +419,7 @@
   },
   {
    "default": "notification",
-   "description": "Local part of the account each site sends its own mail from, e.g. notification for notification@acme.<tenant mail zone>.",
+   "description": "Local part of the account each site sends its own mail from, e.g. notification for notification@acme.example.com.",
    "fieldname": "notification_mailbox_local_part",
    "fieldtype": "Data",
    "label": "Notification Mailbox",
@@ -425,7 +429,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-17 00:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

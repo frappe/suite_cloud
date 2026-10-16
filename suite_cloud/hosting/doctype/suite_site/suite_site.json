@@ -36,7 +36,7 @@
  ],
  "fields": [
   {
-   "description": "The site's name on Pilot, suite-<hex>.<server wildcard zone>.",
+   "description": "The site's name on Pilot: suite- and eight hex digits under the server's wildcard zone, e.g. suite-3f9a1c2b.blr1.frappe.cloud.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -90,7 +90,7 @@
    "search_index": 1
   },
   {
-   "description": "The tenant's label: acme gives acme.<site zone> and acme.<tenant mail zone>.",
+   "description": "The tenant's label. acme gives the site domain acme.sites.example.com and the mail domain acme.example.com, under the zones set in Suite Cloud Settings.",
    "fieldname": "label",
    "fieldtype": "Data",
    "label": "Label",
@@ -178,7 +178,7 @@
   },
   {
    "default": "1",
-   "description": "Give the site <label>.<site zone> as its primary domain once it is active.",
+   "description": "Give the site its label under the site DNS zone, e.g. acme.sites.example.com, as its primary domain once it is active.",
    "fieldname": "assign_site_domain",
    "fieldtype": "Check",
    "label": "Assign Site Domain"
@@ -196,7 +196,7 @@
   },
   {
    "default": "1",
-   "description": "Give the tenant <label>.<tenant mail zone> and send the site's mail from its notification account.",
+   "description": "Give the tenant its label under the tenant mail zone, e.g. acme.example.com, and send the site's mail from its notification account.",
    "fieldname": "assign_mail_domain",
    "fieldtype": "Check",
    "label": "Assign Mail Domain"
@@ -230,7 +230,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-16 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

@@ -42,6 +42,12 @@ class CentralClient:
     def my_capabilities(self) -> list[str]:
         return self.get("central.api.identity.my_capabilities", team=self.team)
 
+    def my_teams(self) -> list[dict]:
+        """The active teams of the key's user: ``name`` is the id the other calls take, ``label``
+        the team name (else the owner's email, else the id)."""
+
+        return self.get("central.api.identity.my_teams")
+
     def list_instances(self) -> list[dict]:
         """The regions the team may create servers in."""
 
@@ -140,9 +146,12 @@ def server_messages(body: dict) -> list[dict]:
         return []
 
 
-def get_central_client() -> CentralClient:
-    """The seam tests replace with a fake."""
+def get_central_client(credentials: dict | None = None) -> CentralClient:
+    """The seam tests replace with a fake. ``credentials`` (url, api_key, api_secret) are tried
+    before they are saved, to list the teams the key can pick from."""
 
+    if credentials:
+        return CentralClient(credentials["url"], credentials["api_key"], credentials["api_secret"], team="")
     settings = frappe.get_cached_doc("Suite Cloud Settings")
     if not settings.is_central_configured:
         frappe.throw(_("Set the Central URL, team, API key and secret in Suite Cloud Settings."))

@@ -123,7 +123,7 @@
    "label": "API Access"
   },
   {
-   "description": "Sent by the tenant as Authorization: Tenant <id>:<secret>. Stored encrypted and shown once, after Rotate Secret; rotating it invalidates the previous secret immediately.",
+   "description": "Sent by the tenant in the Authorization header as Tenant, its id, a colon and this secret. Stored encrypted and shown once, after Rotate Secret; rotating it invalidates the previous secret immediately.",
    "fieldname": "secret",
    "fieldtype": "Password",
    "hidden": 1,
@@ -274,7 +274,7 @@
    "link_fieldname": "tenant"
   }
  ],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-16 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Tenant",

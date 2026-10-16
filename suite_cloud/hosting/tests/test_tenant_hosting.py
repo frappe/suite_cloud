@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -14,9 +16,9 @@ class TestHostingSettings(HostingFixtures, IntegrationTestCase):
         self.setup_hosting()
         self.settings = frappe.get_single("Suite Cloud Settings")
 
-    def test_the_two_zones_must_differ(self) -> None:
+    def test_the_two_zones_may_be_one(self) -> None:
         self.settings.tenant_mail_zone = SITE_ZONE
-        self.assertRaisesRegex(frappe.ValidationError, "different zones", self.settings.save)
+        self.settings.save()  # one zone for both: site domains go under sites
 
     def test_zones_need_a_provider(self) -> None:
         frappe.db.set_value("DNS Zone", MAIL_ZONE, "dns_provider", "")
@@ -28,10 +30,66 @@ class TestHostingSettings(HostingFixtures, IntegrationTestCase):
         frappe.db.set_value("DNS Zone", ROOT_DOMAIN, "dns_provider", "Cloudflare")
         self.assertRaisesRegex(frappe.ValidationError, "zone of cluster", self.settings.save)
 
+    def test_the_central_connection_is_all_or_nothing(self) -> None:
+        for field in ("central_url", "central_team", "central_api_key", "central_api_secret"):
+            self.settings.reload()
+            self.settings.set(field, None)
+            with self.subTest(field):
+                self.assertRaises(frappe.MandatoryError, self.settings.save)
+
+        self.settings.reload()
+        self.settings.update(
+            {"central_url": None, "central_team": None, "central_api_key": None, "central_api_secret": None}
+        )
+        self.settings.save()
+        self.assertFalse(self.settings.is_central_configured)
+
+    def test_backfilling_defaults_is_not_stopped_by_a_partial_connection(self) -> None:
+        self.settings.central_team = None
+        self.settings.flags.ignore_mandatory = True
+        self.settings.save()
+
+    def test_the_default_region_must_be_enabled(self) -> None:
+        self.settings.default_region = REGION
+        frappe.db.set_value("Region", REGION, "enabled", 0)
+        self.assertRaisesRegex(frappe.ValidationError, "not enabled", self.settings.save)
+
     def test_central_is_configured_with_all_four_fields(self) -> None:
         self.assertTrue(self.settings.is_central_configured)
         self.settings.central_team = None
         self.assertFalse(self.settings.is_central_configured)
+
+    def test_the_team_picker_uses_the_credentials_on_the_form(self) -> None:
+        self.settings.update(
+            {
+                "central_url": "https://other-central.test ",
+                "central_team": None,
+                "central_api_secret": "******",
+            }
+        )
+
+        with patch("suite_cloud.hosting.central.get_central_client", return_value=self.central) as factory:
+            teams = self.settings.get_central_teams()
+
+        self.assertEqual(
+            teams,
+            [
+                {"value": "TEAM-00042", "label": "Suite Cloud (TEAM-00042)"},
+                {"value": "TEAM-00043", "label": "ops@frappe.test (TEAM-00043)"},
+                {"value": "TEAM-00007", "label": "TEAM-00007"},
+            ],
+        )
+        # An unchanged secret shows masked on the form: the stored one is used.
+        self.assertEqual(
+            factory.call_args.args[0],
+            {"url": "https://other-central.test", "api_key": "key", "api_secret": "secret"},
+        )
+
+    def test_the_team_picker_needs_the_credentials(self) -> None:
+        self.settings.central_api_key = None
+        self.assertRaisesRegex(
+            frappe.ValidationError, "API key and secret first", self.settings.get_central_teams
+        )
 
     def test_test_central_connection_reads_capabilities(self) -> None:
         self.assertIn("server:create", self.settings.test_central_connection())
@@ -59,15 +117,31 @@ class TestPlacement(HostingFixtures, IntegrationTestCase):
         # Clusters of the site the tests run on would compete; the transaction is rolled back.
         frappe.db.set_value("Stalwart Cluster", {"name": ["not like", f"%.{ROOT_DOMAIN}"]}, "enabled", 0)
 
-    def test_a_cluster_serving_the_region_is_preferred_over_the_default(self) -> None:
+    def test_a_cluster_listing_the_region_wins_else_the_default(self) -> None:
         serving = activate_cluster(make_cluster("blr", hostname=f"mail.blr.{ROOT_DOMAIN}"))
-        other = activate_cluster(
+        activate_cluster(make_cluster("any", hostname=f"mail.any.{ROOT_DOMAIN}", regions=[]))
+        default = activate_cluster(
             make_cluster("eu", hostname=f"mail.eu.{ROOT_DOMAIN}", regions=[{"region": "eu"}])
         )
-        other.db_set("is_default", 1)
+        default.is_default = 1
+        default.save()
 
-        self.assertEqual(pick_cluster(REGION), serving.name)
-        self.assertEqual(pick_cluster("nowhere"), other.name)
+        self.assertEqual(pick_cluster(REGION), serving.name)  # the region's Stalwart region is blr
+        # A cluster listing no region no longer takes every region: the default does.
+        self.assertEqual(pick_cluster("nowhere"), default.name)
+
+    def test_a_region_without_a_stalwart_region_falls_back_to_the_default(self) -> None:
+        activate_cluster(make_cluster("blr", hostname=f"mail.blr.{ROOT_DOMAIN}"))
+        default = activate_cluster(
+            make_cluster("eu", hostname=f"mail.eu.{ROOT_DOMAIN}", regions=[{"region": "eu"}])
+        )
+        default.is_default = 1
+        default.save()
+        region = frappe.get_doc("Region", REGION)
+        region.update({"enabled": 1, "proxy_zone": None, "stalwart_region": None})
+        region.save()  # neither is needed to enable it
+
+        self.assertEqual(pick_cluster(REGION), default.name)  # its own code, zz1, no cluster lists
 
     def test_a_new_hosted_tenant_is_placed_only_when_asked(self) -> None:
         cluster = activate_cluster(make_cluster())

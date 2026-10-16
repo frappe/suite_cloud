@@ -1,6 +1,7 @@
 """In-process stand-ins for Central, Pilot and a site's REST API, behind the client factories."""
 
 import itertools
+import secrets
 from contextlib import ExitStack, contextmanager
 from unittest.mock import patch
 
@@ -32,6 +33,14 @@ class FakeCentral:
     def my_capabilities(self) -> list[str]:
         return ["cluster:view", "server:console", "server:create", "server:view"]
 
+    def my_teams(self) -> list[dict]:
+        # Central folds the title into ``label``: the team name, else the owner's email, else the id.
+        return [
+            {"name": "TEAM-00042", "label": "Suite Cloud"},
+            {"name": "TEAM-00043", "label": "ops@frappe.test"},
+            {"name": "TEAM-00007", "label": "TEAM-00007"},
+        ]
+
     def list_instances(self) -> list[dict]:
         return [
             {
@@ -58,7 +67,7 @@ class FakeCentral:
                 raise CentralRejectedError("Request key reused with other settings.", "VALIDATION_ERROR")
             return self.find_action(key)
         self.arguments[key] = arguments
-        name = f"action-{next(self.ids)}"
+        name = f"action-{next(self.ids)}-{secrets.token_hex(3)}"  # unique across tests, as on Central
         failed = self.fail_creations
         self.actions[name] = {
             "action": name,

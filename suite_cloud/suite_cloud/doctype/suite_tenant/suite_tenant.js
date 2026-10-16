@@ -68,11 +68,11 @@ function adopt_directory(frm) {
 function create_hosted_site(frm) {
 	frappe.prompt(
 		[
-			{ fieldname: 'label', fieldtype: 'Data', label: __('Label'), reqd: 1, description: __('e.g. acme for acme.<site zone> and acme.<tenant mail zone>') },
+			{ fieldname: 'label', fieldtype: 'Data', label: __('Label'), reqd: 1, description: __('e.g. acme, which names the site and mail domains under the zones in Suite Cloud Settings') },
 			{ fieldname: 'region', fieldtype: 'Link', options: 'Region', label: __('Region'), get_query: () => ({ filters: { enabled: 1 } }) },
 		],
 		(values) =>
-			frm.call({ method: 'create_hosted_site', args: values, freeze: true, freeze_message: __('Claiming a site...') }).then((r) =>
+			frm.call({ doc: frm.doc, method: 'create_hosted_site', args: values, freeze: true, freeze_message: __('Claiming a site...') }).then((r) =>
 				frappe.set_route('Form', 'Suite Site', r.message),
 			),
 		__('Create Hosted Site'),
