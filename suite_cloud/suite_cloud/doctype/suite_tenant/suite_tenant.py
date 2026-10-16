@@ -70,8 +70,8 @@ class SuiteTenant(Document):
             if not frappe.utils.validate_email_address(self.contact_email):
                 frappe.throw(_("{0} is not a valid email address.").format(self.contact_email))
         self.allowed_ips = "\n".join(str(n) for n in parse_networks(self.allowed_ips))
-        if self.is_new() or self.has_value_changed("user"):
-            assert_can_own(self.user)
+        if self.user and (self.is_new() or self.has_value_changed("user")):
+            assert_can_own(self.user)  # a missing owner is the mandatory check's to report
         self.validate_limits()
         self.validate_stalwart_cluster()
 
@@ -336,8 +336,10 @@ class SuiteTenant(Document):
 def owner_query(
     doctype: str, txt: str, searchfield: str, start: int, page_len: int, filters: dict | None
 ) -> list:
-    """Link search for the owner: enabled users holding the Suite Tenant role."""
+    """Link search for the owner: enabled users holding the Suite Tenant role. Operators only:
+    the list names every tenant owner."""
 
+    frappe.only_for("System Manager")
     return frappe.get_all(
         "User",
         filters=[["Has Role", "role", "=", TENANT_ROLE], ["User", "enabled", "=", 1]],

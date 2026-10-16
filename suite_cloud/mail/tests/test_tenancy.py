@@ -103,10 +103,19 @@ class TestSuiteTenant(TenancyTestCase):
         owner.set("roles", [])
         self.assertRaisesRegex(frappe.ValidationError, "must keep", owner.save)
 
-        # The form offers only users who may own a tenant.
+        # The form offers only users who may own a tenant, and only to operators.
         offered = [row[0] for row in owner_query("User", "frappe.test", "name", 0, 20, None)]
         self.assertIn(TENANT_OWNER, offered)
         self.assertNotIn(plain, offered)
+        with user_context(TENANT_OWNER):
+            self.assertRaises(frappe.PermissionError, owner_query, "User", "", "name", 0, 20, None)
+
+    def test_owners_from_before_the_role_existed_receive_it(self) -> None:
+        from suite_cloud.patches.v1_0 import grant_owner_role
+
+        frappe.db.delete("Has Role", {"parent": TENANT_OWNER, "role": "Suite Tenant"})
+        grant_owner_role.execute()
+        self.assertTrue(frappe.db.exists("Has Role", {"parent": TENANT_OWNER, "role": "Suite Tenant"}))
 
     def test_owners_reach_only_their_own_tenants_documents(self) -> None:
         mine = self.make_domain()
@@ -138,7 +147,12 @@ class TestSuiteTenant(TenancyTestCase):
         self.cluster.db_set("status", "Pending")
         frappe.clear_document_cache("Stalwart Cluster", self.cluster.name)
         tenant = frappe.get_doc(
-            {"doctype": "Suite Tenant", "title": "other.frappe.test", "stalwart_cluster": self.cluster.name}
+            {
+                "doctype": "Suite Tenant",
+                "title": "other.frappe.test",
+                "stalwart_cluster": self.cluster.name,
+                "user": TENANT_OWNER,
+            }
         )
         self.assertRaisesRegex(frappe.ValidationError, "not active", tenant.insert)
 
