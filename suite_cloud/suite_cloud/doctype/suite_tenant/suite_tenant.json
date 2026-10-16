@@ -28,7 +28,7 @@
   "max_groups",
   "max_mailing_lists",
   "column_break_limits",
-  "used_disk_bytes"
+  "mail_used_disk_bytes"
  ],
  "fields": [
   {
@@ -191,11 +191,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Disk used by the tenant's accounts and groups together, as the cluster last reported it (kept for 5 minutes); nothing is stored.",
-   "fieldname": "used_disk_bytes",
+   "description": "Disk used by the tenant's mail accounts and groups together, as the Stalwart cluster last reported it (kept for 5 minutes); nothing is stored.",
+   "fieldname": "mail_used_disk_bytes",
    "fieldtype": "Int",
    "is_virtual": 1,
-   "label": "Used Disk",
+   "label": "Mail Disk Used",
    "options": "File Size",
    "read_only": 1
   }

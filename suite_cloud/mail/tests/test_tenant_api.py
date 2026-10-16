@@ -121,9 +121,9 @@ class TestTenantResolution(TenantApiTestCase):
         self.assertEqual(get_disk_usage()["used_disk_bytes"], 8704)
         # The desk form shows the same figure; nothing else that reads the document asks for it.
         doc = frappe.get_doc("Suite Tenant", self.tenant.name)
-        self.assertIsNone(doc.used_disk_bytes)
+        self.assertIsNone(doc.mail_used_disk_bytes)
         doc.run_method("onload")
-        self.assertEqual(doc.used_disk_bytes, 8704)
+        self.assertEqual(doc.mail_used_disk_bytes, 8704)
 
     def test_disk_usage_is_not_cached_when_the_cluster_cannot_answer(self) -> None:
         key = f"suite_cloud:disk-usage:{self.tenant.name}"
@@ -136,7 +136,7 @@ class TestTenantResolution(TenantApiTestCase):
             # The form still opens; the figure is simply absent.
             doc = frappe.get_doc("Suite Tenant", self.tenant.name)
             doc.run_method("onload")
-            self.assertIsNone(doc.used_disk_bytes)
+            self.assertIsNone(doc.mail_used_disk_bytes)
         self.assertIsNone(frappe.cache.get_value(key, expires=True))
 
     def test_site_profile_follows_the_workspace(self) -> None:

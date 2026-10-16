@@ -49,7 +49,7 @@ class SuiteTenant(Document):
         title: DF.Data
         status: DF.Literal["Active", "Suspended", "Archived"]
         user: DF.Link | None
-        used_disk_bytes: DF.Int
+        mail_used_disk_bytes: DF.Int
     # end: auto-generated types
 
     # --- lifecycle ------------------------------------------------------------
@@ -224,12 +224,12 @@ class SuiteTenant(Document):
         self.flags.with_usage = True  # the form shows the figure
 
     @property
-    def used_disk_bytes(self) -> int | None:
+    def mail_used_disk_bytes(self) -> int | None:
         """The virtual field: every serialisation reads it, so only the form pays for the lookup."""
 
-        return self.get_used_disk_bytes() if self.flags.with_usage else None
+        return self.get_mail_used_disk_bytes() if self.flags.with_usage else None
 
-    def get_used_disk_bytes(self) -> int | None:
+    def get_mail_used_disk_bytes(self) -> int | None:
         """A cluster that cannot answer costs the figure, not the form or the tenant profile."""
 
         try:
@@ -248,11 +248,11 @@ class SuiteTenant(Document):
         if not fresh and (usage := frappe.cache.get_value(key, expires=True)):
             return usage
 
-        usage = {"used_disk_bytes": self.fetch_used_disk_bytes(), "fetched_at": utc_iso(now_datetime())}
+        usage = {"used_disk_bytes": self.fetch_mail_used_disk_bytes(), "fetched_at": utc_iso(now_datetime())}
         frappe.cache.set_value(key, usage, expires_in_sec=DISK_USAGE_CACHE_TTL)
         return usage
 
-    def fetch_used_disk_bytes(self) -> int:
+    def fetch_mail_used_disk_bytes(self) -> int:
         """One cluster call per ``maxObjectsInGet`` ids, all on the tenant's cluster. A cluster that
         cannot answer raises: a partial sum must never be returned or cached."""
 
@@ -326,7 +326,7 @@ class SuiteTenant(Document):
                 "accounts": self.account_count(),
                 "groups": self.group_count(),
                 "mailing_lists": self.mailing_list_count(),
-                "used_disk_bytes": self.get_used_disk_bytes(),
+                "used_disk_bytes": self.get_mail_used_disk_bytes(),
             },
         }
 
