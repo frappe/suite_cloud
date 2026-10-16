@@ -23,6 +23,7 @@ CONFIG_KEYS = (
     "server_job_timeout",
     "sign_with_ed25519",
     "skip_domain_verification",
+    "verify_stalwart_tls",
     "dmarc_report_retention_days",
     "tls_report_retention_days",
 )
@@ -30,19 +31,13 @@ CONFIG_KEYS = (
 
 @request_cache
 def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tuple | Any:
-    """Fetches configuration values, prioritizing Suite Cloud Settings over the site config.
+    """Fetches configuration values from Suite Cloud Settings.
 
-    The site config fallback is the ``suite_cloud`` dict in ``site_config.json``. Cached per
-    request: the returned dict is shared, so callers must treat it as read-only.
+    Cached per request: the returned dict is shared, so callers must treat it as read-only.
     """
 
-    site_conf = frappe.conf.suite_cloud or {}
     settings = frappe.get_cached_doc("Suite Cloud Settings")
-    config = {}
-    for field in CONFIG_KEYS:
-        value = settings.get(field)
-        # Only an unset value falls through, so a deliberate 0 in settings still wins.
-        config[field] = site_conf.get(field) if value in (None, "") else value
+    config = {field: settings.get(field) for field in CONFIG_KEYS}
 
     if not key:
         return config

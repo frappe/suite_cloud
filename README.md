@@ -186,15 +186,7 @@ hostnames.
 
 ## Configuration
 
-Every value in Suite Cloud Settings can also be placed in `site_config.json` under a `suite_cloud`
-key. When both are set, the settings record wins.
-
-```json
-{ "suite_cloud": { "acme_contact_email": "ops@example.com", "stalwart_version": "v0.16.20" } }
-```
-
-On a development site that talks to a cluster with a staging certificate, set
-`suite_cloud.verify_stalwart_tls` to `false`.
+All configuration lives in Suite Cloud Settings; `site_config.json` is not consulted. On a development site that talks to a cluster with a staging certificate, turn off **Verify Stalwart TLS Certificates** in the Stalwart tab.
 
 ## Scheduled work
 

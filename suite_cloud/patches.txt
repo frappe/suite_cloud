@@ -13,3 +13,4 @@ suite_cloud.patches.v1_0.tenant_id_and_secret
 suite_cloud.patches.v1_0.rename_service_user
 suite_cloud.patches.v1_0.rename_settings_fields
 suite_cloud.patches.v1_0.drop_frappe_cloud_role
+suite_cloud.patches.v1_0.enable_stalwart_tls_verification

@@ -23,6 +23,8 @@
   "column_break_stalwart",
   "stalwart_cli_version",
   "stalwart_cli_download_url_template",
+  "connection_section",
+  "verify_stalwart_tls",
   "dkim_section",
   "sign_with_ed25519",
   "certificates_tab",
@@ -156,6 +158,18 @@
    "label": "Stalwart CLI Download URL Template",
    "length": 255,
    "reqd": 1
+  },
+  {
+   "fieldname": "connection_section",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "default": "1",
+   "description": "Verify the TLS certificate of clusters and egress gateways when talking to their management API. Turn off only on a development site whose cluster has a staging certificate.",
+   "fieldname": "verify_stalwart_tls",
+   "fieldtype": "Check",
+   "label": "Verify Stalwart TLS Certificates"
   },
   {
    "fieldname": "dkim_section",

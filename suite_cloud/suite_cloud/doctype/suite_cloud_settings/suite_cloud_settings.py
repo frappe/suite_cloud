@@ -32,6 +32,7 @@ class SuiteCloudSettings(Document):
         stalwart_cli_version: DF.Data
         stalwart_download_url_template: DF.Data
         stalwart_version: DF.Data
+        verify_stalwart_tls: DF.Check
     # end: auto-generated types
 
     def validate(self) -> None:
