@@ -9,7 +9,7 @@ frappe.ui.form.on('Suite Tenant', {
 	refresh(frm) {
 		if (frm.is_new()) return
 		frm.add_custom_button(__('Rotate Secret'), () => rotate_secret(frm), __('Actions'))
-		if (frm.doc.status !== 'Active') return
+		if (frm.doc.status !== 'Active' || !frm.doc.stalwart_cluster) return
 		frm.add_custom_button(__('Adopt Directory'), () => adopt_directory(frm), __('Actions'))
 	},
 
