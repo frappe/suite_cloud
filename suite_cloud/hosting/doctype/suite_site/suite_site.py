@@ -5,7 +5,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-from suite_cloud.hosting import domains, sites
+from suite_cloud.hosting import domains, labels, sites
 from suite_cloud.hosting.central import site as site_api
 from suite_cloud.utils import get_config
 
@@ -68,8 +68,7 @@ class SuiteSite(Document):
 
     @property
     def site_domain(self) -> str | None:
-        zone = get_config("site_dns_zone")
-        return f"{self.label}.{zone}" if zone and self.label else None
+        return labels.site_domain(self.label) if self.label else None
 
     @property
     def follow_up_skip_reason(self) -> str | None:

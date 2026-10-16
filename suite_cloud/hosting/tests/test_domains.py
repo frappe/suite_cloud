@@ -4,9 +4,10 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date
 
-from suite_cloud.hosting import capacity, domains
+from suite_cloud.hosting import capacity, domains, labels
+from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fakes import PROXY_ZONE, REGION
-from suite_cloud.hosting.tests.fixtures import SITE_ZONE, HostingFixtures
+from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, SITE_ZONE, HostingFixtures
 
 
 class TestSiteDomains(HostingFixtures, IntegrationTestCase):
@@ -103,3 +104,31 @@ class TestSiteDomains(HostingFixtures, IntegrationTestCase):
         self.assertRaisesRegex(
             frappe.ValidationError, "Let's Encrypt", self.site(site.name).add_domain, "shop.example.com"
         )
+
+
+class TestSharedZone(HostingFixtures, IntegrationTestCase):
+    """Sites and mail in one zone: the mail domain takes acme, the site acme.sites."""
+
+    def setUp(self) -> None:
+        self.setup_hosting(site_dns_zone=MAIL_ZONE, tenant_mail_zone=MAIL_ZONE)
+        self.make_vm()
+        self.tenant = self.make_hosted_tenant()
+
+    def test_the_site_domain_goes_under_sites(self) -> None:
+        self.assertEqual(labels.site_domain("acme"), f"acme.sites.{MAIL_ZONE}")
+        self.assertEqual(labels.mail_domain("acme"), f"acme.{MAIL_ZONE}")
+
+        site = self.site(capacity.claim_site(self.tenant.name, "acme", REGION))
+
+        self.assertEqual(site.primary_domain, f"acme.sites.{MAIL_ZONE}")
+        hosts = set(
+            frappe.get_all("DNS Record", {"managed_by": site.name, "dns_zone": MAIL_ZONE}, pluck="host")
+        )
+        self.assertEqual(hosts, {"acme.sites", "_frappe-verification.acme.sites"})
+
+    def test_labels_taken_under_sites_are_not_offered(self) -> None:
+        self.assertRaises(LabelNotAvailableError, labels.assert_label_available, "sites")
+        capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        frappe.db.set_value("Suite Site", {"label": "acme"}, "status", "Dropped")  # its records remain
+        self.assertRaises(LabelNotAvailableError, labels.assert_label_available, "acme")

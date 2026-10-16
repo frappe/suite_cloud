@@ -8,7 +8,7 @@ change nor delete the domain or the account.
 import frappe
 from frappe import _
 
-from suite_cloud.hosting import checkpoint
+from suite_cloud.hosting import checkpoint, labels
 from suite_cloud.mail.doctype.mail_account.mail_account import generate_password
 from suite_cloud.suite_cloud.doctype.dns_record.dns_record import reconcile_managed_records
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import relative_host
@@ -46,7 +46,7 @@ def ensure(site) -> bool:
 def ensure_domain(site):
     if site.mail_domain:
         return frappe.get_doc("Mail Domain", site.mail_domain)
-    name = f"{site.label}.{get_config('tenant_mail_zone')}"
+    name = labels.mail_domain(site.label)
     if frappe.db.exists("Mail Domain", name):
         domain = frappe.get_doc("Mail Domain", name)
     else:

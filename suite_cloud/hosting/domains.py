@@ -28,9 +28,9 @@ class DomainNotReadyError(frappe.ValidationError):
 
 
 def ensure_site_domain(site) -> bool:
-    """The site's own ``<label>.<site zone>``, published, attached and primary; True once it is."""
+    """The site's own domain (see ``labels.site_domain``), published, attached and primary; True once it is."""
 
-    domain = f"{site.label}.{get_config('site_dns_zone')}"
+    domain = site.site_domain
     row = site.get_domain(domain) or add_row(site, domain, managed=True)
     if row.status != "Active":
         fetch_records(site, row)
