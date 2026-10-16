@@ -49,7 +49,7 @@ class SuiteTenant(Document):
         stalwart_cluster: DF.Link | None
         title: DF.Data
         status: DF.Literal["Active", "Suspended", "Archived"]
-        tenant_type: DF.Literal["Suite Site", "Team", "Personal"]
+        tenant_type: DF.Literal["Suite Site", "Team", "Development"]
         mail_used_disk_bytes: DF.Int
     # end: auto-generated types
 

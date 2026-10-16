@@ -43,13 +43,13 @@
   },
   {
    "default": "Suite Site",
-   "description": "What the tenant is: a hosted Frappe Suite site, a team workspace, or one person's account.",
+   "description": "What the tenant is: a hosted Frappe Suite site, a team workspace, or a development setup.",
    "fieldname": "tenant_type",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Type",
-   "options": "Suite Site\nTeam\nPersonal",
+   "options": "Suite Site\nTeam\nDevelopment",
    "reqd": 1
   },
   {
