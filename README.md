@@ -211,7 +211,7 @@ All configuration lives in Suite Cloud Settings; `site_config.json` is not consu
 | --- | --- |
 | Every 5 minutes | Retry failed Server Jobs; poll nodes that are provisioning or draining; read every Virtual Machine from Central and drive unfinished ones on; drive Suite Sites that are mid-way; top up each region's pool of ready sites. |
 | Hourly | Verify unverified domains, except those set to skip it; refresh the DNS records of domains whose DKIM keys are not all stored yet; copy the DMARC and TLS reports each cluster received since the last run; add a server to a region short of free site slots, when servers are created automatically. |
-| Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses; drop DMARC and TLS reports older than their retention; sync regions from Central; expire stale signups and forget their passwords. |
+| Daily | Verify every DNS Record in the zones; check every cluster for configuration drift; check the PTR records of nodes and pool addresses; drop DMARC and TLS reports older than their retention; sync regions and every server from Central, marking a server Central no longer lists Terminated; expire stale signups and forget their passwords. |
 
 ## Development
 

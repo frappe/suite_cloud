@@ -204,8 +204,22 @@ def mark_installed(vm, app: dict) -> bool:
 # --- fleet ------------------------------------------------------------------------
 
 
-def refresh_fleet() -> None:
-    """Cron: one registry call updates every server, then unfinished ones are driven on."""
+def sync_fleet() -> None:
+    """Daily: Central's regions, then every server, including those Central no longer lists."""
+
+    from suite_cloud.hosting.doctype.region.region import sync_regions
+
+    sync_regions()
+    commit()
+    refresh_fleet(mark_missing=True)
+
+
+def refresh_fleet(mark_missing: bool = False) -> None:
+    """Cron: one registry call updates every server, then unfinished ones are driven on.
+
+    ``mark_missing`` ends the servers Central no longer lists, e.g. terminated from its dashboard,
+    so that no new site is placed on them.
+    """
 
     if not frappe.get_cached_doc("Suite Cloud Settings").is_central_configured:
         return
@@ -215,8 +229,12 @@ def refresh_fleet() -> None:
         return
     vms = [frappe.get_doc("Virtual Machine", n) for n in frappe.get_all("Virtual Machine", pluck="name")]
     for vm in vms:
-        if vm.central_resource_id and (server := find_server(registry, vm.central_resource_id)):
+        if not vm.central_resource_id or vm.status == "Terminated":
+            continue
+        if server := find_server(registry, vm.central_resource_id):
             apply_server(vm, server)
+        elif mark_missing:
+            mark_terminated(vm)
     report_unknown_creations(registry, {vm.central_action for vm in vms})
     commit()
     for vm in vms:
@@ -224,6 +242,18 @@ def refresh_fleet() -> None:
             enqueue_provision(vm.name)
         elif vm.is_ready:
             refresh_foreign_sites(vm)
+
+
+def mark_terminated(vm) -> None:
+    vm.db_set(
+        {
+            "status": "Terminated",
+            "enabled": 0,
+            "error": _("Central no longer lists server {0}.").format(vm.central_resource_id),
+            "last_synced_at": now(),
+        }
+    )
+    log_error(f"Server {vm.name} is gone from Central", vm.central_resource_id)
 
 
 def refresh_foreign_sites(vm) -> None:

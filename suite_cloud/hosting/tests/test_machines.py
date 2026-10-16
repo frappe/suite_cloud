@@ -130,6 +130,24 @@ class TestVirtualMachine(HostingFixtures, IntegrationTestCase):
         self.assertEqual(vm.foreign_site_count, 1)  # the baked site.local
         self.assertEqual(vm.free_slots, 2)
 
+    def test_the_daily_sync_reads_regions_and_ends_servers_gone_from_central(self) -> None:
+        vm = self.make_vm()
+        kept = self.make_vm()
+        frappe.db.set_value("Region", REGION, "display_name", "stale")
+        del self.central.servers[vm.central_resource_id]  # terminated from the dashboard
+
+        machines.refresh_fleet()  # the five-minute refresh leaves it alone
+        self.assertEqual(frappe.db.get_value("Virtual Machine", vm.name, "status"), "Running")
+
+        machines.sync_fleet()
+
+        vm.reload()
+        self.assertEqual((vm.status, vm.enabled), ("Terminated", 0))
+        self.assertIn("no longer lists", vm.error)
+        self.assertFalse(vm.has_free_slot)
+        self.assertEqual(frappe.db.get_value("Virtual Machine", kept.name, "status"), "Running")
+        self.assertEqual(frappe.db.get_value("Region", REGION, "display_name"), "Test Region")
+
     def test_open_pilot_asks_for_a_fresh_link(self) -> None:
         vm = self.make_vm()
         with user_context("Administrator"):

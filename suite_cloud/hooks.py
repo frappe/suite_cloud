@@ -69,7 +69,7 @@ scheduler_events = {
         "suite_cloud.mail.doctype.egress_ip_pool.egress_ip_pool.verify_all_ptr_records",
         "suite_cloud.mail.doctype.dmarc_report.dmarc_report.prune_expired_reports",
         "suite_cloud.mail.doctype.tls_report.tls_report.prune_expired_reports",
-        "suite_cloud.hosting.doctype.region.region.sync_regions",
+        "suite_cloud.hosting.machines.sync_fleet",
         "suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request.expire_requests",
     ],
 }
