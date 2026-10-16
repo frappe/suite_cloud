@@ -60,7 +60,7 @@
   },
   {
    "description": "The tenant's cluster, copied on every save. The domain is created on this cluster and its DNS records point at it.",
-   "fetch_from": "tenant.cluster",
+   "fetch_from": "tenant.stalwart_cluster",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -138,7 +138,7 @@
   },
   {
    "default": "0",
-   "description": "Set by Verify DNS Records when SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled. A System Manager or Suite Cloud Manager can set it by hand; the hourly check re-verifies domains that are unchecked, and checked ones with a mandatory record still unresolved, which unchecks a domain verified by hand unless Skip Scheduled Verification is on.",
+   "description": "Set by Verify DNS Records when SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled. A System Manager can set it by hand; the hourly check re-verifies domains that are unchecked, and checked ones with a mandatory record still unresolved, which unchecks a domain verified by hand unless Skip Scheduled Verification is on.",
    "fieldname": "is_verified",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -295,27 +295,16 @@
    "write": 1
   },
   {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Suite Cloud Manager",
-   "share": 1,
-   "write": 1
-  },
-  {
    "permlevel": 1,
    "read": 1,
    "role": "System Manager",
    "write": 1
   },
   {
-   "permlevel": 1,
+   "create": 1,
+   "delete": 1,
    "read": 1,
-   "role": "Suite Cloud Manager",
+   "role": "Suite Tenant",
    "write": 1
   }
  ],

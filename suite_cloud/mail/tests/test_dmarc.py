@@ -340,8 +340,6 @@ class TestDmarcReports(TenantApiTestCase):
         settings = frappe.get_doc("Suite Cloud Settings")
         settings.dmarc_report_retention_days = 0
         self.assertRaises(frappe.ValidationError, settings.save, ignore_permissions=True)
-        # A site from before the field existed saves with the default filled in, not a refusal.
         settings = frappe.get_doc("Suite Cloud Settings")
         settings.dmarc_report_retention_days = None
-        settings.save(ignore_permissions=True)
-        self.assertEqual(settings.dmarc_report_retention_days, reports.DEFAULT_RETENTION_DAYS)
+        self.assertRaises(frappe.ValidationError, settings.save, ignore_permissions=True)

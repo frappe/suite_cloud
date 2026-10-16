@@ -83,11 +83,11 @@ class MailDomain(Document):
     def validate(self) -> None:
         self.domain_name = validate_domain_name(self.domain_name)
         tenant = self.get_site()
-        self.cluster = tenant.cluster
+        self.cluster = tenant.get_cluster().name
         if self.is_new() and not self.flags.adopting:
             # Proof of control comes first: only someone who controls the domain's DNS learns
             # whether another tenant already holds it.
-            if ownership.required():
+            if ownership.required(tenant):
                 ownership.assert_ownership(tenant, self.domain_name)
             assert_domain_available(self.domain_name, self.tenant)
             tenant.assert_can_add_domain()
@@ -197,7 +197,7 @@ class MailDomain(Document):
         mail signed with the old keys stops verifying as soon as they do.
         """
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         self.assert_saved()
         algorithms = dkim_algorithms()
         sync.client_for(self).domains.replace_dkim_keys(self.stalwart_id, algorithms)
@@ -331,7 +331,9 @@ class MailDomain(Document):
         return frappe.get_cached_doc("Suite Tenant", self.tenant)
 
     def get_cluster(self) -> Document:
-        return frappe.get_cached_doc("Stalwart Cluster", self.cluster or self.get_site().cluster)
+        if self.cluster:
+            return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+        return self.get_site().get_cluster()
 
     def to_api(self, with_records: bool = True) -> dict:
         payload = domain_payload(self)

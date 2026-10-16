@@ -31,9 +31,11 @@ from suite_cloud.mail.tests.fixtures import (
     clear_request_cache,
     configure_settings,
     make_cluster,
+    make_owner,
     make_tenant,
     verified_ownership,
 )
+from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError
 
 MAIL_DOMAIN = "suite_cloud.mail.doctype.mail_domain.mail_domain"
 SUITE_TENANT = "suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant"
@@ -80,7 +82,7 @@ class TenantApiTestCase(IntegrationTestCase):
         """Simulates a request the auth hook already signed in for the tenant."""
 
         frappe.local.suite_tenant = None
-        frappe.set_user(frappe.db.get_single_value("Suite Cloud Settings", "tenant_service_user"))
+        frappe.set_user(tenant.user)
         frappe.utils.set_request(headers={"Authorization": f"Tenant {tenant.name}:{secret}"})
         frappe.local.form_dict = frappe._dict()
 
@@ -120,9 +122,9 @@ class TestTenantResolution(TenantApiTestCase):
         self.assertEqual(get_disk_usage()["used_disk_bytes"], 8704)
         # The desk form shows the same figure; nothing else that reads the document asks for it.
         doc = frappe.get_doc("Suite Tenant", self.tenant.name)
-        self.assertIsNone(doc.used_disk_bytes)
+        self.assertIsNone(doc.mail_used_disk_bytes)
         doc.run_method("onload")
-        self.assertEqual(doc.used_disk_bytes, 8704)
+        self.assertEqual(doc.mail_used_disk_bytes, 8704)
 
     def test_disk_usage_is_not_cached_when_the_cluster_cannot_answer(self) -> None:
         key = f"suite_cloud:disk-usage:{self.tenant.name}"
@@ -135,16 +137,16 @@ class TestTenantResolution(TenantApiTestCase):
             # The form still opens; the figure is simply absent.
             doc = frappe.get_doc("Suite Tenant", self.tenant.name)
             doc.run_method("onload")
-            self.assertIsNone(doc.used_disk_bytes)
+            self.assertIsNone(doc.mail_used_disk_bytes)
         self.assertIsNone(frappe.cache.get_value(key, expires=True))
 
     def test_site_profile_follows_the_workspace(self) -> None:
         profile = update_tenant_profile(title="  Acme Corp ", contact_email="Ops@Acme.test")
         self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", "ops@acme.test"))
         self.assertEqual(frappe.db.get_value("Suite Tenant", self.tenant.name, "title"), "Acme Corp")
-        # Only the fields passed change; a blank clears the contact.
+        # Only the fields passed change; a blank puts the contact back to the owner's email.
         profile = update_tenant_profile(contact_email="")
-        self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", None))
+        self.assertEqual((profile["title"], profile["contact_email"]), ("Acme Corp", self.tenant.user))
         # A notice address follows the general email rules, not the mail server's local-part rules.
         self.assertEqual(
             update_tenant_profile(contact_email="ops/team@acme.test")["contact_email"], "ops/team@acme.test"
@@ -197,12 +199,23 @@ class TestTenantResolution(TenantApiTestCase):
         authenticate()  # another scheme is left to Frappe
         self.assertEqual(frappe.session.user, "Guest")
 
+        ping_path = "/api/v2/method/suite_cloud.api.tenant.ping"
         for credential in (f"{self.tenant.name}:wrong", f"nope:{secret}", self.tenant.name):
-            frappe.utils.set_request(headers={"Authorization": f"Tenant {credential}"})
+            frappe.utils.set_request(path=ping_path, headers={"Authorization": f"Tenant {credential}"})
             self.assertRaisesRegex(frappe.AuthenticationError, "authentication failed", authenticate)
             self.assertEqual(frappe.session.user, "Guest")
 
-        frappe.utils.set_request(headers={"Authorization": f"Tenant {self.tenant.name}:{secret}"})
+        # A valid secret is worth nothing outside the tenant API, whatever roles the owner holds.
+        frappe.utils.set_request(
+            path="/api/method/frappe.client.get_list",
+            headers={"Authorization": f"Tenant {self.tenant.name}:{secret}"},
+        )
+        self.assertRaisesRegex(frappe.AuthenticationError, "only by the tenant API", authenticate)
+        self.assertEqual(frappe.session.user, "Guest")
+
+        frappe.utils.set_request(
+            path=ping_path, headers={"Authorization": f"Tenant {self.tenant.name}:{secret}"}
+        )
         authenticate()
         self.assertEqual(frappe.session.user, self.tenant.user)
 
@@ -210,9 +223,20 @@ class TestTenantResolution(TenantApiTestCase):
         frappe.set_user("Guest")
         self.assertRaises(frappe.AuthenticationError, authenticate)
 
+    def test_mail_endpoints_wait_for_a_cluster(self) -> None:
+        # setUp left the session as the fixture owner, who may not create tenants.
+        tenant = frappe.get_doc(
+            {"doctype": "Suite Tenant", "title": "new.frappe.test", "user": make_owner()}
+        ).insert(ignore_permissions=True)
+        self.act_as(tenant)
+        self.assertIsNone(ping()["cluster"])
+        with self.assertRaises(MailNotConfiguredError) as ctx:
+            domains.list_domains()
+        self.assertEqual(ctx.exception.http_status_code, 422)
+
     def test_requests_must_come_from_an_allowed_address_when_set(self) -> None:
         self.tenant.allowed_ips = "203.0.113.10\n2001:db8::/32\n 10.0.0.0/8 "
-        self.tenant.save(ignore_permissions=True)  # the fixture request runs as the service user
+        self.tenant.save(ignore_permissions=True)  # the fixture request runs as the tenant's owner
         self.assertEqual(self.tenant.allowed_ips, "203.0.113.10/32\n2001:db8::/32\n10.0.0.0/8")
         self.assertIn("allowed_ips", self.tenant.to_api())
 

@@ -6,7 +6,6 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint
 
-from suite_cloud.mail.reports import DEFAULT_RETENTION_DAYS
 from suite_cloud.utils import clear_config_cache, validate_version
 
 
@@ -19,19 +18,21 @@ class SuiteCloudSettings(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
-        acme_contact_email: DF.Data | None
+        acme_contact_email: DF.Data
         acme_directory_url: DF.Data
         default_dns_ttl: DF.Int
+        dmarc_report_retention_days: DF.Int
         public_url: DF.Data | None
         server_job_timeout: DF.Int
         sign_with_ed25519: DF.Check
-        tenant_service_user: DF.Link | None
         skip_domain_verification: DF.Check
         spam_filter_rules_version: DF.Data | None
         stalwart_cli_download_url_template: DF.Data
         stalwart_cli_version: DF.Data
         stalwart_download_url_template: DF.Data
         stalwart_version: DF.Data
+        tls_report_retention_days: DF.Int
+        verify_stalwart_tls: DF.Check
     # end: auto-generated types
 
     def validate(self) -> None:
@@ -55,10 +56,6 @@ class SuiteCloudSettings(Document):
             enqueue_recheck_of_vouched_domains()
 
     def validate_report_retention(self) -> None:
-        # A site set up before a field existed has it empty: the default applies rather than a
-        # refusal to save anything else. An explicit value under a day is still a mistake.
         for field in ("dmarc_report_retention_days", "tls_report_retention_days"):
-            if self.get(field) in (None, ""):
-                self.set(field, DEFAULT_RETENTION_DAYS)
-            elif cint(self.get(field)) < 1:
+            if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least one day.").format(_(self.meta.get_label(field))))

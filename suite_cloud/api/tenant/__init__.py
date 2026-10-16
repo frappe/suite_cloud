@@ -1,9 +1,9 @@
 """Tenant-facing API: what a tenant may do with its own slice of the directory.
 
 The tenant sends ``Authorization: Tenant <id>:<secret>``; the ``authenticate`` auth hook checks
-the secret and runs the request as the shared tenant service user. Every endpoint then resolves
-the calling tenant from the id in the header and only ever touches documents owned by that
-tenant. Objects of other tenants are reported as missing, never as forbidden.
+the secret and runs the request as the tenant's owner. Every endpoint then resolves the calling
+tenant from the id in the header and only ever touches documents owned by that tenant. Objects
+of other tenants are reported as missing, never as forbidden.
 """
 
 import functools
@@ -28,13 +28,12 @@ from suite_cloud.mail.stalwart.errors import (
     StalwartUnavailableError,
 )
 from suite_cloud.mail.tenancy.addresses import NOUNS
-from suite_cloud.utils import get_config
 
-API_PATH = "/api/v2/method/suite_cloud.api."
+API_PATHS = ("/api/v2/method/suite_cloud.api.", "/api/method/suite_cloud.api.")
 ERROR_KEYS = ("type", "message", "exception")
 
 OWNED_DOCTYPES = {"Mail Domain", "Mail Account", "Mail Group", "Mailing List"}
-MANAGER_ROLES = ("System Manager", "Suite Cloud Manager")
+MANAGER_ROLES = ("System Manager",)
 RATE_LIMIT = 300  # requests per tenant per minute
 ALIAS_CAP = 100  # aliases on one object; more than that is a list, not an account
 MEMBERSHIP_CAP = 500  # groups or members named in one request
@@ -95,14 +94,21 @@ def current_tenant():
 
 
 def authenticate() -> None:
-    """Frappe auth hook: ``Authorization: Tenant <id>:<secret>`` signs in the service user."""
+    """Frappe auth hook: ``Authorization: Tenant <id>:<secret>`` signs in the tenant's owner.
+
+    Only for the tenant API: every endpoint there resolves the tenant and checks its state and
+    address first. Anywhere else the owner's roles would be reachable with the secret alone.
+    """
 
     name, secret = _credentials_from_header()
     if not name:
         return
+    if not frappe.request.path.startswith(API_PATHS):
+        raise frappe.AuthenticationError(_("Tenant credentials are accepted only by the tenant API."))
 
     stored = None
-    if frappe.db.get_value("Suite Tenant", name, "enabled"):
+    tenant = frappe.db.get_value("Suite Tenant", name, ["enabled", "user"], as_dict=True)
+    if tenant and tenant.enabled:
         stored = get_decrypted_password("Suite Tenant", name, "secret", raise_exception=False)
     if not stored or not secrets.compare_digest(stored, secret):
         request_ip = getattr(frappe.local, "request_ip", None)
@@ -110,20 +116,30 @@ def authenticate() -> None:
         raise frappe.AuthenticationError(_("Tenant authentication failed."))
 
     form_dict = frappe.local.form_dict
-    frappe.set_user(get_config("tenant_service_user"))
+    frappe.set_user(tenant.user)
     frappe.local.form_dict = form_dict  # set_user clears the request body Frappe already parsed
 
 
-def _resolve_tenant():
-    service_user = get_config("tenant_service_user")
+def _tenant_from_secret() -> str | None:
+    """The tenant whose secret signed this request in: the auth hook ran it as the tenant's owner."""
 
-    if frappe.session.user == service_user:
-        name = _credentials_from_header()[0]
-    elif frappe.session.user != "Guest" and set(frappe.get_roles()) & set(MANAGER_ROLES):
-        # Operators may act on behalf of a tenant from the desk or a script.
-        name = frappe.form_dict.get("tenant") or frappe.get_request_header("X-Suite-Tenant")
-    else:
-        name = None
+    name = _credentials_from_header()[0]
+    if name and frappe.session.user == frappe.db.get_value("Suite Tenant", name, "user"):
+        return name
+    return None
+
+
+def _tenant_from_operator() -> str | None:
+    """Operators may act on behalf of a tenant from the desk or a script."""
+
+    if frappe.session.user == "Guest" or not set(frappe.get_roles()) & set(MANAGER_ROLES):
+        return None
+    return frappe.form_dict.get("tenant") or frappe.get_request_header("X-Suite-Tenant")
+
+
+def _resolve_tenant():
+    via_secret = _tenant_from_secret()
+    name = via_secret or _tenant_from_operator()
 
     request_ip = getattr(frappe.local, "request_ip", None)
     if not name or not frappe.db.exists("Suite Tenant", name):
@@ -137,7 +153,7 @@ def _resolve_tenant():
             _("Tenant {0} is {1} and cannot use the API.").format(tenant.name, tenant.status.lower()),
             TenantSuspendedError,
         )
-    if frappe.session.user == service_user and not tenant.allows_ip(request_ip):
+    if via_secret and not tenant.allows_ip(request_ip):
         # A secret copied out of a tenant's config is worthless from anywhere but the tenant's own servers.
         # Either the secret has leaked or the tenant moved servers; operators need to know which.
         log_refusal_once(tenant.name, request_ip, ", ".join((tenant.allowed_ips or "").split("\n")))
@@ -205,7 +221,19 @@ def tenant_api(fn: Callable) -> Callable:
         with api_errors():
             return fn(*args, **kwargs)
 
+    wrapper.is_tenant_api = True  # the contract test checks every endpoint carries this
     return wrapper
+
+
+def mail_api(fn: Callable) -> Callable:
+    """A ``tenant_api`` for the mail endpoints: a tenant without a Stalwart cluster has no mail to act on."""
+
+    @functools.wraps(fn)
+    def wrapper(*args, **kwargs):
+        current_tenant().assert_mail_configured()
+        return fn(*args, **kwargs)
+
+    return tenant_api(wrapper)
 
 
 def assert_arguments(fn: Callable, args: tuple, kwargs: dict) -> None:
@@ -255,7 +283,7 @@ def trim_errors(response, request) -> None:
     """Only the documented keys of an error leave the API: Frappe's desk hints (title, indicator,
     as_table) mean nothing to a REST client."""
 
-    if not request.path.startswith(API_PATH) or response.status_code < 400 or not response.is_json:
+    if not request.path.startswith(API_PATHS) or response.status_code < 400 or not response.is_json:
         return
     body = response.get_json(silent=True)
     if not body or "errors" not in body:
@@ -361,7 +389,7 @@ def page_size(limit: Any, cap: int) -> int:
 
     try:
         wanted = int(limit)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         wanted = cap
     return max(1, min(wanted, cap))
 
@@ -396,7 +424,7 @@ def as_datetime(value: Any) -> datetime | None:
         return None
     try:
         return get_datetime(value)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         frappe.throw(
             _("{0} is not a date. Use ISO 8601, for example 2026-03-04T05:06:07.").format(value),
             InvalidInputError,
@@ -425,7 +453,8 @@ def get_disk_usage(fresh: bool = False) -> dict:
 def update_tenant_profile(title: str | None = None, contact_email: str | None = None) -> dict:
     """What the tenant says about itself: its workspace name as the title, and where to reach it.
 
-    Only the fields passed change; an empty string clears the contact. The title cannot be empty.
+    Only the fields passed change; an empty string puts the contact back to the owner's email. The
+    title cannot be empty.
     """
 
     tenant = current_tenant()
@@ -433,5 +462,5 @@ def update_tenant_profile(title: str | None = None, contact_email: str | None = 
         tenant.title = title.strip()
     if contact_email is not None:
         tenant.contact_email = contact_email.strip() or None
-    tenant.save(ignore_permissions=True)
+    tenant.save()
     return tenant.to_api()

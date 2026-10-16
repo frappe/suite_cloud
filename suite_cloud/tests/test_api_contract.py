@@ -55,6 +55,12 @@ class TestApiVerbs(UnitTestCase):
         names = {name for _, name, _ in api_functions()}
         self.assertTrue({"ping", "create_domain", "list_accounts", "delete_mailing_list"} <= names)
 
+    def test_every_endpoint_resolves_the_tenant_first(self) -> None:
+        # Tenant credentials sign the owner in; only the tenant_api wrapper checks state and address.
+        for path, _, function in api_functions():
+            with self.subTest(path):
+                self.assertTrue(getattr(function, "is_tenant_api", False))
+
 
 class TestApiInput(UnitTestCase):
     def test_malformed_input_is_a_400(self) -> None:

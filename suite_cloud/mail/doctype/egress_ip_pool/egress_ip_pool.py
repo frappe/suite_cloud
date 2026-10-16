@@ -118,7 +118,7 @@ class EgressIPPool(Document):
     def verify_ptr(self, address: str | None = None) -> dict[str, bool]:
         """Check the reverse DNS of one address row (by row name) or of every address."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         rows = [row for row in self.addresses if not address or row.name == address]
         if address and not rows:
             frappe.throw(_("Address row {0} not found.").format(address))

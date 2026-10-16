@@ -441,7 +441,7 @@
   {
    "group": "Tenancy",
    "link_doctype": "Suite Tenant",
-   "link_fieldname": "cluster"
+   "link_fieldname": "stalwart_cluster"
   },
   {
    "group": "Tenancy",
@@ -480,18 +480,6 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "export": 1,
-   "print": 1,
-   "read": 1,
-   "report": 1,
-   "role": "Suite Cloud Manager",
    "share": 1,
    "write": 1
   }

@@ -13,7 +13,7 @@ from suite_cloud.provisioning.ansible import PlaybookRun, playbook_path, playboo
 from suite_cloud.utils import get_config, log_exception
 
 # Every function a job may run to build its variables, and every method it may call back on its
-# server. A Suite Cloud Manager can create Server Job rows; a free choice here would be a way to
+# server. A System Manager can create Server Job rows; a free choice here would be a way to
 # run any callable in the bench as the worker.
 VARIABLES_BUILDERS = (
     "suite_cloud.mail.cluster.bootstrap.build_node_variables",
@@ -214,7 +214,7 @@ class ServerJob(Document):
 
     @frappe.whitelist()
     def retry(self) -> None:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if self.status != "Failed" and not self.is_stale():
             frappe.throw(_("Only failed (or stale running) jobs can be retried."))
 

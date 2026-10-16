@@ -176,7 +176,7 @@ class EgressGateway(Document):
 
     @frappe.whitelist()
     def verify_ssh(self) -> bool:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if not self.ssh_host_keys:
             # First contact: the operator has just put the cluster's key on this box, so the key it
             # presents now is the one every later connection must match.
@@ -198,21 +198,21 @@ class EgressGateway(Document):
     def reset_ssh_host_keys(self) -> None:
         """Forgets the pinned host keys after the server was reinstalled; Verify SSH records the new ones."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         self.db_set({"ssh_host_keys": None, "ssh_verified": 0}, update_modified=False)
         # The next Verify SSH trusts whatever answers, so record who dropped the pin and when.
         self.add_comment("Info", _("Reset the SSH host keys."))
 
     @frappe.whitelist()
     def provision(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if not self.ssh_verified:
             frappe.throw(_("Verify the SSH connection first."))
         return egress.provision_gateway(self).name
 
     @frappe.whitelist()
     def sync_config(self) -> dict:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if self.status != "Active":
             frappe.throw(_("Only an active gateway can be synced."))
         return self.push_config()
@@ -227,7 +227,7 @@ class EgressGateway(Document):
 
     @frappe.whitelist()
     def preview_plan(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return plan.redacted(egress.gateway_plan(self))
 
     @frappe.whitelist()
@@ -237,19 +237,19 @@ class EgressGateway(Document):
 
     @frappe.whitelist()
     def check_health(self) -> bool:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return egress.check_gateway(self)
 
     @frappe.whitelist()
     def upgrade(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return egress.upgrade_gateway(self).name
 
     @frappe.whitelist()
     def replace_dkim_keys(self) -> None:
         """Emergency replacement of the gateway domain's keys after a leak, same selectors."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         client = self.get_client()
         domain = client.domains.find_by_name(self.hostname)
         if not domain:

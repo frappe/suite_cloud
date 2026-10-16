@@ -8,7 +8,6 @@
   "suite_cloud_section",
   "public_url",
   "column_break_general",
-  "tenant_service_user",
   "skip_domain_verification",
   "jobs_section",
   "server_job_timeout",
@@ -23,6 +22,8 @@
   "column_break_stalwart",
   "stalwart_cli_version",
   "stalwart_cli_download_url_template",
+  "connection_section",
+  "verify_stalwart_tls",
   "dkim_section",
   "sign_with_ed25519",
   "certificates_tab",
@@ -57,14 +58,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Every tenant request runs as this user. It is created on install and needs no changes.",
-   "fieldname": "tenant_service_user",
-   "fieldtype": "Link",
-   "label": "Tenant Service User",
-   "options": "User",
-   "read_only": 1
-  },
-  {
    "default": "0",
    "description": "Take a tenant's word for its domains: add them without the TXT record that proves control, and treat them as verified without checking their DNS records. For a development cloud, whose test domains exist in no public DNS. Never on a shared cluster: a wrongly claimed domain locks its owner out, and Stalwart accepts mail for every domain marked verified. Turning it off re-checks the domains it vouched for.",
    "fieldname": "skip_domain_verification",
@@ -90,17 +83,19 @@
   },
   {
    "default": "90",
-   "description": "How long fetched DMARC reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
+   "description": "How long fetched DMARC reports are kept. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
    "fieldname": "dmarc_report_retention_days",
    "fieldtype": "Int",
-   "label": "DMARC Report Retention (Days)"
+   "label": "DMARC Report Retention (Days)",
+   "reqd": 1
   },
   {
    "default": "90",
-   "description": "How long fetched TLS reports are kept; empty means 90 days. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
+   "description": "How long fetched TLS reports are kept. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
    "fieldname": "tls_report_retention_days",
    "fieldtype": "Int",
-   "label": "TLS Report Retention (Days)"
+   "label": "TLS Report Retention (Days)",
+   "reqd": 1
   },
   {
    "fieldname": "stalwart_tab",
@@ -158,6 +153,18 @@
    "reqd": 1
   },
   {
+   "fieldname": "connection_section",
+   "fieldtype": "Section Break",
+   "label": "Connection"
+  },
+  {
+   "default": "1",
+   "description": "Verify the TLS certificate of clusters and egress gateways when talking to their management API. Turn off only on a development site whose cluster has a staging certificate.",
+   "fieldname": "verify_stalwart_tls",
+   "fieldtype": "Check",
+   "label": "Verify Stalwart TLS Certificates"
+  },
+  {
    "fieldname": "dkim_section",
    "fieldtype": "Section Break",
    "label": "DKIM Signing"
@@ -193,11 +200,13 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "admin@example.com",
    "description": "Address the certificate authority writes to about expiring certificates. Used by clusters that do not set their own contact.",
    "fieldname": "acme_contact_email",
    "fieldtype": "Data",
    "label": "ACME Contact Email",
-   "options": "Email"
+   "options": "Email",
+   "reqd": 1
   },
   {
    "fieldname": "dns_tab",
@@ -234,16 +243,6 @@
    "print": 1,
    "read": 1,
    "role": "System Manager",
-   "share": 1,
-   "write": 1
-  },
-  {
-   "create": 1,
-   "delete": 1,
-   "email": 1,
-   "print": 1,
-   "read": 1,
-   "role": "Suite Cloud Manager",
    "share": 1,
    "write": 1
   }

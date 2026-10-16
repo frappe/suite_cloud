@@ -36,7 +36,7 @@ Confirms the credentials and returns the tenant profile, including where its mai
 }
 ```
 
-`status` is `Active`, `Suspended` or `Archived`. A limit of `null` means no limit. `max_disk_gb` is the disk the tenant's plan includes; it does not cap the quotas of the tenant's accounts and groups. `used_disk_bytes` is the figure [`get_disk_usage`](#get_disk_usage) answers, or `null` when the mail server cannot answer.
+`status` is `Active`, `Suspended` or `Archived`. `cluster`, `jmap_url` and `mail_hostname` are `null` until an operator sets the tenant up for Mail; until then every mail call answers a 422 `MailNotConfiguredError`, while the tenant calls on this page keep working. A limit of `null` means no limit. `max_disk_gb` is the disk the tenant's plan includes; it does not cap the quotas of the tenant's accounts and groups. `used_disk_bytes` is the figure [`get_disk_usage`](#get_disk_usage) answers, or `null` when the mail server cannot answer.
 
 ## `get_disk_usage`
 
@@ -64,6 +64,6 @@ Suite Cloud asks the mail server for every account and group of the tenant in as
 | Parameter | Type | Meaning |
 | --- | --- | --- |
 | `title` | string | The tenant's workspace name, shown to operators. It cannot be empty. |
-| `contact_email` | string | Where Suite Cloud sends tenant-specific notices. An empty string clears it. |
+| `contact_email` | string | Where Suite Cloud sends tenant-specific notices. An empty string puts it back to the owner's email. |
 
 Only the fields passed change. Returns the tenant profile as `ping` does. The Suite app sends both fields whenever its settings change.

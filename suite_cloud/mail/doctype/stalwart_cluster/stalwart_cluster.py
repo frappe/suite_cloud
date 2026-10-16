@@ -116,8 +116,14 @@ class StalwartCluster(Document):
             egress.resync_cluster(self)
 
     def on_trash(self) -> None:
-        for doctype in ("Stalwart Node", "Suite Tenant", "Egress Gateway", "Egress IP Pool"):
-            if frappe.db.exists("DocType", doctype) and frappe.db.exists(doctype, {"cluster": self.name}):
+        dependants = (
+            ("Stalwart Node", "cluster"),
+            ("Suite Tenant", "stalwart_cluster"),
+            ("Egress Gateway", "cluster"),
+            ("Egress IP Pool", "cluster"),
+        )
+        for doctype, field in dependants:
+            if frappe.db.exists("DocType", doctype) and frappe.db.exists(doctype, {field: self.name}):
                 frappe.throw(_("Remove every {0} of this cluster first.").format(_(doctype)))
         dns.delete_cluster_records(self)
 
@@ -246,14 +252,14 @@ class StalwartCluster(Document):
 
     @frappe.whitelist()
     def preview_plan(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return plan.redacted(plan.cluster_plan(self))
 
     @frappe.whitelist()
     def sync_config(self) -> dict:
         """Pushes the generated configuration to the running cluster and reloads it."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if self.status != "Active":
             frappe.throw(_("Only an active cluster can be synced; provision the first node instead."))
         return self.push_config()
@@ -270,7 +276,7 @@ class StalwartCluster(Document):
 
     @frappe.whitelist()
     def check_drift(self) -> dict:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         report = plan.drift_report(self)
         self.db_set("drift_report", frappe.as_json(report), update_modified=False)
         return report
@@ -279,19 +285,19 @@ class StalwartCluster(Document):
     def reconcile_directory(self) -> dict:
         """Reports domains/accounts/lists that differ between Suite Cloud and the cluster; never mutates."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return reconcile.directory_report(self)
 
     @frappe.whitelist()
     def finish_bootstrap(self) -> bool:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return bootstrap.finish_bootstrap(self)
 
     @frappe.whitelist()
     def rotate_api_key(self) -> None:
         """Mints a fresh management key with the admin credentials and forgets the old one."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         client = self.get_admin_client()
         old = client.api_keys.find_local(description=plan.API_KEY_DESCRIPTION)
         _, secret = client.api_keys.create_secret(
@@ -311,7 +317,7 @@ class StalwartCluster(Document):
         Stalwart publishes the new records itself; without one they must be published by hand.
         """
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         client = self.get_client()
         domain = client.domains.find_by_name(self.default_domain)
         if not domain:
@@ -329,7 +335,7 @@ class StalwartCluster(Document):
     def upgrade_nodes(self) -> list[str]:
         """Upgrades every active node one after the other to the cluster's Stalwart version."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return [bootstrap.upgrade_node(node).name for node in self.get_nodes(("Active",))]
 
 

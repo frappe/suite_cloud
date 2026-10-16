@@ -27,7 +27,9 @@ def adopt_directory(tenant_name: str) -> dict:
     tenant = frappe.get_doc("Suite Tenant", tenant_name)
     cluster = tenant.get_cluster()
     others = set(
-        frappe.get_all("Suite Tenant", {"cluster": cluster.name, "name": ["!=", tenant.name]}, pluck="name")
+        frappe.get_all(
+            "Suite Tenant", {"stalwart_cluster": cluster.name, "name": ["!=", tenant.name]}, pluck="name"
+        )
     )
     for doctype in ("Mail Domain", "Mail Account", "Mail Group", "Mailing List"):
         # Rows left by a tenant that moved or was removed still say whose the cluster's objects are.

@@ -10,9 +10,11 @@ import hashlib
 from typing import TYPE_CHECKING
 
 import frappe
+from frappe.utils import cint
 
 from suite_cloud.mail.stalwart.client import StalwartClient
 from suite_cloud.mail.stalwart.connection import ConnectionInfo, JMAPConnection, SessionStore
+from suite_cloud.utils import get_config
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -113,6 +115,6 @@ def session_store(key: str) -> SessionStore:
 
 
 def verify_tls() -> bool:
-    """TLS verification stays on unless a dev site opts out in site_config."""
+    """TLS verification stays on unless a development site opts out in Suite Cloud Settings."""
 
-    return bool((frappe.conf.suite_cloud or {}).get("verify_stalwart_tls", True))
+    return bool(cint(get_config("verify_stalwart_tls")))

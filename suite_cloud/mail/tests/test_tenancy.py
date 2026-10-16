@@ -11,13 +11,17 @@ from suite_cloud.mail.stalwart.errors import StalwartRejectedError
 from suite_cloud.mail.tenancy.addresses import get_tenant_domain
 from suite_cloud.mail.tests.fake_stalwart import FakeError, FakeStalwart
 from suite_cloud.mail.tests.fixtures import (
+    TENANT_OWNER,
     activate_cluster,
     clear_request_cache,
     configure_settings,
     make_cluster,
+    make_owner,
     make_tenant,
 )
 from suite_cloud.patches.v1_0 import add_credential_quotas
+from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError, owner_query
+from suite_cloud.utils import user_context
 
 
 class TenancyTestCase(IntegrationTestCase):
@@ -75,21 +79,107 @@ class TenancyTestCase(IntegrationTestCase):
 
 
 class TestSuiteTenant(TenancyTestCase):
-    def test_site_gets_credentials_and_service_user(self) -> None:
+    def test_site_gets_credentials_and_an_owner(self) -> None:
         self.assertEqual(UUID(self.tenant.name).version, 7)
         self.assertEqual(len(self.tenant.new_secret), 40)
         self.assertEqual(self.tenant.get_password("secret"), self.tenant.new_secret)
-        self.assertEqual(self.tenant.user, "suite-tenant@suite-cloud.internal")
-        self.assertEqual(self.tenant.status, "Active")
+        self.assertEqual(self.tenant.user, TENANT_OWNER)
+        self.assertEqual(self.tenant.contact_email, TENANT_OWNER)  # the owner's email until set
+        self.assertEqual((self.tenant.tenant_type, self.tenant.status), ("Suite Site", "Active"))
         self.assertEqual(self.tenant.to_api()["jmap_url"], self.cluster.base_url)
+
+        # One user may own several tenants; a tenant without an owner is refused.
+        other = make_tenant(self.cluster, "other.frappe.test")
+        self.assertEqual(other.user, TENANT_OWNER)
+        orphan = frappe.get_doc({"doctype": "Suite Tenant", "title": "orphan.frappe.test"})
+        self.assertRaises(frappe.MandatoryError, orphan.insert)
+
+    def test_owners_need_and_keep_the_tenant_role(self) -> None:
+        plain = make_owner("plain@frappe.test", with_role=False)
+        tenant = frappe.get_doc({"doctype": "Suite Tenant", "title": "other.frappe.test", "user": plain})
+        self.assertRaisesRegex(frappe.ValidationError, "Suite Tenant role", tenant.insert)
+
+        owner = frappe.get_doc("User", TENANT_OWNER)
+        owner.set("roles", [])
+        self.assertRaisesRegex(frappe.ValidationError, "must keep", owner.save)
+
+        # The form offers only users who may own a tenant, and only to operators.
+        offered = [row[0] for row in owner_query("User", "frappe.test", "name", 0, 20, None)]
+        self.assertIn(TENANT_OWNER, offered)
+        self.assertNotIn(plain, offered)
+        with user_context(TENANT_OWNER):
+            self.assertRaises(frappe.PermissionError, owner_query, "User", "", "name", 0, 20, None)
+
+    def test_owners_from_before_the_role_existed_receive_it(self) -> None:
+        from suite_cloud.patches.v1_0 import grant_owner_role
+
+        frappe.db.delete("Has Role", {"parent": TENANT_OWNER, "role": "Suite Tenant"})
+        grant_owner_role.execute()
+        self.assertTrue(frappe.db.exists("Has Role", {"parent": TENANT_OWNER, "role": "Suite Tenant"}))
+
+    def test_owners_reach_only_their_own_tenants_documents(self) -> None:
+        mine = self.make_domain()
+        other = make_tenant(self.cluster, "other.frappe.test", user=make_owner("other@frappe.test"))
+        theirs = frappe.get_doc(
+            {"doctype": "Mail Domain", "domain_name": "other.com", "tenant": other.name, "is_verified": 1}
+        ).insert()
+
+        with user_context(TENANT_OWNER):
+            self.assertEqual(frappe.get_list("Mail Domain", pluck="name"), [mine.name])
+            self.assertTrue(frappe.has_permission("Mail Domain", "write", mine))
+            self.assertFalse(frappe.has_permission("Mail Domain", "read", theirs))
+            self.assertEqual(frappe.get_list("Suite Tenant", pluck="name"), [self.tenant.name])
+            self.assertFalse(frappe.has_permission("Suite Tenant", "read", other))
+            # Level 0 holds what a tenant may change about itself; the rest is the operator's.
+            tenant = frappe.get_doc("Suite Tenant", self.tenant.name)
+            tenant.title, tenant.max_domains = "renamed.frappe.test", 99  # the suffix keeps tearDown's eye
+            tenant.save()
+            self.assertEqual((tenant.title, tenant.max_domains), ("renamed.frappe.test", 10))
+
+    def test_tenants_from_before_the_type_existed_are_suite_sites(self) -> None:
+        from suite_cloud.patches.v1_0 import fill_tenant_type
+
+        self.tenant.db_set("tenant_type", "", update_modified=False)
+        fill_tenant_type.execute()
+        self.assertEqual(frappe.db.get_value("Suite Tenant", self.tenant.name, "tenant_type"), "Suite Site")
 
     def test_site_needs_an_active_cluster(self) -> None:
         self.cluster.db_set("status", "Pending")
         frappe.clear_document_cache("Stalwart Cluster", self.cluster.name)
         tenant = frappe.get_doc(
-            {"doctype": "Suite Tenant", "title": "other.frappe.test", "cluster": self.cluster.name}
+            {
+                "doctype": "Suite Tenant",
+                "title": "other.frappe.test",
+                "stalwart_cluster": self.cluster.name,
+                "user": TENANT_OWNER,
+            }
         )
         self.assertRaisesRegex(frappe.ValidationError, "not active", tenant.insert)
+
+    def test_mail_waits_for_a_cluster(self) -> None:
+        tenant = frappe.get_doc(
+            {"doctype": "Suite Tenant", "title": "other.frappe.test", "user": TENANT_OWNER}
+        ).insert()
+        profile = tenant.to_api()
+        self.assertEqual(
+            (profile["cluster"], profile["jmap_url"], profile["mail_hostname"]), (None, None, None)
+        )
+        self.assertEqual(profile["usage"]["used_disk_bytes"], 0)
+        domain = {
+            "doctype": "Mail Domain",
+            "domain_name": "other.com",
+            "tenant": tenant.name,
+            "is_verified": 1,
+        }
+        self.assertRaisesRegex(MailNotConfiguredError, "not set up for Mail", frappe.get_doc(domain).insert)
+
+        # Set once nothing of the tenant exists, fixed as soon as something does.
+        tenant.stalwart_cluster = self.cluster.name
+        tenant.save()
+        frappe.get_doc(domain).insert()
+        tenant.reload()
+        tenant.stalwart_cluster = None
+        self.assertRaisesRegex(frappe.ValidationError, "cannot be changed", tenant.save)
 
     def test_rotate_suspend_archive(self) -> None:
         old = self.tenant.get_password("secret")

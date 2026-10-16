@@ -61,7 +61,9 @@ def domains_by_pool(cluster: Document) -> dict[str, list[str]]:
 
     populated = populated_pools(cluster)
     tenant_pools = dict(
-        frappe.get_all("Suite Tenant", {"cluster": cluster.name}, ["name", "egress_pool"], as_list=True)
+        frappe.get_all(
+            "Suite Tenant", {"stalwart_cluster": cluster.name}, ["name", "egress_pool"], as_list=True
+        )
     )
     grouped: dict[str, list[str]] = {}
     domains = frappe.get_all(

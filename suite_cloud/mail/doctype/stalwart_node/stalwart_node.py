@@ -152,7 +152,7 @@ class StalwartNode(Document):
 
     @frappe.whitelist()
     def verify_ssh(self) -> bool:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if not self.ssh_host_keys:
             # First contact: the operator has just put the cluster's key on this box, so the key it
             # presents now is the one every later connection must match.
@@ -178,14 +178,14 @@ class StalwartNode(Document):
     def reset_ssh_host_keys(self) -> None:
         """Forgets the pinned host keys after the server was reinstalled; Verify SSH records the new ones."""
 
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         self.db_set({"ssh_host_keys": None, "ssh_verified": 0}, update_modified=False)
         # The next Verify SSH trusts whatever answers, so record who dropped the pin and when.
         self.add_comment("Info", _("Reset the SSH host keys."))
 
     @frappe.whitelist()
     def provision(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         if not self.ssh_verified:
             frappe.throw(_("Verify the SSH connection first."))
         if not self.enabled:
@@ -194,27 +194,27 @@ class StalwartNode(Document):
 
     @frappe.whitelist()
     def upgrade(self) -> str:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return bootstrap.upgrade_node(self).name
 
     @frappe.whitelist()
     def drain(self) -> None:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         bootstrap.drain_node(self)
 
     @frappe.whitelist()
     def restore(self) -> None:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         bootstrap.restore_node(self)
 
     @frappe.whitelist()
     def check_health(self) -> bool:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         return bootstrap.check_node(self)
 
     @frappe.whitelist()
     def verify_ptr(self) -> bool:
-        frappe.only_for(("System Manager", "Suite Cloud Manager"))
+        frappe.only_for("System Manager")
         ok = verify_ptr_record(self.ipv4_address, self.hostname)
         if ok is None:
             return bool(self.ptr_verified)  # the lookup failed; the last known state stands

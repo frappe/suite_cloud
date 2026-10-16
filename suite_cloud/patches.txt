@@ -13,3 +13,9 @@ suite_cloud.patches.v1_0.tenant_id_and_secret
 suite_cloud.patches.v1_0.rename_service_user
 suite_cloud.patches.v1_0.rename_settings_fields
 suite_cloud.patches.v1_0.drop_frappe_cloud_role
+suite_cloud.patches.v1_0.enable_stalwart_tls_verification
+suite_cloud.patches.v1_0.fill_report_retention_defaults
+suite_cloud.patches.v1_0.rename_tenant_cluster_field
+suite_cloud.patches.v1_0.fill_tenant_type
+suite_cloud.patches.v1_0.drop_suite_cloud_manager_role
+suite_cloud.patches.v1_0.grant_owner_role

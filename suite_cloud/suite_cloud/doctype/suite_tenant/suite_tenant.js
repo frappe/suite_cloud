@@ -3,17 +3,18 @@
 
 frappe.ui.form.on('Suite Tenant', {
 	setup(frm) {
-		frm.set_query('egress_pool', () => ({ filters: { cluster: frm.doc.cluster || '' } }))
+		frm.set_query('egress_pool', () => ({ filters: { cluster: frm.doc.stalwart_cluster || '' } }))
+		frm.set_query('user', () => ({ query: 'suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant.owner_query' }))
 	},
 
 	refresh(frm) {
 		if (frm.is_new()) return
 		frm.add_custom_button(__('Rotate Secret'), () => rotate_secret(frm), __('Actions'))
-		if (frm.doc.status !== 'Active') return
+		if (frm.doc.status !== 'Active' || !frm.doc.stalwart_cluster) return
 		frm.add_custom_button(__('Adopt Directory'), () => adopt_directory(frm), __('Actions'))
 	},
 
-	cluster(frm) {
+	stalwart_cluster(frm) {
 		// A pool belongs to one cluster; a picked one is stale once the cluster changes.
 		frm.set_value('egress_pool', null)
 	},
@@ -41,7 +42,7 @@ function rotate_secret(frm) {
 function adopt_directory(frm) {
 	frappe.confirm(
 		__('Record every domain, account, group and mailing list on cluster {0} as belonging to {1}? Objects that already exist are skipped. Nothing is changed on the cluster.', [
-			frm.doc.cluster,
+			frm.doc.stalwart_cluster,
 			frm.doc.name,
 		]),
 		() =>

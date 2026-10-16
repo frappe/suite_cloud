@@ -23,11 +23,11 @@ A tenant authenticates with its id, the name of its Suite Tenant record, and the
 Authorization: Tenant <id>:<secret>
 ```
 
-Suite Cloud checks the secret against the Suite Tenant record, so the request runs as the shared tenant service user and every method acts only on that tenant's documents. Anything that belongs to another tenant is reported as not found (404), never as forbidden.
+Suite Cloud checks the secret against the Suite Tenant record, so the request runs as the tenant's owner and every method acts only on that tenant's documents. The credentials are accepted only on the tenant API's own URLs; on any other URL they are refused with a 401, so the owner's own permissions are never reachable with the secret. Anything that belongs to another tenant is reported as not found (404), never as forbidden.
 
 When the Suite Tenant lists allowed IP addresses, only requests from those addresses may use its secret. A request from elsewhere gets a 403 with the type `TenantAddressError`, and Suite Cloud logs it for the operators. A secret copied out of a tenant's configuration is worthless anywhere else.
 
-An operator with the System Manager or Suite Cloud Manager role may call the tenant API from the desk or a script on behalf of a tenant. The tenant is named by the `tenant` parameter or the `X-Suite-Tenant` header.
+An operator with the System Manager role may call the tenant API from the desk or a script on behalf of a tenant. The tenant is named by the `tenant` parameter or the `X-Suite-Tenant` header.
 
 ## Verbs
 
@@ -76,6 +76,7 @@ An error answers `{"errors": [{"type": "<exception>", "message": "<text>"}]}` wi
 | 404 | `DoesNotExistError` | The object does not exist, or belongs to another tenant |
 | 409 | `DuplicateEntryError` | The address or domain is already taken |
 | 422 | `ValidationError` | Suite Cloud refused the change: a limit, a rule, an inactive domain |
+| 422 | `MailNotConfiguredError` | The tenant is not set up for Mail yet: it has no Stalwart cluster, so there is nothing to act on |
 | 422 | `ClusterRejectedError` | The mail server refused the change; the message carries its reason |
 | 429 | `TooManyRequestsError` | The tenant made more than 300 requests in the current minute |
 | 502 | `ClusterFailedError` | The mail server failed in a way the caller cannot fix; Suite Cloud logged it for the operators |
