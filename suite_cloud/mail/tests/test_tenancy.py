@@ -143,7 +143,9 @@ class TestSuiteTenant(TenancyTestCase):
         self.assertRaisesRegex(frappe.ValidationError, "not active", tenant.insert)
 
     def test_mail_waits_for_a_cluster(self) -> None:
-        tenant = frappe.get_doc({"doctype": "Suite Tenant", "title": "other.frappe.test"}).insert()
+        tenant = frappe.get_doc(
+            {"doctype": "Suite Tenant", "title": "other.frappe.test", "user": TENANT_OWNER}
+        ).insert()
         profile = tenant.to_api()
         self.assertEqual(
             (profile["cluster"], profile["jmap_url"], profile["mail_hostname"]), (None, None, None)

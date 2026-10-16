@@ -29,7 +29,7 @@ from suite_cloud.mail.stalwart.errors import (
 )
 from suite_cloud.mail.tenancy.addresses import NOUNS
 
-API_PATH = "/api/v2/method/suite_cloud.api."
+API_PATHS = ("/api/v2/method/suite_cloud.api.", "/api/method/suite_cloud.api.")
 ERROR_KEYS = ("type", "message", "exception")
 
 OWNED_DOCTYPES = {"Mail Domain", "Mail Account", "Mail Group", "Mailing List"}
@@ -94,11 +94,17 @@ def current_tenant():
 
 
 def authenticate() -> None:
-    """Frappe auth hook: ``Authorization: Tenant <id>:<secret>`` signs in the tenant's owner."""
+    """Frappe auth hook: ``Authorization: Tenant <id>:<secret>`` signs in the tenant's owner.
+
+    Only for the tenant API: every endpoint there resolves the tenant and checks its state and
+    address first. Anywhere else the owner's roles would be reachable with the secret alone.
+    """
 
     name, secret = _credentials_from_header()
     if not name:
         return
+    if not frappe.request.path.startswith(API_PATHS):
+        raise frappe.AuthenticationError(_("Tenant credentials are accepted only by the tenant API."))
 
     stored = None
     tenant = frappe.db.get_value("Suite Tenant", name, ["enabled", "user"], as_dict=True)
@@ -215,6 +221,7 @@ def tenant_api(fn: Callable) -> Callable:
         with api_errors():
             return fn(*args, **kwargs)
 
+    wrapper.is_tenant_api = True  # the contract test checks every endpoint carries this
     return wrapper
 
 
@@ -276,7 +283,7 @@ def trim_errors(response, request) -> None:
     """Only the documented keys of an error leave the API: Frappe's desk hints (title, indicator,
     as_table) mean nothing to a REST client."""
 
-    if not request.path.startswith(API_PATH) or response.status_code < 400 or not response.is_json:
+    if not request.path.startswith(API_PATHS) or response.status_code < 400 or not response.is_json:
         return
     body = response.get_json(silent=True)
     if not body or "errors" not in body:

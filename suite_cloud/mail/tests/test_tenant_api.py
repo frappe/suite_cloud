@@ -31,6 +31,7 @@ from suite_cloud.mail.tests.fixtures import (
     clear_request_cache,
     configure_settings,
     make_cluster,
+    make_owner,
     make_tenant,
     verified_ownership,
 )
@@ -203,7 +204,18 @@ class TestTenantResolution(TenantApiTestCase):
             self.assertRaisesRegex(frappe.AuthenticationError, "authentication failed", authenticate)
             self.assertEqual(frappe.session.user, "Guest")
 
-        frappe.utils.set_request(headers={"Authorization": f"Tenant {self.tenant.name}:{secret}"})
+        # A valid secret is worth nothing outside the tenant API, whatever roles the owner holds.
+        frappe.utils.set_request(
+            path="/api/method/frappe.client.get_list",
+            headers={"Authorization": f"Tenant {self.tenant.name}:{secret}"},
+        )
+        self.assertRaisesRegex(frappe.AuthenticationError, "only by the tenant API", authenticate)
+        self.assertEqual(frappe.session.user, "Guest")
+
+        frappe.utils.set_request(
+            path="/api/v2/method/suite_cloud.api.tenant.ping",
+            headers={"Authorization": f"Tenant {self.tenant.name}:{secret}"},
+        )
         authenticate()
         self.assertEqual(frappe.session.user, self.tenant.user)
 
@@ -212,7 +224,9 @@ class TestTenantResolution(TenantApiTestCase):
         self.assertRaises(frappe.AuthenticationError, authenticate)
 
     def test_mail_endpoints_wait_for_a_cluster(self) -> None:
-        tenant = frappe.get_doc({"doctype": "Suite Tenant", "title": "new.frappe.test"}).insert()
+        tenant = frappe.get_doc(
+            {"doctype": "Suite Tenant", "title": "new.frappe.test", "user": make_owner()}
+        ).insert()
         self.act_as(tenant)
         self.assertIsNone(ping()["cluster"])
         with self.assertRaises(MailNotConfiguredError) as ctx:
