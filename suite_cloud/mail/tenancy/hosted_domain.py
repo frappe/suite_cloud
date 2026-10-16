@@ -14,7 +14,8 @@ from suite_cloud.suite_cloud.doctype.dns_record.dns_record import reconcile_mana
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import relative_host
 from suite_cloud.utils import get_config
 
-SMTP_PORT = 587
+# Submission records Stalwart publishes, preferred in order: (host, implicit TLS).
+SUBMISSION_RECORDS = (("_submissions._tcp", True), ("_submission._tcp", False))
 PUBLISHED_TYPES = ("MX", "TXT", "CNAME")  # DNS Record has no SRV
 
 
@@ -38,7 +39,7 @@ def ensure(site) -> bool:
             return False
     password = ensure_account(site, domain)
     checkpoint()
-    site.get_site_client().ensure_email_account(email_account_payload(site, tenant, password))
+    site.get_site_client().ensure_email_account(email_account_payload(site, domain, password))
     site.db_set("email_account_created", 1)
     return True
 
@@ -105,15 +106,16 @@ def ensure_account(site, domain) -> str:
     return password
 
 
-def email_account_payload(site, tenant, password: str) -> dict:
-    cluster = tenant.get_cluster()
+def email_account_payload(site, domain, password: str) -> dict:
+    host, port, implicit_tls = submission_endpoint(domain)
     return {
         "email_account_name": "Notifications",
         "email_id": site.notification_account,
         "service": "",
-        "smtp_server": cluster.hostname,
-        "smtp_port": SMTP_PORT,
-        "use_tls": 1,
+        "smtp_server": host,
+        "smtp_port": port,
+        "use_ssl_for_outgoing": int(implicit_tls),
+        "use_tls": int(not implicit_tls),
         "password": password,
         "enable_outgoing": 1,
         "default_outgoing": 1,
@@ -121,6 +123,16 @@ def email_account_payload(site, tenant, password: str) -> dict:
         "always_use_account_name_as_sender_name": 0,
         "enable_incoming": 0,
     }
+
+
+def submission_endpoint(domain) -> tuple[str, int, bool]:
+    """Where mail clients submit, from the domain's own SRV records: what the cluster serves."""
+
+    rows = {row.host: row for row in domain.dns_rows() if row.record_type == "SRV"}
+    for host, implicit_tls in SUBMISSION_RECORDS:
+        if row := rows.get(host):
+            return row.value, row.port, implicit_tls
+    frappe.throw(_("Mail Domain {0} publishes no submission record to send through.").format(domain.name))
 
 
 def remove(site) -> None:

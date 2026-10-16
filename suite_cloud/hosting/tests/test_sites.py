@@ -4,6 +4,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.hosting import capacity, sites
+from suite_cloud.hosting.central.site import SiteUnavailableError
 from suite_cloud.hosting.tests.fakes import REGION
 from suite_cloud.hosting.tests.fixtures import SITE_ZONE, HostingFixtures
 
@@ -109,6 +110,52 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
         del self.pilot.create_site
         site.retry()
         self.assertEqual(self.site(site.name).status, "Ready")
+
+    def test_a_suite_cloud_url_no_site_can_reach_fails_loudly(self) -> None:
+        self.set_setting("public_url", None)
+        with patch("frappe.utils.get_url", return_value="http://suite-cloud1.localhost:8001"):
+            site = self.site(capacity.claim_site(self.tenant.name, "acme", REGION))
+
+        self.assertEqual(site.status, "Failed")
+        self.assertIn("cannot reach Suite Cloud at http://suite-cloud1.localhost:8001", site.error)
+
+    def test_without_a_public_url_the_sites_own_url_is_given(self) -> None:
+        self.set_setting("public_url", None)
+        with patch("frappe.utils.get_url", return_value="https://cloud.example.com"):
+            capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        self.assertEqual(
+            self.site_api.singles["Suite Settings"]["suite_cloud_url"], "https://cloud.example.com"
+        )
+
+    def test_only_addresses_a_server_elsewhere_can_reach_are_given(self) -> None:
+        for url, reachable in (
+            ("https://cloud.example.com", True),
+            ("https://abc.trycloudflare.com", True),
+            ("http://suite-cloud1.localhost:8001", False),
+            ("http://localhost:8000", False),
+            ("http://test_site:8000", False),
+            ("http://mac.local", False),
+            ("http://127.0.0.1:8001", False),
+            ("http://10.0.0.5", False),
+            ("http://203.0.113.9", False),  # documentation range: not globally routable
+        ):
+            with self.subTest(url):
+                self.assertEqual(sites.is_reachable_url(url), reachable)
+
+    def test_a_waiting_step_says_what_it_waits_for(self) -> None:
+        site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+        self.site_api.call = lambda method, **kwargs: (_ for _ in ()).throw(
+            SiteUnavailableError(
+                "Suite Cloud is unreachable; try again shortly.", "SuiteCloudUnavailableError", 503
+            )
+        )
+
+        capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        site.reload()
+        self.assertEqual(site.status, "Configuring")
+        self.assertIn("Waiting: Suite Cloud is unreachable", site.error)
 
     def test_active_comes_before_the_site_domain(self) -> None:
         self.pilot.attached = None  # any domain call would fail

@@ -5,7 +5,9 @@ returns, and ``poll_pending_sites`` comes back to it. The site domain and the ma
 after Active and never take it back.
 """
 
+import ipaddress
 import secrets
+from urllib.parse import urlparse
 
 import frappe
 from frappe import _
@@ -44,7 +46,9 @@ def run_step(doc, step) -> bool:
     begin_step()
     try:
         advanced = step(doc)
-    except WAITING_ERRORS:
+    except WAITING_ERRORS as e:
+        # Not a failure, but said: a site that only ever waits must show what it waits for.
+        frappe.get_doc("Suite Site", doc.name).db_set("error", _("Waiting: {0}").format(e))
         advanced = False
     except Exception as e:
         undo_step()
@@ -142,16 +146,35 @@ def configure_suite(site, client) -> None:
 
 
 def push_tenant_credentials(client, tenant) -> None:
+    suite_cloud_url = get_config("public_url") or frappe.utils.get_url()
+    if not is_reachable_url(suite_cloud_url):
+        raise SiteSetupError(
+            _(
+                "A hosted site cannot reach Suite Cloud at {0}. Set the Public URL in Suite Cloud "
+                "Settings, e.g. a tunnel's address on a development machine."
+            ).format(suite_cloud_url)
+        )
     client.set_single(
         "Suite Settings",
         {
-            "suite_cloud_url": get_config("public_url") or frappe.utils.get_url(),
+            "suite_cloud_url": suite_cloud_url,
             "suite_cloud_tenant": tenant.name,
             "suite_cloud_secret": tenant.get_password("secret"),
             "workspace_name": tenant.title,
             "contact_email": tenant.contact_email,
         },
     )
+
+
+def is_reachable_url(url: str) -> bool:
+    """Whether a server elsewhere could reach the address: not a local or private name."""
+
+    host = (urlparse(url).hostname or "").lower()
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        return "." in host and not host.endswith((".localhost", ".local")) and host != "localhost"
+    return address.is_global
 
 
 def create_tenant_user(site, client) -> None:
@@ -185,13 +208,16 @@ def follow_up(site) -> bool:
     for label, step in site.pending_follow_ups():
         begin_step()
         try:
-            step(site)
-        except WAITING_ERRORS:
-            pass
+            done = step(site)
+        except WAITING_ERRORS as e:
+            frappe.get_doc("Suite Site", site.name).db_set("error", _("{0}: waiting: {1}").format(label, e))
         except Exception as e:
             undo_step()
             log_exception(f"{label} failed for Suite Site {site.name}", site)
             frappe.get_doc("Suite Site", site.name).db_set("error", f"{label}: {e}")
+        else:
+            if done and (frappe.db.get_value("Suite Site", site.name, "error") or "").startswith(f"{label}:"):
+                frappe.db.set_value("Suite Site", site.name, "error", None)  # its own earlier failure
         commit()
         site = frappe.get_doc("Suite Site", site.name)
     return False

@@ -31,7 +31,9 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertTrue(domain.hosted and domain.is_live())
         account = self.site_api.docs[("Email Account", "Notifications")]
         self.assertEqual(account["email_id"], NOTIFICATION)
-        self.assertEqual((account["smtp_server"], account["smtp_port"]), (self.cluster.hostname, 587))
+        # From the domain's _submissions._tcp record: implicit TLS on 465, as the cluster serves it.
+        self.assertEqual((account["smtp_server"], account["smtp_port"]), (self.cluster.hostname, 465))
+        self.assertEqual((account["use_ssl_for_outgoing"], account["use_tls"]), (1, 0))
         self.assertEqual((account["default_outgoing"], account["enable_outgoing"]), (1, 1))
         self.assertTrue(account["password"])
 
@@ -65,6 +67,7 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         sites.provision(site.name)
 
         self.assertTrue(self.site(site.name).email_account_created)
+        self.assertFalse(self.site(site.name).error)  # the step's earlier failure is cleared
         self.assertEqual(frappe.db.count("Mail Account", {"name": NOTIFICATION}), 1)
 
     def test_drop_site_removes_the_mail_domain_and_its_records(self) -> None:

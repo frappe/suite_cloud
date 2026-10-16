@@ -73,7 +73,7 @@
    "label": "Suite Cloud"
   },
   {
-   "description": "Address tenants use to reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL.",
+   "description": "Address tenants use to reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL. Hosted sites are given it to call Suite Cloud, so it must be reachable from Frappe Cloud: on a development machine, set a tunnel's address.",
    "fieldname": "public_url",
    "fieldtype": "Data",
    "label": "Public URL",
@@ -421,7 +421,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-17 04:00:00.000000",
+ "modified": "2026-10-17 07:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

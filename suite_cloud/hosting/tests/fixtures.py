@@ -23,6 +23,7 @@ class HostingFixtures:
             make_zone(zone, is_default=0, dns_provider="Cloudflare", dns_provider_token="token")
         configure_settings(
             **{
+                "public_url": "https://cloud.frappe.test",
                 "central_url": "https://central.test",
                 "central_team": "suite-team",
                 "central_api_key": "key",
@@ -43,6 +44,14 @@ class HostingFixtures:
         # test tenants (Suite Site tenants are placed at once): both are switched off (rolled back).
         frappe.db.set_value("Region", {"name": ["!=", REGION]}, "enabled", 0)
         frappe.db.set_value("Stalwart Cluster", {"name": ["not like", f"%.{ROOT_DOMAIN}"]}, "enabled", 0)
+        # Its sites and open signups hold labels the tests use, such as acme.
+        frappe.db.set_value("Suite Site", {"region": ["!=", REGION]}, "label", None)
+        frappe.db.set_value(
+            "Suite Tenant Request",
+            {"status": ["in", ["Pending", "Verified", "Processing"]]},
+            "status",
+            "Expired",
+        )
         make_region()
         self.set_setting("default_region", REGION)
 
