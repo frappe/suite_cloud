@@ -19,7 +19,7 @@ class SuiteCloudSettings(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
-        acme_contact_email: DF.Data | None
+        acme_contact_email: DF.Data
         acme_directory_url: DF.Data
         default_dns_ttl: DF.Int
         public_url: DF.Data | None

@@ -193,11 +193,13 @@
    "fieldtype": "Column Break"
   },
   {
+   "default": "admin@example.com",
    "description": "Address the certificate authority writes to about expiring certificates. Used by clusters that do not set their own contact.",
    "fieldname": "acme_contact_email",
    "fieldtype": "Data",
    "label": "ACME Contact Email",
-   "options": "Email"
+   "options": "Email",
+   "reqd": 1
   },
   {
    "fieldname": "dns_tab",
