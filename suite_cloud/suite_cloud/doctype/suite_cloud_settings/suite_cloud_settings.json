@@ -440,7 +440,7 @@
   },
   {
    "default": "0",
-   "description": "Accept a signup email with a +tag, e.g. sagar+test@frappe.io. Off, such an email is refused: every tag of one mailbox could sign up again. On, the owner's account on the site leaves the tag out, e.g. sagar@acme.example.com.",
+   "description": "Accept a signup email with a +tag, e.g. john+test@example.com. Off, such an email is refused: every tag of one mailbox could sign up again. On, the owner's account on the site leaves the tag out, e.g. john@acme.example.com.",
    "fieldname": "allow_subaddressed_signups",
    "fieldtype": "Check",
    "label": "Allow Sub-addressed Emails at Signup"

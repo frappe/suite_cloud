@@ -126,7 +126,7 @@
    "read_only": 1
   },
   {
-   "description": "The Mail Account Request on the site inviting the tenant's owner, e.g. for sagar.s@acme.example.com. They choose their password when they accept it.",
+   "description": "The Mail Account Request on the site inviting the tenant's owner, e.g. for john@acme.example.com. They choose their password when they accept it.",
    "fieldname": "owner_invite",
    "fieldtype": "Data",
    "label": "Owner Invite",

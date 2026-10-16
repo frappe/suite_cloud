@@ -21,7 +21,7 @@
  ],
  "fields": [
   {
-   "description": "Where the one-time code and the owner's invite go. Its local part names the owner's account on the site, e.g. sagar.s for sagar.s@acme.example.com.",
+   "description": "Where the one-time code and the owner's invite go. Its local part names the owner's account on the site, e.g. john for john@acme.example.com.",
    "fieldname": "email",
    "fieldtype": "Data",
    "in_list_view": 1,

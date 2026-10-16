@@ -101,7 +101,7 @@ class SuiteSite(Document):
     @property
     def login_email(self) -> str:
         """The owner's account on the site: their own local part at the tenant's mail domain, e.g.
-        sagar.s@acme.frappesuite.com for sagar.s@frappe.io. A +tag is left out: Suite takes no
+        john@acme.example.com for john@example.com. A +tag is left out: Suite takes no
         sub-addressed account."""
 
         if not (domain := labels.mail_domain(self.label)):
