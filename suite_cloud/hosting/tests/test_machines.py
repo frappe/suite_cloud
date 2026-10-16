@@ -1,3 +1,5 @@
+from uuid import UUID
+
 import frappe
 from frappe.tests import IntegrationTestCase
 
@@ -14,6 +16,7 @@ class TestVirtualMachine(HostingFixtures, IntegrationTestCase):
     def test_a_new_server_is_created_booted_verified_and_given_suite(self) -> None:
         vm = self.make_vm()
 
+        self.assertEqual(UUID(vm.name).version, 7)
         self.assertEqual(vm.title, f"suite-{REGION}-{vm.name}")
         self.assertEqual(
             (vm.image_id, vm.plan, vm.max_sites), ("img-new", "plan-small", 3)

@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+from uuid import uuid7
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -57,6 +59,9 @@ class VirtualMachine(Document):
         vcpus: DF.Float
         wildcard_zone: DF.Data | None
     # end: auto-generated types
+
+    def autoname(self) -> None:
+        self.name = str(uuid7())
 
     def before_insert(self) -> None:
         self.status = "Pending"

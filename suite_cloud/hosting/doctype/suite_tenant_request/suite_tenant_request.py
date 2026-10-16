@@ -3,6 +3,7 @@
 
 import hashlib
 import secrets
+from uuid import uuid7
 
 import frappe
 from frappe import _
@@ -42,6 +43,9 @@ class SuiteTenantRequest(Document):
         tenant: DF.Link | None
         timezone: DF.Data | None
     # end: auto-generated types
+
+    def autoname(self) -> None:
+        self.name = str(uuid7())
 
     def before_insert(self) -> None:
         self.status = "Pending"

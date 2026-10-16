@@ -1,5 +1,6 @@
 import re
 from unittest.mock import patch
+from uuid import UUID
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -35,6 +36,7 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
 
     def test_a_signup_ends_with_an_active_site_and_mailed_login_details(self) -> None:
         request = self.create()
+        self.assertEqual(UUID(request).version, 7)
         password = self.stored_password(request)
         self.assertEqual(len(password), 24)  # generated, never typed
         key = signup.verify_otp(request, self.code())["request_key"]

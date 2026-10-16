@@ -1,4 +1,5 @@
 from unittest.mock import patch
+from uuid import UUID
 
 import frappe
 from frappe.tests import IntegrationTestCase
@@ -19,6 +20,7 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
         site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
 
         site.reload()
+        self.assertEqual(UUID(site.name).version, 7)
         self.assertEqual(site.virtual_machine, self.vm.name)
         self.assertRegex(site.hostname, rf"^suite-[0-9a-f]{{8}}\.{REGION}\.frappe\.test$")
         self.assertEqual((site.status, site.site_created), ("Ready", 1))
