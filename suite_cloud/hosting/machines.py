@@ -140,11 +140,14 @@ def verify_host(vm) -> bool:
 
 
 def host_problem(vm, zone: str | None, settings: dict) -> str | None:
-    proxy_zone = frappe.db.get_value("Region", vm.region, "proxy_zone")
     if not zone:
         return _("Pilot lists no wildcard domain, so sites on this server cannot be routed.")
-    if not proxy_zone:
-        return _("Set the proxy zone of region {0}.").format(vm.region)
+    if not zone.startswith(f"{vm.region}."):
+        # Central names every regional zone <region>.<wildcard domain>.
+        return _("Pilot registers sites under {0}, which is not a zone of region {1}.").format(
+            zone, vm.region
+        )
+    proxy_zone = learn_proxy_zone(vm.region, zone)
     if zone != proxy_zone:
         return _("Pilot registers sites under {0}, but region {1} serves {2}.").format(
             zone, vm.region, proxy_zone
@@ -152,6 +155,17 @@ def host_problem(vm, zone: str | None, settings: dict) -> str | None:
     if not (settings.get("production") or {}).get("enabled"):
         return _("Pilot is not in production mode.")
     return None
+
+
+def learn_proxy_zone(region: str, zone: str) -> str:
+    """The region's proxy zone; the first server verified there sets it, under a lock, so two
+    first servers cannot both set it."""
+
+    proxy_zone = frappe.db.get_value("Region", region, "proxy_zone", for_update=True)
+    if not proxy_zone:
+        frappe.db.set_value("Region", region, "proxy_zone", zone)
+        proxy_zone = zone
+    return proxy_zone
 
 
 def install_suite(vm) -> bool:

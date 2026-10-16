@@ -82,6 +82,26 @@ class TestVirtualMachine(HostingFixtures, IntegrationTestCase):
         self.assertFalse(vm.has_free_slot)
         self.assertFalse(vm.is_building)
 
+    def test_the_first_server_teaches_the_region_its_proxy_zone(self) -> None:
+        frappe.db.set_value("Region", REGION, "proxy_zone", None)
+
+        self.assertTrue(self.make_vm().host_verified)
+        self.assertEqual(frappe.db.get_value("Region", REGION, "proxy_zone"), f"{REGION}.frappe.test")
+
+        self.pilot.wildcards = [f".{REGION}.other.test"]
+        other = self.make_vm()
+        self.assertFalse(other.host_verified)
+        self.assertIn(f"region {REGION} serves {REGION}.frappe.test", other.error)
+
+    def test_a_zone_of_another_region_is_never_learned(self) -> None:
+        frappe.db.set_value("Region", REGION, "proxy_zone", None)
+        self.pilot.wildcards = [".blr1.frappe.test"]
+
+        vm = self.make_vm()
+
+        self.assertIn("not a zone of region", vm.error)
+        self.assertIsNone(frappe.db.get_value("Region", REGION, "proxy_zone"))
+
     def test_suite_already_present_is_not_installed_again(self) -> None:
         self.pilot.apps.append({"name": "suite", "current_commit": "fff000"})
         vm = self.make_vm()

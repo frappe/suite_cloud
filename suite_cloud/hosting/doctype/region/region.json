@@ -82,17 +82,18 @@
    "label": "Hosting"
   },
   {
-   "description": "The zone Central's proxy serves sites of this region under: <region>.<Central wildcard domain>, e.g. blr1.frappe.cloud. A server whose Pilot reports another zone fails host verification.",
+   "description": "The zone Central's proxy serves this region's sites under: the region code followed by Central's wildcard domain, e.g. blr1.frappe.cloud. Learned from the first server set up here; every later server must report the same zone.",
    "fieldname": "proxy_zone",
    "fieldtype": "Data",
-   "label": "Proxy Zone"
+   "label": "Proxy Zone",
+   "read_only": 1
   },
   {
    "fieldname": "column_break_hosting",
    "fieldtype": "Column Break"
   },
   {
-   "description": "Region code a Stalwart Cluster lists for this region. Blank uses the region code. Picks the mail cluster of tenants placed here.",
+   "description": "Region code a Stalwart Cluster lists for this region, e.g. blr. Picks the mail cluster of tenants placed here; blank uses the region code, and a code no cluster lists sends them to the default cluster.",
    "fieldname": "stalwart_region",
    "fieldtype": "Data",
    "label": "Stalwart Region"
@@ -106,7 +107,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-17 00:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Region",

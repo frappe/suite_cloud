@@ -37,7 +37,7 @@ class Region(Document):
 
 
 def sync_regions() -> int:
-    """Upserts Central's regions; ``enabled``, ``proxy_zone`` and ``stalwart_region`` stay as set."""
+    """Upserts Central's regions; ``enabled``, ``stalwart_region`` and the learned ``proxy_zone`` stay."""
 
     if not frappe.get_cached_doc("Suite Cloud Settings").is_central_configured:
         return 0

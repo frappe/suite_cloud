@@ -39,6 +39,8 @@ class HostingFixtures:
             }
         )
         remove_hosting_data()
+        # Regions of the site the tests run on would get servers and pooled sites too (rolled back).
+        frappe.db.set_value("Region", {"name": ["!=", REGION]}, "enabled", 0)
         make_region()
         self.set_setting("default_region", REGION)
 
