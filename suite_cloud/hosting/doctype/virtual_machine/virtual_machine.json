@@ -57,6 +57,7 @@
    "read_only": 1
   },
   {
+   "description": "Central region the server is created in.",
    "fieldname": "region",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -87,6 +88,7 @@
   },
   {
    "default": "Pending",
+   "description": "The server's status on Central. Suite Cloud's own setup shows in Host Verified, Suite App and Ready Since; an error stops it until Retry.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -117,12 +119,14 @@
    "label": "Server"
   },
   {
+   "description": "Central image offering the server boots from, from Suite Cloud Settings.",
    "fieldname": "image_offering",
    "fieldtype": "Data",
    "label": "Image Offering",
    "read_only": 1
   },
   {
+   "description": "The image the server was created from: the offering's newest image without a baked site. Fixed at creation.",
    "fieldname": "image_id",
    "fieldtype": "Data",
    "label": "Image",
@@ -136,18 +140,21 @@
    "read_only": 1
   },
   {
+   "description": "The server's virtual CPUs, as Central reports them.",
    "fieldname": "vcpus",
    "fieldtype": "Float",
    "label": "vCPUs",
    "read_only": 1
   },
   {
+   "description": "The server's memory, as Central reports it. Max Sites is worked out from it.",
    "fieldname": "memory_mb",
    "fieldtype": "Int",
    "label": "Memory (MB)",
    "read_only": 1
   },
   {
+   "description": "The server's disk, as Central reports it. Max Sites is worked out from it.",
    "fieldname": "disk_gb",
    "fieldtype": "Float",
    "label": "Disk (GB)",
@@ -167,6 +174,7 @@
   },
   {
    "default": "0",
+   "description": "Give the server a public IPv6 address. Sites are reached through Central's proxy either way.",
    "fieldname": "has_public_ipv6",
    "fieldtype": "Check",
    "label": "Public IPv6",
@@ -185,12 +193,14 @@
    "read_only": 1
   },
   {
+   "description": "Central's id for the creation of the server. Retry asks Central to run it again.",
    "fieldname": "central_action",
    "fieldtype": "Data",
    "label": "Central Action",
    "read_only": 1
   },
   {
+   "description": "Central's id for the server once it exists, e.g. server-avq7a8iild.",
    "fieldname": "central_resource_id",
    "fieldtype": "Data",
    "label": "Central Server",
@@ -202,30 +212,35 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Where Suite Cloud reaches the server's Pilot, e.g. https://admin-vm-1z1420a.mumbai.frappe.cloud.",
    "fieldname": "gateway_url",
    "fieldtype": "Data",
    "label": "Gateway URL",
    "read_only": 1
   },
   {
+   "description": "The audience of the bench tokens Central mints for this Pilot. Set once Pilot has registered with Central.",
    "fieldname": "pilot_audience",
    "fieldtype": "Data",
    "label": "Pilot Audience",
    "read_only": 1
   },
   {
+   "description": "The server's address on Central's private network.",
    "fieldname": "ipv6_address",
    "fieldtype": "Data",
    "label": "Private IPv6",
    "read_only": 1
   },
   {
+   "description": "The server's public IPv4 address, when it has one.",
    "fieldname": "public_ipv4",
    "fieldtype": "Data",
    "label": "Public IPv4 Address",
    "read_only": 1
   },
   {
+   "description": "The server's public IPv6 address, when it has one.",
    "fieldname": "public_ipv6",
    "fieldtype": "Data",
    "label": "Public IPv6 Address",
@@ -265,6 +280,7 @@
   },
   {
    "default": "Pending",
+   "description": "Pending: not installed yet. Installing: Pilot is installing it from the repository in Suite Cloud Settings. Installed: the server can take sites. Failed: see Error; run Install Suite App again.",
    "fieldname": "suite_app_status",
    "fieldtype": "Select",
    "in_standard_filter": 1,
@@ -273,12 +289,14 @@
    "read_only": 1
   },
   {
+   "description": "The Pilot task installing the Suite app, while it runs.",
    "fieldname": "suite_app_task",
    "fieldtype": "Data",
    "label": "Suite App Task",
    "read_only": 1
   },
   {
+   "description": "The commit of the Suite app installed on the server.",
    "fieldname": "suite_app_commit",
    "fieldtype": "Data",
    "label": "Suite App Commit",
@@ -290,6 +308,7 @@
    "label": "State"
   },
   {
+   "description": "When the server finished its setup: running, its host verified and Suite installed. It takes sites from then on.",
    "fieldname": "ready_since",
    "fieldtype": "Datetime",
    "label": "Ready Since",
@@ -303,6 +322,7 @@
    "read_only": 1
   },
   {
+   "description": "When the server was last read from Central: every five minutes, daily, and on Sync Status.",
    "fieldname": "last_synced_at",
    "fieldtype": "Datetime",
    "label": "Last Synced At",
@@ -313,6 +333,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "Why the server's setup stopped, e.g. Pilot registers sites under another zone. Fix the cause, then run Retry.",
    "fieldname": "error",
    "fieldtype": "Small Text",
    "label": "Error",
@@ -326,7 +347,7 @@
    "link_fieldname": "virtual_machine"
   }
  ],
- "modified": "2026-10-17 10:00:00.000000",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Virtual Machine",

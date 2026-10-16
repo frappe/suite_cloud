@@ -22,6 +22,7 @@
  ],
  "fields": [
   {
+   "description": "Where the one-time code and the login details go. Its local part names the user on the site, e.g. sagar.s for sagar.s@acme.example.com.",
    "fieldname": "email",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -32,6 +33,7 @@
    "set_only_once": 1
   },
   {
+   "description": "The person's name, given to their users in Suite Cloud and on the site.",
    "fieldname": "full_name",
    "fieldtype": "Data",
    "label": "Full Name",
@@ -69,6 +71,7 @@
   },
   {
    "default": "Pending",
+   "description": "Pending: waiting for the email code. Verified: the code was correct. Processing: the tenant and its site are being set up. Completed: the site is ready and the login details are mailed (Error says if that failed). Failed: stopped on an error; run Retry. Expired: no code within 24 hours.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -78,6 +81,7 @@
    "read_only": 1
   },
   {
+   "description": "Secret that reads the request's status through the signup API. Handed out once, when the code is verified.",
    "fieldname": "request_key",
    "fieldtype": "Data",
    "hidden": 1,
@@ -85,6 +89,7 @@
    "read_only": 1
   },
   {
+   "description": "The Suite Tenant created for this request.",
    "fieldname": "tenant",
    "fieldtype": "Link",
    "label": "Tenant",
@@ -92,6 +97,7 @@
    "read_only": 1
   },
   {
+   "description": "The site claimed for the tenant.",
    "fieldname": "suite_site",
    "fieldtype": "Link",
    "label": "Suite Site",
@@ -99,12 +105,14 @@
    "read_only": 1
   },
   {
+   "description": "The address the signup came from. Blank for a request created in the desk.",
    "fieldname": "ip_address",
    "fieldtype": "Data",
    "label": "IP Address",
    "read_only": 1
   },
   {
+   "description": "A request still waiting for its code after this expires, and its password is forgotten.",
    "fieldname": "expires_at",
    "fieldtype": "Datetime",
    "label": "Expires At",
@@ -118,6 +126,7 @@
    "label": "Error"
   },
   {
+   "description": "Why the request failed, or why the login details could not be mailed.",
    "fieldname": "error",
    "fieldtype": "Small Text",
    "label": "Error",
@@ -126,7 +135,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 10:00:00.000000",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request",

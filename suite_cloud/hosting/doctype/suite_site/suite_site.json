@@ -44,6 +44,7 @@
    "unique": 1
   },
   {
+   "description": "Region the site is created in. Signups use the Default Region in Suite Cloud Settings.",
    "fieldname": "region",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -69,6 +70,7 @@
   },
   {
    "default": "Pending",
+   "description": "Pending: waiting for a server with room. Creating: Pilot is creating it. Ready: in the pool, unclaimed. Assigned and Configuring: being connected to its tenant. Active: in use. Failed: stopped on an error; run Retry. Dropped: deleted from its server.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -96,6 +98,7 @@
    "read_only": 1
   },
   {
+   "description": "The domain the site is served under once it is attached, e.g. acme.sites.example.com. Blank until then: the hostname serves the site.",
    "fieldname": "primary_domain",
    "fieldtype": "Data",
    "label": "Primary Domain",
@@ -108,6 +111,7 @@
   },
   {
    "default": "0",
+   "description": "Pilot has created the site with the Suite app on its server.",
    "fieldname": "site_created",
    "fieldtype": "Check",
    "label": "Site Created",
@@ -115,6 +119,7 @@
   },
   {
    "default": "0",
+   "description": "The site was given its Suite Cloud URL, tenant id and secret, finished onboarding and reached Suite Cloud with them. Cleared to configure the site again, e.g. after a secret could not be pushed.",
    "fieldname": "suite_configured",
    "fieldtype": "Check",
    "label": "Suite Configured",
@@ -122,6 +127,7 @@
   },
   {
    "default": "0",
+   "description": "The tenant's user exists on the site, e.g. sagar.s@acme.example.com.",
    "fieldname": "tenant_user_created",
    "fieldtype": "Check",
    "label": "Tenant User Created",
@@ -132,6 +138,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "The Pilot task creating or dropping the site, while it runs.",
    "fieldname": "pilot_task",
    "fieldtype": "Data",
    "label": "Pilot Task",
@@ -146,12 +153,14 @@
    "read_only": 1
   },
   {
+   "description": "When the site turned Active: connected to its tenant, with the tenant's user.",
    "fieldname": "activated_at",
    "fieldtype": "Datetime",
    "label": "Activated At",
    "read_only": 1
   },
   {
+   "description": "When Drop Site deleted the site from its server.",
    "fieldname": "dropped_at",
    "fieldtype": "Datetime",
    "label": "Dropped At",
@@ -165,6 +174,7 @@
    "label": "Error"
   },
   {
+   "description": "Why the site failed, what it waits for, or why a step was skipped. A failed site stops until Retry; an Active site stays Active.",
    "fieldname": "error",
    "fieldtype": "Small Text",
    "label": "Error",
@@ -184,6 +194,7 @@
    "read_only_depends_on": "eval:(doc.domains || []).some((row) => row.managed)"
   },
   {
+   "description": "Domains the site is served under. Managed rows are published by Suite Cloud; the others are the tenant's to publish. Change them with the Domains actions.",
    "fieldname": "domains",
    "fieldtype": "Table",
    "label": "Domains",
@@ -203,6 +214,7 @@
    "read_only_depends_on": "eval:doc.mail_domain || doc.tenant_user_created"
   },
   {
+   "description": "The tenant's hosted mail domain, e.g. acme.example.com. Suite Cloud publishes its records and keeps the tenant API from changing it.",
    "fieldname": "mail_domain",
    "fieldtype": "Link",
    "label": "Mail Domain",
@@ -214,6 +226,7 @@
    "fieldtype": "Column Break"
   },
   {
+   "description": "The mailbox the site sends its own mail from, e.g. notification@acme.example.com. Its password lives only in the site's Email Account.",
    "fieldname": "notification_account",
    "fieldtype": "Link",
    "label": "Notification Account",
@@ -231,7 +244,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 10:00:00.000000",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

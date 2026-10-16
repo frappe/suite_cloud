@@ -17,6 +17,7 @@
  "fields": [
   {
    "columns": 3,
+   "description": "A domain the site is served under, e.g. acme.sites.example.com.",
    "fieldname": "domain",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -26,6 +27,7 @@
   {
    "columns": 1,
    "default": "Pending",
+   "description": "Pending: its DNS records are not published or seen yet. Active: attached to the site through Frappe Cloud's proxy. Failed: Pilot could not attach it.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -36,6 +38,7 @@
   {
    "columns": 1,
    "default": "0",
+   "description": "The site's own links and redirects use this domain. Change it with Make Primary.",
    "fieldname": "is_primary",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -60,18 +63,21 @@
    "read_only": 1
   },
   {
+   "description": "When the DNS records were last read from Pilot. They are read again after 23 hours, since Central keeps a verification token for 24.",
    "fieldname": "records_fetched_at",
    "fieldtype": "Datetime",
    "label": "Records Fetched At",
    "read_only": 1
   },
   {
+   "description": "The Pilot task attaching the domain, while it runs.",
    "fieldname": "task",
    "fieldtype": "Data",
    "label": "Pilot Task",
    "read_only": 1
   },
   {
+   "description": "Why the domain is not attached yet, e.g. Central does not see its records.",
    "fieldname": "failure_reason",
    "fieldtype": "Small Text",
    "label": "Failure Reason",
@@ -81,7 +87,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site Domain",

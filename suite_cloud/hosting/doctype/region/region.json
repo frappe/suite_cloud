@@ -31,6 +31,7 @@
    "unique": 1
   },
   {
+   "description": "Central's name for the region, e.g. Mumbai. Set by Sync Regions.",
    "fieldname": "display_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -38,12 +39,14 @@
    "read_only": 1
   },
   {
+   "description": "The cloud the region runs on, as Central reports it. Set by Sync Regions.",
    "fieldname": "provider",
    "fieldtype": "Data",
    "label": "Provider",
    "read_only": 1
   },
   {
+   "description": "Country the region is in, e.g. IN. Set by Sync Regions.",
    "fieldname": "country_code",
    "fieldtype": "Data",
    "label": "Country Code",
@@ -63,6 +66,7 @@
    "label": "Enabled"
   },
   {
+   "description": "The region's status on Central; only Active regions are listed. Set by Sync Regions.",
    "fieldname": "status",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -71,6 +75,7 @@
   },
   {
    "default": "0",
+   "description": "Central could reach the region's infrastructure when it was last synced.",
    "fieldname": "reachable",
    "fieldtype": "Check",
    "label": "Reachable",
@@ -99,6 +104,7 @@
    "label": "Stalwart Region"
   },
   {
+   "description": "When Sync Regions last read this region from Central. It runs daily and from Suite Cloud Settings.",
    "fieldname": "last_synced_at",
    "fieldtype": "Datetime",
    "label": "Last Synced At",
@@ -107,7 +113,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 00:00:00.000000",
+ "modified": "2026-10-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Region",
