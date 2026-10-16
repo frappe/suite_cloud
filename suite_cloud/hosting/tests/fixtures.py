@@ -5,7 +5,7 @@ from unittest.mock import patch
 import frappe
 
 from suite_cloud.hosting.tests.fakes import PROXY_ZONE, REGION, FakeCentral, FakePilot, FakeSite, install
-from suite_cloud.tests.fixtures import ROOT_DOMAIN, configure_settings, make_zone, no_dns_provider
+from suite_cloud.tests.fixtures import ROOT_DOMAIN, configure_settings, make_zone
 from suite_cloud.utils import clear_config_cache
 
 SITE_ZONE = "sites.test"
@@ -58,7 +58,7 @@ class HostingFixtures:
         self.central, self.pilot, self.site_api = FakeCentral(), FakePilot(), FakeSite()
         for context in (
             install(self.central, self.pilot, self.site_api),
-            no_dns_provider(),
+            confirming_dns_provider(),
             patch("suite_cloud.hosting.domains.verify_dns_record", return_value=True),
             patch("suite_cloud.mail.doctype.mail_domain.mail_domain.verify_dns_record", return_value=True),
         ):
@@ -110,3 +110,16 @@ def remove_hosting_data() -> None:
     frappe.db.delete("Suite Site", {"region": REGION})
     frappe.db.delete("Virtual Machine", {"region": REGION})
     frappe.db.delete("Suite Tenant Request", {"email": ["like", "%frappe.test"]})
+
+
+def confirming_dns_provider():
+    """Every push reaches the provider, which confirms it, as a real provider does."""
+
+    from unittest.mock import MagicMock
+
+    provider = MagicMock()
+    provider.ensure_dns_record.return_value = True
+    provider.delete_dns_record.return_value = True
+    return patch(
+        "suite_cloud.suite_cloud.doctype.dns_record.dns_record.get_dns_provider", return_value=provider
+    )

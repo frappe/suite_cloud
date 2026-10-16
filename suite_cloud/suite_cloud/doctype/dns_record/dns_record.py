@@ -210,6 +210,19 @@ def delete_managed_records(owner_doctype: str, owner: str) -> None:
     reconcile_managed_records(owner_doctype, owner, [])
 
 
+def are_managed_records_published(owner_doctype: str, owner: str) -> bool:
+    """Whether the provider confirmed every record of the owner.
+
+    Records are pushed after the commit that creates them. Public resolvers asked before then
+    cache the absence for the zone's negative TTL (often 30 minutes), so nothing should check
+    them until this is true.
+    """
+
+    return not frappe.db.exists(
+        "DNS Record", {"managed_by_doctype": owner_doctype, "managed_by": owner, "is_verified": 0}
+    )
+
+
 def verify_all_dns_records() -> None:
     for name in frappe.get_all("DNS Record", pluck="name"):
         frappe.get_doc("DNS Record", name).verify_dns_record(save=True)

@@ -51,6 +51,18 @@ class TestSiteDomains(HostingFixtures, IntegrationTestCase):
         pooled.assign_site_domain = 0
         pooled.save()  # nothing assigned yet: the operator may opt the site out
 
+    def test_the_site_domain_is_checked_only_once_the_provider_has_its_records(self) -> None:
+        with (
+            patch(
+                "suite_cloud.suite_cloud.doctype.dns_record.dns_record.get_dns_provider", return_value=None
+            ),
+            patch("suite_cloud.hosting.domains.verify_dns_record") as verify,
+        ):
+            site = self.claim()
+
+        verify.assert_not_called()
+        self.assertEqual(site.get_domain(f"acme.{SITE_ZONE}").status, "Pending")
+
     def test_records_not_visible_yet_wait(self) -> None:
         with patch("suite_cloud.hosting.domains.verify_dns_record", return_value=False):
             site = self.claim()

@@ -10,7 +10,10 @@ from frappe import _
 
 from suite_cloud.hosting import checkpoint, labels
 from suite_cloud.mail.doctype.mail_account.mail_account import generate_password
-from suite_cloud.suite_cloud.doctype.dns_record.dns_record import reconcile_managed_records
+from suite_cloud.suite_cloud.doctype.dns_record.dns_record import (
+    are_managed_records_published,
+    reconcile_managed_records,
+)
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import relative_host
 from suite_cloud.utils import get_config
 
@@ -33,6 +36,8 @@ def ensure(site) -> bool:
     domain = ensure_domain(site)
     publish_records(domain)
     checkpoint()
+    if not are_managed_records_published("Mail Domain", domain.name):
+        return False  # the next poll checks once the provider has them
     if not domain.is_live():
         domain.verify_dns_records()
         if not domain.is_live():

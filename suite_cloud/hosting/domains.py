@@ -15,7 +15,10 @@ from frappe.utils import add_to_date, get_datetime, now, now_datetime
 from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.hosting import output_tail, wait_for_task
 from suite_cloud.hosting.central.pilot import PilotConflict, is_finished, task_id
-from suite_cloud.suite_cloud.doctype.dns_record.dns_record import reconcile_managed_records
+from suite_cloud.suite_cloud.doctype.dns_record.dns_record import (
+    are_managed_records_published,
+    reconcile_managed_records,
+)
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import relative_host
 from suite_cloud.utils import get_config
 
@@ -35,6 +38,8 @@ def ensure_site_domain(site) -> bool:
     if row.status != "Active":
         fetch_records(site, row)
         publish_managed_records(site)
+        if not are_managed_records_published("Suite Site", site.name):
+            return False  # the next poll checks once the provider has them
         if not records_visible(row) or not attach(site, row):
             return False
     if not row.is_primary:

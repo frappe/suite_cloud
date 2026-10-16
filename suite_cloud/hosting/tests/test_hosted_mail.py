@@ -1,3 +1,5 @@
+from unittest.mock import patch
+
 import frappe
 
 from suite_cloud.api.mail import accounts as accounts_api
@@ -42,6 +44,19 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
 
         site.assign_mail_domain = 0
         self.assertRaisesRegex(frappe.ValidationError, "already assigned", site.save)
+
+    def test_the_domain_is_checked_only_once_the_provider_has_its_records(self) -> None:
+        with (
+            patch(
+                "suite_cloud.suite_cloud.doctype.dns_record.dns_record.get_dns_provider", return_value=None
+            ),
+            patch("suite_cloud.mail.doctype.mail_domain.mail_domain.MailDomain.verify_dns_records") as verify,
+        ):
+            site = self.claim()
+
+        self.assertEqual(site.mail_domain, DOMAIN)  # created and its records queued
+        verify.assert_not_called()  # resolvers asked now would cache the absence
+        self.assertFalse(site.notification_account)
 
     def test_the_domain_records_are_published_in_the_mail_zone(self) -> None:
         site = self.claim()
