@@ -60,7 +60,7 @@
   },
   {
    "description": "The tenant's cluster, copied on every save. The domain is created on this cluster and its DNS records point at it.",
-   "fetch_from": "tenant.cluster",
+   "fetch_from": "tenant.stalwart_cluster",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_standard_filter": 1,
