@@ -123,5 +123,23 @@ def get_site_client(site) -> SiteClient:
     """The seam tests replace with a fake."""
 
     pilot = site.get_virtual_machine().get_pilot_client()
-    # Its other host names redirect to the primary domain, which serves HTTPS once it is primary.
-    return SiteClient(site.primary_domain or site.hostname, lambda: pilot.site_login_url(site.hostname))
+    return SiteClient(get_api_host(site), lambda: pilot.site_login_url(site.hostname))
+
+
+def get_api_host(site) -> str:
+    """Its other host names redirect to the primary domain, so calls go there, but only to one whose
+    records Suite Cloud publishes: a tenant can point its own domain at any server, which would get
+    the Administrator session."""
+
+    if not site.primary_domain:
+        return site.hostname
+    row = site.get_domain(site.primary_domain)
+    if not (row and row.managed):
+        raise SiteError(
+            _(
+                "{0} is the primary domain of Suite Site {1}, and its tenant controls its DNS, so "
+                "Suite Cloud does not send it the site's Administrator session. Make the site domain "
+                "primary to manage the site."
+            ).format(site.primary_domain, site.name)
+        )
+    return site.primary_domain

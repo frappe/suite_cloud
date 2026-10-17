@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import frappe
 import requests
@@ -214,17 +214,28 @@ class TestSharedZone(HostingFixtures, IntegrationTestCase):
 class TestSiteClient(IntegrationTestCase):
     """The real client, with Pilot and the network replaced."""
 
-    def site(self, primary_domain: str | None = None):
+    def site(self, primary_domain: str | None = None, managed: bool = True):
         pilot = frappe._dict(site_login_url=lambda name: f"https://{name}/app?sid=abc")
-        site = frappe._dict(hostname="suite-1.example.com", primary_domain=primary_domain)
+        site = frappe._dict(name="SITE-1", hostname="suite-1.example.com", primary_domain=primary_domain)
         site.get_virtual_machine = lambda: frappe._dict(get_pilot_client=lambda: pilot)
+        site.get_domain = lambda domain: frappe._dict(domain=domain, managed=int(managed))
         return site
 
-    def test_the_client_calls_the_primary_domain_once_there_is_one(self) -> None:
+    def test_the_client_calls_the_managed_primary_domain_once_there_is_one(self) -> None:
         self.assertEqual(
             site_api.get_site_client(self.site("acme.example.com")).url, "https://acme.example.com"
         )
         self.assertEqual(site_api.get_site_client(self.site()).url, "https://suite-1.example.com")
+
+    def test_the_session_never_goes_to_a_tenant_controlled_primary_domain(self) -> None:
+        login = Mock()
+        site = self.site("shop.example.com", managed=False)
+        site.get_virtual_machine = lambda: frappe._dict(
+            get_pilot_client=lambda: frappe._dict(site_login_url=login)
+        )
+
+        self.assertRaisesRegex(site_api.SiteError, "tenant controls its DNS", site_api.get_site_client, site)
+        login.assert_not_called()
 
     def test_a_redirect_is_not_followed(self) -> None:
         client = site_api.get_site_client(self.site())
