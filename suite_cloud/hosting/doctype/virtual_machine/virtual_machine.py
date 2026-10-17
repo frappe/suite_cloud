@@ -12,6 +12,7 @@ from suite_cloud.hosting import central, machines
 from suite_cloud.hosting.central import pilot
 
 PLACEABLE_STATUS = "Running"
+BUILDING_STATUSES = ("Pending", "Provisioning", "Deploying", PLACEABLE_STATUS)
 
 
 class VirtualMachine(Document):
@@ -110,9 +111,10 @@ class VirtualMachine(Document):
 
     @property
     def is_building(self) -> bool:
-        """On its way to taking sites: not ready yet, and not stopped by an error."""
+        """On its way to taking sites: being created or set up, and not stopped by an error. A paused
+        or stopped server is not."""
 
-        return not self.is_ready and not self.error and self.status not in ("Failed", "Terminated")
+        return not self.is_ready and not self.error and self.status in BUILDING_STATUSES
 
     def get_pilot_client(self):
         return pilot.get_pilot_client(self)
@@ -134,7 +136,8 @@ class VirtualMachine(Document):
     def install_suite_app(self) -> None:
         frappe.only_for("System Manager")
         if self.suite_app_status == "Failed":
-            self.db_set({"suite_app_status": "Pending", "suite_app_task": None, "error": None})
+            self.db_set("error", None)
+            machines.reset_failed_install(self)
         machines.enqueue_provision(self.name)
 
     @frappe.whitelist()

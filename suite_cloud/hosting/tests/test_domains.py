@@ -4,7 +4,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date
 
-from suite_cloud.hosting import capacity, domains, labels
+from suite_cloud.hosting import capacity, domains, labels, sites
 from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fakes import PROXY_ZONE, REGION
 from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, SITE_ZONE, HostingFixtures
@@ -63,6 +63,11 @@ class TestSiteDomains(HostingFixtures, IntegrationTestCase):
         verify.assert_not_called()
         self.assertEqual(site.get_domain(f"acme.{SITE_ZONE}").status, "Pending")
 
+        sites.poll_pending_sites()  # the unconfirmed records are pushed again
+        sites.poll_pending_sites()  # and found confirmed
+
+        self.assertEqual(self.site(site.name).get_domain(f"acme.{SITE_ZONE}").status, "Active")
+
     def test_records_not_visible_yet_wait(self) -> None:
         with patch("suite_cloud.hosting.domains.verify_dns_record", return_value=False):
             site = self.claim()
@@ -109,6 +114,18 @@ class TestSiteDomains(HostingFixtures, IntegrationTestCase):
         self.assertIsNone(self.site(site.name).get_domain("shop.example.com"))
         # Records of a domain the tenant publishes are never Suite Cloud's.
         self.assertFalse(any("shop" in host for host, _type, _value in self.records(site)))
+
+    def test_a_custom_primary_domain_is_kept(self) -> None:
+        site = self.claim()
+        site.add_domain("shop.example.com")
+        self.site(site.name).verify_domain("shop.example.com")
+
+        self.site(site.name).make_primary("shop.example.com")
+        sites.poll_pending_sites()
+
+        site = self.site(site.name)
+        self.assertEqual(site.primary_domain, "shop.example.com")
+        self.assertFalse(site.pending_follow_ups())
 
     def test_a_renewed_token_asks_for_republishing(self) -> None:
         site = self.claim()

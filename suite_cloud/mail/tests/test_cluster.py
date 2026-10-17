@@ -146,6 +146,20 @@ class TestStalwartCluster(IntegrationTestCase):
 
         self.assertEqual(frappe.get_all("Stalwart Cluster", {"is_default": 1}, pluck="name"), [older.name])
 
+    def test_a_disabled_default_gives_way_to_an_enabled_cluster(self) -> None:
+        from suite_cloud.patches.v1_0 import mark_default_cluster
+
+        disabled = make_cluster("disabled", hostname=f"mail.disabled.{ROOT_DOMAIN}")
+        enabled = make_cluster("enabled", hostname=f"mail.enabled.{ROOT_DOMAIN}")
+        # Allowed before the rule: a disabled default (rolled back).
+        frappe.db.sql("update `tabStalwart Cluster` set is_default = 0, enabled = 0")
+        frappe.db.set_value("Stalwart Cluster", disabled.name, "is_default", 1)
+        frappe.db.set_value("Stalwart Cluster", enabled.name, "enabled", 1)
+
+        mark_default_cluster.execute()
+
+        self.assertEqual(frappe.get_all("Stalwart Cluster", {"is_default": 1}, pluck="name"), [enabled.name])
+
     def test_the_default_cluster_cannot_be_disabled_or_deleted(self) -> None:
         cluster = make_cluster()
         cluster.reload()

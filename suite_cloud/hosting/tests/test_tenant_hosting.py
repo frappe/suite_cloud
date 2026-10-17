@@ -165,6 +165,15 @@ class TestTenantGuards(HostingFixtures, IntegrationTestCase):
             frappe.ValidationError, "Drop the tenant's site", self.tenant.create_hosted_site, "other"
         )
 
+    def test_an_owner_named_like_the_notification_account_gets_no_site(self) -> None:
+        from suite_cloud.mail.tests.fixtures import make_owner
+
+        tenant = self.make_hosted_tenant("notify.frappe.test", user=make_owner("notification@frappe.test"))
+
+        self.assertRaisesRegex(
+            frappe.ValidationError, "kept for the site's notifications", tenant.create_hosted_site, "acme"
+        )
+
     def test_a_tenant_with_a_live_site_cannot_be_archived_or_deleted(self) -> None:
         self.tenant.create_hosted_site("acme")
 

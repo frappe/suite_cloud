@@ -37,6 +37,19 @@ class TestMXRecords(UnitTestCase):
             NotImplementedError, provider.create_dns_record, "MX", "acme", "mail.example.net", 300, 10
         )
 
+    def test_a_ttl_change_keeps_an_mx_record_the_provider_cannot_recreate(self) -> None:
+        provider = DNSProvider("Hetzner", "example.com", token="h-token")
+        record = {"content": "mail.example.net", "ttl": 600}
+        with (
+            patch.object(provider, "find_dns_record", return_value=record),
+            patch.object(provider, "delete_dns_record") as delete,
+        ):
+            self.assertRaises(
+                NotImplementedError, provider.ensure_dns_record, "MX", "acme", "mail.example.net", 300, 10
+            )
+
+        delete.assert_not_called()
+
     def test_other_record_types_still_go_through_lexicon(self) -> None:
         provider = DNSProvider("DigitalOcean", "example.com", token="do-token")
         with patch("lexicon.client.Client") as client, patch("requests.post") as post:

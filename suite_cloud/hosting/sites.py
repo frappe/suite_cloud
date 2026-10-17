@@ -1,8 +1,8 @@
 """A Suite Site from creation to a tenant's working site, one re-entrant step at a time.
 
-Pending -> Creating -> Ready (pooled) | Assigned -> Configuring -> Active. A step that has to wait
-returns, and ``poll_pending_sites`` comes back to it. The site domain and the mail steps run
-after Active and never take it back.
+Pending -> Creating -> Ready (pooled) | Assigned -> Configuring -> Active, and Dropping -> Dropped.
+A step that has to wait returns, and ``poll_pending_sites`` comes back to it. The site domain and
+the mail steps run after Active and never take it back.
 """
 
 import ipaddress
@@ -12,8 +12,18 @@ from urllib.parse import urlparse
 import frappe
 from frappe import _
 from frappe.utils import add_to_date, cint, get_datetime, now, now_datetime
+from frappe.utils.background_jobs import get_job_status
+from rq.job import JobStatus
 
-from suite_cloud.hosting import begin_step, commit, output_tail, run_in_background, undo_step, wait_for_task
+from suite_cloud.hosting import (
+    begin_step,
+    checkpoint,
+    commit,
+    output_tail,
+    run_in_background,
+    undo_step,
+    wait_for_task,
+)
 from suite_cloud.hosting.central import CentralUnavailableError
 from suite_cloud.hosting.central.pilot import PilotConflict, PilotNotReady, is_finished, task_id
 from suite_cloud.hosting.central.site import SiteUnavailableError
@@ -52,12 +62,18 @@ def run_step(doc, step) -> bool:
     except Exception as e:
         undo_step()
         log_exception(f"Suite Site {doc.name} failed at {step.__name__}", doc)
-        frappe.get_doc("Suite Site", doc.name).db_set(
-            {"status": "Failed", "error": str(e) or type(e).__name__}
-        )
+        fail(frappe.get_doc("Suite Site", doc.name), str(e) or type(e).__name__)
         advanced = False
     commit()
     return advanced
+
+
+def fail(site, error: str) -> None:
+    """The site and the signup waiting on it: the signup's Retry then retries the site."""
+
+    site.db_set({"status": "Failed", "error": error})
+    if (request := site.get_request()) and request.status == "Processing":
+        request.db_set({"status": "Failed", "error": error})
 
 
 # --- steps ------------------------------------------------------------------------
@@ -126,7 +142,7 @@ def configure(site) -> bool:
     if not site.suite_configured:
         configure_suite(site, site.get_site_client())
         site.db_set("suite_configured", 1)
-        commit()
+        checkpoint()
     activate(site)
     return True
 
@@ -276,8 +292,12 @@ def new_hostname(vm) -> str:
 
 
 def retry(site) -> None:
+    """A failed task is not waited on again: a create with the same key returns a task still running."""
+
     if site.status == "Failed":
-        site.db_set({"status": resume_status(site), "error": None})
+        site.db_set({"status": resume_status(site), "error": None, "pilot_task": None})
+    if (request := site.get_request()) and request.status == "Failed":
+        request.db_set({"status": "Processing", "error": None})
     enqueue_provision(site.name)
 
 
@@ -294,10 +314,18 @@ def enqueue_drop(site: str) -> None:
 
 
 def drop(site: str) -> None:
+    """Dropping is saved first, so no setup job starts on the site; one already running could write
+    its state back afterwards, so the drop waits for it."""
+
     doc = frappe.get_doc("Suite Site", site, for_update=True)
     if doc.status == "Dropped":
         return
-    begin_step()
+    if is_provisioning(site):
+        doc.db_set("error", _("The site's setup job is running; run Drop Site again once it finishes."))
+        commit()
+        return
+    doc.db_set("status", "Dropping")
+    checkpoint()
     try:
         drop_from_server(doc)
         from suite_cloud.mail.tenancy import hosted_domain
@@ -310,8 +338,13 @@ def drop(site: str) -> None:
         frappe.get_doc("Suite Site", site).db_set("error", _("Drop failed: {0}").format(e))
         commit()
         return
-    doc.db_set({"status": "Dropped", "dropped_at": now(), "error": None})
+    # The label is free again: it is unique among sites.
+    doc.db_set({"status": "Dropped", "dropped_at": now(), "error": None, "label": None})
     commit()
+
+
+def is_provisioning(site: str) -> bool:
+    return get_job_status(f"suite-site:{site}") == JobStatus.STARTED
 
 
 def drop_from_server(site) -> None:

@@ -43,15 +43,18 @@ def enqueue_provision(vm: str) -> None:
 
 
 def provision(vm: str) -> None:
-    """Runs the steps in order until one has to wait; the 5-minute fleet refresh comes back."""
+    """Runs the steps in order until one has to wait; the 5-minute fleet refresh comes back. A step
+    already done returns at once, so a server that lost its readiness is set up again."""
 
     for step in (create, accept, boot, verify_host, install_suite):
         doc = frappe.get_doc("Virtual Machine", vm, for_update=True)
-        if doc.error or doc.status in ("Failed", "Terminated") or doc.ready_since:
+        if doc.error or doc.status in ("Failed", "Terminated"):
             return
         if not run_step(doc, step):
             return
-    frappe.get_doc("Virtual Machine", vm).db_set("ready_since", now())
+    doc = frappe.get_doc("Virtual Machine", vm)
+    if not doc.ready_since:
+        doc.db_set("ready_since", now())
     commit()
 
 
@@ -223,11 +226,12 @@ def refresh_fleet(mark_missing: bool = False) -> None:
 
     if not frappe.get_cached_doc("Suite Cloud Settings").is_central_configured:
         return
+    # Read before the registry: a server accepted in between is then missing here, not from Central.
+    vms = [frappe.get_doc("Virtual Machine", n) for n in frappe.get_all("Virtual Machine", pluck="name")]
     try:
         registry = central.get_central_client().registry()
     except CentralUnavailableError:
         return
-    vms = [frappe.get_doc("Virtual Machine", n) for n in frappe.get_all("Virtual Machine", pluck="name")]
     for vm in vms:
         if not vm.central_resource_id or vm.status == "Terminated":
             continue
@@ -284,7 +288,7 @@ def report_unknown_creations(registry: dict, known: set) -> None:
 
 
 def retry(vm) -> None:
-    """Clears the error; a failed Central creation is asked to run again."""
+    """Clears the error; a failed Central creation is asked to run again, a failed install starts anew."""
 
     if vm.central_action and not vm.central_resource_id and vm.status == "Failed":
         try:
@@ -294,7 +298,13 @@ def retry(vm) -> None:
             return
         vm.db_set({"central_action": status.get("action") or vm.central_action})
     vm.db_set({"status": "Pending" if vm.status == "Failed" else vm.status, "error": None})
+    reset_failed_install(vm)
     enqueue_provision(vm.name)
+
+
+def reset_failed_install(vm) -> None:
+    if vm.suite_app_status == "Failed":
+        vm.db_set({"suite_app_status": "Pending", "suite_app_task": None})
 
 
 # --- Central --------------------------------------------------------------------------

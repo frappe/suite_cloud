@@ -61,7 +61,7 @@ def wait_for_task(pilot, task_id: str) -> dict:
 
     from suite_cloud.hosting.central.pilot import is_finished
 
-    commit()  # no row lock is held while waiting
+    checkpoint()  # no row lock is held while waiting
     deadline = time.monotonic() + TASK_WAIT_SECONDS
     task = pilot.get_task(task_id)
     while not is_finished(task) and time.monotonic() < deadline and not frappe.in_test:

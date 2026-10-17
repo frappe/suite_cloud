@@ -210,17 +210,24 @@ def delete_managed_records(owner_doctype: str, owner: str) -> None:
     reconcile_managed_records(owner_doctype, owner, [])
 
 
-def are_managed_records_published(owner_doctype: str, owner: str) -> bool:
-    """Whether the provider confirmed every record of the owner.
+def confirm_managed_records(owner_doctype: str, owner: str) -> bool:
+    """True once the provider confirmed every record of the owner.
 
     Records are pushed after the commit that creates them. Public resolvers asked before then
     cache the absence for the zone's negative TTL (often 30 minutes), so nothing should check
-    them until this is true.
+    them until this is true. A record pushed before but unconfirmed now (its push failed, or the
+    daily check found it not resolving yet) is pushed again: the push changes nothing it finds.
     """
 
-    return not frappe.db.exists(
-        "DNS Record", {"managed_by_doctype": owner_doctype, "managed_by": owner, "is_verified": 0}
+    unconfirmed = frappe.get_all(
+        "DNS Record",
+        {"managed_by_doctype": owner_doctype, "managed_by": owner, "is_verified": 0},
+        ["name", "last_checked_at"],
     )
+    for record in unconfirmed:
+        if record.last_checked_at:  # a new record's first push is still queued
+            frappe.get_doc("DNS Record", record.name).push_to_provider()
+    return not unconfirmed
 
 
 def verify_all_dns_records() -> None:

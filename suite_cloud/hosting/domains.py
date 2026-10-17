@@ -16,7 +16,7 @@ from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.hosting import output_tail, wait_for_task
 from suite_cloud.hosting.central.pilot import PilotConflict, is_finished, task_id
 from suite_cloud.suite_cloud.doctype.dns_record.dns_record import (
-    are_managed_records_published,
+    confirm_managed_records,
     reconcile_managed_records,
 )
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import relative_host
@@ -31,18 +31,19 @@ class DomainNotReadyError(frappe.ValidationError):
 
 
 def ensure_site_domain(site) -> bool:
-    """The site's own domain (see ``labels.site_domain``), published, attached and primary; True once it is."""
+    """The site's own domain (see ``labels.site_domain``), published, attached and, unless the site
+    already has one, primary; True once it is."""
 
     domain = site.site_domain
     row = site.get_domain(domain) or add_row(site, domain, managed=True)
     if row.status != "Active":
         fetch_records(site, row)
         publish_managed_records(site)
-        if not are_managed_records_published("Suite Site", site.name):
+        if not confirm_managed_records("Suite Site", site.name):
             return False  # the next poll checks once the provider has them
         if not records_visible(row) or not attach(site, row):
             return False
-    if not row.is_primary:
+    if not site.primary_domain:
         make_primary(site, domain)
     return True
 

@@ -42,7 +42,15 @@ class SuiteSite(Document):
         region: DF.Link
         site_created: DF.Check
         status: DF.Literal[
-            "Pending", "Creating", "Ready", "Assigned", "Configuring", "Active", "Failed", "Dropped"
+            "Pending",
+            "Creating",
+            "Ready",
+            "Assigned",
+            "Configuring",
+            "Active",
+            "Failed",
+            "Dropping",
+            "Dropped",
         ]
         suite_configured: DF.Check
         tenant: DF.Link | None
@@ -101,13 +109,11 @@ class SuiteSite(Document):
     @property
     def login_email(self) -> str:
         """The owner's account on the site: their own local part at the tenant's mail domain, e.g.
-        john@acme.example.com for john@example.com. A +tag is left out: Suite takes no
-        sub-addressed account."""
+        john@acme.example.com for john@example.com."""
 
-        if not (domain := labels.mail_domain(self.label)):
-            frappe.throw(_("Set the Tenant Mail Zone in Suite Cloud Settings."))
-        local = self.owner_email.split("@", 1)[0].split("+", 1)[0]
-        return validate_email_address(f"{local}@{domain}")
+        if not self.mail_domain:
+            frappe.throw(_("Site {0} has no mail domain yet.").format(self.name))
+        return validate_email_address(f"{labels.login_local_part(self.owner_email)}@{self.mail_domain}")
 
     @property
     def follow_up_skip_reason(self) -> str | None:
@@ -119,6 +125,14 @@ class SuiteSite(Document):
             return _("The server has no Let's Encrypt email, so the site domain is skipped.")
         return None
 
+    @property
+    def has_site_domain(self) -> bool:
+        """Attached, and the site has a primary domain: the site domain at first, though the operator
+        may make another one primary later."""
+
+        row = self.get_domain(self.site_domain)
+        return bool(row and row.status == "Active" and self.primary_domain)
+
     def pending_follow_ups(self) -> list[tuple[str, object]]:
         from suite_cloud.mail.tenancy import hosted_domain
 
@@ -126,7 +140,7 @@ class SuiteSite(Document):
         if (
             self.assign_site_domain
             and self.site_domain
-            and self.primary_domain != self.site_domain
+            and not self.has_site_domain
             and not self.follow_up_skip_reason
         ):
             steps.append((_("Site domain"), domains.ensure_site_domain))

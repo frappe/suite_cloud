@@ -171,6 +171,7 @@ class SuiteTenant(Document):
         if self.tenant_type != "Suite Site":
             frappe.throw(_("Only a Suite Site tenant gets a hosted site."))
         self.assert_no_live_site()
+        labels.assert_owner_name_free(frappe.db.get_value("User", self.user, "email"))
         label = labels.validate_label(label)
         labels.assert_label_available(label)
         region = capacity.assert_region_enabled(region or get_config("default_region"))

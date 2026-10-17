@@ -35,6 +35,7 @@ DNS_PROVIDER_MAP = {
     DNSProviderEnum.NAMECHEAP: "namecheap",
     DNSProviderEnum.GODADDY: "godaddy",
 }
+MX_PROVIDERS = ("digitalocean", "cloudflare")  # those an MX record's priority reaches
 
 
 class DNSProvider:
@@ -127,6 +128,7 @@ class DNSProvider:
         """Lexicon drops an MX record's priority for every provider but Cloudflare, which reads it
         as text; DigitalOcean then refuses the record (HTTP 422)."""
 
+        self.assert_supports_mx()
         if self.provider == "digitalocean":
             return self.create_digitalocean_record(
                 {
@@ -137,10 +139,12 @@ class DNSProvider:
                     "ttl": ttl,
                 }
             )
-        if self.provider == "cloudflare":
-            config = {"action": "create", "type": "MX", "name": host, "content": value, "ttl": ttl}
-            return self.get_client({**config, "priority": str(priority)}).execute()
-        raise NotImplementedError(f"MX records through {self.provider} are not supported yet.")
+        config = {"action": "create", "type": "MX", "name": host, "content": value, "ttl": ttl}
+        return self.get_client({**config, "priority": str(priority)}).execute()  # Cloudflare
+
+    def assert_supports_mx(self) -> None:
+        if self.provider not in MX_PROVIDERS:
+            raise NotImplementedError(f"MX records through {self.provider} are not supported yet.")
 
     def create_digitalocean_record(self, record: dict) -> bool:
         import requests
@@ -174,6 +178,8 @@ class DNSProvider:
         if record := self.find_dns_record(type, host, value):
             if int(record.get("ttl") or 0) == int(ttl):
                 return True
+            if type == "MX":
+                self.assert_supports_mx()  # before the delete: the record must not go unreplaced
             # Delete by value and recreate rather than update by id: Route53 derives one id for a
             # whole record set, so an update by id would rewrite the first value, not this one.
             self.delete_dns_record(type, host, value)

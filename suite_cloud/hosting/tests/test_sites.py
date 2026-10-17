@@ -217,6 +217,24 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
         self.assertNotIn(hostname, self.pilot.sites)
         self.assertFalse(frappe.db.exists("DNS Record", {"managed_by": name}))
         self.assertEqual(frappe.get_doc("Virtual Machine", self.vm.name).site_count, 0)
+        self.assertIsNone(site.label)  # free for another site
+
+    def test_drop_waits_for_a_running_setup_job(self) -> None:
+        name = capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        with patch("suite_cloud.hosting.sites.is_provisioning", return_value=True):
+            self.site(name).drop_site()
+        self.assertEqual(self.site(name).status, "Active")
+        self.assertIn("setup job is running", self.site(name).error)
+
+        self.site(name).drop_site()
+        self.assertEqual(self.site(name).status, "Dropped")
+
+    def test_labels_are_unique_among_sites(self) -> None:
+        capacity.claim_site(self.tenant.name, "acme", REGION)
+
+        other = frappe.get_doc({"doctype": "Suite Site", "region": REGION, "label": "acme"})
+        self.assertRaises(frappe.UniqueValidationError, other.insert)
 
 
 class TestCapacity(HostingFixtures, IntegrationTestCase):
@@ -248,6 +266,18 @@ class TestCapacity(HostingFixtures, IntegrationTestCase):
 
         capacity.ensure_capacity()
         capacity.ensure_capacity()  # the building server's slots count
+
+        self.assertEqual(frappe.db.count("Virtual Machine", {"region": REGION}), 1)
+
+    def test_no_server_is_added_while_one_fits_no_site(self) -> None:
+        self.set_setting("auto_create_vms", 1)
+        self.central.size = {"vcpus": 0.5, "memory_megabytes": 1024, "disk_gigabytes": 10.0}
+        self.make_vm()  # too small for any site
+
+        self.assertRaisesRegex(
+            frappe.ValidationError, "fits no site", capacity.ensure_region_capacity, REGION
+        )
+        capacity.ensure_capacity()
 
         self.assertEqual(frappe.db.count("Virtual Machine", {"region": REGION}), 1)
 

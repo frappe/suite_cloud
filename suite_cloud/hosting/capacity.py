@@ -35,17 +35,21 @@ def claim_site(tenant: str, label: str, region: str) -> str:
 
 
 def pick_virtual_machine(region: str) -> str | None:
-    """The server of the region with most free slots, locked so two placements cannot share the last."""
+    """The server of the region with most free slots. Every candidate is locked before its slots are
+    counted, so a second placement counts only once the first one is saved."""
 
     best, most = None, 0
-    for name in frappe.get_all(
-        "Virtual Machine", {"region": region, "enabled": 1, "status": "Running"}, pluck="name"
+    for name in frappe.db.get_values(
+        "Virtual Machine",
+        {"region": region, "enabled": 1, "status": "Running"},
+        "name",
+        order_by="name asc",  # one lock order: two placements cannot deadlock
+        for_update=True,
+        pluck=True,
     ):
         vm = frappe.get_doc("Virtual Machine", name)
         if vm.has_free_slot and vm.free_slots > most:
             best, most = name, vm.free_slots
-    if best:
-        frappe.db.get_value("Virtual Machine", best, "name", for_update=True)
     return best
 
 
@@ -96,6 +100,7 @@ def ensure_capacity() -> None:
 def ensure_region_capacity(region: str) -> str | None:
     if free_slots(region) >= cint(get_config("min_free_site_slots")):
         return None
+    assert_plan_fits_a_site(region)
     vm = frappe.get_doc({"doctype": "Virtual Machine", "region": region})
     vm.insert(ignore_permissions=True)
     return vm.name
@@ -115,6 +120,21 @@ def free_slots(region: str) -> int:
         "Suite Site", {"region": region, "virtual_machine": ["is", "not set"], "status": "Pending"}
     )
     return slots - waiting
+
+
+def assert_plan_fits_a_site(region: str) -> None:
+    """A server whose reported size fits no site means another one of the same plan would not either."""
+
+    vm = frappe.db.get_value(
+        "Virtual Machine", {"region": region, "enabled": 1, "memory_mb": [">", 0], "max_sites": 0}
+    )
+    if vm:
+        frappe.throw(
+            _(
+                "Server {0} fits no site under the Server Sizing allowances, so no server is added: "
+                "choose a larger Central plan or lower the allowances."
+            ).format(vm)
+        )
 
 
 def building_vms(region: str) -> list[str]:

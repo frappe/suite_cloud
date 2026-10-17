@@ -70,13 +70,13 @@
   },
   {
    "default": "Pending",
-   "description": "Pending: waiting for a server with room. Creating: Pilot is creating it. Ready: in the pool, unclaimed. Assigned and Configuring: being connected to its tenant. Active: in use. Failed: stopped on an error; run Retry. Dropped: deleted from its server.",
+   "description": "Pending: waiting for a server with room. Creating: Pilot is creating it. Ready: in the pool, unclaimed. Assigned and Configuring: being connected to its tenant. Active: in use. Failed: stopped on an error; run Retry. Dropping: Drop Site is removing it; run Drop Site again after an error. Dropped: deleted from its server.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Pending\nCreating\nReady\nAssigned\nConfiguring\nActive\nFailed\nDropped",
+   "options": "Pending\nCreating\nReady\nAssigned\nConfiguring\nActive\nFailed\nDropping\nDropped",
    "read_only": 1
   },
   {
@@ -91,11 +91,12 @@
    "search_index": 1
   },
   {
-   "description": "The tenant's label. acme gives the site domain acme.sites.example.com and the mail domain acme.example.com, under the zones set in Suite Cloud Settings.",
+   "description": "The tenant's label. acme gives the site domain acme.sites.example.com and the mail domain acme.example.com, under the zones set in Suite Cloud Settings. Unique among sites; cleared when the site is dropped.",
    "fieldname": "label",
    "fieldtype": "Data",
    "label": "Label",
-   "read_only": 1
+   "read_only": 1,
+   "unique": 1
   },
   {
    "description": "The domain the site is served under once it is attached, e.g. acme.sites.example.com. Blank until then: the hostname serves the site.",
@@ -242,7 +243,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 15:00:00.000000",
+ "modified": "2026-10-17 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

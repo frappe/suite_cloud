@@ -3,7 +3,7 @@
 
 frappe.listview_settings['Suite Site'] = {
 	get_indicator(doc) {
-		const colors = { Pending: 'orange', Creating: 'blue', Ready: 'cyan', Assigned: 'blue', Configuring: 'blue', Active: 'green', Failed: 'red', Dropped: 'gray' }
+		const colors = { Pending: 'orange', Creating: 'blue', Ready: 'cyan', Assigned: 'blue', Configuring: 'blue', Active: 'green', Failed: 'red', Dropping: 'orange', Dropped: 'gray' }
 		return [__(doc.status), colors[doc.status] || 'gray', `status,=,${doc.status}`]
 	},
 }

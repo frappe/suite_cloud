@@ -8,6 +8,7 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.api import signup
 from suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request import expire_requests
 from suite_cloud.hosting.labels import LabelNotAvailableError
+from suite_cloud.hosting.tests.fakes import REGION
 from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, SITE_ZONE, HostingFixtures
 
 EMAIL = "new-signup@frappe.test"
@@ -121,6 +122,30 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertRaises(LabelNotAvailableError, request(label="www").insert)
         self.assertRaises(frappe.ValidationError, request(email="not-an-address").insert)
         self.assertRaises(frappe.ValidationError, request(full_name=" ").insert)
+
+    def test_a_failed_site_fails_the_signup_whose_retry_retries_the_site(self) -> None:
+        self.pilot.create_site = lambda name, apps, key: self.pilot.task("failed", "Error: disk full")
+        request = frappe.get_doc("Suite Tenant Request", self.create_in_desk())
+        self.assertEqual(request.status, "Failed")
+        self.assertIn("disk full", request.error)
+        site = request.suite_site
+
+        del self.pilot.create_site
+        request.retry()
+
+        request.reload()
+        self.assertEqual((request.status, request.suite_site), ("Completed", site))
+
+    def test_a_label_a_site_took_meanwhile_fails_the_signup(self) -> None:
+        request = self.create()
+        frappe.get_doc({"doctype": "Suite Site", "region": REGION, "label": "acme"}).insert()
+
+        signup.verify_otp(request, self.code())
+
+        doc = frappe.get_doc("Suite Tenant Request", request)
+        self.assertEqual(doc.status, "Failed")
+        self.assertIn("not available", doc.error)
+        self.assertFalse(doc.suite_site)
 
     def test_stale_requests_expire(self) -> None:
         request = self.create()

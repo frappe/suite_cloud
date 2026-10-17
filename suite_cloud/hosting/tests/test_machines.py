@@ -105,6 +105,42 @@ class TestVirtualMachine(HostingFixtures, IntegrationTestCase):
         self.assertIn("not a zone of region", vm.error)
         self.assertIsNone(frappe.db.get_value("Region", REGION, "proxy_zone"))
 
+    def test_retry_starts_a_failed_install_again(self) -> None:
+        self.pilot.install_app = lambda repo, branch: self.pilot.task("failed", "Error: build failed")
+        vm = self.make_vm()
+        self.assertEqual(vm.suite_app_status, "Failed")
+        self.assertIn("build failed", vm.error)
+
+        del self.pilot.install_app
+        vm.retry()
+
+        vm.reload()
+        self.assertEqual((vm.suite_app_status, vm.error), ("Installed", None))
+        self.assertTrue(vm.ready_since)
+
+    def test_a_server_that_lost_its_readiness_is_set_up_again(self) -> None:
+        vm = self.make_vm()
+        self.pilot.production = False
+        vm.verify_host()
+        vm.reload()
+        self.assertIn("production mode", vm.error)
+
+        self.pilot.production = True
+        vm.retry()
+
+        ready = frappe.get_doc("Virtual Machine", vm.name)
+        self.assertTrue(ready.host_verified and ready.is_ready)
+        self.assertEqual(ready.ready_since, vm.ready_since)  # when it first became ready
+
+    def test_a_stopped_server_is_not_building(self) -> None:
+        self.central.boot = False
+        vm = self.make_vm()
+        self.assertTrue(vm.is_building)
+
+        vm.db_set("status", "Stopped")
+
+        self.assertFalse(frappe.get_doc("Virtual Machine", vm.name).is_building)
+
     def test_suite_already_present_is_not_installed_again(self) -> None:
         self.pilot.apps.append({"name": "suite", "current_commit": "fff000"})
         vm = self.make_vm()
@@ -150,6 +186,24 @@ class TestVirtualMachine(HostingFixtures, IntegrationTestCase):
         self.assertFalse(vm.has_free_slot)
         self.assertEqual(frappe.db.get_value("Virtual Machine", kept.name, "status"), "Running")
         self.assertEqual(frappe.db.get_value("Region", REGION, "display_name"), "Test Region")
+
+    def test_a_server_accepted_while_the_registry_is_read_is_not_ended(self) -> None:
+        self.central.boot = False
+        vm = self.make_vm()
+        resource_id = vm.central_resource_id
+        vm.db_set("central_resource_id", None)
+        del self.central.servers[resource_id]  # not listed yet when the registry is read
+        registry = self.central.registry
+
+        def accepted_meanwhile() -> dict:
+            answer = registry()
+            frappe.db.set_value("Virtual Machine", vm.name, "central_resource_id", resource_id)
+            return answer
+
+        self.central.registry = accepted_meanwhile
+        machines.sync_fleet()
+
+        self.assertNotEqual(frappe.db.get_value("Virtual Machine", vm.name, "status"), "Terminated")
 
     def test_max_sites_follow_the_servers_size(self) -> None:
         self.set_setting("max_sites_per_vm", 10)

@@ -137,6 +137,10 @@ class MailDomain(Document):
             egress.resync_cluster_after_commit(self.cluster)
 
     def on_update(self) -> None:
+        if self.hosted:
+            from suite_cloud.mail.tenancy import hosted_domain
+
+            hosted_domain.publish_records(self)  # Suite Cloud's zone: every change to them goes out
         if self.is_new() or not self.stalwart_id or self.flags.skip_push:
             return
         before = self.get_doc_before_save()
@@ -202,9 +206,9 @@ class MailDomain(Document):
     def replace_dkim_keys(self) -> None:
         """Emergency replacement after a leaked key: new keys under the same selectors.
 
-        The owner republishes the DKIM records with the new values. Their rows lose their
-        verification, so the hourly check takes the domain offline until the new records resolve;
-        mail signed with the old keys stops verifying as soon as they do.
+        The owner republishes the DKIM records with the new values (Suite Cloud does, for a hosted
+        domain). Their rows lose their verification, so the hourly check takes the domain offline
+        until the new records resolve; mail signed with the old keys stops verifying as soon as they do.
         """
 
         frappe.only_for("System Manager")

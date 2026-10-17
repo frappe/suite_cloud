@@ -10,7 +10,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_to_date, cint, now, now_datetime
 
-from suite_cloud.hosting import begin_step, commit, labels, run_in_background, undo_step
+from suite_cloud.hosting import begin_step, commit, labels, run_in_background, sites, undo_step
 from suite_cloud.mail.tenancy.addresses import validate_email_address
 from suite_cloud.utils import get_config, log_exception
 
@@ -63,14 +63,9 @@ class SuiteTenantRequest(Document):
         self.label = labels.validate_label(self.label)
         labels.assert_label_available(self.label)
         self.timezone = (self.timezone or "").strip() or None
-        local = self.email.split("@", 1)[0]
-        if "+" in local and not cint(get_config("allow_subaddressed_signups")):
+        if "+" in self.email.split("@", 1)[0] and not cint(get_config("allow_subaddressed_signups")):
             frappe.throw(_("{0} is a sub-address; sign up with the address itself.").format(self.email))
-        if local.split("+", 1)[0] == get_config("notification_mailbox_local_part"):
-            # The owner's account would be the site's own notification account.
-            frappe.throw(
-                _("{0} cannot sign up: its name is kept for the site's notifications.").format(self.email)
-            )
+        labels.assert_owner_name_free(self.email)
 
     def after_insert(self) -> None:
         """A signup proves its email with a code; an operator's request is taken on their word."""
@@ -118,9 +113,14 @@ class SuiteTenantRequest(Document):
 
     @frappe.whitelist()
     def retry(self) -> None:
+        """Retries the request's site once it has one, rather than claiming another."""
+
         frappe.only_for("System Manager")
         if self.status != "Failed":
             frappe.throw(_("Only a failed request can be retried."))
+        if self.suite_site:
+            sites.retry(frappe.get_doc("Suite Site", self.suite_site))
+            return
         self.db_set({"status": "Verified", "error": None})
         enqueue_processing(self.name)
 
@@ -153,6 +153,7 @@ def process_request(request: str) -> None:
         from suite_cloud.hosting import capacity
 
         region = capacity.assert_region_enabled(get_config("default_region"))
+        labels.assert_label_available(doc.label, doc.name)  # a site may have taken it since
         tenant = doc.tenant or ensure_tenant(doc, ensure_user(doc), region)
         # Linked before the site is claimed: the site's job reads the password through the tenant.
         doc.db_set({"tenant": tenant, "status": "Processing"})

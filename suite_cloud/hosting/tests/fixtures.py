@@ -132,5 +132,5 @@ def confirming_dns_provider():
 def mail_ready(site) -> bool:
     """The mail step's outcome without a cluster: the site sends through its notification account."""
 
-    site.db_set("email_account_created", 1)
+    site.db_set({"email_account_created": 1, "mail_domain": f"{site.label}.{MAIL_ZONE}"})
     return True

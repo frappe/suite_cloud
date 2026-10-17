@@ -42,6 +42,21 @@ def mail_domain(label: str) -> str | None:
     return f"{label}.{zone}" if zone else None
 
 
+def login_local_part(email: str) -> str:
+    """The local part of the owner's account on the site: their own, without a +tag, which Suite does
+    not take for an account."""
+
+    return email.split("@", 1)[0].split("+", 1)[0]
+
+
+def assert_owner_name_free(email: str) -> None:
+    if login_local_part(email) == get_config("notification_mailbox_local_part"):
+        # The owner's account would be the site's own notification account.
+        frappe.throw(
+            _("{0} cannot own a hosted site: its name is kept for the site's notifications.").format(email)
+        )
+
+
 def assert_label_available(label: str, request: str | None = None) -> None:
     """Free across sites, open signups, clusters and both zones' records."""
 

@@ -84,6 +84,18 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertTrue(any(r.host.endswith("._domainkey.acme") for r in rows))
         self.assertFalse(any(r.host.startswith("_imaps") for r in rows))  # SRV has no DNS Record type
 
+    def test_changed_records_are_published_again(self) -> None:
+        self.claim()
+        domain = frappe.get_doc("Mail Domain", DOMAIN)
+        row = next(row for row in domain.dns_rows() if "_domainkey" in row.host)
+        row.value = "v=DKIM1; k=ed25519; p=replaced"
+
+        domain.save_records()  # as replace_dkim_keys and refresh_dns_records do
+
+        self.assertTrue(
+            frappe.db.exists("DNS Record", {"managed_by": DOMAIN, "value": ["like", "%p=replaced"]})
+        )
+
     def test_a_failed_smtp_check_is_retried_with_a_new_password(self) -> None:
         self.site_api.smtp_failures = 1
         site = self.claim()
