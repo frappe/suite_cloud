@@ -37,6 +37,7 @@ class HostingFixtures:
                 "min_free_site_slots": 2,
                 "auto_create_vms": 0,
                 "allow_signup": 1,
+                "allow_subaddressed_signups": 0,
                 "site_dns_zone": SITE_ZONE,
                 "tenant_mail_zone": MAIL_ZONE,
                 **settings,

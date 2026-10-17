@@ -205,6 +205,13 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
         self.assertFalse(site.pending_follow_ups())
         self.assertFalse(site.domains)
 
+        self.vm.db_set("letsencrypt_email_set", 1)  # Verify Host gave Pilot the email
+        sites.provision(name)
+
+        site = self.site(name)
+        self.assertTrue(site.has_site_domain)
+        self.assertFalse(site.error)  # the skip no longer holds
+
     def test_drop_site_frees_the_slot(self) -> None:
         name = capacity.claim_site(self.tenant.name, "acme", REGION)
         hostname = self.site(name).hostname

@@ -20,7 +20,7 @@ from suite_cloud.hosting import (
     wait_for_task,
 )
 from suite_cloud.hosting.central import CentralRejectedError, CentralUnavailableError
-from suite_cloud.hosting.central.pilot import PilotNotReady, is_finished, task_id
+from suite_cloud.hosting.central.pilot import PilotError, PilotNotReady, is_finished, task_id
 from suite_cloud.utils import get_config, log_error, log_exception
 
 PILOT_BOOT_DEADLINE = timedelta(minutes=30)
@@ -128,6 +128,7 @@ def verify_host(vm) -> bool:
         if vm.booted_at and now_datetime() - get_datetime(vm.booted_at) > PILOT_BOOT_DEADLINE:
             stop(vm, _("Pilot did not answer within 30 minutes of the server booting."))
         return False
+    settings = ensure_letsencrypt_email(vm, pilot, settings)
     zone = domains[0].lstrip(".") if domains else None
     vm.db_set(
         {
@@ -140,6 +141,22 @@ def verify_host(vm) -> bool:
         return False
     vm.db_set("host_verified", 1)
     return True
+
+
+def ensure_letsencrypt_email(vm, pilot, settings: dict) -> dict:
+    """Pilot's settings once its Let's Encrypt email is set from the ACME Contact Email, which the
+    certificates of site and custom domains need. A failure leaves the server without domains, not
+    without sites, so it is logged and the host check goes on."""
+
+    email = get_config("acme_contact_email")
+    if (settings.get("letsencrypt") or {}).get("email") or not email:
+        return settings
+    try:
+        pilot.set_letsencrypt_email(email)
+        return pilot.settings()  # what Pilot keeps, not what it answered
+    except PilotError:
+        log_exception(f"Pilot on server {vm.name} did not take the Let's Encrypt email", vm)
+        return settings
 
 
 def host_problem(vm, zone: str | None, settings: dict) -> str | None:

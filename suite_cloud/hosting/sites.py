@@ -34,6 +34,7 @@ from suite_cloud.utils import get_config, log_exception
 MAX_HOSTNAME_ATTEMPTS = 5
 INVITE_DAYS = 7
 WAITING_ERRORS = (PilotNotReady, SiteUnavailableError, CentralUnavailableError)
+NO_LETSENCRYPT_EMAIL = "The server has no Let's Encrypt email, so the site domain is skipped."
 
 
 class SiteSetupError(Exception):
@@ -236,6 +237,8 @@ def follow_up(site) -> bool:
     """The site domain, mail and the owner's invite: each failure is noted on the site, which stays
     Active."""
 
+    if site.error == _(NO_LETSENCRYPT_EMAIL) and not site.follow_up_skip_reason:
+        site.db_set("error", None)  # the server got its email since: the site domain goes ahead
     attempted = set()
     # Read again after each step: the owner's invite waits for the mail step before it.
     while steps := [(label, step) for label, step in site.pending_follow_ups() if label not in attempted]:

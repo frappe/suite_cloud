@@ -125,7 +125,7 @@ class SuiteSite(Document):
             and self.site_domain
             and not self.get_virtual_machine().letsencrypt_email_set
         ):
-            return _("The server has no Let's Encrypt email, so the site domain is skipped.")
+            return _(sites.NO_LETSENCRYPT_EMAIL)
         return None
 
     @property

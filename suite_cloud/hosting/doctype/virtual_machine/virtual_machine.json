@@ -268,7 +268,7 @@
   },
   {
    "default": "0",
-   "description": "Pilot can request certificates, which custom domains need.",
+   "description": "Pilot can request certificates, which site and custom domains need. Verify Host sets Pilot's Let's Encrypt email from the ACME Contact Email in Suite Cloud Settings when it has none; Pilot takes it from v0.0.74-pre-alpha.",
    "fieldname": "letsencrypt_email_set",
    "fieldtype": "Check",
    "label": "Let's Encrypt Email Set",
@@ -347,7 +347,7 @@
    "link_fieldname": "virtual_machine"
   }
  ],
- "modified": "2026-10-17 12:00:00.000000",
+ "modified": "2026-10-17 22:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Virtual Machine",

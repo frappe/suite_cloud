@@ -144,6 +144,7 @@ class FakePilot:
         self.pending: dict[str, str] = {}  # task -> site it creates
         self.wildcards = [f".{PROXY_ZONE}"]
         self.letsencrypt_email = "ops@frappe.test"
+        self.keeps_letsencrypt_email = True  # False: a Pilot before v0.0.74, which ignores it
         self.production = True
         self.taken: set[str] = set()  # labels another server holds
         self.attached: dict[str, set] = {}
@@ -177,6 +178,12 @@ class FakePilot:
     def settings(self) -> dict:
         self.check()
         return {"production": {"enabled": self.production}, "letsencrypt": {"email": self.letsencrypt_email}}
+
+    def set_letsencrypt_email(self, email: str) -> None:
+        self.check()
+        self.calls.append(("set_letsencrypt_email", email))
+        if self.keeps_letsencrypt_email:
+            self.letsencrypt_email = email
 
     def list_sites(self) -> list[str]:
         self.check()

@@ -13,6 +13,23 @@ class TestVirtualMachine(HostingFixtures, IntegrationTestCase):
     def setUp(self) -> None:
         self.setup_hosting()
 
+    def test_verify_host_gives_pilot_the_acme_contact_email(self) -> None:
+        self.pilot.letsencrypt_email = None
+
+        vm = self.make_vm()
+
+        self.assertIn(("set_letsencrypt_email", "ops@example.test"), self.pilot.calls)
+        self.assertTrue(vm.host_verified and vm.letsencrypt_email_set)
+
+    def test_a_pilot_that_ignores_the_email_leaves_the_server_without_domains(self) -> None:
+        self.pilot.letsencrypt_email = None
+        self.pilot.keeps_letsencrypt_email = False  # a Pilot before v0.0.74
+
+        vm = self.make_vm()
+
+        self.assertTrue(vm.host_verified)  # it still takes sites
+        self.assertFalse(vm.letsencrypt_email_set)
+
     def test_a_new_server_is_created_booted_verified_and_given_suite(self) -> None:
         vm = self.make_vm()
 

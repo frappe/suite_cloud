@@ -157,7 +157,7 @@ Or run the bench in a mode that runs jobs in threads, for example Pilot's lite m
 
 **A hosted site reports "Suite Cloud is temporarily unavailable", and its Error Log shows a Cloudflare 502.** The bench restarted while the site called it. A development bench restarts when a file under `apps/` changes. Do not save files under `apps/` while a request runs. Keep scratch scripts in another directory. The step tries again on the next poll.
 
-**The site domain step is skipped with "The server has no Let's Encrypt email".** Pilot on the server has no email for Let's Encrypt, and no API can set it. The site works on its `suite-<hex>` host name, but it gets no site domain.
+**The site domain step is skipped with "The server has no Let's Encrypt email".** Pilot on the server has no email for Let's Encrypt. Verify Host sets it from **Suite Cloud Settings > Certificates > ACME Contact Email**, but only Pilot v0.0.74-pre-alpha and later keep it. Fill in the ACME Contact Email, update Pilot if it is older, and click **Verify Host** on the Virtual Machine. The next poll adds the site domain to the server's Active sites.
 
 **A label is "not available".** A site, an open request, a cluster, a mail domain or a DNS record already uses it. Leave **Label** blank to get a free one made from the organization, for example `acme-2`.
 

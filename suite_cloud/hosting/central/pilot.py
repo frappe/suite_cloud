@@ -43,6 +43,12 @@ class PilotClient:
     def settings(self) -> dict:
         return self.request("GET", "/api/v1/settings")
 
+    def set_letsencrypt_email(self, email: str) -> None:
+        """The account email Pilot requests certificates with. A Pilot before v0.0.74-pre-alpha answers
+        but keeps none: read the settings again to know."""
+
+        self.request("PATCH", "/api/v1/settings", json={"letsencrypt": {"email": email}})
+
     def list_sites(self) -> list[str]:
         return [site["name"] for site in self.request("GET", "/api/v1/sites")]
 
