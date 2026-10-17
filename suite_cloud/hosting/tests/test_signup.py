@@ -175,6 +175,11 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(
             labels.generate_label("A very long organization name " * 3), "a-very-long-organization-name"
         )
+        # Cut at whole words only: a word cut to vm would make every numbered label reserved.
+        self.assertEqual(
+            labels.label_from("Northern Lights Data Center VMware"), "northern-lights-data-center"
+        )
+        self.assertEqual(labels.label_from("VM VM"), "vm")
 
     def test_of_two_requests_giving_one_label_the_first_processed_wins(self) -> None:
         first = self.create()

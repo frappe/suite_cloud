@@ -84,13 +84,24 @@ def label_from(organization: str) -> str:
     Acme Inc. gives acme. A reserved result is prefixed with ``team-``."""
 
     text = unicodedata.normalize("NFKD", organization or "").encode("ascii", "ignore").decode().lower()
-    words = re.findall(r"[a-z0-9]+", text)
+    words = re.findall(r"[a-z0-9]+", text) or ["workspace"]
     while len(words) > 1 and words[-1] in LEGAL_SUFFIXES:
         words.pop()
     if len(words) > 1:
-        words = [word for word in words if word != "vm"] or words  # *-vm-* is a server's name
-    label = "-".join(words)[:GENERATED_LENGTH].strip("-") or "workspace"
-    return f"team-{label}"[:GENERATED_LENGTH].strip("-") if is_reserved(label) else label
+        words = [word for word in words if word != "vm"] or ["vm"]  # *-vm-* is a server's name
+    label = join_within(words, GENERATED_LENGTH)
+    return join_within(["team", *words], GENERATED_LENGTH) if is_reserved(label) else label
+
+
+def join_within(words: list[str], length: int) -> str:
+    """As many whole words as fit, so no word is cut into a reserved part such as vm."""
+
+    label = words[0][:length]
+    for word in words[1:]:
+        if len(label) + 1 + len(word) > length:
+            break
+        label = f"{label}-{word}"
+    return label
 
 
 def generate_label(organization: str, request: str | None = None) -> str:
@@ -98,9 +109,8 @@ def generate_label(organization: str, request: str | None = None) -> str:
 
     base = label_from(organization)
     for number in range(1, 100):
-        label = (
-            base if number == 1 else f"{base[: GENERATED_LENGTH - len(str(number)) - 1].rstrip('-')}-{number}"
-        )
+        suffix = f"-{number}"
+        label = base if number == 1 else join_within(base.split("-"), GENERATED_LENGTH - len(suffix)) + suffix
         if not is_reserved(label) and not is_taken(label, request):
             return label
     frappe.throw(_("No label is free for {0}; give one.").format(organization), LabelNotAvailableError)
