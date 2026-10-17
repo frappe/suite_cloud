@@ -5,7 +5,8 @@ import frappe
 from suite_cloud.api.mail import accounts as accounts_api
 from suite_cloud.api.mail import domains as domains_api
 from suite_cloud.api.mail import groups as groups_api
-from suite_cloud.hosting import capacity, progress, sites
+from suite_cloud.hosting import capacity, labels, progress, sites
+from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fakes import REGION
 from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, HostingFixtures
 from suite_cloud.mail.tenancy import hosted_domain
@@ -144,15 +145,29 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertFalse(self.site(site.name).error)  # the step's earlier failure is cleared
         self.assertEqual(frappe.db.count("Mail Account", {"name": NOTIFICATION}), 1)
 
-    def test_drop_site_removes_the_mail_domain_and_its_records(self) -> None:
+    def test_drop_site_keeps_the_tenants_mail_domain_and_mailboxes(self) -> None:
         site = self.claim()
+        self.make_account(f"owner@{DOMAIN}")  # the owner accepted the invite
 
         self.site(site.name).drop_site()
 
-        self.assertFalse(frappe.db.exists("Mail Domain", DOMAIN))
-        self.assertFalse(frappe.db.exists("Mail Account", NOTIFICATION))
-        self.assertFalse(frappe.db.exists("DNS Record", {"managed_by": DOMAIN}))
-        self.assertEqual(self.site(site.name).status, "Dropped")
+        site = self.site(site.name)
+        self.assertEqual((site.status, site.error), ("Dropped", None))
+        self.assertFalse(site.mail_domain or site.notification_account)
+        self.assertFalse(frappe.db.exists("Mail Account", NOTIFICATION))  # the site's own login
+        self.assertTrue(frappe.db.exists("Mail Account", f"owner@{DOMAIN}"))
+        self.assertTrue(frappe.db.exists("Mail Domain", DOMAIN))
+        self.assertTrue(frappe.db.exists("DNS Record", {"managed_by": DOMAIN}))
+
+    def test_the_tenants_next_site_takes_its_kept_domain_back(self) -> None:
+        self.site(self.claim().name).drop_site()
+        self.assertRaises(LabelNotAvailableError, labels.assert_label_available, "acme")  # anyone else
+
+        name = frappe.get_doc("Suite Tenant", self.tenant.name).create_hosted_site("acme")
+
+        site = self.site(name)
+        self.assertEqual((site.mail_domain, site.notification_account), (DOMAIN, NOTIFICATION))
+        self.assertTrue(site.email_account_created)
 
     def test_a_hosted_domain_must_be_one_label_of_the_tenants_site(self) -> None:
         self.claim()

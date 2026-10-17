@@ -145,18 +145,17 @@ def submission_endpoint(domain) -> tuple[str, int, bool]:
     frappe.throw(_("Mail Domain {0} publishes no submission record to send through.").format(domain.name))
 
 
-def remove(site) -> None:
-    """Drops the notification account and the hosted domain; the domain takes its records along."""
+def detach(site) -> None:
+    """Drops the site's notification account, whose password only the site had. The domain and its
+    mailboxes are the tenant's: they stay, for the tenant's next site, until the tenant is archived
+    with its data."""
 
-    account, domain = site.notification_account, site.mail_domain
+    account = site.notification_account
     site.db_set(
         {"notification_account": None, "mail_domain": None, "email_account_created": 0}
-    )  # unlinked first
+    )  # unlinked first: a dropped site must not hold the tenant's domain
     if account and frappe.db.exists("Mail Account", account):
         frappe.delete_doc("Mail Account", account, ignore_permissions=True)
-    if domain and frappe.db.exists("Mail Domain", domain):
-        # Mailboxes the tenant added on the domain stop the delete: they are the tenant's to remove.
-        frappe.delete_doc("Mail Domain", domain, ignore_permissions=True)
 
 
 def assert_not_hosted(doc) -> None:

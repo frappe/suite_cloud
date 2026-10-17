@@ -26,7 +26,7 @@ frappe.ui.form.on('Suite Site', {
 		frm.add_custom_button(
 			__('Drop Site'),
 			() =>
-				frappe.confirm(__('Drop {0}? The site, its mail domain and notification account are deleted.', [frm.doc.hostname || frm.doc.name]), () =>
+				frappe.confirm(__('Drop {0}? The site and its notification account are deleted. The mail domain and its mailboxes stay with the tenant.', [frm.doc.hostname || frm.doc.name]), () =>
 					frm.events.call(frm, 'drop_site', {}, __('Queueing...')),
 				),
 			__('Actions'),

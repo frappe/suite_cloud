@@ -91,7 +91,7 @@
    "search_index": 1
   },
   {
-   "description": "The tenant's label. acme gives the site domain acme.sites.example.com and the mail domain acme.example.com, under the zones set in Suite Cloud Settings. Unique among sites; cleared when the site is dropped.",
+   "description": "The tenant's label. acme gives the site domain acme.sites.example.com and the mail domain acme.example.com, under the zones set in Suite Cloud Settings. Unique among sites; cleared when the site is dropped, though the tenant's mail domain keeps it for that tenant's next site.",
    "fieldname": "label",
    "fieldtype": "Data",
    "label": "Label",
@@ -213,7 +213,7 @@
    "label": "Mail"
   },
   {
-   "description": "The tenant's hosted mail domain, e.g. acme.example.com. Suite Cloud publishes its records and keeps the tenant API from changing it.",
+   "description": "The tenant's hosted mail domain, e.g. acme.example.com. Suite Cloud publishes its records and keeps the tenant API from changing it. Unlinked when the site is dropped: the domain and its mailboxes stay with the tenant until it is archived with its data.",
    "fieldname": "mail_domain",
    "fieldtype": "Link",
    "label": "Mail Domain",
@@ -243,7 +243,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 16:00:00.000000",
+ "modified": "2026-10-17 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

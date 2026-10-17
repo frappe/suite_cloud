@@ -336,7 +336,7 @@ def drop(site: str) -> None:
         drop_from_server(doc)
         from suite_cloud.mail.tenancy import hosted_domain
 
-        hosted_domain.remove(doc)
+        hosted_domain.detach(doc)
         delete_managed_records("Suite Site", doc.name)
     except Exception as e:
         undo_step()

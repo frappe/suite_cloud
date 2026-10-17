@@ -163,7 +163,7 @@ def process_request(request: str) -> None:
         from suite_cloud.hosting import capacity
 
         region = capacity.assert_region_enabled(get_config("default_region"))
-        labels.assert_label_available(doc.label, doc.name)  # a site may have taken it since
+        labels.assert_label_available(doc.label, doc.name, doc.tenant)  # a site may have taken it since
         tenant = doc.tenant or ensure_tenant(doc, ensure_user(doc), region)
         # Linked before the site is claimed: the site's job finds the request through the tenant.
         doc.db_set({"tenant": tenant, "status": "Processing"})

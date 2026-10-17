@@ -173,7 +173,7 @@ class SuiteTenant(Document):
         self.assert_no_live_site()
         labels.assert_owner_name_free(frappe.db.get_value("User", self.user, "email"))
         label = labels.validate_label(label)
-        labels.assert_label_available(label)
+        labels.assert_label_available(label, tenant=self.name)
         region = capacity.assert_region_enabled(region or get_config("default_region"))
         return capacity.claim_site(self.name, label, region)
 

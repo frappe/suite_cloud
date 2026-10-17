@@ -57,14 +57,15 @@ def assert_owner_name_free(email: str) -> None:
         )
 
 
-def assert_label_available(label: str, request: str | None = None) -> None:
-    """Free across sites, open signups, clusters and both zones' records."""
+def assert_label_available(label: str, request: str | None = None, tenant: str | None = None) -> None:
+    """Free across sites, open signups, clusters and both zones' records. A ``tenant``'s own hosted
+    mail domain, kept from a site it dropped, leaves the label free for that tenant."""
 
-    if label in RESERVED or RESERVED_PATTERN.match(label) or is_taken(label, request):
+    if label in RESERVED or RESERVED_PATTERN.match(label) or is_taken(label, request, tenant):
         frappe.throw(_("{0} is not available.").format(label), LabelNotAvailableError)
 
 
-def is_taken(label: str, request: str | None) -> bool:
+def is_taken(label: str, request: str | None, tenant: str | None) -> bool:
     if frappe.db.exists("Stalwart Cluster", {"label": label}):
         return True
     if frappe.db.exists("Suite Site", {"label": label, "status": ["!=", "Dropped"]}):
@@ -78,11 +79,15 @@ def is_taken(label: str, request: str | None) -> bool:
         (site_domain(label), get_config("site_dns_zone")),
         (mail_domain(label), get_config("tenant_mail_zone")),
     ):
-        if domain and (
-            frappe.db.exists("Mail Domain", domain) or has_records(zone, relative_host(domain, zone))
-        ):
+        if domain and is_domain_held(domain, zone, tenant):
             return True
     return False
+
+
+def is_domain_held(domain: str, zone: str, tenant: str | None) -> bool:
+    if tenant and frappe.db.exists("Mail Domain", {"name": domain, "tenant": tenant, "hosted": 1}):
+        return False  # the tenant's own, with its records
+    return bool(frappe.db.exists("Mail Domain", domain) or has_records(zone, relative_host(domain, zone)))
 
 
 def has_records(zone: str, host: str) -> bool:
