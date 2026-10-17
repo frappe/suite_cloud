@@ -110,6 +110,7 @@ STEPS = (
         "Creating the user and Suite Tenant",
         ("verified",),
         lambda state: bool(state.request.tenant),
+        get_summary=lambda state: _("Label {0}").format(state.request.label),
     ),
     Step(
         "claim",

@@ -6,7 +6,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.api import signup
-from suite_cloud.hosting import progress
+from suite_cloud.hosting import labels, progress
 from suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request import expire_requests
 from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fakes import REGION
@@ -26,8 +26,10 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         mailer.start()
         self.addCleanup(mailer.stop)
 
-    def create(self, label: str = "acme") -> str:
-        return signup.create_request(email=EMAIL, full_name="Ada Lovelace", label=label)["request"]
+    def create(self, label: str | None = "acme", organization: str = "Acme Inc.") -> str:
+        return signup.create_request(
+            email=EMAIL, full_name="Ada Lovelace", organization=organization, label=label
+        )["request"]
 
     def code(self) -> str:
         return re.search(r"\d{6}", self.mails[-1]["message"]).group()
@@ -39,11 +41,17 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
 
         status = signup.get_status(request, key)
         self.assertEqual(
-            status, {"status": "Completed", "stage": "Active", "site_url": f"https://acme.{SITE_ZONE}"}
+            status,
+            {
+                "status": "Completed",
+                "stage": "Active",
+                "label": "acme",
+                "site_url": f"https://acme.{SITE_ZONE}",
+            },
         )
         doc = frappe.get_doc("Suite Tenant Request", request)
         tenant = frappe.get_doc("Suite Tenant", doc.tenant)
-        self.assertEqual((tenant.user, tenant.tenant_type), (EMAIL, "Suite Site"))
+        self.assertEqual((tenant.user, tenant.tenant_type, tenant.title), (EMAIL, "Suite Site", "Acme Inc."))
         self.assertIn("Suite Tenant", frappe.get_roles(EMAIL))
         self.assertEqual(frappe.db.get_value("User", EMAIL, "user_type"), "Website User")
         # The site invites its owner to their account at the mail domain; they choose the password.
@@ -93,7 +101,12 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(frappe.db.get_value("Suite Site", request.suite_site, "status"), "Active")
 
     def test_sub_addressed_emails_are_refused_unless_allowed(self) -> None:
-        values = {"doctype": "Suite Tenant Request", "full_name": "Ada Lovelace", "label": "acme"}
+        values = {
+            "doctype": "Suite Tenant Request",
+            "full_name": "Ada Lovelace",
+            "organization": "Acme",
+            "label": "acme",
+        }
         doc = frappe.get_doc({**values, "email": "new-signup+test@frappe.test"})
         self.assertRaisesRegex(frappe.ValidationError, "sub-address", doc.insert)
 
@@ -111,18 +124,70 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         )
 
     def test_the_notification_local_part_cannot_sign_up(self) -> None:
-        values = {"doctype": "Suite Tenant Request", "full_name": "Ada Lovelace", "label": "acme"}
+        values = {
+            "doctype": "Suite Tenant Request",
+            "full_name": "Ada Lovelace",
+            "organization": "Acme",
+            "label": "acme",
+        }
         doc = frappe.get_doc({**values, "email": "notification@frappe.test"})
         self.assertRaisesRegex(frappe.ValidationError, "kept for the site's notifications", doc.insert)
 
     def test_a_request_made_in_the_desk_is_checked_like_a_signup(self) -> None:
         def request(**fields):
-            values = {"email": EMAIL, "full_name": "Ada Lovelace", "label": "acme", **fields}
+            values = {
+                "email": EMAIL,
+                "full_name": "Ada Lovelace",
+                "organization": "Acme",
+                "label": "acme",
+                **fields,
+            }
             return frappe.get_doc({"doctype": "Suite Tenant Request", **values})
 
         self.assertRaises(LabelNotAvailableError, request(label="www").insert)
         self.assertRaises(frappe.ValidationError, request(email="not-an-address").insert)
         self.assertRaises(frappe.ValidationError, request(full_name=" ").insert)
+        self.assertRaises(frappe.ValidationError, request(organization=" ").insert)
+
+    def test_a_label_is_made_from_the_organization_when_processed(self) -> None:
+        request = self.create(label=None, organization="Ácme Technologies Pvt. Ltd.")
+        self.assertFalse(frappe.db.get_value("Suite Tenant Request", request, "label"))  # holds nothing yet
+        self.create(label=None)  # a second signup for Acme is not refused
+
+        signup.verify_otp(request, self.code_of(0))
+
+        doc = frappe.get_doc("Suite Tenant Request", request)
+        self.assertEqual((doc.status, doc.label), ("Completed", "acme-technologies"))
+        self.assertEqual(self.site(doc.suite_site).label, "acme-technologies")
+        self.assertEqual(self.steps(request)["tenant"].detail, "Label acme-technologies")
+
+    def test_a_taken_label_gets_the_next_free_number(self) -> None:
+        frappe.get_doc({"doctype": "Suite Site", "region": REGION, "label": "acme"}).insert()
+        frappe.get_doc({"doctype": "Suite Site", "region": REGION, "label": "acme-2"}).insert()
+
+        self.assertEqual(labels.generate_label("Acme Inc."), "acme-3")
+        self.assertEqual(labels.generate_label("www"), "team-www")  # reserved names are prefixed
+        self.assertEqual(labels.generate_label("株式会社"), "workspace")  # nothing left in ASCII
+        self.assertEqual(
+            labels.generate_label("A very long organization name " * 3), "a-very-long-organization-name"
+        )
+
+    def test_of_two_requests_giving_one_label_the_first_processed_wins(self) -> None:
+        first = self.create()
+        frappe.db.set_value("Suite Tenant Request", first, "label", None)  # as if both passed the check
+        second = self.create()
+        frappe.db.set_value("Suite Tenant Request", first, "label", "acme")
+
+        signup.verify_otp(first, self.code_of(0))
+        signup.verify_otp(second, self.code_of(1))
+
+        statuses = frappe.get_all(
+            "Suite Tenant Request", {"name": ["in", [first, second]]}, ["name", "status", "error"]
+        )
+        by_name = {row.name: row for row in statuses}
+        self.assertEqual(by_name[first].status, "Completed")
+        self.assertEqual(by_name[second].status, "Failed")
+        self.assertIn("not available", by_name[second].error)
 
     def test_a_failed_site_fails_the_signup_whose_retry_retries_the_site(self) -> None:
         self.pilot.create_site = lambda name, apps, key: self.pilot.task("failed", "Error: disk full")
@@ -210,6 +275,9 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(self.steps(request)["verified"].status, "Failed")
         self.assertIn("expired", self.steps(request)["verified"].detail)
 
+    def code_of(self, index: int) -> str:
+        return re.search(r"\d{6}", self.mails[index]["message"]).group()
+
     def steps(self, request: str) -> dict:
         return {row.step: row for row in frappe.get_doc("Suite Tenant Request", request).steps}
 
@@ -218,6 +286,7 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
             "doctype": "Suite Tenant Request",
             "email": EMAIL,
             "full_name": "Ada Lovelace",
+            "organization": "Acme Inc.",
             "label": "acme",
         }
         return frappe.get_doc(doc).insert().name

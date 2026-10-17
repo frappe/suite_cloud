@@ -37,7 +37,8 @@ class SuiteTenantRequest(Document):
         expires_at: DF.Datetime | None
         full_name: DF.Data
         ip_address: DF.Data | None
-        label: DF.Data
+        label: DF.Data | None
+        organization: DF.Data
         request_key: DF.Data | None
         status: DF.Literal["Pending", "Verified", "Processing", "Completed", "Failed", "Expired"]
         steps: DF.Table[SuiteTenantRequestStep]
@@ -66,8 +67,12 @@ class SuiteTenantRequest(Document):
         self.full_name = (self.full_name or "").strip()
         if not self.full_name:
             frappe.throw(_("Enter the name of the person signing up."))
-        self.label = labels.validate_label(self.label)
-        labels.assert_label_available(self.label)
+        self.organization = (self.organization or "").strip()
+        if not self.organization:
+            frappe.throw(_("Enter the name of the organization, e.g. the company or team."))
+        if self.label:  # given: held from now on; otherwise made from the organization when processed
+            self.label = labels.validate_label(self.label)
+            labels.assert_label_available(self.label)
         self.timezone = (self.timezone or "").strip() or None
         if "+" in self.email.split("@", 1)[0] and not cint(get_config("allow_subaddressed_signups")):
             frappe.throw(_("{0} is a sub-address; sign up with the address itself.").format(self.email))
@@ -163,7 +168,7 @@ def process_request(request: str) -> None:
         from suite_cloud.hosting import capacity
 
         region = capacity.assert_region_enabled(get_config("default_region"))
-        labels.assert_label_available(doc.label, doc.name, doc.tenant)  # a site may have taken it since
+        labels.reserve_label(doc)
         tenant = doc.tenant or ensure_tenant(doc, ensure_user(doc), region)
         # Linked before the site is claimed: the site's job finds the request through the tenant.
         doc.db_set({"tenant": tenant, "status": "Processing"})
@@ -209,7 +214,7 @@ def ensure_tenant(request, user: str, region: str) -> str:
     tenant = frappe.get_doc(
         {
             "doctype": "Suite Tenant",
-            "title": _("{0}'s workspace").format(request.full_name.strip()),
+            "title": request.organization,  # the site's workspace name
             "tenant_type": "Suite Site",
             "user": user,
         }

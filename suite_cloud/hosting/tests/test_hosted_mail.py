@@ -42,7 +42,12 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertTrue(account["password"])
 
     def test_a_request_shows_every_step_to_the_owner_invite(self) -> None:
-        values = {"email": "progress@frappe.test", "full_name": "John Doe", "label": "acme"}
+        values = {
+            "email": "progress@frappe.test",
+            "full_name": "John Doe",
+            "organization": "Acme",
+            "label": "acme",
+        }
         request = frappe.get_doc({"doctype": "Suite Tenant Request", **values})
         request.flags.verify_by_otp = True  # not processed: the test claims the site for the tenant
         request.insert()

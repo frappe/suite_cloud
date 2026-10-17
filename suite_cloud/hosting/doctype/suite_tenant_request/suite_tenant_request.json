@@ -7,6 +7,7 @@
  "field_order": [
   "email",
   "full_name",
+  "organization",
   "label",
   "timezone",
   "column_break_main",
@@ -42,12 +43,20 @@
    "set_only_once": 1
   },
   {
-   "description": "Names the tenant's site and mail domains, e.g. acme. Lowercase letters, digits and dashes.",
+   "description": "The company or team the workspace is for, e.g. Acme Inc. It names the workspace on the site, and the label is made from it unless one is given.",
+   "fieldname": "organization",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Organization",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Names the tenant's site and mail domains, e.g. acme. Leave it blank to have it made from the organization when the request is processed: Acme Inc. gives acme, or acme-2 when acme is taken. A label given here must be free and is held from now on.",
    "fieldname": "label",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Label",
-   "reqd": 1,
    "search_index": 1,
    "set_only_once": 1
   },
@@ -142,7 +151,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 18:00:00.000000",
+ "modified": "2026-10-17 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request",
@@ -162,7 +171,7 @@
   }
  ],
  "row_format": "Dynamic",
- "search_fields": "email,label",
+ "search_fields": "email,organization,label",
  "show_title_field_in_link": 1,
  "sort_field": "creation",
  "sort_order": "DESC",

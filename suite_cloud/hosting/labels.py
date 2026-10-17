@@ -1,4 +1,5 @@
-"""The label a tenant picks: ``acme`` names its site domain and its mail domain.
+"""The label that names a tenant's site domain and mail domain, e.g. ``acme``: given, or made from
+the organization's name when its request is processed.
 
 The mail domain is ``acme.<tenant mail zone>``. The site domain is ``acme.<site zone>``, or
 ``acme.sites.<zone>`` when both are one zone: the site's CNAME cannot share a name with the mail
@@ -6,10 +7,12 @@ domain's MX and TXT records.
 """
 
 import re
+import unicodedata
 
 import frappe
 from frappe import _
 
+from suite_cloud.hosting import checkpoint
 from suite_cloud.mail.tenancy.addresses import DOMAIN_LABEL
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import relative_host
 from suite_cloud.utils import get_config
@@ -17,6 +20,25 @@ from suite_cloud.utils import get_config
 SHARED_ZONE_LABEL = "sites"  # where site domains go when sites and mail share a zone
 RESERVED = {"admin", "atlas", "cargo", "proxy", "site", "www", "mail", "spf", "out", SHARED_ZONE_LABEL}
 RESERVED_PATTERN = re.compile(r"^(spf\d+|proxy-.*|site-.*|.*-vm-.*)$")
+OPEN_STATUSES = ("Pending", "Verified", "Processing")  # requests in these hold their label
+GENERATED_LENGTH = 30  # it is in every address of the tenant's mail domain
+# Dropped from the end of an organization's name: Acme Inc. gives acme.
+LEGAL_SUFFIXES = {
+    "inc",
+    "llc",
+    "llp",
+    "ltd",
+    "limited",
+    "pvt",
+    "private",
+    "corp",
+    "co",
+    "gmbh",
+    "plc",
+    "ag",
+    "bv",
+    "sa",
+}
 
 
 class LabelNotAvailableError(frappe.ValidationError):
@@ -57,20 +79,68 @@ def assert_owner_name_free(email: str) -> None:
         )
 
 
-def assert_label_available(label: str, request: str | None = None, tenant: str | None = None) -> None:
-    """Free across sites, open signups, clusters and both zones' records. A ``tenant``'s own hosted
-    mail domain, kept from a site it dropped, leaves the label free for that tenant."""
+def label_from(organization: str) -> str:
+    """The organization's name in lowercase ASCII words joined by dashes, legal suffixes left out:
+    Acme Inc. gives acme. A reserved result is prefixed with ``team-``."""
 
-    if label in RESERVED or RESERVED_PATTERN.match(label) or is_taken(label, request, tenant):
+    text = unicodedata.normalize("NFKD", organization or "").encode("ascii", "ignore").decode().lower()
+    words = re.findall(r"[a-z0-9]+", text)
+    while len(words) > 1 and words[-1] in LEGAL_SUFFIXES:
+        words.pop()
+    label = "-".join(words)[:GENERATED_LENGTH].strip("-") or "workspace"
+    return f"team-{label}"[:GENERATED_LENGTH].strip("-") if is_reserved(label) else label
+
+
+def generate_label(organization: str, request: str | None = None) -> str:
+    """The first free one of acme, acme-2, acme-3 and so on."""
+
+    base = label_from(organization)
+    for number in range(1, 100):
+        label = (
+            base if number == 1 else f"{base[: GENERATED_LENGTH - len(str(number)) - 1].rstrip('-')}-{number}"
+        )
+        if not is_reserved(label) and not is_taken(label, request):
+            return label
+    frappe.throw(_("No label is free for {0}; give one.").format(organization), LabelNotAvailableError)
+
+
+def reserve_label(request) -> str:
+    """The request's label, held from now on: its own if still free, else one made from its
+    organization. One request at a time, committed before the next, so no two pick one label."""
+
+    with frappe.cache.lock(f"{frappe.local.site}:suite_cloud:labels", timeout=60, blocking_timeout=60):
+        if request.label:
+            # Held now only by requests already processing: of two that gave it, the first wins.
+            assert_label_available(request.label, request.name, request.tenant, holders=("Processing",))
+        else:
+            request.db_set("label", generate_label(request.organization, request.name))
+        request.db_set("status", "Processing")  # holds the label for the requests after it
+        checkpoint()
+    return request.label
+
+
+def assert_label_available(
+    label: str, request: str | None = None, tenant: str | None = None, holders: tuple = OPEN_STATUSES
+) -> None:
+    """Free across sites, requests in ``holders``, clusters and both zones' records. A ``tenant``'s
+    own hosted mail domain, kept from a site it dropped, leaves the label free for that tenant."""
+
+    if is_reserved(label) or is_taken(label, request, tenant, holders):
         frappe.throw(_("{0} is not available.").format(label), LabelNotAvailableError)
 
 
-def is_taken(label: str, request: str | None, tenant: str | None) -> bool:
+def is_reserved(label: str) -> bool:
+    return label in RESERVED or bool(RESERVED_PATTERN.match(label))
+
+
+def is_taken(
+    label: str, request: str | None, tenant: str | None = None, holders: tuple = OPEN_STATUSES
+) -> bool:
     if frappe.db.exists("Stalwart Cluster", {"label": label}):
         return True
     if frappe.db.exists("Suite Site", {"label": label, "status": ["!=", "Dropped"]}):
         return True
-    open_request = {"label": label, "status": ["in", ["Pending", "Verified", "Processing"]]}
+    open_request = {"label": label, "status": ["in", list(holders)]}
     if request:
         open_request["name"] = ["!=", request]
     if frappe.db.exists("Suite Tenant Request", open_request):

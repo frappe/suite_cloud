@@ -20,7 +20,9 @@ class SignupClosedError(frappe.PermissionError):
 
 @frappe.whitelist(allow_guest=True, methods=["POST"])
 @rate_limit(limit=5, seconds=60 * 60)
-def create_request(email: str, full_name: str, label: str, timezone: str | None = None) -> dict:
+def create_request(
+    email: str, full_name: str, organization: str, label: str | None = None, timezone: str | None = None
+) -> dict:
     """Stores the request and mails a one-time code to ``email``."""
 
     assert_signup_open()
@@ -29,6 +31,7 @@ def create_request(email: str, full_name: str, label: str, timezone: str | None 
             "doctype": "Suite Tenant Request",
             "email": email,
             "full_name": full_name,
+            "organization": organization,
             "label": label,
             "timezone": timezone,
             "ip_address": frappe.local.request_ip,
@@ -63,6 +66,7 @@ def get_status(request: str, request_key: str) -> dict:
     return {
         "status": doc.status,
         "stage": site.status if site else None,
+        "label": doc.label,  # set once processing starts, unless given
         "site_url": site.url if site and doc.status == "Completed" else None,
     }
 
