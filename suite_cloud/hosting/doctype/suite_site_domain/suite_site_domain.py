@@ -21,6 +21,7 @@ class SuiteSiteDomain(Document):
         parent: DF.Data
         parentfield: DF.Data
         parenttype: DF.Data
+        primary_skipped: DF.Check
         records_fetched_at: DF.Datetime | None
         status: DF.Literal["Pending", "Active", "Failed"]
         task: DF.Data | None

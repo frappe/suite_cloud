@@ -8,6 +8,7 @@
   "domain",
   "status",
   "is_primary",
+  "primary_skipped",
   "managed",
   "dns_records",
   "records_fetched_at",
@@ -46,6 +47,15 @@
    "read_only": 1
   },
   {
+   "default": "0",
+   "depends_on": "primary_skipped",
+   "description": "It did not answer over HTTPS within minutes of being attached, so the site kept its own host name. Make it primary once it serves HTTPS.",
+   "fieldname": "primary_skipped",
+   "fieldtype": "Check",
+   "label": "Not Made Primary",
+   "read_only": 1
+  },
+  {
    "columns": 1,
    "default": "0",
    "description": "Suite Cloud publishes this domain's records itself.",
@@ -77,7 +87,7 @@
    "read_only": 1
   },
   {
-   "description": "Why the domain is not attached yet, e.g. Central does not see its records.",
+   "description": "Why the domain is not attached yet, e.g. Central does not see its records, or why it was not made primary.",
    "fieldname": "failure_reason",
    "fieldtype": "Small Text",
    "label": "Failure Reason",

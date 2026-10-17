@@ -43,19 +43,27 @@ class TestSiteDomains(HostingFixtures, IntegrationTestCase):
         )
         self.assertEqual(self.pilot.primary[site.hostname], domain)
 
-    def test_a_site_domain_becomes_primary_only_once_it_serves_https(self) -> None:
+    def test_a_site_domain_without_https_in_time_stays_attached_but_not_primary(self) -> None:
         problem = f"https://acme.{SITE_ZONE} does not answer over HTTPS yet: wrong version number"
-        with patch("suite_cloud.hosting.domains.get_https_problem", return_value=problem):
+        with (
+            patch("suite_cloud.hosting.domains.get_https_problem", return_value=problem),
+            patch("frappe.log_error") as log_error,
+        ):
             site = self.claim()
 
-        self.assertEqual(site.get_domain(f"acme.{SITE_ZONE}").status, "Active")  # attached
+        row = site.get_domain(f"acme.{SITE_ZONE}")
+        self.assertEqual((row.status, row.is_primary, row.primary_skipped), ("Active", 0, 1))
+        self.assertIn(problem, row.failure_reason)
         self.assertFalse(site.primary_domain)  # the site keeps answering on its own host name
-        self.assertIn("Site domain: waiting", site.error)
-        self.assertIn("HTTPS", site.error)
+        self.assertNotIn(site.hostname, self.pilot.primary)
+        self.assertFalse(site.error)
+        self.assertTrue(site.has_site_domain)  # proceeds: not tried again on each poll
+        self.assertIn("not made primary", log_error.call_args.kwargs["title"])
 
-        sites.provision(site.name)
+        domains.make_primary(site, f"acme.{SITE_ZONE}")  # the operator, once it serves HTTPS
 
-        self.assertEqual(self.site(site.name).primary_domain, f"acme.{SITE_ZONE}")
+        row = self.site(site.name).get_domain(f"acme.{SITE_ZONE}")
+        self.assertEqual((row.is_primary, row.primary_skipped, row.failure_reason), (1, 0, None))
 
     def test_a_domain_without_https_cannot_be_made_primary(self) -> None:
         site = self.claim()

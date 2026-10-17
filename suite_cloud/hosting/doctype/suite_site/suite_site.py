@@ -131,26 +131,27 @@ class SuiteSite(Document):
     @property
     def has_site_domain(self) -> bool:
         """Attached, and the site has a primary domain: the site domain at first, though the operator
-        may make another one primary later."""
+        may make another one primary later. One that gave no HTTPS in time stays attached only."""
 
         row = self.get_domain(self.site_domain)
-        return bool(row and row.status == "Active" and self.primary_domain)
+        return bool(row and row.status == "Active" and (self.primary_domain or row.primary_skipped))
 
     def pending_follow_ups(self) -> list[tuple[str, object]]:
         from suite_cloud.mail.tenancy import hosted_domain
 
         steps = []
+        if not self.email_account_created:
+            steps.append((_("Mail"), hosted_domain.ensure))
+        elif not self.owner_invite:
+            steps.append((_("Owner invite"), sites.invite_owner))  # sent from the notification account
         if (
             self.assign_site_domain
             and self.site_domain
             and not self.has_site_domain
             and not self.follow_up_skip_reason
         ):
+            # Last: it may wait minutes for HTTPS, while mail's records propagate meanwhile.
             steps.append((_("Site domain"), domains.ensure_site_domain))
-        if not self.email_account_created:
-            steps.append((_("Mail"), hosted_domain.ensure))
-        elif not self.owner_invite:
-            steps.append((_("Owner invite"), sites.invite_owner))  # sent from the notification account
         return steps
 
     # --- related --------------------------------------------------------------------

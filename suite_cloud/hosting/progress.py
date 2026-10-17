@@ -62,6 +62,10 @@ class RequestState:
             return _("The site gets no site domain.")
         return self.site.follow_up_skip_reason
 
+    def get_site_domain_summary(self) -> str:
+        row = self.site.get_domain(self.site.site_domain)
+        return row.failure_reason if row.primary_skipped else self.site.site_domain
+
     @property
     def are_mail_records_published(self) -> bool:
         records = {"managed_by_doctype": "Mail Domain", "managed_by": self.mail_domain.name}
@@ -142,7 +146,7 @@ STEPS = (
         ("configure",),
         lambda state: state.site.has_site_domain,
         get_skip_reason=RequestState.get_site_domain_skip_reason,
-        get_summary=lambda state: state.site.site_domain,
+        get_summary=RequestState.get_site_domain_summary,
         follow_up="Site domain",
     ),
     Step(

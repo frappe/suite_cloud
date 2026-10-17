@@ -7,6 +7,7 @@ publishes them.
 """
 
 import json
+import time
 
 import frappe
 import requests
@@ -14,9 +15,8 @@ from frappe import _
 from frappe.utils import add_to_date, get_datetime, now, now_datetime
 
 from suite_cloud.dns.resolver import verify_dns_record
-from suite_cloud.hosting import output_tail, wait_for_task
+from suite_cloud.hosting import checkpoint, output_tail, wait_for_task
 from suite_cloud.hosting.central.pilot import PilotConflict, is_finished, task_id
-from suite_cloud.hosting.central.site import SiteUnavailableError
 from suite_cloud.suite_cloud.doctype.dns_record.dns_record import (
     confirm_managed_records,
     reconcile_managed_records,
@@ -27,6 +27,8 @@ from suite_cloud.utils import get_config
 RECORDS_MAX_AGE_HOURS = 23  # Central keeps a verification token 24 hours
 PUBLISHED_TYPES = ("CNAME", "TXT")
 HTTPS_CHECK_SECONDS = 15
+HTTPS_POLL_SECONDS = 15
+HTTPS_WAIT_MINUTES = 5  # Pilot issues the certificate in a task of its own after attaching
 
 
 class DomainNotReadyError(frappe.ValidationError):
@@ -35,7 +37,7 @@ class DomainNotReadyError(frappe.ValidationError):
 
 def ensure_site_domain(site) -> bool:
     """The site's own domain (see ``labels.site_domain``), published, attached and, unless the site
-    already has one, primary; True once it is."""
+    already has one, primary; True once it is, or once it is attached but gave no HTTPS in time."""
 
     domain = site.site_domain
     row = site.get_domain(domain) or add_row(site, domain, managed=True)
@@ -47,8 +49,9 @@ def ensure_site_domain(site) -> bool:
         if not records_visible(row) or not attach(site, row):
             return False
     if not site.primary_domain:
-        if problem := get_https_problem(domain):
-            raise SiteUnavailableError(problem)  # the site keeps its own host name meanwhile
+        if problem := wait_for_https(domain):
+            skip_primary(site, row, problem)
+            return True
         make_primary(site, domain)
     return True
 
@@ -90,8 +93,34 @@ def make_primary(site, domain: str) -> None:
     run_task(pilot, pilot.set_primary(site.hostname, domain))
     for other in site.domains:
         other.is_primary = int(other.domain == domain)
+    row.update({"primary_skipped": 0, "failure_reason": None})
     site.primary_domain = domain
     site.save(ignore_permissions=True)
+
+
+def wait_for_https(domain: str) -> str | None:
+    """None once the domain answers over HTTPS; else why not, after ``HTTPS_WAIT_MINUTES``."""
+
+    checkpoint()  # no row lock is held while waiting
+    deadline = time.monotonic() + HTTPS_WAIT_MINUTES * 60
+    while (problem := get_https_problem(domain)) and time.monotonic() < deadline and not frappe.in_test:
+        time.sleep(HTTPS_POLL_SECONDS)
+    return problem
+
+
+def skip_primary(site, row, problem: str) -> None:
+    """The site keeps its own host name: a primary domain without HTTPS would break every visitor."""
+
+    reason = _("Not made primary: no HTTPS within {0} minutes of attaching. {1}").format(
+        HTTPS_WAIT_MINUTES, problem
+    )
+    set_row(site, row, primary_skipped=1, failure_reason=reason)
+    frappe.log_error(
+        title=f"[Suite Cloud] Site domain {row.domain} not made primary",
+        message=reason,
+        reference_doctype=site.doctype,
+        reference_name=site.name,
+    )
 
 
 def get_https_problem(domain: str) -> str | None:
