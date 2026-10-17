@@ -225,6 +225,8 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
                 self.assertTrue(steps[key].started_at and steps[key].ended_at)
         site = self.site(request.suite_site)
         self.assertEqual(steps["claim"].detail, f"Suite Site {site.name}")
+        processing_time = frappe.db.get_value("Suite Tenant Request", request.name, "processing_time")
+        self.assertIsNotNone(processing_time)  # counted from the creation: no code to wait for
         self.assertEqual(steps["server"].detail, f"Virtual Machine {site.virtual_machine}")
 
     def test_a_site_from_the_pool_skips_the_server_and_site_steps(self) -> None:
@@ -247,6 +249,7 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         signup.verify_otp(request, self.code())
 
         steps = self.steps(request)
+        self.assertFalse(frappe.db.get_value("Suite Tenant Request", request, "processing_time"))  # not done
         self.assertEqual((steps["verified"].status, steps["claim"].status), ("Completed", "Completed"))
         self.assertEqual(steps["server"].status, "Running")
         self.assertIn("no server in", steps["server"].detail)

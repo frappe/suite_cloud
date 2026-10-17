@@ -210,6 +210,7 @@ def sync(request) -> None:
             save_row(row, status, detail)
             changed = True
     if changed:
+        save_processing_time(state)
         publish(request)
 
 
@@ -229,6 +230,18 @@ def save_row(row, status: str, detail: str | None) -> None:
         values.update(ended_at=None, duration=None)
     frappe.db.set_value("Suite Tenant Request Step", row.name, values, update_modified=False)
     row.update(values)
+
+
+def save_processing_time(state: RequestState) -> None:
+    """From the email confirmation, or the creation for a request made in the desk, to completion."""
+
+    completed, verified = state.rows["completed"], state.rows["verified"]
+    if completed.status != "Completed" or state.request.processing_time:
+        return
+    started_at = verified.ended_at if verified.status == "Completed" else state.rows["created"].ended_at
+    state.request.db_set(
+        "processing_time", time_diff_in_seconds(completed.ended_at, started_at), update_modified=False
+    )
 
 
 def publish(request) -> None:

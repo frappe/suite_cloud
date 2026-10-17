@@ -12,6 +12,7 @@
   "timezone",
   "column_break_main",
   "status",
+  "processing_time",
   "request_key",
   "tenant",
   "suite_site",
@@ -83,6 +84,14 @@
    "read_only": 1
   },
   {
+   "description": "How long the request took from the email confirmation to the owner's invite, waiting and retries included. A request made in the desk counts from its creation. Set when the request completes.",
+   "fieldname": "processing_time",
+   "fieldtype": "Duration",
+   "in_list_view": 1,
+   "label": "Processing Time",
+   "read_only": 1
+  },
+  {
    "description": "Secret that reads the request's status through the signup API. Handed out once, when the code is verified.",
    "fieldname": "request_key",
    "fieldtype": "Data",
@@ -151,7 +160,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 20:00:00.000000",
+ "modified": "2026-10-17 21:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request",

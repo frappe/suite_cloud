@@ -39,6 +39,7 @@ class SuiteTenantRequest(Document):
         ip_address: DF.Data | None
         label: DF.Data | None
         organization: DF.Data
+        processing_time: DF.Duration | None
         request_key: DF.Data | None
         status: DF.Literal["Pending", "Verified", "Processing", "Completed", "Failed", "Expired"]
         steps: DF.Table[SuiteTenantRequestStep]
