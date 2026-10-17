@@ -97,7 +97,11 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         )
 
     def test_a_domain_keeps_its_zone_after_the_mail_zone_moves(self) -> None:
+        from suite_cloud.tests.fixtures import make_zone
+
         self.claim()
+        make_zone("moved.test", is_default=0, dns_provider="Cloudflare", dns_provider_token="token")
+        self.addCleanup(self.set_setting, "tenant_mail_zone", MAIL_ZONE)
         self.set_setting("tenant_mail_zone", "moved.test")
 
         frappe.get_doc("Mail Domain", DOMAIN).save_records()
