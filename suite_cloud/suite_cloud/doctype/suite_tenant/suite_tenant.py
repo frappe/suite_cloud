@@ -145,9 +145,16 @@ class SuiteTenant(Document):
         site gets it at once."""
 
         frappe.only_for("System Manager")
+        from suite_cloud.hosting.central.site import SiteError, get_api_host
+
+        if site := self.get_live_site():
+            try:
+                get_api_host(site)  # checked first: a site that cannot get the new secret keeps the old one
+            except SiteError as e:
+                frappe.throw(str(e))
         secret = self.generate_secret()
         self.save(ignore_permissions=True)
-        if site := self.get_live_site():
+        if site:
             push_secret_to_site(site)
         return secret
 

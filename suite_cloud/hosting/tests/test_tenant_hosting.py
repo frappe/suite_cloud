@@ -196,6 +196,19 @@ class TestTenantGuards(HostingFixtures, IntegrationTestCase):
         self.assertEqual(self.site(name).status, "Failed")  # Configure ran again and the site is down
         self.assertFalse(self.site(name).suite_configured)
 
+    def test_a_secret_is_not_rotated_for_a_site_behind_a_tenant_controlled_domain(self) -> None:
+        name = self.tenant.create_hosted_site("acme")
+        self.site(name).add_domain("shop.example.com")
+        self.site(name).verify_domain("shop.example.com")
+        self.site(name).make_primary("shop.example.com")
+        secret = self.tenant.get_password("secret")
+
+        self.assertRaisesRegex(frappe.ValidationError, "tenant controls its DNS", self.tenant.rotate_secret)
+
+        self.tenant.reload()
+        self.assertEqual(self.tenant.get_password("secret"), secret)
+        self.assertEqual(self.site(name).status, "Active")
+
     def test_only_suite_site_tenants_get_a_site(self) -> None:
         team = self.make_hosted_tenant("team.frappe.test", tenant_type="Team")
         self.assertRaisesRegex(
