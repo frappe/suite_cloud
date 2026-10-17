@@ -1,10 +1,12 @@
 from unittest.mock import patch
 
 import frappe
+import requests
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date
 
 from suite_cloud.hosting import capacity, domains, labels, sites
+from suite_cloud.hosting.central import site as site_api
 from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fakes import PROXY_ZONE, REGION
 from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, SITE_ZONE, HostingFixtures
@@ -40,6 +42,34 @@ class TestSiteDomains(HostingFixtures, IntegrationTestCase):
             {("acme", "CNAME", f"proxy.{PROXY_ZONE}"), ("_frappe-verification.acme", "TXT", "token-1")},
         )
         self.assertEqual(self.pilot.primary[site.hostname], domain)
+
+    def test_a_site_domain_becomes_primary_only_once_it_serves_https(self) -> None:
+        problem = f"https://acme.{SITE_ZONE} does not answer over HTTPS yet: wrong version number"
+        with patch("suite_cloud.hosting.domains.get_https_problem", return_value=problem):
+            site = self.claim()
+
+        self.assertEqual(site.get_domain(f"acme.{SITE_ZONE}").status, "Active")  # attached
+        self.assertFalse(site.primary_domain)  # the site keeps answering on its own host name
+        self.assertIn("Site domain: waiting", site.error)
+        self.assertIn("HTTPS", site.error)
+
+        sites.provision(site.name)
+
+        self.assertEqual(self.site(site.name).primary_domain, f"acme.{SITE_ZONE}")
+
+    def test_a_domain_without_https_cannot_be_made_primary(self) -> None:
+        site = self.claim()
+        site.add_domain("shop.example.com")
+        site.verify_domain("shop.example.com")
+
+        with patch("suite_cloud.hosting.domains.get_https_problem", return_value="no TLS"):
+            self.assertRaisesRegex(
+                domains.DomainNotReadyError,
+                "no TLS",
+                domains.make_primary,
+                self.site(site.name),
+                "shop.example.com",
+            )
 
     def test_the_site_domain_choice_is_fixed_once_the_domain_is_added(self) -> None:
         site = self.claim()
@@ -171,3 +201,31 @@ class TestSharedZone(HostingFixtures, IntegrationTestCase):
 
         frappe.db.set_value("Suite Site", {"label": "acme"}, "status", "Dropped")  # its records remain
         self.assertRaises(LabelNotAvailableError, labels.assert_label_available, "acme")
+
+
+class TestSiteClient(IntegrationTestCase):
+    """The real client, with Pilot and the network replaced."""
+
+    def site(self, primary_domain: str | None = None):
+        pilot = frappe._dict(site_login_url=lambda name: f"https://{name}/app?sid=abc")
+        site = frappe._dict(hostname="suite-1.example.com", primary_domain=primary_domain)
+        site.get_virtual_machine = lambda: frappe._dict(get_pilot_client=lambda: pilot)
+        return site
+
+    def test_the_client_calls_the_primary_domain_once_there_is_one(self) -> None:
+        self.assertEqual(
+            site_api.get_site_client(self.site("acme.example.com")).url, "https://acme.example.com"
+        )
+        self.assertEqual(site_api.get_site_client(self.site()).url, "https://suite-1.example.com")
+
+    def test_a_redirect_is_not_followed(self) -> None:
+        client = site_api.get_site_client(self.site())
+        response = requests.Response()
+        response.status_code = 301
+        response.headers["Location"] = "https://acme.example.com/api/v2/document/User/x"
+
+        with patch.object(client.session, "request", return_value=response) as send:
+            self.assertRaisesRegex(
+                site_api.SiteUnavailableError, "redirected to https://acme", client.get_doc, "User", "x"
+            )
+        self.assertFalse(send.call_args.kwargs["allow_redirects"])

@@ -64,6 +64,7 @@ class HostingFixtures:
             install(self.central, self.pilot, self.site_api),
             confirming_dns_provider(),
             patch("suite_cloud.hosting.domains.verify_dns_record", return_value=True),
+            patch("suite_cloud.hosting.domains.get_https_problem", return_value=None),
             patch("suite_cloud.mail.doctype.mail_domain.mail_domain.verify_dns_record", return_value=True),
             *([] if real_mail else [patch("suite_cloud.mail.tenancy.hosted_domain.ensure", new=mail_ready)]),
         ):

@@ -9,12 +9,14 @@ publishes them.
 import json
 
 import frappe
+import requests
 from frappe import _
 from frappe.utils import add_to_date, get_datetime, now, now_datetime
 
 from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.hosting import output_tail, wait_for_task
 from suite_cloud.hosting.central.pilot import PilotConflict, is_finished, task_id
+from suite_cloud.hosting.central.site import SiteUnavailableError
 from suite_cloud.suite_cloud.doctype.dns_record.dns_record import (
     confirm_managed_records,
     reconcile_managed_records,
@@ -24,6 +26,7 @@ from suite_cloud.utils import get_config
 
 RECORDS_MAX_AGE_HOURS = 23  # Central keeps a verification token 24 hours
 PUBLISHED_TYPES = ("CNAME", "TXT")
+HTTPS_CHECK_SECONDS = 15
 
 
 class DomainNotReadyError(frappe.ValidationError):
@@ -44,6 +47,8 @@ def ensure_site_domain(site) -> bool:
         if not records_visible(row) or not attach(site, row):
             return False
     if not site.primary_domain:
+        if problem := get_https_problem(domain):
+            raise SiteUnavailableError(problem)  # the site keeps its own host name meanwhile
         make_primary(site, domain)
     return True
 
@@ -74,15 +79,31 @@ def verify_domain(site, domain: str) -> bool:
 
 
 def make_primary(site, domain: str) -> None:
+    """Every other host name of the site redirects to the primary one, so it must serve HTTPS."""
+
     row = get_row(site, domain)
     if row.status != "Active":
         frappe.throw(_("{0} is not attached yet.").format(domain))
+    if problem := get_https_problem(domain):
+        frappe.throw(problem, DomainNotReadyError)
     pilot = site.get_pilot_client()
     run_task(pilot, pilot.set_primary(site.hostname, domain))
     for other in site.domains:
         other.is_primary = int(other.domain == domain)
     site.primary_domain = domain
     site.save(ignore_permissions=True)
+
+
+def get_https_problem(domain: str) -> str | None:
+    """Why the domain does not answer over HTTPS with a valid certificate, as visitors reach it.
+    Pilot reports a domain's certificate once it holds one, but the proxy in front of the server
+    may not route TLS for the name yet."""
+
+    try:
+        requests.get(f"https://{domain}/api/method/ping", timeout=HTTPS_CHECK_SECONDS, allow_redirects=False)
+    except requests.RequestException as e:
+        return _("https://{0} does not answer over HTTPS yet: {1}").format(domain, e)
+    return None
 
 
 def remove_domain(site, domain: str) -> None:

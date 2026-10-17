@@ -79,6 +79,11 @@ class SiteClient:
 
     def request(self, verb: str, path: str, **kwargs):
         response = self.send(verb, path, **kwargs)
+        if response.is_redirect:
+            # Followed, the session cookie would stay behind and a write could turn into a read.
+            raise SiteUnavailableError(
+                _("Site {0} redirected to {1}.").format(self.hostname, response.headers.get("Location"))
+            )
         if response.status_code == 400 and error_type(response) == "CSRFTokenError":
             self.sign_in()  # a page rendered with the session: a fresh one carries no token
             response = self.send(verb, path, **kwargs)
@@ -88,7 +93,9 @@ class SiteClient:
 
     def send(self, verb: str, path: str, **kwargs) -> requests.Response:
         try:
-            return self.session.request(verb, f"{self.url}{path}", timeout=TIMEOUT, **kwargs)
+            return self.session.request(
+                verb, f"{self.url}{path}", timeout=TIMEOUT, allow_redirects=False, **kwargs
+            )
         except requests.RequestException as e:
             raise SiteUnavailableError(_("Site {0} is not reachable: {1}").format(self.hostname, e))
 
@@ -116,4 +123,5 @@ def get_site_client(site) -> SiteClient:
     """The seam tests replace with a fake."""
 
     pilot = site.get_virtual_machine().get_pilot_client()
-    return SiteClient(site.hostname, lambda: pilot.site_login_url(site.hostname))
+    # Its other host names redirect to the primary domain, which serves HTTPS once it is primary.
+    return SiteClient(site.primary_domain or site.hostname, lambda: pilot.site_login_url(site.hostname))

@@ -159,6 +159,8 @@ Or run the bench in a mode that runs jobs in threads, for example Pilot's lite m
 
 **The site domain step is skipped with "The server has no Let's Encrypt email".** Pilot on the server has no email for Let's Encrypt. Verify Host sets it from **Suite Cloud Settings > Certificates > ACME Contact Email**, but only Pilot v0.0.74-pre-alpha and later keep it. Fill in the ACME Contact Email, update Pilot if it is older, and click **Verify Host** on the Virtual Machine. The next poll adds the site domain to the server's Active sites.
 
+**The site domain waits with "does not answer over HTTPS yet".** Pilot attached the domain and holds its certificate, but the regional proxy (`proxy.<region>.frappe.cloud`) does not route HTTPS for the name yet, so port 443 answers without TLS. A primary domain gets every visitor of the site, so Suite Cloud makes the domain primary only after `https://<domain>` answers. Until then, the site answers on its `suite-<hex>` host name, and the step tries again every five minutes. Check with `curl -v https://<domain>/api/method/ping`.
+
 **A label is "not available".** A site, an open request, a cluster, a mail domain or a DNS record already uses it. Leave **Label** blank to get a free one made from the organization, for example `acme-2`.
 
 **Stalwart rejects requests with a certificate error.** The cluster uses a staging certificate. Clear **Verify Stalwart TLS Certificates**.
