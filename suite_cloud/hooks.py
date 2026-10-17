@@ -52,6 +52,7 @@ scheduler_events = {
             "suite_cloud.mail.doctype.egress_gateway.egress_gateway.poll_pending_gateways",
             "suite_cloud.hosting.machines.refresh_fleet",
             "suite_cloud.hosting.sites.poll_pending_sites",
+            "suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request.resume_requests",
             "suite_cloud.hosting.capacity.ensure_site_pool",
         ],
     },

@@ -88,6 +88,16 @@ def assert_domain_available(domain_name: str, tenant: str) -> None:
     assert_domain_not_reserved(domain_name)
 
 
+def assert_not_notification_address(email: str) -> None:
+    """On a hosted domain the notification address is the site's, even while no site uses it: a
+    mailbox there would be taken over by the tenant's next site."""
+
+    from suite_cloud.utils import get_config
+
+    if email.split("@", 1)[0] == get_config("notification_mailbox_local_part"):
+        frappe.throw(_("{0} is kept for the site's notifications.").format(email))
+
+
 def assert_hosted_domain(domain_name: str, tenant: str) -> None:
     """A hosted domain is one label under the tenant mail zone, matching a site of the tenant."""
 

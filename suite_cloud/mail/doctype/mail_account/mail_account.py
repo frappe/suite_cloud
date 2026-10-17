@@ -16,6 +16,7 @@ from suite_cloud.mail.tenancy.account_credentials import API_KEYS, APP_PASSWORDS
 from suite_cloud.mail.tenancy.addresses import (
     assert_address_available,
     assert_domain_live,
+    assert_not_notification_address,
     get_tenant_domain,
     validate_email_address,
 )
@@ -77,6 +78,8 @@ class MailAccount(QuotaHolder, Document):
         self.cluster = domain.cluster
         if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
+        if self.is_new() and domain.hosted and not self.is_system_account:
+            assert_not_notification_address(self.email)
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
 

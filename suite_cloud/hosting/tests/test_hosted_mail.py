@@ -65,6 +65,7 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         details = {row.step: row.detail for row in request.steps}
         self.assertEqual((details["mail_domain"], details["notification_account"]), (DOMAIN, NOTIFICATION))
         self.assertEqual(details["invite"], site.login_email)
+        self.assertGreaterEqual(request.processing_time, 0)  # set once the last step completed
         reports = [call.args[1] for call in publish.call_args_list if call.args[0] == progress.EVENT]
         self.assertEqual((reports[-1]["progress"], reports[-1]["total"]), (14, 14))
 
@@ -163,6 +164,34 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertTrue(frappe.db.exists("Mail Account", f"owner@{DOMAIN}"))
         self.assertTrue(frappe.db.exists("Mail Domain", DOMAIN))
         self.assertTrue(frappe.db.exists("DNS Record", {"managed_by": DOMAIN}))
+
+    def test_the_notification_address_stays_the_sites_while_no_site_uses_it(self) -> None:
+        self.site(self.claim().name).drop_site()
+
+        self.assertRaisesRegex(
+            frappe.ValidationError, "kept for the site's notifications", self.make_account, NOTIFICATION
+        )
+
+    def test_the_next_site_never_takes_over_a_tenant_mailbox(self) -> None:
+        self.site(self.claim().name).drop_site()
+        account = frappe.get_doc(
+            {
+                "doctype": "Mail Account",
+                "email": NOTIFICATION,
+                "tenant": self.tenant.name,
+                "is_system_account": 1,
+            }
+        )
+        account.flags.password = "secret-pw"
+        account.insert()
+        account.db_set("is_system_account", 0)  # a mailbox of the tenant's, made before the address was kept
+
+        with patch("suite_cloud.mail.doctype.mail_account.mail_account.MailAccount.reset_password") as reset:
+            site = self.site(frappe.get_doc("Suite Tenant", self.tenant.name).create_hosted_site("acme"))
+
+        reset.assert_not_called()
+        self.assertIn("mailbox of the tenant", site.error)
+        self.assertFalse(site.notification_account)
 
     def test_the_tenants_next_site_takes_its_kept_domain_back(self) -> None:
         self.site(self.claim().name).drop_site()

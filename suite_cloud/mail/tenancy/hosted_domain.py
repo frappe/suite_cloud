@@ -98,7 +98,12 @@ def ensure_account(site, domain) -> str:
     email = f"{get_config('notification_mailbox_local_part')}@{domain.name}"
     password = generate_password()
     if frappe.db.exists("Mail Account", email):
-        frappe.get_doc("Mail Account", email).reset_password(password)
+        account = frappe.get_doc("Mail Account", email)
+        if not account.is_system_account:
+            frappe.throw(
+                _("{0} is a mailbox of the tenant, not the site's notification account.").format(email)
+            )
+        account.reset_password(password)
     else:
         account = frappe.get_doc(
             {

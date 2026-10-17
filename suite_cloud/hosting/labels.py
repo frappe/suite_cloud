@@ -87,6 +87,8 @@ def label_from(organization: str) -> str:
     words = re.findall(r"[a-z0-9]+", text)
     while len(words) > 1 and words[-1] in LEGAL_SUFFIXES:
         words.pop()
+    if len(words) > 1:
+        words = [word for word in words if word != "vm"] or words  # *-vm-* is a server's name
     label = "-".join(words)[:GENERATED_LENGTH].strip("-") or "workspace"
     return f"team-{label}"[:GENERATED_LENGTH].strip("-") if is_reserved(label) else label
 

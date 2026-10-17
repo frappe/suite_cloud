@@ -17,6 +17,7 @@ from suite_cloud.utils import get_config, log_exception
 OTP_TTL = 600
 OTP_ATTEMPTS = 5
 REQUEST_TTL_HOURS = 24
+RESUME_AFTER_MINUTES = 10
 
 
 class SuiteTenantRequest(Document):
@@ -162,8 +163,8 @@ def process_request(request: str) -> None:
     """User, then tenant, then a claimed site; the site's own job completes the request."""
 
     doc = frappe.get_doc("Suite Tenant Request", request, for_update=True)
-    if doc.status != "Verified":
-        return
+    if doc.status not in ("Verified", "Processing") or doc.suite_site:
+        return  # Processing without a site: stopped after its label was reserved, so resumed
     begin_step()
     try:
         from suite_cloud.hosting import capacity
@@ -182,6 +183,23 @@ def process_request(request: str) -> None:
         frappe.get_doc("Suite Tenant Request", request).db_set({"status": "Failed", "error": str(e)})
     progress.sync(frappe.get_doc("Suite Tenant Request", request))
     commit()
+
+
+def resume_requests() -> None:
+    """Cron: requests whose processing stopped, a lost job or a worker that died after the label was
+    reserved, start again. One whose job is still queued or running is left to it."""
+
+    stale = add_to_date(now_datetime(), minutes=-RESUME_AFTER_MINUTES)
+    for name in frappe.get_all(
+        "Suite Tenant Request",
+        {
+            "status": ["in", ["Verified", "Processing"]],
+            "suite_site": ["is", "not set"],
+            "modified": ["<", stale],
+        },
+        pluck="name",
+    ):
+        enqueue_processing(name)  # deduplicated: skipped while its job is queued or running
 
 
 def ensure_user(request) -> str:

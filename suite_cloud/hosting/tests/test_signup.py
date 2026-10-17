@@ -7,7 +7,10 @@ from frappe.tests import IntegrationTestCase
 
 from suite_cloud.api import signup
 from suite_cloud.hosting import labels, progress
-from suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request import expire_requests
+from suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request import (
+    expire_requests,
+    resume_requests,
+)
 from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fakes import REGION
 from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, SITE_ZONE, HostingFixtures
@@ -167,6 +170,7 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
 
         self.assertEqual(labels.generate_label("Acme Inc."), "acme-3")
         self.assertEqual(labels.generate_label("www"), "team-www")  # reserved names are prefixed
+        self.assertEqual(labels.generate_label("Acme VM Hosting"), "acme-hosting")  # not a server's name
         self.assertEqual(labels.generate_label("株式会社"), "workspace")  # nothing left in ASCII
         self.assertEqual(
             labels.generate_label("A very long organization name " * 3), "a-very-long-organization-name"
@@ -225,8 +229,6 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
                 self.assertTrue(steps[key].started_at and steps[key].ended_at)
         site = self.site(request.suite_site)
         self.assertEqual(steps["claim"].detail, f"Suite Site {site.name}")
-        processing_time = frappe.db.get_value("Suite Tenant Request", request.name, "processing_time")
-        self.assertIsNotNone(processing_time)  # counted from the creation: no code to wait for
         self.assertEqual(steps["server"].detail, f"Virtual Machine {site.virtual_machine}")
 
     def test_a_site_from_the_pool_skips_the_server_and_site_steps(self) -> None:
@@ -265,6 +267,22 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(doc.status, "Failed")
         self.assertIn("not available", doc.error)
         self.assertFalse(doc.suite_site)
+
+    def test_a_request_stopped_after_reserving_its_label_resumes(self) -> None:
+        request = self.create(label=None)
+        # The worker died right after the label was reserved: Processing, but no tenant and no site.
+        frappe.db.set_value(
+            "Suite Tenant Request",
+            request,
+            {"status": "Processing", "label": "acme", "modified": frappe.utils.add_to_date(None, hours=-1)},
+            update_modified=False,
+        )
+
+        resume_requests()
+
+        doc = frappe.get_doc("Suite Tenant Request", request)
+        self.assertEqual((doc.status, doc.label), ("Completed", "acme"))
+        self.assertEqual(self.site(doc.suite_site).label, "acme")
 
     def test_stale_requests_expire(self) -> None:
         request = self.create()
