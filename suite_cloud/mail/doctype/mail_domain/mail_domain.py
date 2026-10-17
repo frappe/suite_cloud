@@ -18,9 +18,11 @@ from suite_cloud.mail.tenancy.addresses import (
     NOUNS,
     assert_addresses_deliverable,
     assert_domain_available,
+    assert_hosted_domain,
     validate_domain_name,
     validate_email_address,
 )
+from suite_cloud.suite_cloud.doctype.dns_record.dns_record import delete_managed_records
 from suite_cloud.utils import dkim_algorithms, get_config, log_exception, utc_iso
 
 # A change to any of these reaches the cluster; is_verified is set by hand only by managers.
@@ -59,6 +61,7 @@ class MailDomain(Document):
         domain_name: DF.Data
         egress_pool: DF.Link | None
         enabled: DF.Check
+        hosted: DF.Check
         is_verified: DF.Check
         last_refreshed_at: DF.Datetime | None
         last_verified_at: DF.Datetime | None
@@ -85,11 +88,7 @@ class MailDomain(Document):
         tenant = self.get_site()
         self.cluster = tenant.get_cluster().name
         if self.is_new() and not self.flags.adopting:
-            # Proof of control comes first: only someone who controls the domain's DNS learns
-            # whether another tenant already holds it.
-            if ownership.required(tenant):
-                ownership.assert_ownership(tenant, self.domain_name)
-            assert_domain_available(self.domain_name, self.tenant)
+            self.assert_can_be_added(tenant)
             tenant.assert_can_add_domain()
         if self.catch_all_address:
             self.catch_all_address = validate_email_address(self.catch_all_address)
@@ -113,6 +112,16 @@ class MailDomain(Document):
             # The zone already holds the certificate-bound records; only which tables list them changes.
             self.rebuild_dns_records(self.dns_zone_file or "")
 
+    def assert_can_be_added(self, tenant: Document) -> None:
+        if self.hosted:
+            assert_hosted_domain(self.domain_name, self.tenant)  # the zone is Suite Cloud's own
+            return
+        # Proof of control comes first: only someone who controls the domain's DNS learns
+        # whether another tenant already holds it.
+        if ownership.required(tenant):
+            ownership.assert_ownership(tenant, self.domain_name)
+        assert_domain_available(self.domain_name, self.tenant)
+
     def after_insert(self) -> None:
         payload = self.stalwart_payload()
         if self.flags.skip_push:  # adopted: the cluster has it; only read what it publishes
@@ -128,6 +137,10 @@ class MailDomain(Document):
             egress.resync_cluster_after_commit(self.cluster)
 
     def on_update(self) -> None:
+        if self.hosted:
+            from suite_cloud.mail.tenancy import hosted_domain
+
+            hosted_domain.publish_records(self)  # Suite Cloud's zone: every change to them goes out
         if self.is_new() or not self.stalwart_id or self.flags.skip_push:
             return
         before = self.get_doc_before_save()
@@ -154,6 +167,7 @@ class MailDomain(Document):
         for reports in (DMARC_REPORTS, TLS_REPORTS):
             reports.detach_domain(self.name)
         sync.push_destroy(self, "domains")
+        delete_managed_records(self.doctype, self.name)
 
     def after_delete(self) -> None:
         on_a_pool = self.egress_pool or frappe.db.get_value("Suite Tenant", self.tenant, "egress_pool")
@@ -192,9 +206,9 @@ class MailDomain(Document):
     def replace_dkim_keys(self) -> None:
         """Emergency replacement after a leaked key: new keys under the same selectors.
 
-        The owner republishes the DKIM records with the new values. Their rows lose their
-        verification, so the hourly check takes the domain offline until the new records resolve;
-        mail signed with the old keys stops verifying as soon as they do.
+        The owner republishes the DKIM records with the new values (Suite Cloud does, for a hosted
+        domain). Their rows lose their verification, so the hourly check takes the domain offline
+        until the new records resolve; mail signed with the old keys stops verifying as soon as they do.
         """
 
         frappe.only_for("System Manager")

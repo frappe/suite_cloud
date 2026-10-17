@@ -10,6 +10,9 @@ frappe.ui.form.on('Suite Tenant', {
 	refresh(frm) {
 		if (frm.is_new()) return
 		frm.add_custom_button(__('Rotate Secret'), () => rotate_secret(frm), __('Actions'))
+		if (frm.doc.tenant_type === 'Suite Site' && frm.doc.status === 'Active') {
+			frm.add_custom_button(__('Create Hosted Site'), () => create_hosted_site(frm), __('Actions'))
+		}
 		if (frm.doc.status !== 'Active' || !frm.doc.stalwart_cluster) return
 		frm.add_custom_button(__('Adopt Directory'), () => adopt_directory(frm), __('Actions'))
 	},
@@ -58,5 +61,21 @@ function adopt_directory(frm) {
 					message: [__('{0} adopted, {1} skipped.', [count(report.adopted), count(report.skipped)]), ...lines].join('<br>'),
 				})
 			}),
+	)
+}
+
+// Claims a ready site of the region, or creates one; the label names the site and mail domains.
+function create_hosted_site(frm) {
+	frappe.prompt(
+		[
+			{ fieldname: 'label', fieldtype: 'Data', label: __('Label'), reqd: 1, description: __('e.g. acme, which names the site and mail domains under the zones in Suite Cloud Settings') },
+			{ fieldname: 'region', fieldtype: 'Link', options: 'Region', label: __('Region'), get_query: () => ({ filters: { enabled: 1 } }) },
+		],
+		(values) =>
+			frm.call({ doc: frm.doc, method: 'create_hosted_site', args: values, freeze: true, freeze_message: __('Claiming a site...') }).then((r) =>
+				frappe.set_route('Form', 'Suite Site', r.message),
+			),
+		__('Create Hosted Site'),
+		__('Create'),
 	)
 }

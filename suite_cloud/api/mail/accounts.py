@@ -14,6 +14,7 @@ from suite_cloud.api.tenant import (
     owned,
     owned_page,
     page_size,
+    visible,
 )
 from suite_cloud.mail.doctype.mail_account.mail_account import (
     account_payloads,
@@ -64,7 +65,7 @@ def get_quotas(emails: list[str] | str) -> dict:
         return {}
     rows = frappe.get_all(
         "Mail Account",
-        filters={"tenant": current_tenant().name, "name": ["in", wanted]},
+        filters=visible("Mail Account", {"name": ["in", wanted]}),
         fields=["name", "stalwart_id", "cluster"],
     )
     quotas = quota_rows.disk_quota_gb_by_name("Mail Account", [row.name for row in rows])
@@ -180,7 +181,8 @@ def set_account_enabled(email: str, enabled: bool) -> dict:
 @frappe.whitelist(methods=["PUT"])
 @mail_api
 def set_password(email: str, password: str) -> None:
-    owned("Mail Account", email).set_password(password)
+    doc = owned("Mail Account", email)
+    doc.set_password(password)
 
 
 @frappe.whitelist(methods=["POST"])
@@ -356,5 +358,6 @@ def set_groups(email: str, groups: list[str] | str | None = None) -> dict:
 @frappe.whitelist(methods=["DELETE"])
 @mail_api
 def delete_account(email: str) -> None:
-    owned("Mail Account", email).delete(ignore_permissions=True)
+    doc = owned("Mail Account", email)
+    doc.delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204

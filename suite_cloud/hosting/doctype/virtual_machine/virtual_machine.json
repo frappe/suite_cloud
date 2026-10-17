@@ -1,0 +1,377 @@
+{
+ "actions": [],
+ "creation": "2026-10-16 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "region",
+  "max_sites",
+  "column_break_main",
+  "enabled",
+  "status",
+  "site_count",
+  "foreign_site_count",
+  "server_section",
+  "image_offering",
+  "image_id",
+  "plan",
+  "vcpus",
+  "memory_mb",
+  "disk_gb",
+  "column_break_server",
+  "has_public_ipv4",
+  "has_public_ipv6",
+  "central_section",
+  "request_key",
+  "central_action",
+  "central_resource_id",
+  "column_break_central",
+  "gateway_url",
+  "pilot_audience",
+  "ipv6_address",
+  "public_ipv4",
+  "public_ipv6",
+  "host_section",
+  "wildcard_zone",
+  "host_verified",
+  "letsencrypt_email_set",
+  "column_break_host",
+  "suite_app_status",
+  "suite_app_task",
+  "suite_app_commit",
+  "state_section",
+  "ready_since",
+  "booted_at",
+  "last_synced_at",
+  "column_break_state",
+  "error"
+ ],
+ "fields": [
+  {
+   "description": "The server's name on Central: suite, the region and this record's name, e.g. suite-blr1-a1b2c3d4e5.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "read_only": 1
+  },
+  {
+   "description": "Central region the server is created in.",
+   "fieldname": "region",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Region",
+   "options": "Region",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Sites this server takes, Suite sites and others together: worked out from its memory and disk (Server Sizing in Suite Cloud Settings), up to Max Sites per Server. Recalculated whenever Central reports its size. Until then it is Max Sites per Server.",
+   "fieldname": "max_sites",
+   "fieldtype": "Int",
+   "label": "Max Sites",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "New sites may be placed here. Decommission clears it; existing sites stay.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Accepts Sites"
+  },
+  {
+   "default": "Pending",
+   "description": "The server's status on Central. Suite Cloud's own setup shows in Host Verified, Suite App and Ready Since; an error stops it until Retry.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nProvisioning\nDeploying\nRunning\nPaused\nStopped\nFailed\nTerminated",
+   "read_only": 1
+  },
+  {
+   "description": "Suite Sites on this server that are not dropped.",
+   "fieldname": "site_count",
+   "fieldtype": "Int",
+   "is_virtual": 1,
+   "label": "Suite Sites",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Sites Pilot lists that are not Suite Sites, such as the baked site.local.",
+   "fieldname": "foreign_site_count",
+   "fieldtype": "Int",
+   "label": "Other Sites",
+   "read_only": 1
+  },
+  {
+   "fieldname": "server_section",
+   "fieldtype": "Section Break",
+   "label": "Server"
+  },
+  {
+   "description": "Central image offering the server boots from, from Suite Cloud Settings.",
+   "fieldname": "image_offering",
+   "fieldtype": "Data",
+   "label": "Image Offering",
+   "read_only": 1
+  },
+  {
+   "description": "The image the server was created from: the offering's newest image without a baked site. Fixed at creation.",
+   "fieldname": "image_id",
+   "fieldtype": "Data",
+   "label": "Image",
+   "read_only": 1
+  },
+  {
+   "description": "The server's plan on Central. Set when the server is created; Sync Status and the five-minute refresh read it back, so a resize on the Frappe Cloud dashboard shows here. Blank for a custom size.",
+   "fieldname": "plan",
+   "fieldtype": "Data",
+   "label": "Plan",
+   "read_only": 1
+  },
+  {
+   "description": "The server's virtual CPUs, as Central reports them.",
+   "fieldname": "vcpus",
+   "fieldtype": "Float",
+   "label": "vCPUs",
+   "read_only": 1
+  },
+  {
+   "description": "The server's memory, as Central reports it. Max Sites is worked out from it.",
+   "fieldname": "memory_mb",
+   "fieldtype": "Int",
+   "label": "Memory (MB)",
+   "read_only": 1
+  },
+  {
+   "description": "The server's disk, as Central reports it. Max Sites is worked out from it.",
+   "fieldname": "disk_gb",
+   "fieldtype": "Float",
+   "label": "Disk (GB)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_server",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Sites are reached through Central's proxy; a public address is optional. IPv4 needs an IP rate in the region.",
+   "fieldname": "has_public_ipv4",
+   "fieldtype": "Check",
+   "label": "Public IPv4",
+   "set_only_once": 1
+  },
+  {
+   "default": "0",
+   "description": "Give the server a public IPv6 address. Sites are reached through Central's proxy either way.",
+   "fieldname": "has_public_ipv6",
+   "fieldtype": "Check",
+   "label": "Public IPv6",
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "central_section",
+   "fieldtype": "Section Break",
+   "label": "Central"
+  },
+  {
+   "description": "Sent with create_server, so a retried call returns the same creation.",
+   "fieldname": "request_key",
+   "fieldtype": "Data",
+   "label": "Request Key",
+   "read_only": 1
+  },
+  {
+   "description": "Central's id for the creation of the server. Retry asks Central to run it again.",
+   "fieldname": "central_action",
+   "fieldtype": "Data",
+   "label": "Central Action",
+   "read_only": 1
+  },
+  {
+   "description": "Central's id for the server once it exists, e.g. server-avq7a8iild.",
+   "fieldname": "central_resource_id",
+   "fieldtype": "Data",
+   "label": "Central Server",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_central",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Where Suite Cloud reaches the server's Pilot, e.g. https://admin-vm-1z1420a.mumbai.frappe.cloud.",
+   "fieldname": "gateway_url",
+   "fieldtype": "Data",
+   "label": "Gateway URL",
+   "read_only": 1
+  },
+  {
+   "description": "The audience of the bench tokens Central mints for this Pilot. Set once Pilot has registered with Central.",
+   "fieldname": "pilot_audience",
+   "fieldtype": "Data",
+   "label": "Pilot Audience",
+   "read_only": 1
+  },
+  {
+   "description": "The server's address on Central's private network.",
+   "fieldname": "ipv6_address",
+   "fieldtype": "Data",
+   "label": "Private IPv6",
+   "read_only": 1
+  },
+  {
+   "description": "The server's public IPv4 address, when it has one.",
+   "fieldname": "public_ipv4",
+   "fieldtype": "Data",
+   "label": "Public IPv4 Address",
+   "read_only": 1
+  },
+  {
+   "description": "The server's public IPv6 address, when it has one.",
+   "fieldname": "public_ipv6",
+   "fieldtype": "Data",
+   "label": "Public IPv6 Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "host_section",
+   "fieldtype": "Section Break",
+   "label": "Host"
+  },
+  {
+   "description": "The zone Pilot registers new sites under.",
+   "fieldname": "wildcard_zone",
+   "fieldtype": "Data",
+   "label": "Wildcard Zone",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "The wildcard zone matches the region's proxy zone and production mode is on.",
+   "fieldname": "host_verified",
+   "fieldtype": "Check",
+   "label": "Host Verified",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Pilot can request certificates, which site and custom domains need. Verify Host sets Pilot's Let's Encrypt email from the ACME Contact Email in Suite Cloud Settings when it has none; Pilot takes it from v0.0.74-pre-alpha.",
+   "fieldname": "letsencrypt_email_set",
+   "fieldtype": "Check",
+   "label": "Let's Encrypt Email Set",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_host",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "description": "Pending: not installed yet. Installing: Pilot is installing it from the repository in Suite Cloud Settings. Installed: the server can take sites. Failed: see Error; run Install Suite App again.",
+   "fieldname": "suite_app_status",
+   "fieldtype": "Select",
+   "in_standard_filter": 1,
+   "label": "Suite App",
+   "options": "Pending\nInstalling\nInstalled\nFailed",
+   "read_only": 1
+  },
+  {
+   "description": "The Pilot task installing the Suite app, while it runs.",
+   "fieldname": "suite_app_task",
+   "fieldtype": "Data",
+   "label": "Suite App Task",
+   "read_only": 1
+  },
+  {
+   "description": "The commit of the Suite app installed on the server.",
+   "fieldname": "suite_app_commit",
+   "fieldtype": "Data",
+   "label": "Suite App Commit",
+   "read_only": 1
+  },
+  {
+   "fieldname": "state_section",
+   "fieldtype": "Section Break",
+   "label": "State"
+  },
+  {
+   "description": "When the server finished its setup: running, its host verified and Suite installed. It takes sites from then on.",
+   "fieldname": "ready_since",
+   "fieldtype": "Datetime",
+   "label": "Ready Since",
+   "read_only": 1
+  },
+  {
+   "description": "When Central first reported the server running. Pilot gets 30 minutes from then to answer.",
+   "fieldname": "booted_at",
+   "fieldtype": "Datetime",
+   "label": "Booted At",
+   "read_only": 1
+  },
+  {
+   "description": "When the server was last read from Central: every five minutes, daily, and on Sync Status.",
+   "fieldname": "last_synced_at",
+   "fieldtype": "Datetime",
+   "label": "Last Synced At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_state",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Why the server's setup stopped, e.g. Pilot registers sites under another zone. Fix the cause, then run Retry.",
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "link_doctype": "Suite Site",
+   "link_fieldname": "virtual_machine"
+  }
+ ],
+ "modified": "2026-10-17 22:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hosting",
+ "name": "Virtual Machine",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "title",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

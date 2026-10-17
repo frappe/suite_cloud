@@ -88,6 +88,31 @@ def assert_domain_available(domain_name: str, tenant: str) -> None:
     assert_domain_not_reserved(domain_name)
 
 
+def assert_not_notification_address(email: str) -> None:
+    """On a hosted domain the notification address is the site's, even while no site uses it: a
+    mailbox there would be taken over by the tenant's next site."""
+
+    from suite_cloud.utils import get_config
+
+    if email.split("@", 1)[0] == get_config("notification_mailbox_local_part"):
+        frappe.throw(_("{0} is kept for the site's notifications.").format(email))
+
+
+def assert_hosted_domain(domain_name: str, tenant: str) -> None:
+    """A hosted domain is one label under the tenant mail zone, matching a site of the tenant."""
+
+    from suite_cloud.utils import get_config
+
+    zone = get_config("tenant_mail_zone")
+    label = domain_name.removesuffix(f".{zone}") if zone else ""
+    if not zone or label == domain_name or "." in label:
+        frappe.throw(_("{0} is not a domain under the tenant mail zone.").format(domain_name))
+    if frappe.db.get_value("Mail Domain", domain_name, "tenant"):
+        frappe.throw(_("Domain {0} is not available.").format(domain_name), frappe.DuplicateEntryError)
+    if not frappe.db.exists("Suite Site", {"tenant": tenant, "label": label, "status": ["!=", "Dropped"]}):
+        frappe.throw(_("Tenant {0} has no site labelled {1}.").format(tenant, label))
+
+
 def assert_domain_not_reserved(domain_name: str) -> None:
     for zone in frappe.get_all("DNS Zone", pluck="name"):
         if domain_name == zone or domain_name.endswith(f".{zone}"):

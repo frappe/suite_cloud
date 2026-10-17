@@ -226,7 +226,12 @@ class TestTenantResolution(TenantApiTestCase):
     def test_mail_endpoints_wait_for_a_cluster(self) -> None:
         # setUp left the session as the fixture owner, who may not create tenants.
         tenant = frappe.get_doc(
-            {"doctype": "Suite Tenant", "title": "new.frappe.test", "user": make_owner()}
+            {
+                "doctype": "Suite Tenant",
+                "title": "new.frappe.test",
+                "tenant_type": "Team",
+                "user": make_owner(),
+            }
         ).insert(ignore_permissions=True)
         self.act_as(tenant)
         self.assertIsNone(ping()["cluster"])

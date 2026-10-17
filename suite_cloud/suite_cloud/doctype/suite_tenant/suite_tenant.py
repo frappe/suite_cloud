@@ -12,8 +12,9 @@ from frappe.utils import cint, flt, now, now_datetime
 from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.errors import StalwartError
 from suite_cloud.mail.tenancy.permissions import TENANT_ROLE, assert_can_own
+from suite_cloud.mail.tenancy.placement import pick_cluster
 from suite_cloud.mail.tenancy.usage import USAGE_PROPERTIES
-from suite_cloud.utils import utc_iso
+from suite_cloud.utils import get_config, log_exception, utc_iso
 
 DIRECTORY_DOCTYPES = ("Mail Account", "Mail Group", "Mailing List", "Mail Domain")
 REPORT_DOCTYPES = ("DMARC Report", "TLS Report")
@@ -62,6 +63,15 @@ class SuiteTenant(Document):
     def before_insert(self) -> None:
         self.status = "Active"
         self.new_secret = self.generate_secret()
+        self.place_on_cluster()
+
+    def place_on_cluster(self) -> None:
+        """A Suite Site tenant without a cluster gets the one serving its region (``flags.region``),
+        else the default cluster."""
+
+        if self.stalwart_cluster or self.tenant_type != "Suite Site":
+            return
+        self.stalwart_cluster = pick_cluster(self.flags.region or get_config("default_region"))
 
     def validate(self) -> None:
         self.title = (self.title or "").strip()
@@ -107,6 +117,7 @@ class SuiteTenant(Document):
                 egress.resync_cluster(frappe.get_cached_doc("Stalwart Cluster", name))
 
     def on_trash(self) -> None:
+        self.assert_no_live_site()
         if self.status != "Archived":
             frappe.throw(_("Archive the tenant before deleting it."))
         if frappe.db.exists("Mail Domain", {"tenant": self.name}):
@@ -130,12 +141,48 @@ class SuiteTenant(Document):
 
     @frappe.whitelist()
     def rotate_secret(self) -> str:
-        """Returns the new secret once; it is stored encrypted and never shown again."""
+        """Returns the new secret once; it is stored encrypted and never shown again. A hosted
+        site gets it at once."""
 
         frappe.only_for("System Manager")
+        from suite_cloud.hosting.central.site import SiteError, get_api_host
+
+        if site := self.get_live_site():
+            try:
+                get_api_host(site)  # checked first: a site that cannot get the new secret keeps the old one
+            except SiteError as e:
+                frappe.throw(str(e))
         secret = self.generate_secret()
         self.save(ignore_permissions=True)
+        if site:
+            push_secret_to_site(site)
         return secret
+
+    # --- hosting ----------------------------------------------------------------
+
+    def get_live_site(self) -> Document | None:
+        name = frappe.db.get_value("Suite Site", {"tenant": self.name, "status": ["!=", "Dropped"]}, "name")
+        return frappe.get_doc("Suite Site", name) if name else None
+
+    def assert_no_live_site(self) -> None:
+        if site := frappe.db.get_value("Suite Site", {"tenant": self.name, "status": ["!=", "Dropped"]}):
+            frappe.throw(_("Drop the tenant's site {0} first.").format(site))
+
+    @frappe.whitelist()
+    def create_hosted_site(self, label: str, region: str | None = None) -> str:
+        """Claims a ready site of the region for the tenant, or creates one."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.hosting import capacity, labels
+
+        if self.tenant_type != "Suite Site":
+            frappe.throw(_("Only a Suite Site tenant gets a hosted site."))
+        self.assert_no_live_site()
+        labels.assert_owner_name_free(frappe.db.get_value("User", self.user, "email"))
+        label = labels.validate_label(label)
+        labels.assert_label_available(label, tenant=self.name)
+        region = capacity.assert_region_enabled(region or get_config("default_region"))
+        return capacity.claim_site(self.name, label, region)
 
     # --- state ----------------------------------------------------------------
 
@@ -159,6 +206,7 @@ class SuiteTenant(Document):
         """Locks the tenant out; with ``delete_data`` every directory object is removed from Stalwart too."""
 
         frappe.only_for("System Manager")
+        self.assert_no_live_site()
         self.db_set({"enabled": 0, "status": "Archived", "archived_at": now()})
         if delete_data:
             if frappe.flags.do_not_enqueue:
@@ -188,7 +236,9 @@ class SuiteTenant(Document):
         return frappe.db.count("Mail Domain", {"tenant": self.name})
 
     def account_count(self) -> int:
-        return frappe.db.count("Mail Account", {"tenant": self.name})
+        """The tenant's own accounts: system accounts are Suite Cloud's and count for nothing."""
+
+        return frappe.db.count("Mail Account", {"tenant": self.name, "is_system_account": 0})
 
     def group_count(self) -> int:
         return frappe.db.count("Mail Group", {"tenant": self.name})
@@ -258,9 +308,10 @@ class SuiteTenant(Document):
 
         ids = []
         for doctype in MAILBOX_DOCTYPES:
-            ids += frappe.get_all(
-                doctype, {"tenant": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
-            )
+            filters = {"tenant": self.name, "stalwart_id": ["is", "set"]}
+            if doctype == "Mail Account":
+                filters["is_system_account"] = 0  # Suite Cloud's own, not the tenant's usage
+            ids += frappe.get_all(doctype, filters, pluck="stalwart_id")
         if not ids:
             return 0  # building a client already fetches the session
         objects = get_client(self.get_cluster()).accounts.get_many(ids, properties=USAGE_PROPERTIES)
@@ -351,6 +402,24 @@ def owner_query(
         as_list=True,
         distinct=True,
     )
+
+
+def push_secret_to_site(site) -> None:
+    """An Active site gets the new secret now; otherwise Configure runs again and carries it."""
+
+    from suite_cloud.hosting import sites
+
+    if site.status == "Active":
+        try:
+            sites.push_tenant_credentials(site.get_site_client(), frappe.get_doc("Suite Tenant", site.tenant))
+            return
+        except Exception:
+            log_exception(f"New secret could not reach Suite Site {site.name}", site)
+    if site.suite_configured:
+        site.db_set("suite_configured", 0)
+        if site.status == "Active":
+            site.db_set("status", "Assigned")
+        sites.enqueue_provision(site.name)
 
 
 def parse_networks(text: str | None) -> list:

@@ -1,0 +1,102 @@
+{
+ "actions": [],
+ "creation": "2026-10-17 18:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 0,
+ "engine": "InnoDB",
+ "field_order": [
+  "step",
+  "title",
+  "status",
+  "column_break_main",
+  "started_at",
+  "ended_at",
+  "duration",
+  "detail_section",
+  "detail"
+ ],
+ "fields": [
+  {
+   "description": "The step's key in suite_cloud.hosting.progress, e.g. mail_records.",
+   "fieldname": "step",
+   "fieldtype": "Data",
+   "label": "Step Key",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "columns": 4,
+   "description": "What the step does, e.g. Verifying the Mail Domain DNS records. Steps are listed in the order they run; the site domain runs alongside the mail steps.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Step",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "default": "Pending",
+   "description": "Pending: the steps it follows have not finished. Running: started, maybe waiting on a server or on DNS; Detail says what for. Completed: done. Skipped: not needed, e.g. no server or site was created for a site taken from the ready pool. Failed: the request failed here; Retry on the request goes on from this step.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Pending\nRunning\nCompleted\nSkipped\nFailed",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "When the step first started. A retry keeps it.",
+   "fieldname": "started_at",
+   "fieldtype": "Datetime",
+   "label": "Started At",
+   "read_only": 1
+  },
+  {
+   "description": "When the step completed or failed.",
+   "fieldname": "ended_at",
+   "fieldtype": "Datetime",
+   "label": "Ended At",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "description": "From Started At to Ended At, waiting included: a step that waits on DNS takes as long as the provider does.",
+   "fieldname": "duration",
+   "fieldtype": "Duration",
+   "in_list_view": 1,
+   "label": "Duration",
+   "read_only": 1
+  },
+  {
+   "fieldname": "detail_section",
+   "fieldtype": "Section Break"
+  },
+  {
+   "columns": 3,
+   "description": "What a running step waits for, why a step failed or was skipped, or what it chose, e.g. the server a site was placed on.",
+   "fieldname": "detail",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Detail",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-17 18:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hosting",
+ "name": "Suite Tenant Request Step",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

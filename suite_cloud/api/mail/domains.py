@@ -5,6 +5,7 @@ from frappe.utils import sbool
 from suite_cloud.api.tenant import current_tenant, mail_api, owned, owned_names
 from suite_cloud.mail.doctype.mail_domain.mail_domain import domain_payloads
 from suite_cloud.mail.tenancy.addresses import assert_domain_not_reserved, validate_domain_name
+from suite_cloud.mail.tenancy.hosted_domain import assert_not_hosted
 from suite_cloud.mail.tenancy.ownership import ownership_record
 
 
@@ -80,6 +81,7 @@ def update_domain(
     enabled: bool | None = None,
 ) -> dict:
     doc = owned("Mail Domain", domain)
+    assert_not_hosted(doc)
     if description is not None:
         doc.description = description
     if catch_all_address is not None:
@@ -99,7 +101,9 @@ def update_domain(
 @frappe.whitelist(methods=["DELETE"])
 @mail_api
 def delete_domain(domain: str) -> None:
-    owned("Mail Domain", domain).delete(ignore_permissions=True)
+    doc = owned("Mail Domain", domain)
+    assert_not_hosted(doc)
+    doc.delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204
 
 

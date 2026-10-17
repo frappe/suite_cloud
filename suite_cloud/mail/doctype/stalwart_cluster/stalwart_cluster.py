@@ -85,6 +85,8 @@ class StalwartCluster(Document):
             self.relay_password = frappe.generate_hash(length=32)
         if not self.ssh_public_key:
             self.ssh_private_key, self.ssh_public_key = generate_keypair(f"suite-cloud-{self.hostname}")
+        if not frappe.db.exists("Stalwart Cluster", {"is_default": 1}):
+            self.is_default = 1  # the first cluster: there is always a default
 
     def validate(self) -> None:
         validate_ssh_user_field(self)
@@ -116,6 +118,8 @@ class StalwartCluster(Document):
             egress.resync_cluster(self)
 
     def on_trash(self) -> None:
+        if self.is_default and frappe.db.exists("Stalwart Cluster", {"name": ["!=", self.name]}):
+            frappe.throw(_("Mark another cluster as default before deleting this one."))
         dependants = (
             ("Stalwart Node", "cluster"),
             ("Suite Tenant", "stalwart_cluster"),
@@ -204,10 +208,16 @@ class StalwartCluster(Document):
             frappe.throw(_("A multi-node cluster needs a Redis in-memory store to coordinate nodes."))
 
     def validate_default(self) -> None:
-        if self.is_default:
-            frappe.db.set_value(
-                "Stalwart Cluster", {"is_default": 1, "name": ["!=", self.name]}, "is_default", 0
-            )
+        """Exactly one cluster is the default: it moves by marking another, never by clearing it."""
+
+        before = None if self.is_new() else self.get_doc_before_save()
+        if before and before.is_default and not self.is_default:
+            frappe.throw(_("Mark another cluster as default instead; there must always be one."))
+        if not self.is_default:
+            return
+        if not self.enabled:
+            frappe.throw(_("The default cluster cannot be disabled; mark another cluster as default first."))
+        frappe.db.set_value("Stalwart Cluster", {"is_default": 1, "name": ["!=", self.name]}, "is_default", 0)
 
     # --- helpers --------------------------------------------------------------
 
