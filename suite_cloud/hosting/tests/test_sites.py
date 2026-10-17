@@ -230,6 +230,13 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
         self.site(name).drop_site()
         self.assertEqual(self.site(name).status, "Dropped")
 
+    def test_a_site_still_being_created_cannot_be_deleted(self) -> None:
+        self.pilot.hold_tasks = True
+        site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+        self.assertEqual(self.site(site.name).status, "Creating")
+
+        self.assertRaisesRegex(frappe.ValidationError, "Drop the site", self.site(site.name).delete)
+
     def test_labels_are_unique_among_sites(self) -> None:
         capacity.claim_site(self.tenant.name, "acme", REGION)
 
@@ -278,8 +285,10 @@ class TestCapacity(HostingFixtures, IntegrationTestCase):
             frappe.ValidationError, "fits no site", capacity.ensure_region_capacity, REGION
         )
         capacity.ensure_capacity()
-
         self.assertEqual(frappe.db.count("Virtual Machine", {"region": REGION}), 1)
+
+        self.set_setting("central_plan", "plan-general")  # a larger plan is bought
+        self.assertTrue(capacity.ensure_region_capacity(REGION))
 
     def test_capacity_does_nothing_when_off(self) -> None:
         capacity.ensure_capacity()

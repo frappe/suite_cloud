@@ -85,7 +85,9 @@ class SuiteSite(Document):
         sites.enqueue_provision(self.name)
 
     def on_trash(self) -> None:
-        if self.site_created and self.status != "Dropped":
+        """A site Pilot may still be creating counts as existing: deleting it would orphan it."""
+
+        if (self.site_created or self.pilot_task) and self.status != "Dropped":
             frappe.throw(_("Drop the site before deleting it."))
 
     # --- state ------------------------------------------------------------------
@@ -109,11 +111,12 @@ class SuiteSite(Document):
     @property
     def login_email(self) -> str:
         """The owner's account on the site: their own local part at the tenant's mail domain, e.g.
-        john@acme.example.com for john@example.com."""
+        john@acme.example.com for john@example.com. The saved domain, once there is one: the tenant
+        mail zone may move later."""
 
-        if not self.mail_domain:
-            frappe.throw(_("Site {0} has no mail domain yet.").format(self.name))
-        return validate_email_address(f"{labels.login_local_part(self.owner_email)}@{self.mail_domain}")
+        if not (domain := self.mail_domain or labels.mail_domain(self.label)):
+            frappe.throw(_("Set the Tenant Mail Zone in Suite Cloud Settings."))
+        return validate_email_address(f"{labels.login_local_part(self.owner_email)}@{domain}")
 
     @property
     def follow_up_skip_reason(self) -> str | None:

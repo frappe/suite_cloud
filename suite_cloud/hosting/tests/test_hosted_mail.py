@@ -96,6 +96,15 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
             frappe.db.exists("DNS Record", {"managed_by": DOMAIN, "value": ["like", "%p=replaced"]})
         )
 
+    def test_a_domain_keeps_its_zone_after_the_mail_zone_moves(self) -> None:
+        self.claim()
+        self.set_setting("tenant_mail_zone", "moved.test")
+
+        frappe.get_doc("Mail Domain", DOMAIN).save_records()
+
+        zones = frappe.get_all("DNS Record", {"managed_by": DOMAIN}, pluck="dns_zone", distinct=True)
+        self.assertEqual(zones, [MAIL_ZONE])
+
     def test_a_failed_smtp_check_is_retried_with_a_new_password(self) -> None:
         self.site_api.smtp_failures = 1
         site = self.claim()

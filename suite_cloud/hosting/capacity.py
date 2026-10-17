@@ -4,7 +4,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint
 
-from suite_cloud.hosting import begin_step, commit, undo_step
+from suite_cloud.hosting import begin_step, commit, machines, undo_step
 from suite_cloud.utils import get_config, log_exception
 
 POOLED_STATUSES = ("Pending", "Creating", "Ready")
@@ -100,8 +100,9 @@ def ensure_capacity() -> None:
 def ensure_region_capacity(region: str) -> str | None:
     if free_slots(region) >= cint(get_config("min_free_site_slots")):
         return None
-    assert_plan_fits_a_site(region)
     vm = frappe.get_doc({"doctype": "Virtual Machine", "region": region})
+    machines.resolve_server_arguments(vm)
+    assert_plan_fits_a_site(region, vm.plan)
     vm.insert(ignore_permissions=True)
     return vm.name
 
@@ -122,18 +123,19 @@ def free_slots(region: str) -> int:
     return slots - waiting
 
 
-def assert_plan_fits_a_site(region: str) -> None:
-    """A server whose reported size fits no site means another one of the same plan would not either."""
+def assert_plan_fits_a_site(region: str, plan: str) -> None:
+    """A server of ``plan`` whose reported size fits no site means another one would not either."""
 
     vm = frappe.db.get_value(
-        "Virtual Machine", {"region": region, "enabled": 1, "memory_mb": [">", 0], "max_sites": 0}
+        "Virtual Machine",
+        {"region": region, "plan": plan, "enabled": 1, "memory_mb": [">", 0], "max_sites": 0},
     )
     if vm:
         frappe.throw(
             _(
-                "Server {0} fits no site under the Server Sizing allowances, so no server is added: "
-                "choose a larger Central plan or lower the allowances."
-            ).format(vm)
+                "Server {0} of plan {1} fits no site under the Server Sizing allowances, so no server "
+                "is added: choose a larger Central plan or lower the allowances."
+            ).format(vm, plan)
         )
 
 

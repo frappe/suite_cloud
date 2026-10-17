@@ -67,7 +67,9 @@ def ensure_domain(site):
 
 
 def publish_records(domain) -> None:
-    zone = get_config("tenant_mail_zone")
+    """In the zone the domain was created under, one label up: the tenant mail zone may have moved since."""
+
+    zone = domain.domain_name.split(".", 1)[1]
     reconcile_managed_records("Mail Domain", domain.name, record_rows(domain, zone))
 
 
