@@ -16,6 +16,8 @@
   "suite_site",
   "ip_address",
   "expires_at",
+  "progress_section",
+  "steps",
   "error_section",
   "error"
  ],
@@ -110,6 +112,20 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.steps && doc.steps.length",
+   "fieldname": "progress_section",
+   "fieldtype": "Section Break",
+   "label": "Progress"
+  },
+  {
+   "description": "Every step from the request to the owner's invite, with how long each took. Updated as the request's jobs run.",
+   "fieldname": "steps",
+   "fieldtype": "Table",
+   "label": "Steps",
+   "options": "Suite Tenant Request Step",
+   "read_only": 1
+  },
+  {
    "collapsible": 1,
    "depends_on": "eval:doc.error",
    "fieldname": "error_section",
@@ -117,7 +133,7 @@
    "label": "Error"
   },
   {
-   "description": "Why the request failed, or why the login details could not be mailed.",
+   "description": "Why the request failed; the failed step is marked in Progress.",
    "fieldname": "error",
    "fieldtype": "Small Text",
    "label": "Error",
@@ -126,7 +142,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 15:00:00.000000",
+ "modified": "2026-10-17 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request",

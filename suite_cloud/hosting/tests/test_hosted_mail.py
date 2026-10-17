@@ -5,7 +5,7 @@ import frappe
 from suite_cloud.api.mail import accounts as accounts_api
 from suite_cloud.api.mail import domains as domains_api
 from suite_cloud.api.mail import groups as groups_api
-from suite_cloud.hosting import capacity, sites
+from suite_cloud.hosting import capacity, progress, sites
 from suite_cloud.hosting.tests.fakes import REGION
 from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, HostingFixtures
 from suite_cloud.mail.tenancy import hosted_domain
@@ -39,6 +39,28 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertEqual((account["use_ssl_for_outgoing"], account["use_tls"]), (1, 0))
         self.assertEqual((account["default_outgoing"], account["enable_outgoing"]), (1, 1))
         self.assertTrue(account["password"])
+
+    def test_a_request_shows_every_step_to_the_owner_invite(self) -> None:
+        values = {"email": "progress@frappe.test", "full_name": "John Doe", "label": "acme"}
+        request = frappe.get_doc({"doctype": "Suite Tenant Request", **values})
+        request.flags.verify_by_otp = True  # not processed: the test claims the site for the tenant
+        request.insert()
+        request.db_set({"status": "Processing", "tenant": self.tenant.name})
+        progress.sync(request)
+
+        with patch("frappe.publish_realtime") as publish:
+            site = self.claim()
+
+        request.reload()
+        self.assertEqual(request.status, "Completed")
+        statuses = {row.step: row.status for row in request.steps}
+        self.assertEqual(statuses.pop("site_domain"), "Skipped")  # no site DNS zone here
+        self.assertEqual(set(statuses.values()), {"Completed"})
+        details = {row.step: row.detail for row in request.steps}
+        self.assertEqual((details["mail_domain"], details["notification_account"]), (DOMAIN, NOTIFICATION))
+        self.assertEqual(details["invite"], site.login_email)
+        reports = [call.args[1] for call in publish.call_args_list if call.args[0] == progress.EVENT]
+        self.assertEqual((reports[-1]["progress"], reports[-1]["total"]), (14, 14))
 
     def test_the_notification_account_is_a_send_only_system_account(self) -> None:
         self.tenant.db_set("max_accounts", 1)

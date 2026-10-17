@@ -6,6 +6,7 @@ import frappe
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.api import signup
+from suite_cloud.hosting import progress
 from suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request import expire_requests
 from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fakes import REGION
@@ -129,12 +130,62 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(request.status, "Failed")
         self.assertIn("disk full", request.error)
         site = request.suite_site
+        steps = self.steps(request.name)
+        self.assertEqual((steps["server"].status, steps["site"].status), ("Completed", "Failed"))
+        self.assertIn("disk full", steps["site"].detail)
+        self.assertEqual(steps["configure"].status, "Pending")
 
         del self.pilot.create_site
         request.retry()
 
         request.reload()
         self.assertEqual((request.status, request.suite_site), ("Completed", site))
+        retried = self.steps(request.name)["site"]
+        self.assertEqual((retried.status, retried.detail), ("Completed", self.site(site).hostname))
+        self.assertEqual(retried.started_at, steps["site"].started_at)  # from the first try
+
+    def test_a_desk_request_shows_its_steps(self) -> None:
+        request = frappe.get_doc("Suite Tenant Request", self.create_in_desk())
+
+        self.assertEqual(
+            [row.step for row in request.steps],
+            [step.key for step in progress.STEPS],
+        )
+        steps = self.steps(request.name)
+        self.assertEqual(steps["verified"].status, "Skipped")
+        self.assertIn("desk", steps["verified"].detail)
+        for key in ("created", "tenant", "claim", "server", "site", "configure"):
+            with self.subTest(key):
+                self.assertEqual(steps[key].status, "Completed")
+                self.assertTrue(steps[key].started_at and steps[key].ended_at)
+        site = self.site(request.suite_site)
+        self.assertEqual(steps["claim"].detail, f"Suite Site {site.name}")
+        self.assertEqual(steps["server"].detail, f"Virtual Machine {site.virtual_machine}")
+
+    def test_a_site_from_the_pool_skips_the_server_and_site_steps(self) -> None:
+        pooled = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
+
+        request = frappe.get_doc("Suite Tenant Request", self.create_in_desk())
+
+        self.assertEqual(request.suite_site, pooled.name)
+        steps = self.steps(request.name)
+        self.assertEqual((steps["server"].status, steps["site"].status), ("Skipped", "Skipped"))
+        self.assertIn(pooled.name, steps["server"].detail)
+        self.assertEqual(steps["configure"].status, "Completed")
+
+    def test_a_request_shows_what_it_waits_for(self) -> None:
+        request = self.create()
+        self.assertEqual(self.steps(request)["verified"].status, "Running")
+        self.assertIn(EMAIL, self.steps(request)["verified"].detail)
+        frappe.db.set_value("Virtual Machine", {"region": REGION}, "enabled", 0)
+
+        signup.verify_otp(request, self.code())
+
+        steps = self.steps(request)
+        self.assertEqual((steps["verified"].status, steps["claim"].status), ("Completed", "Completed"))
+        self.assertEqual(steps["server"].status, "Running")
+        self.assertIn("no server in", steps["server"].detail)
+        self.assertEqual(steps["site"].status, "Pending")
 
     def test_a_label_a_site_took_meanwhile_fails_the_signup(self) -> None:
         request = self.create()
@@ -156,6 +207,11 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         expire_requests()
 
         self.assertEqual(frappe.db.get_value("Suite Tenant Request", request, "status"), "Expired")
+        self.assertEqual(self.steps(request)["verified"].status, "Failed")
+        self.assertIn("expired", self.steps(request)["verified"].detail)
+
+    def steps(self, request: str) -> dict:
+        return {row.step: row for row in frappe.get_doc("Suite Tenant Request", request).steps}
 
     def create_in_desk(self) -> str:
         doc = {

@@ -10,7 +10,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import add_to_date, cint, now, now_datetime
 
-from suite_cloud.hosting import begin_step, commit, labels, run_in_background, sites, undo_step
+from suite_cloud.hosting import begin_step, commit, labels, progress, run_in_background, sites, undo_step
 from suite_cloud.mail.tenancy.addresses import validate_email_address
 from suite_cloud.utils import get_config, log_exception
 
@@ -28,6 +28,10 @@ class SuiteTenantRequest(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
+        from suite_cloud.hosting.doctype.suite_tenant_request_step.suite_tenant_request_step import (
+            SuiteTenantRequestStep,
+        )
+
         email: DF.Data
         error: DF.SmallText | None
         expires_at: DF.Datetime | None
@@ -36,6 +40,7 @@ class SuiteTenantRequest(Document):
         label: DF.Data
         request_key: DF.Data | None
         status: DF.Literal["Pending", "Verified", "Processing", "Completed", "Failed", "Expired"]
+        steps: DF.Table[SuiteTenantRequestStep]
         suite_site: DF.Link | None
         tenant: DF.Link | None
         timezone: DF.Data | None
@@ -48,6 +53,7 @@ class SuiteTenantRequest(Document):
         self.status = "Pending"
         self.request_key = secrets.token_urlsafe(32)
         self.expires_at = add_to_date(now_datetime(), hours=REQUEST_TTL_HOURS)
+        progress.add_steps(self)
 
     def validate(self) -> None:
         if self.is_new():
@@ -72,6 +78,8 @@ class SuiteTenantRequest(Document):
 
         if not self.flags.verify_by_otp:
             self.db_set("status", "Verified")
+        progress.sync(self)
+        if self.status == "Verified":
             enqueue_processing(self.name)
 
     # --- one-time code --------------------------------------------------------
@@ -100,6 +108,7 @@ class SuiteTenantRequest(Document):
             frappe.throw(_("The code is not correct."))
         frappe.cache.delete_value(otp_key(self.name))
         self.db_set("status", "Verified")
+        progress.sync(self)
         enqueue_processing(self.name)
 
     # --- completion -------------------------------------------------------------
@@ -122,6 +131,7 @@ class SuiteTenantRequest(Document):
             sites.retry(frappe.get_doc("Suite Site", self.suite_site))
             return
         self.db_set({"status": "Verified", "error": None})
+        progress.sync(self)
         enqueue_processing(self.name)
 
     @frappe.whitelist()
@@ -155,14 +165,16 @@ def process_request(request: str) -> None:
         region = capacity.assert_region_enabled(get_config("default_region"))
         labels.assert_label_available(doc.label, doc.name)  # a site may have taken it since
         tenant = doc.tenant or ensure_tenant(doc, ensure_user(doc), region)
-        # Linked before the site is claimed: the site's job reads the password through the tenant.
+        # Linked before the site is claimed: the site's job finds the request through the tenant.
         doc.db_set({"tenant": tenant, "status": "Processing"})
+        progress.sync(doc)  # the claim's start tells a pooled site from one made for the request
         site = capacity.claim_site(tenant, doc.label, region)
         frappe.db.set_value("Suite Tenant Request", doc.name, "suite_site", site)
     except Exception as e:
         undo_step()
         log_exception(f"Signup {request} failed", doc)
         frappe.get_doc("Suite Tenant Request", request).db_set({"status": "Failed", "error": str(e)})
+    progress.sync(frappe.get_doc("Suite Tenant Request", request))
     commit()
 
 
@@ -215,6 +227,7 @@ def expire_requests() -> None:
     )
     for name in stale:
         frappe.db.set_value("Suite Tenant Request", name, "status", "Expired")
+        progress.sync(frappe.get_doc("Suite Tenant Request", name))
     commit()
 
 

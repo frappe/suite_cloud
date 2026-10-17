@@ -20,6 +20,7 @@ from suite_cloud.hosting import (
     checkpoint,
     commit,
     output_tail,
+    progress,
     run_in_background,
     undo_step,
     wait_for_task,
@@ -64,6 +65,7 @@ def run_step(doc, step) -> bool:
         log_exception(f"Suite Site {doc.name} failed at {step.__name__}", doc)
         fail(frappe.get_doc("Suite Site", doc.name), str(e) or type(e).__name__)
         advanced = False
+    progress.sync_site(doc)
     commit()
     return advanced
 
@@ -84,8 +86,10 @@ def create(site) -> bool:
 
     if not site.virtual_machine:
         if not place(site):
+            site.db_set("error", _("Waiting: no server in {0} has a free site slot.").format(site.region))
             return False
-        site.db_set({"virtual_machine": site.virtual_machine, "hostname": site.hostname})
+        site.db_set({"virtual_machine": site.virtual_machine, "hostname": site.hostname, "error": None})
+        progress.sync_site(site)  # kept by the checkpoint before the wait on Pilot
     pilot = site.get_pilot_client()
     if not site.pilot_task:
         if site.hostname in pilot.list_sites():
@@ -249,6 +253,7 @@ def follow_up(site) -> bool:
         else:
             if done and (frappe.db.get_value("Suite Site", site.name, "error") or "").startswith(f"{label}:"):
                 frappe.db.set_value("Suite Site", site.name, "error", None)  # its own earlier failure
+        progress.sync_site(site)
         commit()
         site = frappe.get_doc("Suite Site", site.name)
     return False
@@ -298,6 +303,7 @@ def retry(site) -> None:
         site.db_set({"status": resume_status(site), "error": None, "pilot_task": None})
     if (request := site.get_request()) and request.status == "Failed":
         request.db_set({"status": "Processing", "error": None})
+        progress.sync(request)
     enqueue_provision(site.name)
 
 

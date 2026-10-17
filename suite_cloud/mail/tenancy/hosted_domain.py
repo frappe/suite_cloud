@@ -8,7 +8,7 @@ change nor delete the domain or the account.
 import frappe
 from frappe import _
 
-from suite_cloud.hosting import checkpoint, labels
+from suite_cloud.hosting import checkpoint, labels, progress
 from suite_cloud.mail.doctype.mail_account.mail_account import generate_password
 from suite_cloud.suite_cloud.doctype.dns_record.dns_record import (
     confirm_managed_records,
@@ -42,6 +42,7 @@ def ensure(site) -> bool:
         domain.verify_dns_records()
         if not domain.is_live():
             return False
+    progress.sync_site(site)  # verified now; the account takes its own time
     password = ensure_account(site, domain)
     checkpoint()
     site.get_site_client().ensure_email_account(email_account_payload(site, domain, password))
