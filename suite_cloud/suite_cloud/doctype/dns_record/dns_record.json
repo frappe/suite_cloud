@@ -145,12 +145,12 @@
    "label": "Managed By"
   },
   {
-   "description": "Records owned by a cluster, node, gateway or pool are created and removed with it. Blank means created by hand.",
+   "description": "Records owned by a cluster, node, gateway, pool, hosted mail domain or Suite Site are created and removed with it. Blank means created by hand.",
    "fieldname": "managed_by_doctype",
    "fieldtype": "Select",
    "in_standard_filter": 1,
    "label": "Managed By Type",
-   "options": "\nStalwart Cluster\nStalwart Node\nEgress Gateway\nEgress IP Pool",
+   "options": "\nStalwart Cluster\nStalwart Node\nEgress Gateway\nEgress IP Pool\nMail Domain\nSuite Site",
    "read_only": 1,
    "set_only_once": 1
   },
@@ -173,7 +173,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-08 12:00:00.000000",
+ "modified": "2026-10-16 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "DNS Record",

@@ -120,6 +120,60 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertRaisesRegex(frappe.ValidationError, "already used", dup.insert)
         remove_cluster(auto.name)
 
+    def test_there_is_always_exactly_one_default_cluster(self) -> None:
+        frappe.db.set_value("Stalwart Cluster", {"is_default": 1}, "is_default", 0)  # rolled back
+        first = make_cluster("first", hostname=f"mail.first.{ROOT_DOMAIN}")
+        second = make_cluster("second", hostname=f"mail.second.{ROOT_DOMAIN}")
+        self.assertEqual((first.is_default, second.is_default), (1, 0))
+
+        first.is_default = 0
+        self.assertRaisesRegex(frappe.ValidationError, "Mark another cluster", first.save)
+
+        second.is_default = 1
+        second.save()
+        self.assertEqual(frappe.get_all("Stalwart Cluster", {"is_default": 1}, pluck="name"), [second.name])
+
+    def test_clusters_without_a_default_get_the_oldest_enabled_one(self) -> None:
+        from suite_cloud.patches.v1_0 import mark_default_cluster
+
+        older = make_cluster("older", hostname=f"mail.older.{ROOT_DOMAIN}")
+        newer = make_cluster("newer", hostname=f"mail.newer.{ROOT_DOMAIN}")
+        # A site from before the rule: no default, and only these two enabled (rolled back).
+        frappe.db.sql("update `tabStalwart Cluster` set is_default = 0, enabled = 0")
+        frappe.db.set_value("Stalwart Cluster", {"name": ["in", [older.name, newer.name]]}, "enabled", 1)
+
+        mark_default_cluster.execute()
+
+        self.assertEqual(frappe.get_all("Stalwart Cluster", {"is_default": 1}, pluck="name"), [older.name])
+
+    def test_a_disabled_default_gives_way_to_an_enabled_cluster(self) -> None:
+        from suite_cloud.patches.v1_0 import mark_default_cluster
+
+        disabled = make_cluster("disabled", hostname=f"mail.disabled.{ROOT_DOMAIN}")
+        enabled = make_cluster("enabled", hostname=f"mail.enabled.{ROOT_DOMAIN}")
+        # Allowed before the rule: a disabled default (rolled back).
+        frappe.db.sql("update `tabStalwart Cluster` set is_default = 0, enabled = 0")
+        frappe.db.set_value("Stalwart Cluster", disabled.name, "is_default", 1)
+        frappe.db.set_value("Stalwart Cluster", enabled.name, "enabled", 1)
+
+        mark_default_cluster.execute()
+
+        self.assertEqual(frappe.get_all("Stalwart Cluster", {"is_default": 1}, pluck="name"), [enabled.name])
+
+    def test_the_default_cluster_cannot_be_disabled_or_deleted(self) -> None:
+        cluster = make_cluster()
+        cluster.reload()
+        cluster.is_default = 1
+        cluster.save()
+        other = make_cluster("other", hostname=f"mail.other.{ROOT_DOMAIN}")
+
+        cluster.enabled = 0
+        self.assertRaisesRegex(frappe.ValidationError, "cannot be disabled", cluster.save)
+        cluster.reload()
+        self.assertRaisesRegex(frappe.ValidationError, "before deleting", cluster.delete)
+        other.enabled = 0
+        other.save()  # any other cluster may be
+
     def test_store_kind_is_enforced(self) -> None:
         blob = make_store("Blob", "S3", region="us-east-1", bucket="b", access_key="a", secret_key="s")
         cluster = frappe.get_doc(

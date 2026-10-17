@@ -82,7 +82,7 @@
   },
   {
    "default": "1",
-   "description": "Untick to stop placing new tenants here and mark the cluster Disabled. Existing tenants keep working.",
+   "description": "Untick to stop placing new tenants here and mark the cluster Disabled. Existing tenants keep working. The default cluster cannot be disabled; mark another one as default first.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
@@ -141,9 +141,9 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Hostname",
+   "read_only": 1,
    "set_only_once": 1,
-   "unique": 1,
-   "read_only": 1
+   "unique": 1
   },
   {
    "description": "Sub-zone the cluster owns, built from the label and the zone, e.g. blr.frappemail.com. Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
@@ -166,13 +166,13 @@
   },
   {
    "default": "0",
-   "description": "Cluster a tenant is placed on when none is named and no cluster serves the requested region. Only one cluster can be default.",
+   "description": "Cluster a tenant is placed on when no cluster lists its region. There is always exactly one: the first cluster becomes the default, and marking another cluster moves it there. The default cannot be disabled or deleted.",
    "fieldname": "is_default",
    "fieldtype": "Check",
    "label": "Is Default"
   },
   {
-   "description": "Region codes a tenant may be placed from, e.g. blr, sfo. Leave empty to serve any region. Placement policy only: the cluster's servers may sit anywhere.",
+   "description": "Region codes a tenant may be placed from, e.g. blr, sfo; a Region's Stalwart Region is matched against them. A tenant whose region no cluster lists goes to the default cluster. Placement policy only: the cluster's servers may sit anywhere.",
    "fieldname": "regions",
    "fieldtype": "Table",
    "label": "Regions Served",
@@ -464,7 +464,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-16 03:30:00.000000",
+ "modified": "2026-10-16 23:30:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",
@@ -485,10 +485,10 @@
   }
  ],
  "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1,
  "title_field": "title",
- "show_title_field_in_link": 1
+ "track_changes": 1
 }

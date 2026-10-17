@@ -33,7 +33,40 @@
   "acme_contact_email",
   "dns_tab",
   "dns_section",
-  "default_dns_ttl"
+  "default_dns_ttl",
+  "frappe_cloud_tab",
+  "central_section",
+  "central_url",
+  "central_team",
+  "column_break_central",
+  "central_api_key",
+  "central_api_secret",
+  "servers_section",
+  "default_region",
+  "central_image_offering",
+  "central_plan",
+  "column_break_servers",
+  "max_sites_per_vm",
+  "min_free_site_slots",
+  "auto_create_vms",
+  "sizing_section",
+  "reserved_memory_mb",
+  "memory_per_site_mb",
+  "column_break_sizing",
+  "reserved_disk_gb",
+  "disk_per_site_gb",
+  "suite_app_section",
+  "suite_app_repo",
+  "column_break_suite_app",
+  "suite_app_ref",
+  "sites_section",
+  "ready_sites_per_region",
+  "allow_signup",
+  "allow_subaddressed_signups",
+  "column_break_sites",
+  "site_dns_zone",
+  "tenant_mail_zone",
+  "notification_mailbox_local_part"
  ],
  "fields": [
   {
@@ -47,7 +80,7 @@
    "label": "Suite Cloud"
   },
   {
-   "description": "Address tenants use to reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL.",
+   "description": "Address tenants use to reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL. Hosted sites are given it to call Suite Cloud, so it must be reachable from Frappe Cloud: on a development machine, set a tunnel's address.",
    "fieldname": "public_url",
    "fieldtype": "Data",
    "label": "Public URL",
@@ -225,12 +258,225 @@
    "fieldtype": "Int",
    "label": "Default DNS TTL (Seconds)",
    "reqd": 1
+  },
+  {
+   "fieldname": "frappe_cloud_tab",
+   "fieldtype": "Tab Break",
+   "label": "Frappe Cloud"
+  },
+  {
+   "fieldname": "central_section",
+   "fieldtype": "Section Break",
+   "label": "Central"
+  },
+  {
+   "description": "Address of Frappe Cloud's control plane, e.g. https://central.frappe.cloud. Suite Cloud creates its servers there.",
+   "fieldname": "central_url",
+   "fieldtype": "Data",
+   "label": "Central URL",
+   "mandatory_depends_on": "eval:doc.central_url || doc.central_team || doc.central_api_key || doc.central_api_secret",
+   "options": "URL"
+  },
+  {
+   "description": "The team that owns Suite Cloud's servers, picked from the teams the API key's user belongs to; enter the URL, key and secret first. The key's user needs a team-wide role with server:create, server:view, cluster:view and server:console in it.",
+   "fieldname": "central_team",
+   "fieldtype": "Autocomplete",
+   "label": "Central Team",
+   "mandatory_depends_on": "eval:doc.central_url || doc.central_team || doc.central_api_key || doc.central_api_secret"
+  },
+  {
+   "fieldname": "column_break_central",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "central_api_key",
+   "fieldtype": "Data",
+   "label": "Central API Key",
+   "mandatory_depends_on": "eval:doc.central_url || doc.central_team || doc.central_api_key || doc.central_api_secret"
+  },
+  {
+   "fieldname": "central_api_secret",
+   "fieldtype": "Password",
+   "label": "Central API Secret",
+   "mandatory_depends_on": "eval:doc.central_url || doc.central_team || doc.central_api_key || doc.central_api_secret"
+  },
+  {
+   "fieldname": "servers_section",
+   "fieldtype": "Section Break",
+   "label": "Servers"
+  },
+  {
+   "description": "Where a tenant's site goes when its signup names no region. Only enabled regions are offered: run Sync Regions under Frappe Cloud, then enable a region and set its proxy zone.",
+   "fieldname": "default_region",
+   "fieldtype": "Link",
+   "label": "Default Region",
+   "options": "Region"
+  },
+  {
+   "default": "pilot",
+   "description": "Central image offering new servers boot from; its newest image without a baked site is used.",
+   "fieldname": "central_image_offering",
+   "fieldtype": "Data",
+   "label": "Image Offering",
+   "reqd": 1
+  },
+  {
+   "description": "Central plan of new servers. Blank takes the first plan Central offers in the region.",
+   "fieldname": "central_plan",
+   "fieldtype": "Data",
+   "label": "Plan"
+  },
+  {
+   "fieldname": "column_break_servers",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "10",
+   "description": "The most sites any server takes, Suite sites and others together, whatever its size. Each server's Max Sites is worked out from its memory and disk below and never exceeds this.",
+   "fieldname": "max_sites_per_vm",
+   "fieldtype": "Int",
+   "label": "Max Sites per Server",
+   "reqd": 1
+  },
+  {
+   "default": "2",
+   "description": "With Create Servers Automatically on, a region with fewer free slots than this gets one more server, at most one per hour.",
+   "fieldname": "min_free_site_slots",
+   "fieldtype": "Int",
+   "label": "Minimum Free Site Slots",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Add a server to a region that runs short of free site slots. Each server is billed to the Central team.",
+   "fieldname": "auto_create_vms",
+   "fieldtype": "Check",
+   "label": "Create Servers Automatically"
+  },
+  {
+   "description": "A server takes as many sites as both its memory and its disk allow, after what the server itself needs: (memory − reserved) ÷ memory per site, and the same for disk. Recalculated whenever Central reports the server's size, so a resize on the dashboard counts.",
+   "fieldname": "sizing_section",
+   "fieldtype": "Section Break",
+   "label": "Server Sizing"
+  },
+  {
+   "default": "1024",
+   "description": "Memory the bench needs before any site: Frappe, the Suite app, MariaDB, Redis and the workers.",
+   "fieldname": "reserved_memory_mb",
+   "fieldtype": "Int",
+   "label": "Memory Reserved for the Server (MB)",
+   "reqd": 1
+  },
+  {
+   "default": "512",
+   "fieldname": "memory_per_site_mb",
+   "fieldtype": "Int",
+   "label": "Memory per Site (MB)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_sizing",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "8",
+   "description": "Disk the system, the bench and its apps take before any site.",
+   "fieldname": "reserved_disk_gb",
+   "fieldtype": "Int",
+   "label": "Disk Reserved for the Server (GB)",
+   "reqd": 1
+  },
+  {
+   "default": "2",
+   "fieldname": "disk_per_site_gb",
+   "fieldtype": "Int",
+   "label": "Disk per Site (GB)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "suite_app_section",
+   "fieldtype": "Section Break",
+   "label": "Suite App"
+  },
+  {
+   "default": "https://github.com/frappe/suite",
+   "description": "Git repository of the Suite app each server installs.",
+   "fieldname": "suite_app_repo",
+   "fieldtype": "Data",
+   "label": "Repository",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_suite_app",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "develop",
+   "description": "What new servers install. Servers already set up keep the commit they installed.",
+   "fieldname": "suite_app_ref",
+   "fieldtype": "Data",
+   "label": "Branch or Tag",
+   "reqd": 1
+  },
+  {
+   "fieldname": "sites_section",
+   "fieldtype": "Section Break",
+   "label": "Sites"
+  },
+  {
+   "default": "2",
+   "description": "Sites with Suite installed kept waiting in each enabled region, so a signup gets one at once. 0 creates every site on demand.",
+   "fieldname": "ready_sites_per_region",
+   "fieldtype": "Int",
+   "label": "Ready Sites per Region",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Accept signups through the public signup API. Each one creates a tenant and claims a site.",
+   "fieldname": "allow_signup",
+   "fieldtype": "Check",
+   "label": "Allow Signup"
+  },
+  {
+   "default": "0",
+   "description": "Accept a signup email with a +tag, e.g. john+test@example.com. Off, such an email is refused: every tag of one mailbox could sign up again. On, the owner's account on the site leaves the tag out, e.g. john@acme.example.com.",
+   "fieldname": "allow_subaddressed_signups",
+   "fieldtype": "Check",
+   "label": "Allow Sub-addressed Emails at Signup"
+  },
+  {
+   "fieldname": "column_break_sites",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Zone under which each site gets its label as its primary domain, e.g. acme.example.app. It may be the tenant mail zone: site domains then go under sites, e.g. acme.sites.example.com beside the mail domain acme.example.com. It needs a DNS provider.",
+   "fieldname": "site_dns_zone",
+   "fieldtype": "Link",
+   "label": "Site DNS Zone",
+   "options": "DNS Zone"
+  },
+  {
+   "description": "Zone under which each tenant gets its label as its mail domain, e.g. acme.example.com. Every hosted site gets one, so it is required once Central is set. It may be the site DNS zone. It needs a DNS provider and must not be the zone of a Stalwart cluster.",
+   "fieldname": "tenant_mail_zone",
+   "fieldtype": "Link",
+   "label": "Tenant Mail Zone",
+   "mandatory_depends_on": "eval:doc.central_url",
+   "options": "DNS Zone"
+  },
+  {
+   "default": "notification",
+   "description": "Local part of the account each site sends its own mail from, e.g. notification for notification@acme.example.com.",
+   "fieldname": "notification_mailbox_local_part",
+   "fieldtype": "Data",
+   "label": "Notification Mailbox",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-16 02:30:00.000000",
+ "modified": "2026-10-17 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

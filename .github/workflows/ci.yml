@@ -30,6 +30,8 @@ jobs:
             tests: suite_cloud/tests
           - name: Mail
             tests: suite_cloud/mail/tests
+          - name: Hosting
+            tests: suite_cloud/hosting/tests
 
     services:
       redis-cache:

@@ -1,2 +1,3 @@
 Suite Cloud
 Mail
+Hosting

@@ -1,0 +1,190 @@
+{
+ "actions": [],
+ "creation": "2026-10-16 12:00:00.000000",
+ "description": "A request for a hosted Suite workspace. Signups through the public API confirm their email with a one-time code; a request created here is taken on the operator's word and processed at once. Either way the owner is invited from the new site and chooses their own password.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "email",
+  "full_name",
+  "organization",
+  "label",
+  "timezone",
+  "column_break_main",
+  "status",
+  "processing_time",
+  "request_key",
+  "tenant",
+  "suite_site",
+  "ip_address",
+  "expires_at",
+  "progress_section",
+  "steps",
+  "error_section",
+  "error"
+ ],
+ "fields": [
+  {
+   "description": "Where the one-time code and the owner's invite go. Its local part names the owner's account on the site, e.g. john for john@acme.example.com.",
+   "fieldname": "email",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Email",
+   "options": "Email",
+   "reqd": 1,
+   "search_index": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "The person's name, given to their users in Suite Cloud and on the site.",
+   "fieldname": "full_name",
+   "fieldtype": "Data",
+   "label": "Full Name",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "The company or team the workspace is for, e.g. Acme Inc. It names the workspace on the site, and the label is made from it unless one is given.",
+   "fieldname": "organization",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Organization",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Names the tenant's site and mail domains, e.g. acme. Leave it blank to have it made from the organization when the request is processed: Acme Inc. gives acme, or acme-2 when acme is taken. A label given here must be free and is held from now on.",
+   "fieldname": "label",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Label",
+   "search_index": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "The site's time zone, e.g. Asia/Kolkata. Blank keeps the site's default.",
+   "fieldname": "timezone",
+   "fieldtype": "Data",
+   "label": "Time Zone",
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "Pending",
+   "description": "Pending: waiting for the email code. Verified: the code was correct. Processing: the tenant and its site are being set up. Completed: the site is ready and its owner invited; they choose their password when they accept. Failed: stopped on an error; run Retry. Expired: no code within 24 hours.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nVerified\nProcessing\nCompleted\nFailed\nExpired",
+   "read_only": 1
+  },
+  {
+   "description": "How long the request took from the email confirmation to the owner's invite, waiting and retries included. A request made in the desk counts from its creation. Set when the request completes.",
+   "fieldname": "processing_time",
+   "fieldtype": "Duration",
+   "in_list_view": 1,
+   "label": "Processing Time",
+   "read_only": 1
+  },
+  {
+   "description": "Secret that reads the request's status through the signup API. Handed out once, when the code is verified.",
+   "fieldname": "request_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Request Key",
+   "read_only": 1
+  },
+  {
+   "description": "The Suite Tenant created for this request.",
+   "fieldname": "tenant",
+   "fieldtype": "Link",
+   "label": "Tenant",
+   "options": "Suite Tenant",
+   "read_only": 1
+  },
+  {
+   "description": "The site claimed for the tenant.",
+   "fieldname": "suite_site",
+   "fieldtype": "Link",
+   "label": "Suite Site",
+   "options": "Suite Site",
+   "read_only": 1
+  },
+  {
+   "description": "The address the signup came from. Blank for a request created in the desk.",
+   "fieldname": "ip_address",
+   "fieldtype": "Data",
+   "label": "IP Address",
+   "read_only": 1
+  },
+  {
+   "description": "A request still waiting for its code after this expires.",
+   "fieldname": "expires_at",
+   "fieldtype": "Datetime",
+   "label": "Expires At",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.steps && doc.steps.length",
+   "fieldname": "progress_section",
+   "fieldtype": "Section Break",
+   "label": "Progress"
+  },
+  {
+   "description": "Every step from the request to the owner's invite, with how long each took. Updated as the request's jobs run.",
+   "fieldname": "steps",
+   "fieldtype": "Table",
+   "label": "Steps",
+   "options": "Suite Tenant Request Step",
+   "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "depends_on": "eval:doc.error",
+   "fieldname": "error_section",
+   "fieldtype": "Section Break",
+   "label": "Error"
+  },
+  {
+   "description": "Why the request failed; the failed step is marked in Progress.",
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-17 21:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hosting",
+ "name": "Suite Tenant Request",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "email,organization,label",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "email",
+ "track_changes": 1
+}

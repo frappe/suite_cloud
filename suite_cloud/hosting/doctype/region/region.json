@@ -1,0 +1,144 @@
+{
+ "actions": [],
+ "autoname": "field:region",
+ "creation": "2026-10-16 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "region",
+  "display_name",
+  "provider",
+  "country_code",
+  "column_break_main",
+  "enabled",
+  "status",
+  "reachable",
+  "hosting_section",
+  "proxy_zone",
+  "column_break_hosting",
+  "stalwart_region",
+  "last_synced_at"
+ ],
+ "fields": [
+  {
+   "description": "Central's code for the region, e.g. blr1.",
+   "fieldname": "region",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Region",
+   "reqd": 1,
+   "set_only_once": 1,
+   "unique": 1
+  },
+  {
+   "description": "Central's name for the region, e.g. Mumbai. Set by Sync Regions.",
+   "fieldname": "display_name",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Display Name",
+   "read_only": 1
+  },
+  {
+   "description": "The cloud the region runs on, as Central reports it. Set by Sync Regions.",
+   "fieldname": "provider",
+   "fieldtype": "Data",
+   "label": "Provider",
+   "read_only": 1
+  },
+  {
+   "description": "Country the region is in, e.g. IN. Set by Sync Regions.",
+   "fieldname": "country_code",
+   "fieldtype": "Data",
+   "label": "Country Code",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Suite Cloud keeps sites and servers here. Set by hand; Sync Regions never changes it.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Enabled"
+  },
+  {
+   "description": "The region's status on Central; only Active regions are listed. Set by Sync Regions.",
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Central Status",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Central could reach the region's infrastructure when it was last synced.",
+   "fieldname": "reachable",
+   "fieldtype": "Check",
+   "label": "Reachable",
+   "read_only": 1
+  },
+  {
+   "fieldname": "hosting_section",
+   "fieldtype": "Section Break",
+   "label": "Hosting"
+  },
+  {
+   "description": "The zone Central's proxy serves this region's sites under: the region code followed by Central's wildcard domain, e.g. blr1.frappe.cloud. Learned from the first server set up here; every later server must report the same zone.",
+   "fieldname": "proxy_zone",
+   "fieldtype": "Data",
+   "label": "Proxy Zone",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_hosting",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Region code a Stalwart Cluster lists for this region, e.g. blr. Picks the mail cluster of tenants placed here; blank uses the region code, and a code no cluster lists sends them to the default cluster.",
+   "fieldname": "stalwart_region",
+   "fieldtype": "Data",
+   "label": "Stalwart Region"
+  },
+  {
+   "description": "When Sync Regions last read this region from Central. It runs daily and from Suite Cloud Settings.",
+   "fieldname": "last_synced_at",
+   "fieldtype": "Datetime",
+   "label": "Last Synced At",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-17 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Hosting",
+ "name": "Region",
+ "naming_rule": "By fieldname",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "display_name",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "display_name",
+ "track_changes": 1
+}

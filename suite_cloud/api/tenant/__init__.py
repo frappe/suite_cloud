@@ -319,15 +319,24 @@ def owned(doctype: str, name: str, for_update: bool = False):
     doc = None
     if name and frappe.db.exists(doctype, name):
         doc = frappe.get_doc(doctype, name, for_update=for_update)
-    if doc is None or doc.tenant != tenant.name:
+    if doc is None or doc.tenant != tenant.name or doc.get("is_system_account"):
         frappe.throw(
             _("{0} {1} was not found.").format(_(NOUNS[doctype]).capitalize(), name), frappe.DoesNotExistError
         )
     return doc
 
 
-def owned_names(doctype: str, filters: dict | None = None, **kwargs) -> list[str]:
+def visible(doctype: str, filters: dict | None = None) -> dict:
+    """The tenant's own rows: system accounts are Suite Cloud's and the tenant API never sees them."""
+
     filters = {"tenant": current_tenant().name, **(filters or {})}
+    if doctype == "Mail Account":
+        filters["is_system_account"] = 0
+    return filters
+
+
+def owned_names(doctype: str, filters: dict | None = None, **kwargs) -> list[str]:
+    filters = visible(doctype, filters)
     return frappe.get_all(doctype, filters=filters, pluck="name", order_by="name asc", **kwargs)
 
 
@@ -343,7 +352,7 @@ def owned_page(
 ) -> tuple[list[str], int]:
     """One page of the tenant's document names by name, plus how many match in all."""
 
-    filters = {"tenant": current_tenant().name, **(filters or {})}
+    filters = visible(doctype, filters)
     or_filters = None
     if search and search.strip():
         like = f"%{search.strip()}%"

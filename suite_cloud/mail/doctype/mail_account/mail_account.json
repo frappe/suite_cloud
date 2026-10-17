@@ -11,6 +11,7 @@
   "cluster",
   "column_break_main",
   "enabled",
+  "is_system_account",
   "disable_receiving",
   "display_name",
   "description",
@@ -86,6 +87,15 @@
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Enabled"
+  },
+  {
+   "default": "0",
+   "description": "An account Suite Cloud keeps for a hosted site's own mail, e.g. notification@acme.example.com. It sends only, does not count against the tenant's Max Accounts or disk usage, and the tenant cannot change or delete it.",
+   "fieldname": "is_system_account",
+   "fieldtype": "Check",
+   "label": "System Account",
+   "read_only": 1,
+   "set_only_once": 1
   },
   {
    "default": "0",
@@ -211,7 +221,7 @@
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 03:00:00.000000",
+ "modified": "2026-10-17 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",
