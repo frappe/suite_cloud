@@ -125,8 +125,7 @@ def skip_primary(site, row, problem: str) -> None:
 
 def get_https_problem(domain: str) -> str | None:
     """Why the domain does not answer over HTTPS with a valid certificate, as visitors reach it.
-    Pilot reports a domain's certificate once it holds one, but the proxy in front of the server
-    may not route TLS for the name yet."""
+    The proxy serves HTTPS for the name only once Pilot's certificate task succeeded."""
 
     try:
         requests.get(f"https://{domain}/api/method/ping", timeout=HTTPS_CHECK_SECONDS, allow_redirects=False)
