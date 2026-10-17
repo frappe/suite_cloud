@@ -215,6 +215,8 @@ All configuration lives in Suite Cloud Settings; `site_config.json` is not consu
 
 ## Development
 
+[docs/development.md](docs/development.md) sets up a development site step by step: the bench, tests and lint, DNS zones, a Stalwart cluster, a Cloudflare tunnel and Frappe Cloud.
+
 ```sh
 bench --site yoursite run-tests --app suite_cloud --test-category all
 ```
