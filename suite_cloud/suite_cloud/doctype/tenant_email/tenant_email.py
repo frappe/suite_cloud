@@ -81,6 +81,7 @@ def send(tenant, name: str, recipient: str, params: dict, request_key: str) -> T
         msg=body,
         subject=subject,
         email_account=account,
+        expose_recipients="header",  # not queued, so no one fills in the To placeholder
         inline_images=email_types.get_inline_images(body),
     )
     message_id = make_msgid(domain=account.email_id.rpartition("@")[2]).strip("<>")
