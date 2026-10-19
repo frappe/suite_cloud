@@ -2,7 +2,7 @@
 
 Module `suite_cloud.api.email`. The conventions are in the [overview](README.md).
 
-A site connected to Suite Cloud does not send mail itself. Invites, password resets, shares and all other mail of the site go through Suite Cloud, which sends each email immediately and answers whether it was sent. Nothing is queued on Suite Cloud.
+A site connected to Suite Cloud does not send mail itself. Invites, password resets, shares and all other mail of the site go through Suite Cloud, which sends each email immediately and answers whether it was sent. Nothing is queued on Suite Cloud. A site whose System Manager sets another Email Account as the default outgoing one sends through that account instead, and its mail does not reach Suite Cloud.
 
 Suite Cloud sends through the outgoing Email Account that **Suite Cloud Settings > Tenant Email** sets for the tenant's type (Suite Site, Team or Development). The sender name is the Email Account's name, or the tenant's title when **Use Tenant Title as Sender Name** is checked. The site's own From, Sender and Reply-To headers are removed. A Reply-To is set only when the Email Account adds one. Each email is recorded as a **Tenant Email**, and the emails sent this month show as `emails_sent` in the [tenant profile](tenant.md#ping).
 
