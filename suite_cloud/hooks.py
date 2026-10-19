@@ -75,6 +75,8 @@ scheduler_events = {
     ],
 }
 
+default_log_clearing_doctypes = {"Tenant Email": 90}
+
 # Execution history points back at its server; it must not block deleting the server.
 ignore_links_on_delete = ["Server Job"]
 

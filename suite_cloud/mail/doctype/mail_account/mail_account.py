@@ -16,7 +16,6 @@ from suite_cloud.mail.tenancy.account_credentials import API_KEYS, APP_PASSWORDS
 from suite_cloud.mail.tenancy.addresses import (
     assert_address_available,
     assert_domain_live,
-    assert_not_notification_address,
     get_tenant_domain,
     validate_email_address,
 )
@@ -52,7 +51,6 @@ class MailAccount(QuotaHolder, Document):
         email: DF.Data
         enabled: DF.Check
         groups: DF.TableMultiSelect[MailGroupMember]
-        is_system_account: DF.Check
         locale: DF.Data | None
         new_password: DF.Password | None
         quotas: DF.Table[MailQuota]
@@ -78,13 +76,11 @@ class MailAccount(QuotaHolder, Document):
         self.cluster = domain.cluster
         if self.is_new() and not self.flags.adopting:
             assert_domain_live(domain)
-        if self.is_new() and domain.hosted and not self.is_system_account:
-            assert_not_notification_address(self.email)
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
 
         tenant = frappe.get_cached_doc("Suite Tenant", self.tenant)
-        if self.is_new() and not self.flags.adopting and not self.is_system_account:
+        if self.is_new() and not self.flags.adopting:
             tenant.assert_can_add_account()
             account_credentials.apply_default_limits(self)
         quotas.validate(self)

@@ -172,17 +172,9 @@ STEPS = (
         follow_up="Mail",
     ),
     Step(
-        "notification_account",
-        "Creating the notification account",
-        ("mail_verified",),
-        lambda state: bool(state.site.email_account_created),
-        get_summary=lambda state: state.site.notification_account,
-        follow_up="Mail",
-    ),
-    Step(
         "invite",
         "Inviting the owner",
-        ("notification_account",),
+        ("mail_verified",),
         lambda state: bool(state.site.owner_invite),
         get_summary=lambda state: state.site.login_email,
         follow_up="Owner invite",

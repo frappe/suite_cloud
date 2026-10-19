@@ -5,6 +5,7 @@ Suite Cloud exposes one REST API over Frappe's v2 method endpoint. The **tenant 
 | Page | Covers |
 | --- | --- |
 | [Tenant](tenant.md) | `ping`, `update_tenant_profile`, `get_disk_usage` |
+| [Email](email.md) | `send_email`: the site's own mail, such as invites and password resets |
 | [Domains](domains.md) | Adding a domain, its DNS records and verification |
 | [Accounts](accounts.md) | Mailboxes, passwords, quotas, aliases, group membership, account options |
 | [Groups](groups.md) | Groups, their members and aliases |

@@ -121,20 +121,6 @@ class TestSignup(HostingFixtures, IntegrationTestCase):
         self.assertEqual(invite["account"], f"new-signup@acme.{MAIL_ZONE}")  # the tag is left out
         self.assertEqual(invite["backup_email"], "new-signup+test@frappe.test")
         self.assertEqual(frappe.db.get_value("Suite Tenant Request", request.name, "status"), "Completed")
-        notification = frappe.get_doc({**values, "label": "beta", "email": "notification+x@frappe.test"})
-        self.assertRaisesRegex(
-            frappe.ValidationError, "kept for the site's notifications", notification.insert
-        )
-
-    def test_the_notification_local_part_cannot_sign_up(self) -> None:
-        values = {
-            "doctype": "Suite Tenant Request",
-            "full_name": "Ada Lovelace",
-            "organization": "Acme",
-            "label": "acme",
-        }
-        doc = frappe.get_doc({**values, "email": "notification@frappe.test"})
-        self.assertRaisesRegex(frappe.ValidationError, "kept for the site's notifications", doc.insert)
 
     def test_a_request_made_in_the_desk_is_checked_like_a_signup(self) -> None:
         def request(**fields):

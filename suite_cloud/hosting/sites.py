@@ -200,8 +200,8 @@ def activate(site) -> None:
 
 
 def invite_owner(site) -> bool:
-    """Suite's own invite to the owner, from the site's notification account: they choose their
-    password when they accept, so none is ever sent."""
+    """Suite's own invite to the owner, sent through Suite Cloud: they choose their password when
+    they accept, so none is ever sent."""
 
     invite = site.get_site_client().create_doc(
         "Mail Account Request",

@@ -14,6 +14,10 @@
   "column_break_jobs",
   "dmarc_report_retention_days",
   "tls_report_retention_days",
+  "email_section",
+  "tenant_email_accounts",
+  "column_break_email",
+  "use_tenant_title_as_sender_name",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -65,8 +69,7 @@
   "allow_subaddressed_signups",
   "column_break_sites",
   "site_dns_zone",
-  "tenant_mail_zone",
-  "notification_mailbox_local_part"
+  "tenant_mail_zone"
  ],
  "fields": [
   {
@@ -129,6 +132,30 @@
    "fieldtype": "Int",
    "label": "TLS Report Retention (Days)",
    "reqd": 1
+  },
+  {
+   "fieldname": "email_section",
+   "fieldtype": "Section Break",
+   "label": "Tenant Email",
+   "description": "Sites connected to Suite Cloud send their mail through it, e.g. invites and password resets."
+  },
+  {
+   "description": "The outgoing Email Account each tenant type's sites send through. A site whose type has none cannot send mail.",
+   "fieldname": "tenant_email_accounts",
+   "fieldtype": "Table",
+   "label": "Email Accounts",
+   "options": "Tenant Email Account"
+  },
+  {
+   "fieldname": "column_break_email",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Send under the tenant's title, e.g. Acme <noreply@example.com>. Off: under the Email Account's name.",
+   "fieldname": "use_tenant_title_as_sender_name",
+   "fieldtype": "Check",
+   "label": "Use Tenant Title as Sender Name"
   },
   {
    "fieldname": "stalwart_tab",
@@ -463,20 +490,12 @@
    "label": "Tenant Mail Zone",
    "mandatory_depends_on": "eval:doc.central_url",
    "options": "DNS Zone"
-  },
-  {
-   "default": "notification",
-   "description": "Local part of the account each site sends its own mail from, e.g. notification for notification@acme.example.com.",
-   "fieldname": "notification_mailbox_local_part",
-   "fieldtype": "Data",
-   "label": "Notification Mailbox",
-   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-17 15:00:00.000000",
+ "modified": "2026-10-19 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

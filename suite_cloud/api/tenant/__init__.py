@@ -319,7 +319,7 @@ def owned(doctype: str, name: str, for_update: bool = False):
     doc = None
     if name and frappe.db.exists(doctype, name):
         doc = frappe.get_doc(doctype, name, for_update=for_update)
-    if doc is None or doc.tenant != tenant.name or doc.get("is_system_account"):
+    if doc is None or doc.tenant != tenant.name:
         frappe.throw(
             _("{0} {1} was not found.").format(_(NOUNS[doctype]).capitalize(), name), frappe.DoesNotExistError
         )
@@ -327,12 +327,9 @@ def owned(doctype: str, name: str, for_update: bool = False):
 
 
 def visible(doctype: str, filters: dict | None = None) -> dict:
-    """The tenant's own rows: system accounts are Suite Cloud's and the tenant API never sees them."""
+    """The tenant's own rows."""
 
-    filters = {"tenant": current_tenant().name, **(filters or {})}
-    if doctype == "Mail Account":
-        filters["is_system_account"] = 0
-    return filters
+    return {"tenant": current_tenant().name, **(filters or {})}
 
 
 def owned_names(doctype: str, filters: dict | None = None, **kwargs) -> list[str]:

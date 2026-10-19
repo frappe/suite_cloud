@@ -2,8 +2,6 @@
 
 Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. The conventions are in the [overview](README.md).
 
-A hosted site's `notification@` address on its mail domain is a system account that Suite Cloud keeps for the site's own mail. The tenant API never shows it: listings leave it out, and naming it answers 404, as for an account that does not exist. It does not count against the tenant's account limit or disk usage.
-
 | Method | Verb | Purpose |
 | --- | --- | --- |
 | `mail.accounts.list_accounts` | GET | A page of accounts |

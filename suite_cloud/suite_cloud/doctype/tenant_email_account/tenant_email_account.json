@@ -1,0 +1,43 @@
+{
+ "actions": [],
+ "creation": "2026-10-19 12:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "tenant_type",
+  "email_account"
+ ],
+ "fields": [
+  {
+   "fieldname": "tenant_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Tenant Type",
+   "options": "Suite Site\nTeam\nDevelopment",
+   "reqd": 1
+  },
+  {
+   "description": "The outgoing Email Account that sends the mail of this tenant type's sites.",
+   "fieldname": "email_account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Email Account",
+   "options": "Email Account",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-10-19 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Suite Cloud",
+ "name": "Tenant Email Account",
+ "owner": "Administrator",
+ "permissions": [],
+ "row_format": "Dynamic",
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

@@ -30,8 +30,7 @@
   "mail_tab",
   "mail_domain",
   "column_break_mail",
-  "notification_account",
-  "email_account_created"
+  "mail_domain_verified"
  ],
  "fields": [
   {
@@ -225,25 +224,17 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "The mailbox the site sends its own mail from, e.g. notification@acme.example.com. Its password lives only in the site's Email Account.",
-   "fieldname": "notification_account",
-   "fieldtype": "Link",
-   "label": "Notification Account",
-   "options": "Mail Account",
-   "read_only": 1
-  },
-  {
    "default": "0",
-   "description": "The site sends through the notification account by default.",
-   "fieldname": "email_account_created",
+   "description": "The mail domain's DNS records are live. The owner's invite waits for this.",
+   "fieldname": "mail_domain_verified",
    "fieldtype": "Check",
-   "label": "Email Account Created",
+   "label": "Mail Domain Verified",
    "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-17 19:00:00.000000",
+ "modified": "2026-10-19 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

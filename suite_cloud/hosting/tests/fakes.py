@@ -7,7 +7,6 @@ from unittest.mock import patch
 
 from suite_cloud.hosting.central import CentralRejectedError
 from suite_cloud.hosting.central.pilot import PilotConflict, PilotNotReady
-from suite_cloud.hosting.central.site import SiteError
 
 REGION = "zz1"
 PROXY_ZONE = f"{REGION}.frappe.test"
@@ -266,7 +265,6 @@ class FakeSite:
         self.singles: dict[str, dict] = {}
         self.docs: dict[tuple[str, str], dict] = {}
         self.calls: list[tuple] = []
-        self.smtp_failures = 0
 
     def create_doc(self, doctype: str, values: dict) -> dict:
         name = f"{doctype.lower().replace(' ', '-')}-{next(self.ids)}"
@@ -288,12 +286,6 @@ class FakeSite:
     def run_doc_method(self, doctype: str, name: str, method: str, **kwargs) -> dict:
         self.calls.append((method, kwargs) if doctype == "Suite Settings" else (method, name))
         return {"title": "ok"}
-
-    def ensure_email_account(self, values: dict) -> None:
-        if self.smtp_failures:
-            self.smtp_failures -= 1
-            raise SiteError("Invalid login or password", "ValidationError", 417)
-        self.docs[("Email Account", values["email_account_name"])] = values
 
 
 @contextmanager
