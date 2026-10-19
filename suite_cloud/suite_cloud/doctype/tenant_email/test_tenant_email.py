@@ -55,6 +55,7 @@ class TestTenantEmail(IntegrationTestCase):
 
         message = self.sent_message()
         self.assertEqual(message["From"], f"{ACCOUNT} <noreply@cloud.example.test>")
+        self.assertEqual(message["To"], RECIPIENT)
         self.assertEqual(message["Reply-To"], "noreply@cloud.example.test")  # the account's, never the site's
         self.assertEqual(message["Subject"], "Join Mail Senders Inc. on Frappe Suite")
         html = message.get_body(("html",)).get_content()
