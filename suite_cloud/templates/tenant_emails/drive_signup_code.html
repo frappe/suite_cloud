@@ -1,0 +1,7 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Drive" %}
+{% set heading = "Your Frappe Drive sign-in code" %}
+{% set message = "Enter this code to sign in to Frappe Drive." %}
+{% set fine_print = "If you did not ask for it, you can ignore this email." %}
+{% set note = "You are receiving this because this email was used to sign in to Frappe Drive." %}
+{% block details %}{% include "templates/tenant_emails/_code.html" %}{% endblock %}

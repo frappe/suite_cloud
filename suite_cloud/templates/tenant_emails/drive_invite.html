@@ -1,0 +1,9 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Drive" %}
+{% set team = team_name or workspace %}
+{% set heading = "Join " ~ team ~ " on Frappe Drive" %}
+{% set message = inviter ~ " invited you to join " ~ team ~ " on Frappe Drive." %}
+{% set button = "Accept invitation" %}
+{% set show_link = true %}
+{% set fine_print = "If you did not expect it, you can ignore this email." %}
+{% set note = "You are receiving this because someone invited this email to Frappe Drive." %}

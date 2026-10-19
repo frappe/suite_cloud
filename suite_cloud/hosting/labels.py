@@ -71,14 +71,6 @@ def login_local_part(email: str) -> str:
     return email.split("@", 1)[0].split("+", 1)[0]
 
 
-def assert_owner_name_free(email: str) -> None:
-    if login_local_part(email) == get_config("notification_mailbox_local_part"):
-        # The owner's account would be the site's own notification account.
-        frappe.throw(
-            _("{0} cannot own a hosted site: its name is kept for the site's notifications.").format(email)
-        )
-
-
 def label_from(organization: str) -> str:
     """The organization's name in lowercase ASCII words joined by dashes, legal suffixes left out:
     Acme Inc. gives acme. A reserved result is prefixed with ``team-``."""

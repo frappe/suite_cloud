@@ -1,0 +1,6 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Drive" %}
+{% set heading = sharer ~ " shared a " ~ item_type ~ " with you" %}
+{% set message = sharer ~ " shared the " ~ item_type ~ " “" ~ item_name ~ "” with you on Frappe Drive." %}
+{% set button = "Open " ~ item_type %}
+{% set note = "You are receiving this because someone in " ~ workspace ~ " shared a " ~ item_type ~ " with you." %}

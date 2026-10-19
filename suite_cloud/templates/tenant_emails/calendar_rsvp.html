@@ -1,0 +1,29 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Calendar" %}
+{% set heading = "New response: " ~ title %}
+{% set message = responder_name ~ (" (" ~ responder_email ~ ")" if responder_name != responder_email else "") ~ " responded “" ~ response ~ "” to your invitation." %}
+{% set note = "You are receiving this because you organized this event." %}
+{% block details %}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin: 24px 0 0; background-color: #f8f8f8; border-radius: 12px;">
+	<tr>
+		<td style="padding: 6px 18px;">
+			<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size: 14px; line-height: 1.5;">
+				<tr>
+					<td style="padding: 12px 0; width: 88px; vertical-align: top; color: #7c7c7c; border-bottom: 1px solid #ededed;">When</td>
+					<td style="padding: 12px 0; color: #383838; border-bottom: 1px solid #ededed;"><b style="font-weight: 600; color: #171717;">{{ when | e }}</b>{% if timezone %}<br />{{ timezone | e }}{% endif %}</td>
+				</tr>
+				{% if location %}
+				<tr>
+					<td style="padding: 12px 0; width: 88px; vertical-align: top; color: #7c7c7c; border-bottom: 1px solid #ededed;">Where</td>
+					<td style="padding: 12px 0; color: #383838; word-break: break-word; border-bottom: 1px solid #ededed;">{{ location | e }}</td>
+				</tr>
+				{% endif %}
+				<tr>
+					<td style="padding: 12px 0; width: 88px; vertical-align: top; color: #7c7c7c;">Organizer</td>
+					<td style="padding: 12px 0; color: #383838; word-break: break-word;">{{ organizer_name | e }}{% if organizer_name != organizer_email %} &middot; {{ organizer_email | e }}{% endif %}</td>
+				</tr>
+			</table>
+		</td>
+	</tr>
+</table>
+{% endblock %}

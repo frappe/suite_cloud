@@ -31,12 +31,13 @@ Confirms the credentials and returns the tenant profile, including where its mai
     "accounts": 41,
     "groups": 3,
     "mailing_lists": 1,
-    "used_disk_bytes": 734003200
+    "used_disk_bytes": 734003200,
+    "emails_sent": 182
   }
 }
 ```
 
-`status` is `Active`, `Suspended` or `Archived`. `cluster`, `jmap_url` and `mail_hostname` are `null` until an operator sets the tenant up for Mail; until then every mail call answers a 422 `MailNotConfiguredError`, while the tenant calls on this page keep working. A limit of `null` means no limit. `max_disk_gb` is the disk the tenant's plan includes; it does not cap the quotas of the tenant's accounts and groups. `used_disk_bytes` is the figure [`get_disk_usage`](#get_disk_usage) answers, or `null` when the mail server cannot answer.
+`status` is `Active`, `Suspended` or `Archived`. `cluster`, `jmap_url` and `mail_hostname` are `null` until an operator sets the tenant up for Mail; until then every mail call answers a 422 `MailNotConfiguredError`, while the tenant calls on this page keep working. A limit of `null` means no limit. `max_disk_gb` is the disk the tenant's plan includes; it does not cap the quotas of the tenant's accounts and groups. `used_disk_bytes` is the figure [`get_disk_usage`](#get_disk_usage) answers, or `null` when the mail server cannot answer. `emails_sent` counts the emails the tenant's sites sent through Suite Cloud this calendar month, by when each was sent; see [Email](email.md).
 
 ## `get_disk_usage`
 

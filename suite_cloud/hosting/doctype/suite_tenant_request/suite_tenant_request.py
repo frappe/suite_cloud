@@ -78,7 +78,6 @@ class SuiteTenantRequest(Document):
         self.timezone = (self.timezone or "").strip() or None
         if "+" in self.email.split("@", 1)[0] and not cint(get_config("allow_subaddressed_signups")):
             frappe.throw(_("{0} is a sub-address; sign up with the address itself.").format(self.email))
-        labels.assert_owner_name_free(self.email)
 
     def after_insert(self) -> None:
         """A signup proves its email with a code; an operator's request is taken on their word."""

@@ -2,7 +2,7 @@
 
 Module `suite_cloud.api.signup`. A visitor asks for a Frappe Suite workspace, proves their email address, and gets a hosted site. These methods need no credentials. They answer only while **Allow Signup** is checked in Suite Cloud Settings; otherwise they answer 403 with the type `SignupClosedError`.
 
-Every method is a POST, whatever its name: the code and the request key travel in the JSON body, never in a URL. Each method is rate limited per IP address. Once the site is ready, it invites the owner from its own notification address. The invite is for an account at the tenant's mail domain, e.g. `john@acme.example.com` for `john@example.com`, and the owner chooses their password when they accept it. No password is ever mailed.
+Every method is a POST, whatever its name: the code and the request key travel in the JSON body, never in a URL. Each method is rate limited per IP address. Once the site is ready, it invites the owner. The invite goes out through Suite Cloud. The invite is for an account at the tenant's mail domain, e.g. `john@acme.example.com` for `john@example.com`, and the owner chooses their password when they accept it. No password is ever mailed.
 
 ## `create_request`
 

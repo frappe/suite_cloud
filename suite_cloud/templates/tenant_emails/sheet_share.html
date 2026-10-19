@@ -1,0 +1,6 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Sheets" %}
+{% set heading = sharer ~ " shared a sheet with you" %}
+{% set message = sharer ~ " shared the sheet “" ~ sheet ~ "” with you. You can " ~ access ~ " it." %}
+{% set button = "Open sheet" %}
+{% set note = "You are receiving this because someone in " ~ workspace ~ " shared a sheet with you." %}

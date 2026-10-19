@@ -21,6 +21,10 @@ class SuiteCloudSettings(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
+        from suite_cloud.suite_cloud.doctype.tenant_email_account.tenant_email_account import (
+            TenantEmailAccount,
+        )
+
         acme_contact_email: DF.Data
         acme_directory_url: DF.Data
         allow_signup: DF.Check
@@ -39,7 +43,6 @@ class SuiteCloudSettings(Document):
         max_sites_per_vm: DF.Int
         memory_per_site_mb: DF.Int
         min_free_site_slots: DF.Int
-        notification_mailbox_local_part: DF.Data
         public_url: DF.Data | None
         ready_sites_per_region: DF.Int
         reserved_disk_gb: DF.Int
@@ -55,8 +58,10 @@ class SuiteCloudSettings(Document):
         stalwart_version: DF.Data
         suite_app_ref: DF.Data
         suite_app_repo: DF.Data
+        tenant_email_accounts: DF.Table[TenantEmailAccount]
         tenant_mail_zone: DF.Link | None
         tls_report_retention_days: DF.Int
+        use_tenant_title_as_sender_name: DF.Check
         verify_stalwart_tls: DF.Check
     # end: auto-generated types
 
@@ -69,6 +74,7 @@ class SuiteCloudSettings(Document):
             self.spam_filter_rules_version, _("Spam Filter Rules Version")
         )
         self.validate_report_retention()
+        self.validate_tenant_email_accounts()
         self.validate_hosting()
 
     def on_update(self) -> None:
@@ -85,6 +91,24 @@ class SuiteCloudSettings(Document):
         for field in ("dmarc_report_retention_days", "tls_report_retention_days"):
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least one day.").format(_(self.meta.get_label(field))))
+
+    def validate_tenant_email_accounts(self) -> None:
+        seen = set()
+        for row in self.tenant_email_accounts:
+            if row.tenant_type in seen:
+                frappe.throw(
+                    _("Row {0}: {1} tenants already have an Email Account.").format(row.idx, row.tenant_type)
+                )
+            seen.add(row.tenant_type)
+            if not frappe.db.get_value("Email Account", row.email_account, "enable_outgoing"):
+                frappe.throw(
+                    _("Row {0}: Email Account {1} does not send.").format(row.idx, row.email_account)
+                )
+
+    def get_tenant_email_account(self, tenant_type: str) -> str | None:
+        return next(
+            (row.email_account for row in self.tenant_email_accounts if row.tenant_type == tenant_type), None
+        )
 
     def validate_hosting(self) -> None:
         if self.central_url:

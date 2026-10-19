@@ -138,7 +138,7 @@ Clusters place tenants by region. A tenant whose region no cluster lists goes to
 
 1. Create a **Suite Tenant Request** with an email address, a full name and an organization. Leave **Label** blank.
 2. Open the request. The progress bar and the **Steps** table show each step with its time.
-3. Wait for **Completed**. The owner gets an invite email from `notification@<label>.<tenant mail zone>`.
+3. Wait for **Completed**. The owner gets an invite email from the Email Account that **Suite Cloud Settings > Tenant Email** sets for Suite Site tenants.
 
 The steps that wait for DNS take a few minutes. The poll runs every five minutes.
 

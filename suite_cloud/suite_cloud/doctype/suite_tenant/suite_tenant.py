@@ -7,7 +7,7 @@ from uuid import uuid7
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint, flt, now, now_datetime
+from frappe.utils import cint, flt, get_first_day, now, now_datetime, today
 
 from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.errors import StalwartError
@@ -178,7 +178,6 @@ class SuiteTenant(Document):
         if self.tenant_type != "Suite Site":
             frappe.throw(_("Only a Suite Site tenant gets a hosted site."))
         self.assert_no_live_site()
-        labels.assert_owner_name_free(frappe.db.get_value("User", self.user, "email"))
         label = labels.validate_label(label)
         labels.assert_label_available(label, tenant=self.name)
         region = capacity.assert_region_enabled(region or get_config("default_region"))
@@ -236,15 +235,19 @@ class SuiteTenant(Document):
         return frappe.db.count("Mail Domain", {"tenant": self.name})
 
     def account_count(self) -> int:
-        """The tenant's own accounts: system accounts are Suite Cloud's and count for nothing."""
-
-        return frappe.db.count("Mail Account", {"tenant": self.name, "is_system_account": 0})
+        return frappe.db.count("Mail Account", {"tenant": self.name})
 
     def group_count(self) -> int:
         return frappe.db.count("Mail Group", {"tenant": self.name})
 
     def mailing_list_count(self) -> int:
         return frappe.db.count("Mailing List", {"tenant": self.name})
+
+    def sent_email_count(self) -> int:
+        """Emails the tenant's sites sent through Suite Cloud this calendar month."""
+
+        filters = {"tenant": self.name, "status": "Sent", "sent_at": [">=", get_first_day(today())]}
+        return frappe.db.count("Tenant Email", filters)
 
     def assert_can_add_domain(self) -> None:
         self.lock()
@@ -308,10 +311,9 @@ class SuiteTenant(Document):
 
         ids = []
         for doctype in MAILBOX_DOCTYPES:
-            filters = {"tenant": self.name, "stalwart_id": ["is", "set"]}
-            if doctype == "Mail Account":
-                filters["is_system_account"] = 0  # Suite Cloud's own, not the tenant's usage
-            ids += frappe.get_all(doctype, filters, pluck="stalwart_id")
+            ids += frappe.get_all(
+                doctype, {"tenant": self.name, "stalwart_id": ["is", "set"]}, pluck="stalwart_id"
+            )
         if not ids:
             return 0  # building a client already fetches the session
         objects = get_client(self.get_cluster()).accounts.get_many(ids, properties=USAGE_PROPERTIES)
@@ -340,6 +342,18 @@ class SuiteTenant(Document):
     def get_cluster(self) -> Document:
         self.assert_mail_configured()
         return frappe.get_cached_doc("Stalwart Cluster", self.stalwart_cluster)
+
+    def get_site_hosts(self) -> set[str]:
+        """The host names of the tenant's hosted sites; none for a tenant whose site Suite Cloud
+        does not host."""
+
+        sites = frappe.get_all(
+            "Suite Site", {"tenant": self.name, "status": ["!=", "Dropped"]}, ["name", "hostname"]
+        )
+        domains = frappe.get_all(
+            "Suite Site Domain", {"parent": ["in", [s.name for s in sites] or [""]]}, pluck="domain"
+        )
+        return {host.lower() for host in [*(s.hostname for s in sites), *domains] if host}
 
     def allows_ip(self, ip: str | None) -> bool:
         """Whether a request from ``ip`` may use the tenant's secret. No list means any address."""
@@ -378,6 +392,7 @@ class SuiteTenant(Document):
                 "groups": self.group_count(),
                 "mailing_lists": self.mailing_list_count(),
                 "used_disk_bytes": self.get_mail_used_disk_bytes(),
+                "emails_sent": self.sent_email_count(),
             },
         }
 

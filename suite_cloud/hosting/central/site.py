@@ -10,7 +10,7 @@ from urllib.parse import parse_qs, quote, urlparse
 import requests
 from frappe import _
 
-TIMEOUT = 60  # saving an Email Account logs in to SMTP
+TIMEOUT = 60
 
 
 class SiteError(Exception):
@@ -66,14 +66,6 @@ class SiteClient:
     def ensure_user(self, values: dict) -> None:
         if not self.get_doc("User", values["email"]):
             self.create_doc("User", values)
-
-    def ensure_email_account(self, values: dict) -> None:
-        """Created or updated: saving logs in to SMTP, so it fails until the mailbox works."""
-
-        if self.get_doc("Email Account", values["email_account_name"]):
-            self.update_doc("Email Account", values["email_account_name"], values)
-        else:
-            self.create_doc("Email Account", values)
 
     # --- transport ----------------------------------------------------------------
 

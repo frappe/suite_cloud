@@ -45,7 +45,6 @@ CONFIG_KEYS = (
     "allow_subaddressed_signups",
     "site_dns_zone",
     "tenant_mail_zone",
-    "notification_mailbox_local_part",
 )
 
 

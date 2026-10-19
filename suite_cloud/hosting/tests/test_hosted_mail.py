@@ -2,10 +2,8 @@ from unittest.mock import patch
 
 import frappe
 
-from suite_cloud.api.mail import accounts as accounts_api
 from suite_cloud.api.mail import domains as domains_api
-from suite_cloud.api.mail import groups as groups_api
-from suite_cloud.hosting import capacity, labels, progress, sites
+from suite_cloud.hosting import capacity, labels, progress
 from suite_cloud.hosting.labels import LabelNotAvailableError
 from suite_cloud.hosting.tests.fakes import REGION
 from suite_cloud.hosting.tests.fixtures import MAIL_ZONE, HostingFixtures
@@ -14,7 +12,6 @@ from suite_cloud.mail.tenancy.hosted_domain import HostedObjectError
 from suite_cloud.mail.tests.test_tenancy import TenancyTestCase
 
 DOMAIN = f"acme.{MAIL_ZONE}"
-NOTIFICATION = f"notification@{DOMAIN}"
 
 
 class TestHostedMail(HostingFixtures, TenancyTestCase):
@@ -26,20 +23,15 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
     def claim(self):
         return self.site(capacity.claim_site(self.tenant.name, "acme", REGION))
 
-    def test_the_tenant_gets_a_live_mail_domain_and_a_notification_account(self) -> None:
+    def test_the_tenant_gets_a_live_mail_domain_and_no_account_of_the_sites_own(self) -> None:
         site = self.claim()
 
-        self.assertEqual((site.mail_domain, site.notification_account), (DOMAIN, NOTIFICATION))
-        self.assertTrue(site.email_account_created)
+        self.assertEqual((site.mail_domain, site.mail_domain_verified), (DOMAIN, 1))
         domain = frappe.get_doc("Mail Domain", DOMAIN)
         self.assertTrue(domain.hosted and domain.is_live())
-        account = self.site_api.docs[("Email Account", "Notifications")]
-        self.assertEqual(account["email_id"], NOTIFICATION)
-        # From the domain's _submissions._tcp record: implicit TLS on 465, as the cluster serves it.
-        self.assertEqual((account["smtp_server"], account["smtp_port"]), (self.cluster.hostname, 465))
-        self.assertEqual((account["use_ssl_for_outgoing"], account["use_tls"]), (1, 0))
-        self.assertEqual((account["default_outgoing"], account["enable_outgoing"]), (1, 1))
-        self.assertTrue(account["password"])
+        # The site sends through Suite Cloud: it has no mailbox or Email Account of its own.
+        self.assertFalse(frappe.db.exists("Mail Account", {"domain": DOMAIN}))
+        self.assertFalse([key for key in self.site_api.docs if key[0] == "Email Account"])
 
     def test_a_request_shows_every_step_to_the_owner_invite(self) -> None:
         values = {
@@ -63,25 +55,18 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         self.assertEqual(statuses.pop("site_domain"), "Skipped")  # no site DNS zone here
         self.assertEqual(set(statuses.values()), {"Completed"})
         details = {row.step: row.detail for row in request.steps}
-        self.assertEqual((details["mail_domain"], details["notification_account"]), (DOMAIN, NOTIFICATION))
+        self.assertEqual(details["mail_domain"], DOMAIN)
         self.assertEqual(details["invite"], site.login_email)
         self.assertGreaterEqual(request.processing_time, 0)  # set once the last step completed
         reports = [call.args[1] for call in publish.call_args_list if call.args[0] == progress.EVENT]
-        self.assertEqual((reports[-1]["progress"], reports[-1]["total"]), (14, 14))
+        self.assertEqual((reports[-1]["progress"], reports[-1]["total"]), (13, 13))
 
-    def test_the_notification_account_is_a_send_only_system_account(self) -> None:
+    def test_the_owner_is_invited_once_the_domain_is_live(self) -> None:
         self.tenant.db_set("max_accounts", 1)
         self.make_domain()
-        self.make_account("someone@acme.com")  # the tenant's one account
+        self.make_account("someone@acme.com")  # the tenant's one account: the site takes none
         site = self.claim()
 
-        account = frappe.get_doc("Mail Account", NOTIFICATION)  # created despite the full limit
-        self.assertEqual((account.is_system_account, account.disable_receiving), (1, 1))
-        tenant = frappe.get_doc("Suite Tenant", self.tenant.name)
-        self.assertEqual(tenant.account_count(), 1)
-        self.fake.objects["Account"][account.stalwart_id]["usedDiskQuota"] = 10**9
-        self.assertEqual(tenant.fetch_mail_used_disk_bytes(), 0)  # Suite Cloud's own disk
-        # Once it sends, the site invites the owner from it.
         (invite,) = self.site_api.invites()
         self.assertEqual(invite["account"], f"owner@{DOMAIN}")
         self.assertEqual(site.owner_invite, invite["name"])
@@ -97,7 +82,8 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
 
         self.assertEqual(site.mail_domain, DOMAIN)  # created and its records queued
         verify.assert_not_called()  # resolvers asked now would cache the absence
-        self.assertFalse(site.notification_account)
+        self.assertFalse(site.mail_domain_verified)
+        self.assertFalse(self.site_api.invites())
 
     def test_the_domain_records_are_published_in_the_mail_zone(self) -> None:
         site = self.claim()
@@ -138,19 +124,6 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         zones = frappe.get_all("DNS Record", {"managed_by": DOMAIN}, pluck="dns_zone", distinct=True)
         self.assertEqual(zones, [MAIL_ZONE])
 
-    def test_a_failed_smtp_check_is_retried_with_a_new_password(self) -> None:
-        self.site_api.smtp_failures = 1
-        site = self.claim()
-        self.assertFalse(site.email_account_created)
-        self.assertIn("Mail", site.error)
-        self.assertEqual(site.status, "Active")
-
-        sites.provision(site.name)
-
-        self.assertTrue(self.site(site.name).email_account_created)
-        self.assertFalse(self.site(site.name).error)  # the step's earlier failure is cleared
-        self.assertEqual(frappe.db.count("Mail Account", {"name": NOTIFICATION}), 1)
-
     def test_drop_site_keeps_the_tenants_mail_domain_and_mailboxes(self) -> None:
         site = self.claim()
         self.make_account(f"owner@{DOMAIN}")  # the owner accepted the invite
@@ -159,39 +132,10 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
 
         site = self.site(site.name)
         self.assertEqual((site.status, site.error), ("Dropped", None))
-        self.assertFalse(site.mail_domain or site.notification_account)
-        self.assertFalse(frappe.db.exists("Mail Account", NOTIFICATION))  # the site's own login
+        self.assertFalse(site.mail_domain or site.mail_domain_verified)
         self.assertTrue(frappe.db.exists("Mail Account", f"owner@{DOMAIN}"))
         self.assertTrue(frappe.db.exists("Mail Domain", DOMAIN))
         self.assertTrue(frappe.db.exists("DNS Record", {"managed_by": DOMAIN}))
-
-    def test_the_notification_address_stays_the_sites_while_no_site_uses_it(self) -> None:
-        self.site(self.claim().name).drop_site()
-
-        self.assertRaisesRegex(
-            frappe.ValidationError, "kept for the site's notifications", self.make_account, NOTIFICATION
-        )
-
-    def test_the_next_site_never_takes_over_a_tenant_mailbox(self) -> None:
-        self.site(self.claim().name).drop_site()
-        account = frappe.get_doc(
-            {
-                "doctype": "Mail Account",
-                "email": NOTIFICATION,
-                "tenant": self.tenant.name,
-                "is_system_account": 1,
-            }
-        )
-        account.flags.password = "secret-pw"
-        account.insert()
-        account.db_set("is_system_account", 0)  # a mailbox of the tenant's, made before the address was kept
-
-        with patch("suite_cloud.mail.doctype.mail_account.mail_account.MailAccount.reset_password") as reset:
-            site = self.site(frappe.get_doc("Suite Tenant", self.tenant.name).create_hosted_site("acme"))
-
-        reset.assert_not_called()
-        self.assertIn("mailbox of the tenant", site.error)
-        self.assertFalse(site.notification_account)
 
     def test_the_tenants_next_site_takes_its_kept_domain_back(self) -> None:
         self.site(self.claim().name).drop_site()
@@ -200,8 +144,7 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
         name = frappe.get_doc("Suite Tenant", self.tenant.name).create_hosted_site("acme")
 
         site = self.site(name)
-        self.assertEqual((site.mail_domain, site.notification_account), (DOMAIN, NOTIFICATION))
-        self.assertTrue(site.email_account_created)
+        self.assertEqual((site.mail_domain, site.mail_domain_verified), (DOMAIN, 1))
 
     def test_a_hosted_domain_must_be_one_label_of_the_tenants_site(self) -> None:
         self.claim()
@@ -225,22 +168,6 @@ class TestHostedMail(HostingFixtures, TenancyTestCase):
 
         self.assertRaises(HostedObjectError, domains_api.update_domain, DOMAIN, description="x")
         self.assertRaises(HostedObjectError, domains_api.delete_domain, DOMAIN)
-
-    def test_the_tenant_api_does_not_see_the_notification_account(self) -> None:
-        self.claim()
-        self.act_as_tenant()
-
-        self.assertEqual(accounts_api.list_accounts()["items"], [])
-        self.assertEqual(accounts_api.list_accounts(domain=DOMAIN)["total"], 0)
-        self.assertEqual(accounts_api.get_quotas([NOTIFICATION]), {})
-        for call in (
-            lambda: accounts_api.get_account(NOTIFICATION),
-            lambda: accounts_api.set_password(NOTIFICATION, "another-secret-pw"),
-            lambda: accounts_api.delete_account(NOTIFICATION),
-            lambda: groups_api.create_group(email=f"team@{DOMAIN}", members=[NOTIFICATION]),
-        ):
-            with self.subTest(call):
-                self.assertRaises(frappe.DoesNotExistError, call)
 
     def test_record_rows_map_hosts_to_the_zone(self) -> None:
         site = self.claim()

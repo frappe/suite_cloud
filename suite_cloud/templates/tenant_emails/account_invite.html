@@ -1,0 +1,8 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Suite" %}
+{% set heading = "Join " ~ workspace ~ " on Frappe Suite" %}
+{% set message = inviter ~ " invited you to join " ~ workspace ~ " on Frappe Suite." %}
+{% set button = "Accept invitation" %}
+{% set show_link = true %}
+{% set fine_print = "If you did not expect it, you can ignore this email." %}
+{% set note = "You are receiving this because someone invited this email to a Frappe Suite workspace." %}

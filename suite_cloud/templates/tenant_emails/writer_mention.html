@@ -1,0 +1,6 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Writer" %}
+{% set heading = author ~ " mentioned you in " ~ document %}
+{% set message = author ~ " mentioned you in a comment in “" ~ document ~ "”." %}
+{% set button = "Open document" %}
+{% set note = "You are receiving this because you were mentioned in a document in " ~ workspace ~ "." %}

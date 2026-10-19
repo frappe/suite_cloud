@@ -23,11 +23,15 @@ import frappe
 from suite_cloud.mail.cluster import plan
 from suite_cloud.mail.stalwart.client import StalwartClient
 from suite_cloud.mail.stalwart.connection import ConnectionInfo, JMAPConnection
+from suite_cloud.mail.stalwart.directory import Domain
 from suite_cloud.mail.tests.mail_sink import MailSink
 
 HOSTNAME = "mail.example.org"
 ADMIN = "admin"
 SINK_ROUTE = "sink"
+# Relays, so it takes any address; held nowhere, its mail is local and bounces unless routed off.
+PROBE_DOMAIN = "route-probe.example.org"
+PROBE_SENDER = "probe@outside.example.net"
 # Every start fetches the web interface from GitHub before it listens: a second, or half a minute.
 START_TIMEOUT = 90
 SETTLE_TIMEOUT = 60
@@ -57,6 +61,7 @@ class RealStalwart:
         self.recovery_port, self.http_port, self.smtp_port = free_ports(3)
         self.sink = MailSink()
         self.process: subprocess.Popen | None = None
+        self.routes = 0
 
     # --- lifecycle ------------------------------------------------------------------
 
@@ -71,6 +76,7 @@ class RealStalwart:
         self.prepare_first_start()
         self.launch("normal")
         self.take_test_mail()
+        self.management.domains.create_id(Domain(name=PROBE_DOMAIN, dkim_algorithms=(), allow_relaying=True))
 
     def stop(self) -> None:
         try:
@@ -191,11 +197,25 @@ class RealStalwart:
         return self.client(self.http_port)
 
     def route(self, rules: list[dict]) -> None:
-        """Routes by ``rules``; whatever they let through leaves by the sink."""
+        """Routes by ``rules``; whatever they let through leaves by the sink.
 
-        route = {"match": plan.as_list(rules), "else": f"'{SINK_ROUTE}'"}
+        Returns once mail takes the new route: a reload can answer before the queue uses it. A
+        probe address only this route sends to the sink proves it; under an older one it bounces.
+        """
+
+        self.routes += 1
+        probe = f"route-{self.routes}@{PROBE_DOMAIN}"
+        canary = {"if": f"rcpt == '{probe}'", "then": f"'{SINK_ROUTE}'"}
+        route = {"match": plan.as_list([canary, *rules]), "else": f"'{SINK_ROUTE}'"}
         self.management.singleton("MtaOutboundStrategy").write({"route": route})
         self.management.reload_settings()
+        wait_for(lambda: self.is_relayed(probe), "the new route to apply", SETTLE_TIMEOUT)
+        self.sink.clear()
+
+    def is_relayed(self, recipient: str) -> bool:
+        self.send(PROBE_SENDER, recipient)
+        self.settle()
+        return recipient in self.sink.relayed()
 
     def send(self, sender: str, recipient: str) -> None:
         message = EmailMessage()

@@ -132,7 +132,7 @@ def confirming_dns_provider():
 
 
 def mail_ready(site) -> bool:
-    """The mail step's outcome without a cluster: the site sends through its notification account."""
+    """The mail step's outcome without a cluster: the tenant's mail domain is live."""
 
-    site.db_set("email_account_created", 1)
+    site.db_set("mail_domain_verified", 1)
     return True

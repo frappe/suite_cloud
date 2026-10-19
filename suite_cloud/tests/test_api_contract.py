@@ -5,7 +5,7 @@ from datetime import datetime
 import frappe
 from frappe.tests import UnitTestCase
 
-from suite_cloud.api import tenant
+from suite_cloud.api import email, tenant
 from suite_cloud.api.mail import accounts, dmarc, domains, groups, mailing_lists, meta, tls
 from suite_cloud.api.tenant import InvalidInputError, api_errors, as_datetime, as_list
 from suite_cloud.mail.stalwart.errors import (
@@ -15,7 +15,7 @@ from suite_cloud.mail.stalwart.errors import (
     StalwartUnavailableError,
 )
 
-MODULES = (tenant, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
+MODULES = (tenant, email, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
 VERB_BY_PREFIX = {
     "list_": "GET",
     "get_": "GET",
@@ -53,7 +53,9 @@ class TestApiVerbs(UnitTestCase):
 
     def test_the_contract_covers_the_whole_package(self) -> None:
         names = {name for _, name, _ in api_functions()}
-        self.assertTrue({"ping", "create_domain", "list_accounts", "delete_mailing_list"} <= names)
+        self.assertTrue(
+            {"ping", "send_email", "create_domain", "list_accounts", "delete_mailing_list"} <= names
+        )
 
     def test_every_endpoint_resolves_the_tenant_first(self) -> None:
         # Tenant credentials sign the owner in; only the tenant_api wrapper checks state and address.

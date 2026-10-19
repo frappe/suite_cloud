@@ -29,12 +29,11 @@ class SuiteSite(Document):
         attempts: DF.Int
         domains: DF.Table[SuiteSiteDomain]
         dropped_at: DF.Datetime | None
-        email_account_created: DF.Check
         error: DF.SmallText | None
         hostname: DF.Data | None
         label: DF.Data | None
         mail_domain: DF.Link | None
-        notification_account: DF.Link | None
+        mail_domain_verified: DF.Check
         owner_invite: DF.Data | None
         owner_invited_at: DF.Datetime | None
         pilot_task: DF.Data | None
@@ -140,10 +139,10 @@ class SuiteSite(Document):
         from suite_cloud.mail.tenancy import hosted_domain
 
         steps = []
-        if not self.email_account_created:
+        if not self.mail_domain_verified:
             steps.append((_("Mail"), hosted_domain.ensure))
         elif not self.owner_invite:
-            steps.append((_("Owner invite"), sites.invite_owner))  # sent from the notification account
+            steps.append((_("Owner invite"), sites.invite_owner))
         if (
             self.assign_site_domain
             and self.site_domain
