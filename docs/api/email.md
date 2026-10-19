@@ -31,7 +31,7 @@ Suite Cloud sends through the outgoing Email Account that **Suite Cloud Settings
 | `data-exchange` | `app`, `action`, `succeeded`, `link` | |
 | `meet-recording` | `room`, `recorded_at`, `status` (`Ready`, `Partial` or `Failed`) | `link` |
 
-A `link` must be a web address. When Suite Cloud hosts the tenant's site, it must also lead to that site: its host name or one of its domains. The templates escape every parameter, so a parameter cannot add markup to the email.
+A `link` must be a plain web address, with no user name, backslash or space in it: a browser could read such a link's host differently than Suite Cloud does. When Suite Cloud hosts the tenant's site, it must also lead to that site: its host name or one of its domains. The templates escape every parameter, so a parameter cannot add markup to the email.
 
 ```json
 {

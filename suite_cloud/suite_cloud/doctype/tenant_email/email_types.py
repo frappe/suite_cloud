@@ -108,8 +108,17 @@ def validate_params(email_type: EmailType, params: dict, site_hosts: set[str]) -
 
 
 def assert_site_link(name: str, link: str, site_hosts: set[str]) -> None:
+    """A plain web address. A backslash, a space or a ``user@`` part is refused outright: a browser
+    reads such a link's host differently than Python does, e.g. ``https://evil.example\\@site``."""
+
     url = urlparse(link)
-    if url.scheme not in ("http", "https") or not url.hostname:
+    if (
+        url.scheme not in ("http", "https")
+        or not url.hostname
+        or url.username is not None
+        or "\\" in link
+        or any(c.isspace() or not c.isprintable() for c in link)
+    ):
         frappe.throw(_("{0} must be a web address.").format(name), InvalidEmailError)
     if site_hosts and url.hostname.lower() not in site_hosts:
         frappe.throw(_("{0} must lead to the tenant's own site.").format(name), InvalidEmailError)

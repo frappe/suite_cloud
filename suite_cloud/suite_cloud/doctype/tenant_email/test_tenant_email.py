@@ -118,6 +118,24 @@ class TestTenantEmail(IntegrationTestCase):
         )
         email_types.validate_params(email_type, {"link": "https://anywhere.example.net/1"}, set())
 
+    def test_a_link_whose_host_a_browser_reads_differently_is_refused(self) -> None:
+        email_type = EMAIL_TYPES["password-reset"]
+        for link in (
+            "https://evil.example\\@acme.example.test/reset",  # a browser opens evil.example
+            "https://evil.example@acme.example.test/reset",
+            "https://acme.example.test /reset",
+            "https://acme.example.test/\treset",
+        ):
+            with self.subTest(link):
+                self.assertRaisesRegex(
+                    InvalidEmailError,
+                    "must be a web address",
+                    email_types.validate_params,
+                    email_type,
+                    {"link": link},
+                    {"acme.example.test"},
+                )
+
     def test_a_key_that_was_sent_is_not_sent_again(self) -> None:
         first, second = self.send(), self.send()
 
