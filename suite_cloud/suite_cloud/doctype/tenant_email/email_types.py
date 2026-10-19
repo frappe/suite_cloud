@@ -15,13 +15,14 @@ class InvalidEmailError(frappe.ValidationError):
 
 @dataclass(frozen=True)
 class EmailType:
-    """One email a site may ask for. Its template is ``templates/tenant_emails/<name>.html``."""
+    """One email a site may ask for. Its template is ``templates/tenant_emails/<name>.html``, and
+    each of ``images`` an image of ``public/images/emails`` that the template embeds by name."""
 
     subject: str  # Jinja, over the parameters
-    product: str  # the wordmark: Frappe <product>
     required: tuple[str, ...]
     optional: tuple[str, ...] = ()
     links: tuple[str, ...] = ("link",)  # URLs that must lead to the tenant's own site
+    images: tuple[str, ...] = ()
 
     @property
     def params(self) -> tuple[str, ...]:
@@ -29,29 +30,26 @@ class EmailType:
 
 
 EMAIL_TYPES = {
-    "password-reset": EmailType("Reset your password", "Mail", ("link",)),
-    "account-invite": EmailType("{{ inviter }} invited you to Frappe Mail", "Mail", ("inviter", "link")),
-    "signup-code": EmailType(
-        "Your Frappe Mail verification code", "Mail", ("code", "expires_in_minutes"), links=()
+    "password-reset": EmailType("Reset Password", ("link",)),
+    "account-invite": EmailType(
+        "You have been invited by {{ inviter }} to join Frappe Mail", ("inviter", "link")
     ),
-    "drive-signup-code": EmailType("Your Frappe Drive verification code", "Drive", ("code",), links=()),
+    "signup-code": EmailType("Frappe Mail - Verification Code", ("code", "expires_in_minutes"), links=()),
+    "drive-signup-code": EmailType("Frappe Drive - OTP", ("code",), links=()),
     "drive-invite": EmailType(
-        "{{ inviter }} invited you to Frappe Drive", "Drive", ("inviter", "link"), ("team_name",)
+        "Frappe Drive - Invitation", ("inviter", "link"), ("team_name",), images=("drive-logo.png",)
     ),
     "drive-share": EmailType(
-        "{{ sharer }} shared a {{ item_type }} with you",
-        "Drive",
+        "Frappe Drive - {{ item_type | capitalize }} Shared",
         ("sharer", "item_type", "item_name", "link"),
+        images=("drive-logo.png",),
     ),
     "writer-mention": EmailType(
-        "{{ author }} mentioned you in {{ document }}", "Writer", ("author", "document", "link")
+        "Frappe Drive - Mention in {{ document }}", ("author", "document", "link"), images=("drive-logo.png",)
     ),
-    "sheet-share": EmailType(
-        "{{ sharer }} shared a sheet with you", "Sheets", ("sharer", "sheet", "access", "link")
-    ),
+    "sheet-share": EmailType("{{ sharer }} shared a sheet with you", ("sharer", "sheet", "access", "link")),
     "calendar-rsvp": EmailType(
         '{{ responder_name }} responded "{{ response }}": {{ title }}',
-        "Calendar",
         (
             "title",
             "responder_name",
@@ -63,19 +61,19 @@ EMAIL_TYPES = {
         ),
         ("timezone", "location"),
         links=(),
+        images=("calendar-logo.png",),
     ),
     "data-exchange": EmailType(
-        "{{ app }} data {{ action | lower }} {{ 'completed' if succeeded else 'failed' }}",
-        "Mail",
+        "{{ app }} Data {{ action }} {{ 'Completed' if succeeded else 'Failed' }}",
         ("app", "action", "succeeded", "link"),
     ),
     "meet-recording": EmailType(
         "{% if status == 'Failed' %}Your recording of {{ room }} could not be processed"
         "{% elif status == 'Partial' %}Your partial recording of {{ room }} is ready"
         "{% else %}Your recording of {{ room }} is ready{% endif %}",
-        "Meet",
         ("room", "recorded_at", "status"),
         ("link",),
+        images=("meet-logo.png",),
     ),
 }
 
@@ -124,10 +122,19 @@ def assert_site_link(name: str, link: str, site_hosts: set[str]) -> None:
         frappe.throw(_("{0} must lead to the tenant's own site.").format(name), InvalidEmailError)
 
 
-def render(name: str, email_type: EmailType, params: dict, workspace: str) -> tuple[str, str]:
+def render(name: str, email_type: EmailType, params: dict) -> tuple[str, str]:
     """The subject and HTML body."""
 
-    context = {**params, "product": email_type.product, "workspace": workspace}
-    subject = frappe.render_template(email_type.subject, context, is_path=False)
-    body = frappe.render_template(f"templates/tenant_emails/{name.replace('-', '_')}.html", context)
+    subject = frappe.render_template(email_type.subject, params, is_path=False)
+    body = frappe.render_template(f"templates/tenant_emails/{name.replace('-', '_')}.html", params)
     return " ".join(subject.split()), body  # one line: a header cannot carry the site's newlines
+
+
+def get_inline_images(email_type: EmailType) -> list[dict]:
+    """The images the template embeds, as ``get_email`` takes them."""
+
+    images = []
+    for filename in email_type.images:
+        with open(frappe.get_app_path("suite_cloud", "public", "images", "emails", filename), "rb") as f:
+            images.append({"filename": filename, "filecontent": f.read()})
+    return images

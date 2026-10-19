@@ -1,11 +1,16 @@
-{% extends "templates/tenant_emails/base.html" %}
-{% import "templates/tenant_emails/macros.html" as m %}
-{% block content %}
-{{ m.heading(title) }}
-{{ m.paragraph(responder_name ~ (" (" ~ responder_email ~ ")" if responder_name != responder_email else "") ~ " responded \"" ~ response ~ "\" to your invitation.") }}
-<table role="presentation" cellpadding="0" cellspacing="0" style="margin: 0 auto; font-size: 14px; line-height: 1.6; color: #383838; text-align: left;">
-	<tr><td style="padding-right: 16px; color: #7c7c7c;">When</td><td>{{ when | e }}{% if timezone %} ({{ timezone | e }}){% endif %}</td></tr>
-	{% if location %}<tr><td style="padding-right: 16px; color: #7c7c7c;">Where</td><td>{{ location | e }}</td></tr>{% endif %}
-	<tr><td style="padding-right: 16px; color: #7c7c7c;">Organizer</td><td>{{ organizer_name | e }}</td></tr>
-</table>
+{% extends "templates/tenant_emails/_event_base.html" %}
+{% set font = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" %}
+{% block card %}
+{% import "templates/tenant_emails/_event_macros.html" as m with context %}
+{%- set pill = {'yes': ('#eaf7ef', '#1a7f45'), 'maybe': ('#fdf6ec', '#a9690a'), 'no': ('#fff2f2', '#e03636')}.get(response | lower, ('#f0f0f0', '#383838')) -%}
+						{{ m.eyebrow('New response to your invitation') }}
+						{{ m.heading(title) }}
+						{% call m.panel(padding='16px 18px') %}
+							{#- Name and address on one line, separated the way the Organizer row below does
+							    it; weight and color already tell them apart, so a second line only adds
+							    height. `word-break` lets a long address wrap instead of widening the card. -#}
+							<div style="font-size: 15px; color: #171717; font-weight: 600; line-height: 1.5; word-break: break-word;">{{ responder_name | e }}{% if responder_name != responder_email %} <span style="color: #b5b5b5; font-weight: 400;">&middot;</span> <a href="mailto:{{ responder_email | e }}" style="color: #007be0; text-decoration: none; font-weight: 400;">{{ responder_email | e }}</a>{% endif %}</div>
+							<div style="margin-top: 12px;"><span style="display: inline-block; padding: 5px 12px; background-color: {{ pill[0] }}; color: {{ pill[1] }}; border-radius: 8px; font-size: 13px; font-weight: 600;">Responded &ldquo;{{ response | e }}&rdquo;</span></div>
+						{% endcall %}
+						{{ m.details_table('When', when, timezone, location, organizer_name, organizer_email, bold=true) }}
 {% endblock %}

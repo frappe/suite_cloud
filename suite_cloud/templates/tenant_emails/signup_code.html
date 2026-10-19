@@ -1,8 +1,3 @@
-{% extends "templates/tenant_emails/base.html" %}
-{% import "templates/tenant_emails/macros.html" as m %}
-{% block content %}
-{{ m.heading("Your verification code") }}
-{{ m.code(code) }}
-{{ m.paragraph("Enter this code to verify your email address. It expires in " ~ expires_in_minutes ~ " minutes.") }}
-{{ m.note("If you did not ask for this, you can ignore this email.") }}
-{% endblock %}
+{% extends "templates/tenant_emails/generic.html" %}
+{% set title = "Your verification code is " ~ code ~ "." %}
+{% set description = "Enter this code to verify your email address. It expires in " ~ expires_in_minutes ~ " minutes." %}

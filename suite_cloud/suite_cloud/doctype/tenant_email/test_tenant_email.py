@@ -56,13 +56,18 @@ class TestTenantEmail(IntegrationTestCase):
         message = self.sent_message()
         self.assertEqual(message["From"], f"{ACCOUNT} <noreply@cloud.example.test>")
         self.assertEqual(message["Reply-To"], "noreply@cloud.example.test")  # the account's, never the site's
-        self.assertEqual(message["Subject"], "Ana <b>Lima</b> invited you to Frappe Mail")
+        self.assertEqual(message["Subject"], "You have been invited by Ana <b>Lima</b> to join Frappe Mail")
         html = message.get_body(("html",)).get_content()
-        self.assertIn("Ana &lt;b&gt;Lima&lt;/b&gt; invited you to join Mail Senders Inc.", html)
+        self.assertIn("You have been invited by Ana &lt;b&gt;Lima&lt;/b&gt; to join Frappe Mail.", html)
         self.assertIn('href="https://acme.example.test/mail/signup/abc"', html)
         self.assertEqual(
             (log.status, log.email_type, log.email_account, log.subject),
-            ("Sent", "account-invite", ACCOUNT, "Ana <b>Lima</b> invited you to Frappe Mail"),
+            (
+                "Sent",
+                "account-invite",
+                ACCOUNT,
+                "You have been invited by Ana <b>Lima</b> to join Frappe Mail",
+            ),
         )
         self.assertEqual(message["Message-Id"], f"<{log.message_id}>")
         self.assertEqual(frappe.get_doc("Suite Tenant", self.tenant.name).sent_email_count(), 1)
@@ -73,9 +78,20 @@ class TestTenantEmail(IntegrationTestCase):
                 p: "https://acme.example.test/x" if p in email_type.links else "1" for p in email_type.params
             }
             with self.subTest(name):
-                subject, body = email_types.render(name, email_type, params, "Acme")
+                subject, body = email_types.render(name, email_type, params)
                 self.assertTrue(subject and "\n" not in subject)
-                self.assertIn(f"Frappe {email_type.product}", body)
+                self.assertTrue(body.strip())
+                self.assertNotIn("{{", body)
+                self.assertEqual(len(email_types.get_inline_images(email_type)), len(email_type.images))
+
+    def test_a_drive_email_embeds_the_drive_logo(self) -> None:
+        params = {"sharer": "Ana", "item_type": "file", "item_name": "Plan.pdf", "link": INVITE["link"]}
+        self.send(email_type="drive-share", params=params)
+
+        message = self.sent_message()
+        self.assertEqual(message["Subject"], "Frappe Drive - File Shared")
+        logo = next(part for part in message.walk() if part.get_content_type() == "image/png")
+        self.assertIn(f"cid:{logo['Content-ID'].strip('<>')}", message.get_body(("html",)).get_content())
 
     def test_the_tenant_title_and_the_accounts_reply_to_when_set(self) -> None:
         self.set_settings(use_tenant_title_as_sender_name=1)

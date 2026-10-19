@@ -1,6 +1,3 @@
-{% extends "templates/tenant_emails/base.html" %}
-{% import "templates/tenant_emails/macros.html" as m %}
-{% block content %}
-{{ m.paragraph(sharer ~ " shared the sheet " ~ sheet ~ " with you. You can " ~ access ~ " it.") }}
-{{ m.button("Open Sheet", link) }}
-{% endblock %}
+{#- The sheet share email Sheets sent as an inline message, without a template of its own. -#}
+<p>{{ sharer | e }} shared the sheet <b>{{ sheet | e }}</b> with you. You can {{ access | e }} it.</p>
+<p><a href="{{ link | e }}">Open the sheet</a></p>

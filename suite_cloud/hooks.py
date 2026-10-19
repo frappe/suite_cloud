@@ -77,6 +77,9 @@ scheduler_events = {
 
 default_log_clearing_doctypes = {"Tenant Email": 90}
 
+# Suite's email stylesheet, which the templates of Suite's emails were written against
+email_css = ["/assets/suite_cloud/css/email.css"]
+
 # Execution history points back at its server; it must not block deleting the server.
 ignore_links_on_delete = ["Server Job"]
 

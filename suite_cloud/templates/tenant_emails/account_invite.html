@@ -1,8 +1,4 @@
-{% extends "templates/tenant_emails/base.html" %}
-{% import "templates/tenant_emails/macros.html" as m %}
-{% block content %}
-{{ m.heading("You are invited to Frappe Mail") }}
-{{ m.paragraph(inviter ~ " invited you to join " ~ workspace ~ " on Frappe Mail. Confirm your email address to set up your account.") }}
-{{ m.button("Accept Invitation", link) }}
-{{ m.note("If you were not expecting this, you can ignore this email.") }}
-{% endblock %}
+{% extends "templates/tenant_emails/generic.html" %}
+{% set title = "You have been invited by " ~ inviter ~ " to join Frappe Mail." %}
+{% set description = "Please confirm your email address by clicking the button below." %}
+{% set button = "Verify Account" %}

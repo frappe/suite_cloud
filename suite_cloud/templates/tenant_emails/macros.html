@@ -1,21 +1,32 @@
-{% macro heading(text) -%}
-<h2 style="margin: 0 0 10px; font-size: 19px; color: #171717;">{{ text | e }}</h2>
-{%- endmacro %}
+{% macro button(label, link, primary = true) %}
+<table cellpadding="0" cellspacing="0" role="presentation">
+	<tbody>
+		<tr>
+			<td class="button {{ 'button-primary' if primary else '' }}">
+				{# .btn exempts the label from frappe's `.email-body a:not(.btn)` link
+				   restyle, which premailer keeps as !important (it can't inline :not())
+				   and which would bury the button's own color under the link color.
+				   The class comes with the rest of frappe's .btn, which premailer inlines
+				   too: border and margin are re-declared here (the style attribute wins,
+				   in place) so the button keeps the geometry .button-primary gives it. #}
+				<a class="btn" href="{{ link | e }}" rel="nofollow" style="border: 0; margin: 0;">
+					{{ label | e }}
+				</a>
+			</td>
+		</tr>
+	</tbody>
+</table>
+{% endmacro %}
 
-{% macro paragraph(text) -%}
-<p style="font-size: 15px; line-height: 1.5; color: #171717; max-width: 400px; margin: 0 auto 24px;">{{ text | e }}</p>
-{%- endmacro %}
+{% macro separator() %}
+<table class="w-full" cellpadding="0" cellspacing="0" role="presentation">
+	<tbody>
+		<tr>
+			<td class="py-8">
+				<div class="h-px bg-gray-300 leading-px"></div>
+			</td>
+		</tr>
+	</tbody>
+</table>
+{% endmacro %}
 
-{% macro button(label, link) -%}
-{#- .btn exempts the anchor from frappe's `.email-body a:not(.btn)` restyle; border and margin
-    are set again because the class brings the rest of frappe's .btn with it. -#}
-<a class="btn" href="{{ link | e }}" style="display: inline-block; padding: 12px 24px; font-size: 14px; color: #ffffff; background-color: #171717; text-decoration: none; border-radius: 8px; border: 0; margin: 0;">{{ label | e }}</a>
-{%- endmacro %}
-
-{% macro code(value) -%}
-<p style="font-size: 28px; font-weight: 600; letter-spacing: 0.2em; color: #171717; margin: 8px 0 24px;">{{ value | e }}</p>
-{%- endmacro %}
-
-{% macro note(text) -%}
-<p style="font-size: 12px; color: #888888; margin: 24px 0 0;">{{ text | e }}</p>
-{%- endmacro %}
