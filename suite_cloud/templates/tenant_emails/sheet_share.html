@@ -1,3 +1,6 @@
-{#- The sheet share email Sheets sent as an inline message, without a template of its own. -#}
-<p>{{ sharer | e }} shared the sheet <b>{{ sheet | e }}</b> with you. You can {{ access | e }} it.</p>
-<p><a href="{{ link | e }}">Open the sheet</a></p>
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Sheets" %}
+{% set heading = sharer ~ " shared a sheet with you" %}
+{% set message = sharer ~ " shared the sheet “" ~ sheet ~ "” with you. You can " ~ access ~ " it." %}
+{% set button = "Open sheet" %}
+{% set note = "You are receiving this because someone in " ~ workspace ~ " shared a sheet with you." %}

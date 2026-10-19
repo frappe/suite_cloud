@@ -1,34 +1,46 @@
-<table
-	class="sm:bg-white bg-gray-100"
-	cellpadding="0"
-	cellspacing="0"
-	role="presentation"
-	width="100%"
->
+{#- One layout for every Suite email, after Frappe Cloud's: a white card on a grey page holding the
+    product's icon and name, a heading, a message, one button and the fine print under it. Each
+    email extends this and sets what it shows. The values come from the site: escaped here. -#}
+{%- set font = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" -%}
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color: #f4f4f4; margin: 0; padding: 0;">
 	<tr>
-		<td align="center" valign="top">
-			<table cellpadding="0" cellspacing="0" role="presentation" width="600px">
-				<tbody>
-					<tr>
-						<td class="px-8 pt-10 pb-8 text-center text-gray-900">
-							<div>
-								<img
-									src="https://github.com/frappe/gameplan/assets/9355208/447035d0-0686-41d2-910a-a3d21928ab94"
-									alt="Frappe Logo"
-									class="h-6 mx-auto"
-								/>
-							</div>
-						</td>
-					</tr>
-					<tr>
-						{% block content %}{% endblock %}
-					</tr>
-					<tr>
-						<td class="py-8 text-center text-gray-500 text-sm">
-							This email was sent by Frappe Mail
-						</td>
-					</tr>
-				</tbody>
+		<td align="center" style="padding: 40px 16px;">
+			<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="width: 100%; max-width: 600px; background-color: #ffffff; border-radius: 16px;">
+				<tr>
+					<td style="padding: 40px; font-family: {{ font }}; color: #171717; text-align: left;">
+						<table role="presentation" cellpadding="0" cellspacing="0">
+							<tr>
+								<td style="vertical-align: middle; padding-right: 12px;">
+									<img embed="{{ product | lower }}.png" width="28" height="28" alt="" style="display: block; border: 0; width: 28px; height: 28px;" />
+								</td>
+								<td style="vertical-align: middle; font-family: {{ font }}; font-size: 17px; font-weight: 600; color: #171717;">Frappe {{ product }}</td>
+							</tr>
+						</table>
+						<h1 style="margin: 28px 0 12px; font-family: {{ font }}; font-size: 26px; line-height: 1.25; font-weight: 700; letter-spacing: -0.01em; color: #171717;">{{ heading | e }}</h1>
+						<p style="margin: 0; font-size: 15px; line-height: 1.6; color: #383838;">{{ message | e }}</p>
+						{% block details %}{% endblock %}
+						{%- if button and link %}
+						<table role="presentation" cellpadding="0" cellspacing="0">
+							<tr>
+								<td style="padding-top: 28px;">
+									{#- .btn exempts the anchor from frappe's `.email-body a:not(.btn)` restyle; border and
+									    margin are set again because the class brings the rest of frappe's .btn with it. -#}
+									<a class="btn" href="{{ link | e }}" style="display: inline-block; padding: 10px 16px; background-color: #171717; color: #ffffff; font-family: {{ font }}; font-size: 15px; font-weight: 500; line-height: 1.4; text-decoration: none; border-radius: 8px; border: 0; margin: 0;">{{ button | e }}</a>
+								</td>
+							</tr>
+						</table>
+						{%- endif %}
+						{%- if fine_print %}
+						<p style="margin: 24px 0 0; font-size: 13px; line-height: 1.5; color: #7c7c7c;">{{ fine_print | e }}</p>
+						{%- endif %}
+						{%- if show_link and link %}
+						<p style="margin: 24px 0 0; font-size: 13px; line-height: 1.5; color: #7c7c7c;">If the button does not work, open this link:<br /><a href="{{ link | e }}" style="color: #171717; text-decoration: underline; word-break: break-all;">{{ link | e }}</a></p>
+						{%- endif %}
+						{%- if note %}
+						<p style="margin: 32px 0 0; font-size: 14px; line-height: 1.6; color: #7c7c7c;"><b style="font-weight: 600;">Note:</b> {{ note | e }}</p>
+						{%- endif %}
+					</td>
+				</tr>
 			</table>
 		</td>
 	</tr>

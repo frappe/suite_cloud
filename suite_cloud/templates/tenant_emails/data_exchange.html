@@ -1,4 +1,7 @@
-{% extends "templates/tenant_emails/generic.html" %}
-{% set title = app ~ " Data " ~ action ~ (" Completed" if succeeded else " Failed") %}
-{% set description = "View details for this exchange." %}
-{% set button = "View " ~ action %}
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Calendar" if app == "Calendar" else "Mail" %}
+{% set what = app ~ " data " ~ (action | lower) %}
+{% set heading = (what | capitalize) ~ (" completed" if succeeded else " failed") %}
+{% set message = ("Your " ~ what ~ " is complete." if succeeded else "Your " ~ what ~ " did not complete. Open it to see what went wrong.") %}
+{% set button = "View " ~ (action | lower) %}
+{% set note = "You are receiving this because you started this " ~ (action | lower) ~ "." %}

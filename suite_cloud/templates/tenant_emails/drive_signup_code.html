@@ -1,14 +1,7 @@
-<div style="text-align: center; font-family: Arial, sans-serif; padding: 20px">
-  <h3 style="margin-bottom: 10px">Sign in to your account:</h3>
-
-  <!-- Use a div instead of a p for the OTP -->
-  <div
-    style="font-size: 14px; color: #444; max-width: 400px; margin: 0 auto 20px"
-  >
-    <h2>{{ code | e }}</h2>
-  </div>
-
-  <p style="font-size: 12px; color: #888; margin-top: 15px">
-    If you didn’t request this, feel free to ignore this email.
-  </p>
-</div>
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Drive" %}
+{% set heading = "Your Frappe Drive sign-in code" %}
+{% set message = "Enter this code to sign in to Frappe Drive." %}
+{% set fine_print = "If you did not ask for it, you can ignore this email." %}
+{% set note = "You are receiving this because this email was used to sign in to Frappe Drive." %}
+{% block details %}{% include "templates/tenant_emails/_code.html" %}{% endblock %}

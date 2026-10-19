@@ -73,7 +73,7 @@ def send(tenant, name: str, recipient: str, params: dict, request_key: str) -> T
     if log.status == "Sent":
         return log
     account = get_email_account(tenant.tenant_type)
-    subject, body = email_types.render(name, email_type, params)
+    subject, body = email_types.render(name, email_type, params, tenant.title)
     sender = formataddr((get_sender_name(tenant, account), account.email_id))
     mail = get_email(
         [recipient],
@@ -81,7 +81,7 @@ def send(tenant, name: str, recipient: str, params: dict, request_key: str) -> T
         msg=body,
         subject=subject,
         email_account=account,
-        inline_images=email_types.get_inline_images(email_type),
+        inline_images=email_types.get_inline_images(body),
     )
     message_id = make_msgid(domain=account.email_id.rpartition("@")[2]).strip("<>")
     mail.set_message_id(message_id)

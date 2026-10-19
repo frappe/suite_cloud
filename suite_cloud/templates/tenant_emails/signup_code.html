@@ -1,3 +1,7 @@
-{% extends "templates/tenant_emails/generic.html" %}
-{% set title = "Your verification code is " ~ code ~ "." %}
-{% set description = "Enter this code to verify your email address. It expires in " ~ expires_in_minutes ~ " minutes." %}
+{% extends "templates/tenant_emails/base.html" %}
+{% set product = "Suite" %}
+{% set heading = "Verify your email address" %}
+{% set message = "Enter this code to finish signing up for Frappe Suite." %}
+{% set fine_print = "The code expires in " ~ expires_in_minutes ~ " minutes. If you did not ask for it, you can ignore this email." %}
+{% set note = "You are receiving this because this email was used to sign up for Frappe Suite." %}
+{% block details %}{% include "templates/tenant_emails/_code.html" %}{% endblock %}
