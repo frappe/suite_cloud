@@ -1,0 +1,6 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% import "templates/tenant_emails/macros.html" as m %}
+{% block content %}
+{{ m.paragraph(sharer ~ " shared the sheet " ~ sheet ~ " with you. You can " ~ access ~ " it.") }}
+{{ m.button("Open Sheet", link) }}
+{% endblock %}

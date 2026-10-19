@@ -1,0 +1,8 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% import "templates/tenant_emails/macros.html" as m %}
+{% block content %}
+{{ m.heading("You are invited to " ~ (team_name ~ " on " if team_name else "") ~ "Frappe Drive") }}
+{{ m.paragraph(inviter ~ " invited you to join " ~ (team_name ~ " on " if team_name else "") ~ "Frappe Drive.") }}
+{{ m.button("Accept Invitation", link) }}
+{{ m.note("If you were not expecting this, you can ignore this email.") }}
+{% endblock %}

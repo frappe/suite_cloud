@@ -1,0 +1,6 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% import "templates/tenant_emails/macros.html" as m %}
+{% block content %}
+{{ m.paragraph(author ~ " mentioned you in a comment in " ~ document ~ ".") }}
+{{ m.button("Open Document", link) }}
+{% endblock %}

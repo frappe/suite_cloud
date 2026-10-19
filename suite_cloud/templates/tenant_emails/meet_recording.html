@@ -1,0 +1,12 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% import "templates/tenant_emails/macros.html" as m %}
+{% block content %}
+{%- if status == "Failed" -%}
+{{ m.paragraph("The recording of " ~ room ~ " from " ~ recorded_at ~ " could not be processed. No recording was added to Drive.") }}
+{%- elif status == "Partial" -%}
+{{ m.paragraph("A partial recording of " ~ room ~ " from " ~ recorded_at ~ " is ready in Drive. Some portions could not be captured.") }}
+{%- else -%}
+{{ m.paragraph("The recording of " ~ room ~ " from " ~ recorded_at ~ " is ready in Drive.") }}
+{%- endif %}
+{% if link %}{{ m.button("Open recording in Drive", link) }}{% endif %}
+{% endblock %}

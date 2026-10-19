@@ -1,4 +1,5 @@
-"""The mail a tenant's site sends, such as invites and password resets: Suite Cloud sends it."""
+"""The emails a tenant's site sends about Suite, such as invites and password resets: Suite Cloud
+holds their templates and sends them."""
 
 import frappe
 from frappe import _
@@ -10,12 +11,13 @@ from suite_cloud.suite_cloud.doctype.tenant_email import tenant_email
 
 @frappe.whitelist(methods=["POST"])
 @tenant_api
-def send_email(recipient: str, message: str, request_key: str) -> dict:
-    """Sends ``message``, a whole MIME email, to one recipient now and answers whether it was sent."""
+def send_email(email_type: str, recipient: str, params: dict, request_key: str) -> dict:
+    """Sends one email of ``email_type`` to one recipient now and answers whether it was sent."""
 
     recipient, request_key = (recipient or "").strip(), (request_key or "").strip()
     if "," in recipient or not validate_email_address(recipient):
         frappe.throw(_("{0} is not one email address.").format(recipient), InvalidInputError)
     if not request_key:
         frappe.throw(_("The request_key field is required."), InvalidInputError)
-    return tenant_email.send(current_tenant(), recipient, message, request_key).to_api()
+    tenant = current_tenant()
+    return tenant_email.send(tenant, email_type, recipient, frappe.parse_json(params), request_key).to_api()

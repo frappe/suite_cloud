@@ -1,0 +1,8 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% import "templates/tenant_emails/macros.html" as m %}
+{% block content %}
+{{ m.heading("Your verification code") }}
+{{ m.code(code) }}
+{{ m.paragraph("Enter this code to sign in to Frappe Drive.") }}
+{{ m.note("If you did not ask for this, you can ignore this email.") }}
+{% endblock %}

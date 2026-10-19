@@ -343,6 +343,18 @@ class SuiteTenant(Document):
         self.assert_mail_configured()
         return frappe.get_cached_doc("Stalwart Cluster", self.stalwart_cluster)
 
+    def get_site_hosts(self) -> set[str]:
+        """The host names of the tenant's hosted sites; none for a tenant whose site Suite Cloud
+        does not host."""
+
+        sites = frappe.get_all(
+            "Suite Site", {"tenant": self.name, "status": ["!=", "Dropped"]}, ["name", "hostname"]
+        )
+        domains = frappe.get_all(
+            "Suite Site Domain", {"parent": ["in", [s.name for s in sites] or [""]]}, pluck="domain"
+        )
+        return {host.lower() for host in [*(s.hostname for s in sites), *domains] if host}
+
     def allows_ip(self, ip: str | None) -> bool:
         """Whether a request from ``ip`` may use the tenant's secret. No list means any address."""
 

@@ -1,25 +1,19 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-import email
 import smtplib
-from email import policy
-from email.headerregistry import Address
-from email.message import EmailMessage
-from email.utils import formataddr
+from email.utils import formataddr, make_msgid
 from uuid import NAMESPACE_URL, uuid5
 
 import frappe
 from frappe import _
+from frappe.email.email_body import get_email
 from frappe.model.document import Document
 from frappe.query_builder import Interval
 from frappe.query_builder.functions import Now
 from frappe.utils import now_datetime
 
-EMAIL_TYPE_HEADER = "X-Suite-Email-Type"
-MAX_MESSAGE_BYTES = 25 * 1024 * 1024
-# The site's say on who sends: the Email Account sends, so these are set again or left out.
-SITE_HEADERS = ("From", "Sender", "Reply-To", "Return-Path", "X-Original-From", EMAIL_TYPE_HEADER)
+from suite_cloud.suite_cloud.doctype.tenant_email import email_types
 
 
 class EmailNotConfiguredError(frappe.ValidationError):
@@ -66,31 +60,37 @@ class TenantEmail(Document):
         frappe.db.delete(table, filters=(table.creation < (Now() - Interval(days=days))))
 
 
-def send(tenant, recipient: str, message: str, request_key: str) -> TenantEmail:
-    """Sends one email of the tenant's site now, through the Email Account of the tenant's type.
+def send(tenant, name: str, recipient: str, params: dict, request_key: str) -> TenantEmail:
+    """Sends the tenant's site one of Suite Cloud's emails now, from its template and through the
+    Email Account of the tenant's type.
 
     A key that was sent answers that result again; a failed one is sent again.
     """
 
+    email_type = email_types.get_email_type(name)
+    email_types.validate_params(email_type, params, tenant.get_site_hosts())
     log = claim(tenant.name, request_key)
     if log.status == "Sent":
         return log
     account = get_email_account(tenant.tenant_type)
-    parsed = parse(message)
-    email_type = str(parsed[EMAIL_TYPE_HEADER] or "other").strip().lower()[:140]
-    parsed = as_sent_by(parsed, account, get_sender_name(tenant, account))
+    subject, body = email_types.render(name, email_type, params, tenant.title)
+    sender = formataddr((get_sender_name(tenant, account), account.email_id))
+    mail = get_email([recipient], sender=sender, msg=body, subject=subject, email_account=account)
+    message_id = make_msgid(domain=account.email_id.rpartition("@")[2]).strip("<>")
+    mail.set_message_id(message_id)
+    message = mail.as_string()  # also sets the sender and Reply-To the account asks for
     log.update(
         {
-            "email_type": email_type,
+            "email_type": name,
             "recipient": recipient,
             "email_account": account.name,
-            "sender": str(parsed["From"]),
-            "subject": str(parsed["Subject"] or ""),
-            "message_id": str(parsed["Message-Id"] or "").strip("<>") or None,  # no tag to sanitize
+            "sender": mail.sender,
+            "subject": subject,
+            "message_id": message_id,  # without <>, which would be sanitized away as a tag
         }
     )
     try:
-        deliver(account, recipient, parsed.as_bytes())
+        deliver(account, recipient, frappe.safe_encode(message))
         log.update({"status": "Sent", "sent_at": now_datetime(), "error": None})
     except Exception as e:
         log.update({"status": "Failed", "error": describe(e)})
@@ -135,30 +135,6 @@ def get_sender_name(tenant, account) -> str:
     if frappe.get_cached_doc("Suite Cloud Settings").use_tenant_title_as_sender_name and tenant.title:
         return tenant.title
     return account.name
-
-
-def parse(message: str) -> EmailMessage:
-    if len(message.encode()) > MAX_MESSAGE_BYTES:
-        frappe.throw(_("The email is larger than {0} MB.").format(MAX_MESSAGE_BYTES // (1024 * 1024)))
-    return email.message_from_string(message, policy=policy.SMTP)
-
-
-def as_sent_by(message: EmailMessage, account, sender_name: str) -> EmailMessage:
-    """From the account under ``sender_name``; Reply-To only as the account sets it."""
-
-    for header in SITE_HEADERS:
-        del message[header]
-    message["From"] = Address(display_name=sender_name, addr_spec=account.email_id)
-    if reply_to := get_reply_to(account):
-        message["Reply-To"] = reply_to
-    return message
-
-
-def get_reply_to(account) -> str | None:
-    if not account.add_reply_to_header:
-        return None
-    addresses = [formataddr((row._name, row.email)) for row in account.reply_to_addresses if row.email]
-    return ", ".join(addresses) or None
 
 
 def deliver(account, recipient: str, message: bytes) -> None:

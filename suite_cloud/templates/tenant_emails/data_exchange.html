@@ -1,0 +1,7 @@
+{% extends "templates/tenant_emails/base.html" %}
+{% import "templates/tenant_emails/macros.html" as m %}
+{% block content %}
+{{ m.heading(app ~ " data " ~ (action | lower) ~ (" completed" if succeeded else " failed")) }}
+{{ m.paragraph("View the details of this " ~ (action | lower) ~ ".") }}
+{{ m.button("View " ~ action, link) }}
+{% endblock %}

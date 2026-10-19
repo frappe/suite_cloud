@@ -9,23 +9,14 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.api import email as email_api
 from suite_cloud.api.tenant import InvalidInputError
 from suite_cloud.mail.tests.fixtures import make_owner
-from suite_cloud.suite_cloud.doctype.tenant_email import tenant_email
+from suite_cloud.suite_cloud.doctype.tenant_email import email_types, tenant_email
+from suite_cloud.suite_cloud.doctype.tenant_email.email_types import EMAIL_TYPES, InvalidEmailError
 from suite_cloud.suite_cloud.doctype.tenant_email.tenant_email import EmailNotConfiguredError
 from suite_cloud.utils import clear_config_cache
 
 ACCOUNT = "Suite Cloud Test Mail"
 RECIPIENT = "someone@example.test"
-MESSAGE = (
-    "From: Site Admin <admin@acme.example.test>\r\n"
-    "Reply-To: admin@acme.example.test\r\n"
-    "To: someone@example.test\r\n"
-    "Subject: You have been invited\r\n"
-    "Message-Id: <invite-1@acme.example.test>\r\n"
-    "X-Suite-Email-Type: Account-Invite\r\n"
-    "Content-Type: text/plain\r\n"
-    "\r\n"
-    "Join us.\r\n"
-)
+INVITE = {"inviter": "Ana <b>Lima</b>", "link": "https://acme.example.test/mail/signup/abc"}
 
 
 class TestTenantEmail(IntegrationTestCase):
@@ -51,27 +42,40 @@ class TestTenantEmail(IntegrationTestCase):
         frappe.clear_document_cache("Suite Cloud Settings", "Suite Cloud Settings")
         clear_config_cache()
 
-    def send(self, request_key: str = "queue-1:someone@example.test"):
-        return tenant_email.send(self.tenant, RECIPIENT, MESSAGE, request_key)
+    def send(self, request_key: str = "invite-1", email_type: str = "account-invite", params=None):
+        return tenant_email.send(self.tenant, email_type, RECIPIENT, params or INVITE, request_key)
 
     def sent_message(self) -> email.message.EmailMessage:
         _account, recipient, raw = self.deliver.call_args.args
         self.assertEqual(recipient, RECIPIENT)
         return email.message_from_bytes(raw, policy=policy.SMTP)
 
-    def test_the_account_of_the_tenants_type_sends_under_its_own_name(self) -> None:
+    def test_suite_cloud_renders_the_email_and_its_account_sends_it(self) -> None:
         log = self.send()
 
         message = self.sent_message()
         self.assertEqual(message["From"], f"{ACCOUNT} <noreply@cloud.example.test>")
-        self.assertIsNone(message["Reply-To"])  # the site's is dropped; the account sets none
-        self.assertIsNone(message["X-Suite-Email-Type"])
-        self.assertEqual(message["Subject"], "You have been invited")
+        self.assertEqual(message["Reply-To"], "noreply@cloud.example.test")  # the account's, never the site's
+        self.assertEqual(message["Subject"], "Ana <b>Lima</b> invited you to Frappe Mail")
+        html = message.get_body(("html",)).get_content()
+        self.assertIn("Ana &lt;b&gt;Lima&lt;/b&gt; invited you to join Mail Senders Inc.", html)
+        self.assertIn('href="https://acme.example.test/mail/signup/abc"', html)
         self.assertEqual(
-            (log.status, log.email_type, log.email_account, log.message_id),
-            ("Sent", "account-invite", ACCOUNT, "invite-1@acme.example.test"),
+            (log.status, log.email_type, log.email_account, log.subject),
+            ("Sent", "account-invite", ACCOUNT, "Ana <b>Lima</b> invited you to Frappe Mail"),
         )
+        self.assertEqual(message["Message-Id"], f"<{log.message_id}>")
         self.assertEqual(frappe.get_doc("Suite Tenant", self.tenant.name).sent_email_count(), 1)
+
+    def test_every_email_type_renders(self) -> None:
+        for name, email_type in EMAIL_TYPES.items():
+            params = {
+                p: "https://acme.example.test/x" if p in email_type.links else "1" for p in email_type.params
+            }
+            with self.subTest(name):
+                subject, body = email_types.render(name, email_type, params, "Acme")
+                self.assertTrue(subject and "\n" not in subject)
+                self.assertIn(f"Frappe {email_type.product}", body)
 
     def test_the_tenant_title_and_the_accounts_reply_to_when_set(self) -> None:
         self.set_settings(use_tenant_title_as_sender_name=1)
@@ -84,6 +88,35 @@ class TestTenantEmail(IntegrationTestCase):
         message = self.sent_message()
         self.assertEqual(message["From"], '"Mail Senders Inc." <noreply@cloud.example.test>')
         self.assertEqual(message["Reply-To"], "Support <support@cloud.example.test>")
+
+    def test_only_known_emails_with_their_parameters_are_sent(self) -> None:
+        for email_type, params, error in (
+            ("newsletter", INVITE, "does not send newsletter"),
+            ("account-invite", {"link": INVITE["link"]}, "Missing parameters: inviter"),
+            ("account-invite", {**INVITE, "body": "<p>Win!</p>"}, "Unknown parameters: body"),
+            ("account-invite", {**INVITE, "inviter": ["Ana"]}, "inviter must be text"),
+            ("account-invite", {**INVITE, "link": "javascript:alert(1)"}, "link must be a web address"),
+        ):
+            with self.subTest(error):
+                self.assertRaisesRegex(
+                    InvalidEmailError, error, self.send, params=params, email_type=email_type
+                )
+        self.deliver.assert_not_called()
+
+    def test_links_lead_only_to_the_tenants_own_site_when_it_is_hosted(self) -> None:
+        email_type = EMAIL_TYPES["password-reset"]
+        hosts = {"acme.example.test"}
+
+        email_types.validate_params(email_type, {"link": "https://acme.example.test/reset/1"}, hosts)
+        self.assertRaisesRegex(
+            InvalidEmailError,
+            "the tenant's own site",
+            email_types.validate_params,
+            email_type,
+            {"link": "https://phish.example.net/reset/1"},
+            hosts,
+        )
+        email_types.validate_params(email_type, {"link": "https://anywhere.example.net/1"}, set())
 
     def test_a_key_that_was_sent_is_not_sent_again(self) -> None:
         first, second = self.send(), self.send()
@@ -140,8 +173,10 @@ class TestTenantEmail(IntegrationTestCase):
 
         for recipient in ("a@example.test, b@example.test", "not-an-address"):
             with self.subTest(recipient):
-                self.assertRaises(InvalidInputError, email_api.send_email, recipient, MESSAGE, "key")
-        result = email_api.send_email(RECIPIENT, MESSAGE, "queue-2:someone@example.test")
+                self.assertRaises(
+                    InvalidInputError, email_api.send_email, "account-invite", recipient, INVITE, "key"
+                )
+        result = email_api.send_email("account-invite", RECIPIENT, INVITE, "invite-2")
         self.assertEqual(result["status"], "Sent")
 
 
