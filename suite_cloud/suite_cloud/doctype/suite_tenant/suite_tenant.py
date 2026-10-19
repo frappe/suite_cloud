@@ -246,7 +246,7 @@ class SuiteTenant(Document):
     def sent_email_count(self) -> int:
         """Emails the tenant's sites sent through Suite Cloud this calendar month."""
 
-        filters = {"tenant": self.name, "status": "Sent", "creation": [">=", get_first_day(today())]}
+        filters = {"tenant": self.name, "status": "Sent", "sent_at": [">=", get_first_day(today())]}
         return frappe.db.count("Tenant Email", filters)
 
     def assert_can_add_domain(self) -> None:

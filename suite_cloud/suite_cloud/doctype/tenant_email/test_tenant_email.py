@@ -91,6 +91,26 @@ class TestTenantEmail(IntegrationTestCase):
         self.assertEqual(first.name, second.name)
         self.deliver.assert_called_once()
 
+    def test_a_concurrent_request_with_the_key_answers_the_first_result(self) -> None:
+        first = self.send()
+
+        # The first request's row is not committed yet: the second inserts the same name and waits.
+        with patch.object(frappe.db, "exists", return_value=False):
+            second = self.send()
+
+        self.assertEqual((second.name, second.status), (first.name, "Sent"))
+        self.deliver.assert_called_once()
+
+    def test_an_email_counts_in_the_month_it_was_sent(self) -> None:
+        self.deliver.side_effect = smtplib.SMTPRecipientsRefused({RECIPIENT: (450, b"Try later")})
+        failed = self.send()
+        failed.db_set("creation", frappe.utils.add_months(frappe.utils.now_datetime(), -1))
+
+        self.deliver.side_effect = None
+        self.send()
+
+        self.assertEqual(frappe.get_doc("Suite Tenant", self.tenant.name).sent_email_count(), 1)
+
     def test_a_refused_email_fails_and_its_key_sends_it_again(self) -> None:
         self.deliver.side_effect = smtplib.SMTPRecipientsRefused({RECIPIENT: (550, b"No such user")})
         failed = self.send()

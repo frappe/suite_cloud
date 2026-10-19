@@ -23,13 +23,14 @@ The `X-Suite-Email-Type` header of the message names what the email is, e.g. `pa
   "name": "0199e1a2-3b4c-7d5e-8f60-123456789abc",
   "status": "Sent",
   "message_id": "invite-1@acme.example.com",
+  "sent_at": "2026-10-19 12:00:00",
   "error": null
 }
 ```
 
 `status` is `Sent` or `Failed`. When the mail server refuses the email or cannot be reached, the call still answers 200, with `status` `Failed` and the server's reply in `error`, e.g. `550 No such user`. The site then shows the error or tries again.
 
-A `request_key` that was sent before answers the earlier result and does not send the email again. A key that failed before is sent again. So the site can safely retry a request whose answer was lost.
+A `request_key` that was sent before answers the earlier result and does not send the email again. A key that failed before is sent again. A request that arrives while another request with the same key is sending waits for it, then answers its result. So the site can safely retry a request whose answer was lost.
 
 | Error | Status | When |
 | --- | --- | --- |

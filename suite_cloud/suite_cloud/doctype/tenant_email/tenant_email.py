@@ -7,13 +7,14 @@ from email import policy
 from email.headerregistry import Address
 from email.message import EmailMessage
 from email.utils import formataddr
-from uuid import uuid7
+from uuid import NAMESPACE_URL, uuid5
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.query_builder import Interval
 from frappe.query_builder.functions import Now
+from frappe.utils import now_datetime
 
 EMAIL_TYPE_HEADER = "X-Suite-Email-Type"
 MAX_MESSAGE_BYTES = 25 * 1024 * 1024
@@ -41,16 +42,23 @@ class TenantEmail(Document):
         recipient: DF.Data | None
         request_key: DF.Data | None
         sender: DF.Data | None
-        status: DF.Literal["Sent", "Failed"]
+        sent_at: DF.Datetime | None
+        status: DF.Literal["Sending", "Sent", "Failed"]
         subject: DF.SmallText | None
         tenant: DF.Link
     # end: auto-generated types
 
     def autoname(self) -> None:
-        self.name = str(uuid7())
+        self.name = get_name(self.tenant, self.request_key)
 
     def to_api(self) -> dict:
-        return {"name": self.name, "status": self.status, "message_id": self.message_id, "error": self.error}
+        return {
+            "name": self.name,
+            "status": self.status,
+            "message_id": self.message_id,
+            "sent_at": self.sent_at,
+            "error": self.error,
+        }
 
     @staticmethod
     def clear_old_logs(days: int = 90) -> None:
@@ -64,10 +72,9 @@ def send(tenant, recipient: str, message: str, request_key: str) -> TenantEmail:
     A key that was sent answers that result again; a failed one is sent again.
     """
 
-    log = frappe.get_doc("Tenant Email", name) if (name := find(tenant.name, request_key)) else None
-    if log and log.status == "Sent":
+    log = claim(tenant.name, request_key)
+    if log.status == "Sent":
         return log
-    log = log or frappe.new_doc("Tenant Email", tenant=tenant.name, request_key=request_key)
     account = get_email_account(tenant.tenant_type)
     parsed = parse(message)
     email_type = str(parsed[EMAIL_TYPE_HEADER] or "other").strip().lower()[:140]
@@ -84,15 +91,32 @@ def send(tenant, recipient: str, message: str, request_key: str) -> TenantEmail:
     )
     try:
         deliver(account, recipient, parsed.as_bytes())
-        log.update({"status": "Sent", "error": None})
+        log.update({"status": "Sent", "sent_at": now_datetime(), "error": None})
     except Exception as e:
         log.update({"status": "Failed", "error": describe(e)})
     log.save(ignore_permissions=True)
     return log
 
 
-def find(tenant: str, request_key: str) -> str | None:
-    return frappe.db.get_value("Tenant Email", {"tenant": tenant, "request_key": request_key})
+def get_name(tenant: str, request_key: str) -> str:
+    """One name per tenant and key, so a second row for the key cannot be inserted."""
+
+    return str(uuid5(NAMESPACE_URL, f"suite-cloud:tenant-email:{tenant}:{request_key}"))
+
+
+def claim(tenant: str, request_key: str) -> TenantEmail:
+    """The key's row, locked until the request ends, before anything is sent: a concurrent request
+    with the same key waits on the lock, then answers this request's result."""
+
+    name = get_name(tenant, request_key)
+    if not frappe.db.exists("Tenant Email", name):
+        try:
+            frappe.get_doc({"doctype": "Tenant Email", "tenant": tenant, "request_key": request_key}).insert(
+                ignore_permissions=True
+            )
+        except frappe.DuplicateEntryError:
+            pass  # inserted by a concurrent request, which held it until it was done
+    return frappe.get_doc("Tenant Email", name, for_update=True)
 
 
 def get_email_account(tenant_type: str) -> Document:

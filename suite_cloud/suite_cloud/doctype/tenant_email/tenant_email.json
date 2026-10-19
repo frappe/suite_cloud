@@ -12,6 +12,7 @@
   "email_account",
   "sender",
   "message_id",
+  "sent_at",
   "request_key",
   "section_break_message",
   "subject",
@@ -44,8 +45,9 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Status",
-   "options": "Sent\nFailed",
-   "read_only": 1
+   "options": "Sending\nSent\nFailed",
+   "read_only": 1,
+   "default": "Sending"
   },
   {
    "fieldname": "recipient",
@@ -81,12 +83,18 @@
    "read_only": 1
   },
   {
-   "description": "The site's key for this email: a request with the same key answers this result again instead of sending the email twice.",
+   "fieldname": "sent_at",
+   "fieldtype": "Datetime",
+   "label": "Sent At",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "The site's key for this email. It names the row, so a request with the same key answers this result again instead of sending the email twice.",
    "fieldname": "request_key",
    "fieldtype": "Data",
    "label": "Request Key",
-   "read_only": 1,
-   "search_index": 1
+   "read_only": 1
   },
   {
    "fieldname": "section_break_message",
@@ -108,7 +116,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-19 12:00:00.000000",
+ "modified": "2026-10-19 13:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Tenant Email",
