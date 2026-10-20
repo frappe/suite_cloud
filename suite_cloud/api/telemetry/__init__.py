@@ -8,6 +8,7 @@ the warehouse loads it later. Nothing here touches the site database.
 
 import ipaddress
 import json
+import math
 import re
 import secrets
 from collections.abc import Callable
@@ -29,6 +30,7 @@ MAX_RECORDS = 5000  # records in one request
 HOSTNAME_LIMIT = 253
 SOURCE_PATTERN = re.compile(r"[a-z0-9_-]{1,64}")
 METRIC_TYPES = ("counter", "gauge", "histogram")
+INTEGER_LIMIT = 2**63  # the metrics table stores counts as 64-bit integers
 
 
 def authenticate() -> None:
@@ -215,10 +217,12 @@ class Record:
             if required:
                 self.refuse(key, _("is required"))
             return None
-        if isinstance(value, bool) or not isinstance(value, int | float):
-            self.refuse(key, _("must be a number"))
+        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+            self.refuse(key, _("must be a finite number"))
         if integer and value != int(value):
             self.refuse(key, _("must be an integer"))
+        if integer and not -INTEGER_LIMIT <= value < INTEGER_LIMIT:
+            self.refuse(key, _("must fit a 64-bit integer"))
         return int(value) if integer else float(value)
 
     def json_object(self, key: str) -> str | None:
