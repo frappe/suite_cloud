@@ -9,6 +9,7 @@ from uuid import uuid7
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from suite_cloud.mail.tests.fixtures import error_log_count
 from suite_cloud.telemetry import EVENTS, METRICS
 from suite_cloud.telemetry.spool import Spool
 
@@ -75,13 +76,13 @@ class TestSpool(IntegrationTestCase):
 
     def test_a_rejected_file_is_moved_aside_and_logged(self) -> None:
         path = self.write("b1")
-        before = frappe.db.count("Error Log")
+        before = error_log_count()
 
         self.spool.reject(path, "not a parquet file")
 
         self.assertFalse(path.exists())
         self.assertTrue((self.spool.root / "rejected" / "events" / "b1.parquet").exists())
-        self.assertEqual(frappe.db.count("Error Log"), before + 1)
+        self.assertEqual(error_log_count(), before + 1)
 
     def test_delete_tolerates_a_file_another_run_removed(self) -> None:
         path = self.write("b1")

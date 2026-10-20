@@ -12,6 +12,7 @@ from duckdb import IOException
 from frappe.tests import IntegrationTestCase
 from frappe.utils import get_files_path
 
+from suite_cloud.mail.tests.fixtures import error_log_count
 from suite_cloud.telemetry import EVENTS, METRICS, TelemetryTable
 from suite_cloud.telemetry.spool import Spool
 from suite_cloud.telemetry.warehouse import Warehouse
@@ -115,25 +116,25 @@ class TestWarehouse(IntegrationTestCase):
             EVENTS, METRICS.get_batch({**ENVELOPE, "batch_id": "0-wrong"}, [metric()]), "0-wrong"
         )
         self.stage(EVENTS, [event()])
-        errors = frappe.db.count("Error Log")
+        errors = error_log_count()
 
         added = self.warehouse.load_pending()
 
         self.assertEqual(added, {"events": 1})
         rejected = self.spool.root / "rejected" / "events"
         self.assertEqual(sorted(p.name for p in rejected.iterdir()), ["0-garbage.parquet", "0-wrong.parquet"])
-        self.assertEqual(frappe.db.count("Error Log"), errors + 2)
+        self.assertEqual(error_log_count(), errors + 2)
 
     def test_a_lock_that_cannot_be_taken_keeps_the_files_for_the_next_run(self) -> None:
         path = self.stage(EVENTS, [event()])
-        errors = frappe.db.count("Error Log")
+        errors = error_log_count()
 
         with patch.object(Warehouse, "write_connection", side_effect=IOException("Could not set lock")):
             added = self.warehouse.load_pending()
 
         self.assertEqual(added, {})
         self.assertTrue(path.exists())
-        self.assertEqual(frappe.db.count("Error Log"), errors + 1)
+        self.assertEqual(error_log_count(), errors + 1)
 
     def test_the_prune_removes_only_rows_past_the_retention(self) -> None:
         self.stage(
