@@ -217,13 +217,17 @@ class Record:
             if required:
                 self.refuse(key, _("is required"))
             return None
-        if isinstance(value, bool) or not isinstance(value, int | float) or not math.isfinite(value):
+        if isinstance(value, bool) or not isinstance(value, int | float):
+            self.refuse(key, _("must be a number"))
+        try:  # NaN or infinity as an integer, or an integer too large for a double
+            number = int(value) if integer else float(value)
+        except (OverflowError, ValueError):
             self.refuse(key, _("must be a finite number"))
-        if integer and value != int(value):
-            self.refuse(key, _("must be an integer"))
-        if integer and not -INTEGER_LIMIT <= value < INTEGER_LIMIT:
+        if integer and (number != value or not -INTEGER_LIMIT <= number < INTEGER_LIMIT):
             self.refuse(key, _("must fit a 64-bit integer"))
-        return int(value) if integer else float(value)
+        if not integer and not math.isfinite(number):
+            self.refuse(key, _("must be a finite number"))
+        return number
 
     def json_object(self, key: str) -> str | None:
         value = self.fields.get(key)

@@ -115,11 +115,13 @@ class TestValidation(TelemetryApiTestCase):
     def test_a_bad_metric_is_a_400_too(self) -> None:
         cases = (
             ({"type": "rate"}, "must be one of"),
-            ({"value": "12"}, "must be a finite number"),
-            ({"value": True}, "must be a finite number"),
+            ({"value": "12"}, "must be a number"),
+            ({"value": True}, "must be a number"),
             ({"value": float("nan")}, "must be a finite number"),
+            ({"value": 10**400}, "must be a finite number"),
             ({"sum": float("inf")}, "must be a finite number"),
-            ({"count": 1.5}, "must be an integer"),
+            ({"count": 1.5}, "must fit a 64-bit integer"),
+            ({"count": float("nan")}, "must be a finite number"),
             ({"count": 2**63}, "must fit a 64-bit integer"),
             ({"name": ""}, "name is required"),
         )
