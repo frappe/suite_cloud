@@ -5,7 +5,7 @@ from datetime import datetime
 import frappe
 from frappe.tests import UnitTestCase
 
-from suite_cloud.api import email, tenant
+from suite_cloud.api import email, telemetry, tenant
 from suite_cloud.api.mail import accounts, dmarc, domains, groups, mailing_lists, meta, tls
 from suite_cloud.api.tenant import InvalidInputError, api_errors, as_datetime, as_list
 from suite_cloud.mail.stalwart.errors import (
@@ -16,6 +16,7 @@ from suite_cloud.mail.stalwart.errors import (
 )
 
 MODULES = (tenant, email, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
+AGENT_MODULES = (telemetry,)  # called by the nodes' agents, not by tenants
 VERB_BY_PREFIX = {
     "list_": "GET",
     "get_": "GET",
@@ -28,10 +29,10 @@ VERB_BY_PREFIX = {
 }
 
 
-def api_functions():
-    """Every whitelisted function of the tenant API."""
+def api_functions(modules=MODULES):
+    """Every whitelisted function of the given API modules."""
 
-    for module in MODULES:
+    for module in modules:
         for name, member in vars(module).items():
             if callable(member) and member in frappe.whitelisted and member.__module__ == module.__name__:
                 yield f"{module.__name__}.{name}", name, member
@@ -45,7 +46,7 @@ def expected_verb(name: str) -> str:
 
 class TestApiVerbs(UnitTestCase):
     def test_every_site_method_answers_only_the_verb_its_name_says(self) -> None:
-        for path, name, function in api_functions():
+        for path, name, function in api_functions(MODULES + AGENT_MODULES):
             methods = frappe.allowed_http_methods_for_whitelisted_func[function]
             verb = expected_verb(name)
             with self.subTest(path):
@@ -62,6 +63,15 @@ class TestApiVerbs(UnitTestCase):
         for path, _, function in api_functions():
             with self.subTest(path):
                 self.assertTrue(getattr(function, "is_tenant_api", False))
+
+    def test_every_agent_endpoint_checks_the_agent_first(self) -> None:
+        # The secret signs the telemetry user in; only the telemetry_api wrapper refuses anyone else.
+        names = set()
+        for path, name, function in api_functions(AGENT_MODULES):
+            names.add(name)
+            with self.subTest(path):
+                self.assertTrue(getattr(function, "is_telemetry_api", False))
+        self.assertEqual(names, {"events", "metrics"})
 
 
 class TestApiInput(UnitTestCase):
