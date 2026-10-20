@@ -34,10 +34,12 @@ The app has three modules, so one CODEOWNERS line can cover each product:
 | --- | --- | --- |
 | **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Tenant, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
 | **Mail** | `suite_cloud/mail` | The mail product: Stalwart Store, Cluster, Node, Egress Gateway and IP Pool, the mail directory (Mail Domain, Mail Account, Mail Group, Mailing List), and the `stalwart`, `cluster` and `tenancy` packages. |
+| **Telemetry** | `suite_cloud/telemetry` | The logs, traces and metrics the agents on the nodes push: the API that stages a batch as parquet, the `Warehouse` that loads the files into Frappe Insights' DuckDB and prunes them, and the Insights dashboards for Stalwart. |
 | **Hosting** | `suite_cloud/hosting` | Suite sites on Frappe Cloud: Region, Virtual Machine, Suite Site, Suite Tenant Request, the `central` clients (Central, Pilot, the site's REST API) and the `machines`, `sites`, `domains` and `capacity` steps. |
 
 The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what any product needs
 (authentication, `ping`, the tenant profile) and `suite_cloud.api.mail` for the mail directory.
+`suite_cloud.api.telemetry` is for the agents on the nodes, not for tenants.
 
 ## The pieces
 
@@ -59,7 +61,8 @@ The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what a
 | **Suite Site** | A Suite site on a server: waiting in the region's pool, or assigned to a tenant, connected to Suite Cloud, given the domain `<label>.<site zone>` and a mail domain `<label>.<tenant mail zone>`, and then invites the tenant's owner. |
 | **Suite Tenant Request** | One request for a hosted workspace: the email, the organization, and a label made from it (Acme Inc. gives acme, or acme-2 when taken) unless one is given. Once the site can send mail, it invites the owner to an account at the tenant's mail domain, and the owner chooses their password when they accept. A signup through the public API confirms its email with a one-time code; one an operator creates in the desk is processed at once. Its Progress table lists every step from the code to the owner's invite, with when it ran and how long it took, and the form shows a progress bar while it runs. |
 | **Tenant Email** | One email Suite Cloud sent for a tenant's site: its type (e.g. `password-reset`), recipient, the Email Account that sent it, and whether it was sent. Kept 90 days. |
-| **Suite Cloud Settings** | Defaults: DNS time-to-live, Stalwart version and download URLs, certificate settings, the public URL of this Suite Cloud, job timeout, and the outgoing Email Account each tenant type's sites send through. |
+| **Suite Cloud Settings** | Defaults: DNS time-to-live, Stalwart version and download URLs, certificate settings, the public URL of this Suite Cloud, job timeout, the outgoing Email Account each tenant type's sites send through, and the telemetry secret and retention. |
+| **Telemetry** | Not a record but a store: the events and metrics the agent on each node pushes to the [telemetry API](docs/api/telemetry.md), kept as the `events` and `metrics` tables of the `suite_cloud_telemetry` data source in Frappe Insights, which Suite Cloud requires. Every batch is staged as a parquet file under the site's private files and loaded every five minutes; rows older than the retention are deleted daily. The shipped **Stalwart** Insights workbook holds the dashboards. |
 
 ## Install
 

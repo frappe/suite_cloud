@@ -1,6 +1,7 @@
 import frappe
 
 from suite_cloud.telemetry import TELEMETRY_USER
+from suite_cloud.telemetry.warehouse import Warehouse
 
 # The role every tenant owner holds: no desk, and on each DocType only what a tenant owns
 # (see suite_cloud.mail.tenancy.permissions). Operators are System Managers.
@@ -16,14 +17,15 @@ def after_migrate() -> None:
 
 
 def setup() -> None:
-    """Creates the roles and the telemetry user and fills new settings defaults; safe to run on
-    every migrate."""
+    """Creates the roles, the telemetry user and store, and fills new settings defaults; safe to
+    run on every migrate."""
 
     for role_name, desk_access in ROLES:
         ensure_role(role_name, desk_access)
 
     ensure_user(TELEMETRY_USER, "Telemetry Agent")
     ensure_setting_defaults()
+    Warehouse().ensure_data_source()
 
 
 def ensure_role(role_name: str, desk_access: int) -> None:

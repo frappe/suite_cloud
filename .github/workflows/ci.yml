@@ -32,6 +32,8 @@ jobs:
             tests: suite_cloud/mail/tests
           - name: Hosting
             tests: suite_cloud/hosting/tests
+          - name: Telemetry
+            tests: suite_cloud/telemetry/tests
 
     services:
       redis-cache:
@@ -109,6 +111,7 @@ jobs:
       - name: Install Suite Cloud
         working-directory: /home/runner/frappe-bench
         run: |
+          bench get-app insights --branch develop --skip-assets  # required by suite_cloud
           bench get-app suite_cloud "$GITHUB_WORKSPACE" --skip-assets
           bench setup requirements --dev
           bench new-site --db-root-password root --admin-password admin test_site

@@ -4,6 +4,7 @@ app_publisher = "Frappe"
 app_description = "Deploys and manages Stalwart mail clusters for Frappe Suite sites"
 app_email = "developers@frappe.io"
 app_license = "agpl-3.0"
+required_apps = ["insights"]  # holds the telemetry the nodes push (suite_cloud.telemetry)
 
 # Send non-GET requests for this app's endpoints as native `application/json`
 # bodies instead of form-encoded, per-key JSON-stringified values.
@@ -54,6 +55,7 @@ scheduler_events = {
             "suite_cloud.hosting.sites.poll_pending_sites",
             "suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request.resume_requests",
             "suite_cloud.hosting.capacity.ensure_site_pool",
+            "suite_cloud.telemetry.warehouse.load_staged_batches",
         ],
     },
     "hourly": [
@@ -72,6 +74,7 @@ scheduler_events = {
         "suite_cloud.mail.doctype.tls_report.tls_report.prune_expired_reports",
         "suite_cloud.hosting.machines.sync_fleet",
         "suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request.expire_requests",
+        "suite_cloud.telemetry.warehouse.prune_expired_rows",
     ],
 }
 
