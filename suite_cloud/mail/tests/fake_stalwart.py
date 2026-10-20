@@ -144,6 +144,13 @@ class FakeStalwart:
         account = self._authenticate(request.headers.get("Authorization"))
         if account is None:
             return json_response(401, {"type": "about:blank", "title": "Unauthorized", "status": 401})
+        if self._is_locked(account):
+            # A role without the authenticate permission (Suite Cloud's disabled role) shuts the
+            # account out of every session, master-user logins included.
+            detail = "You do not have enough permissions to access this resource."
+            return json_response(
+                403, {"type": "about:blank", "title": "Forbidden", "status": 403, "detail": detail}
+            )
 
         if path == "/.well-known/jmap":
             return json_response(200, self._session(account))
@@ -153,6 +160,14 @@ class FakeStalwart:
         if path == "/api/schema":
             return json_response(200, SCHEMA)
         return json_response(404, {"status": 404, "title": "Not Found"})
+
+    def _is_locked(self, account_id: str) -> bool:
+        roles = (self.objects["Account"].get(account_id) or {}).get("roles") or {}
+        role_ids = (roles.get("roleIds") or {}) if roles.get("@type") == "Custom" else {}
+        return any(
+            "authenticate" not in ((self.objects["Role"].get(role_id) or {}).get("enabledPermissions") or {})
+            for role_id in role_ids
+        )
 
     def _authenticate(self, header: str | None) -> str | None:
         """Returns the authenticated account id, or None."""

@@ -49,8 +49,16 @@ def validate(doc) -> None:
 
     before = doc.get_doc_before_save()
     for kind in KINDS:
-        if before is not None and not before.get(kind.field) and doc.stalwart_id and not is_loaded(doc, kind):
-            load(doc, kind)  # an account mirrored for the first time starts from the cluster's list
+        # An account mirrored for the first time starts from the cluster's list. A disabled one
+        # cannot sign in to be asked, so it is mirrored on the first save after it is enabled.
+        if (
+            before is not None
+            and before.enabled
+            and not before.get(kind.field)
+            and doc.stalwart_id
+            and not is_loaded(doc, kind)
+        ):
+            load(doc, kind)
         previous = baseline(doc, before, kind)
         for row in doc.get(kind.field):
             row.allowed_ips = "\n".join(parse_ips(row.allowed_ips))

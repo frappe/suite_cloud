@@ -979,6 +979,21 @@ class TestMailAccount(TenancyTestCase):
         self.assertNotIn(old_id, stored)
         self.assertEqual(sorted(c["description"] for c in stored.values()), ["Phone", "Suite Cloud"])
 
+    def test_a_disabled_account_can_be_enabled(self) -> None:
+        account = self.make_account("ivan@acme.com")
+        self.assertEqual(account.api_keys, [])
+        account.enabled = 0
+        account.save()
+
+        # A disabled account cannot sign in, so its empty API key list is mirrored after it is enabled.
+        account = frappe.get_doc("Mail Account", account.name)
+        account.enabled = 1
+        account.save()
+        account.append("api_keys", {"description": "CI"})
+        account.save()
+        stored = self.fake.objects[f"ApiKey:{account.stalwart_id}"]
+        self.assertEqual([c["description"] for c in stored.values()], ["CI"])
+
     def test_credentials_created_before_a_failed_save_are_revoked_with_it(self) -> None:
         account = self.make_account("heidi@acme.com")
         frappe.db.after_rollback.reset()  # the insert's own callback goes with its commit outside tests
