@@ -67,6 +67,29 @@ class TestSuiteCloudSettings(IntegrationTestCase):
         patch.execute()
         self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELDS[0]), 30)
 
+    def test_telemetry_retention_is_backfilled_for_existing_sites(self) -> None:
+        from suite_cloud.patches.v1_0 import fill_telemetry_retention_default as patch
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, 0)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 90)
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, 30)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 30)
+
+    def test_a_retention_under_a_day_is_refused(self) -> None:
+        self.settings.telemetry_retention_days = 0
+        self.assertRaises(frappe.ValidationError, self.settings.save)
+
+    def test_the_telemetry_user_is_created_without_roles(self) -> None:
+        from suite_cloud.install import TELEMETRY_USER, ensure_user
+
+        ensure_user(TELEMETRY_USER, "Telemetry Agent")
+        ensure_user(TELEMETRY_USER, "Telemetry Agent")  # a second migrate changes nothing
+        user = frappe.get_doc("User", TELEMETRY_USER)
+        self.assertEqual((user.user_type, user.roles), ("Website User", []))
+
     def test_tls_verification_is_backfilled_for_existing_sites(self) -> None:
         from suite_cloud.patches.v1_0 import enable_stalwart_tls_verification as patch
 

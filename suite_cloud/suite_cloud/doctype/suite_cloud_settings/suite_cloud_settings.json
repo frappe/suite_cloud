@@ -18,6 +18,10 @@
   "tenant_email_accounts",
   "column_break_email",
   "use_tenant_title_as_sender_name",
+  "telemetry_section",
+  "telemetry_secret",
+  "column_break_telemetry",
+  "telemetry_retention_days",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -156,6 +160,30 @@
    "fieldname": "use_tenant_title_as_sender_name",
    "fieldtype": "Check",
    "label": "Use Tenant Title as Sender Name"
+  },
+  {
+   "description": "The agents on Stalwart and SFU nodes push logs and metrics to the telemetry API; the loader copies them into Insights.",
+   "fieldname": "telemetry_section",
+   "fieldtype": "Section Break",
+   "label": "Telemetry"
+  },
+  {
+   "description": "The bearer token every telemetry agent sends. Empty: the telemetry API refuses every request. Change it to rotate; agents must get the new value.",
+   "fieldname": "telemetry_secret",
+   "fieldtype": "Password",
+   "label": "Telemetry Secret"
+  },
+  {
+   "fieldname": "column_break_telemetry",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "90",
+   "description": "How long events and metrics are kept in Insights. Older rows are deleted daily.",
+   "fieldname": "telemetry_retention_days",
+   "fieldtype": "Int",
+   "label": "Telemetry Retention (Days)",
+   "reqd": 1
   },
   {
    "fieldname": "stalwart_tab",
@@ -495,7 +523,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-19 12:00:00.000000",
+ "modified": "2026-10-20 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

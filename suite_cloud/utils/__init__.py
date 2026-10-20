@@ -25,6 +25,7 @@ CONFIG_KEYS = (
     "verify_stalwart_tls",
     "dmarc_report_retention_days",
     "tls_report_retention_days",
+    "telemetry_retention_days",
     "central_url",
     "central_team",
     "central_api_key",

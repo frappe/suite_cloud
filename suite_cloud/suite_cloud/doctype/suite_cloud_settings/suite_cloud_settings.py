@@ -58,6 +58,8 @@ class SuiteCloudSettings(Document):
         stalwart_version: DF.Data
         suite_app_ref: DF.Data
         suite_app_repo: DF.Data
+        telemetry_retention_days: DF.Int
+        telemetry_secret: DF.Password | None
         tenant_email_accounts: DF.Table[TenantEmailAccount]
         tenant_mail_zone: DF.Link | None
         tls_report_retention_days: DF.Int
@@ -88,7 +90,7 @@ class SuiteCloudSettings(Document):
             enqueue_recheck_of_vouched_domains()
 
     def validate_report_retention(self) -> None:
-        for field in ("dmarc_report_retention_days", "tls_report_retention_days"):
+        for field in ("dmarc_report_retention_days", "tls_report_retention_days", "telemetry_retention_days"):
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least one day.").format(_(self.meta.get_label(field))))
 
