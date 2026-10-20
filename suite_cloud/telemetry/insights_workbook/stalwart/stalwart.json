@@ -1244,7 +1244,7 @@
    "workbook": "stalwart"
   }
  },
- "creation": "2026-10-20 21:02:07.432479",
+ "creation": "2026-10-20 22:03:31.274225",
  "dashboards": {
   "stalwart-delivery": {
    "items": [
@@ -1851,7 +1851,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-20 21:02:14.371589",
+ "modified": "2026-10-20 22:03:38.850248",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -1871,6 +1871,20 @@
       "type": "table"
      },
      "type": "source"
+    },
+    {
+     "filters": [
+      {
+       "column": {
+        "column_name": "source",
+        "type": "column"
+       },
+       "operator": "=",
+       "value": "stalwart"
+      }
+     ],
+     "logical_operator": "And",
+     "type": "filter_group"
     },
     {
      "data_type": "String",
@@ -1934,6 +1948,20 @@
       "type": "table"
      },
      "type": "source"
+    },
+    {
+     "filters": [
+      {
+       "column": {
+        "column_name": "source",
+        "type": "column"
+       },
+       "operator": "=",
+       "value": "stalwart"
+      }
+     ],
+     "logical_operator": "And",
+     "type": "filter_group"
     },
     {
      "column": {
