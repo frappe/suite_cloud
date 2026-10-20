@@ -108,10 +108,27 @@ class TestWarehouse(IntegrationTestCase):
         self.assertEqual(self.count(EVENTS), 3)
         self.assertEqual(self.spool.get_pending(EVENTS, 10), [])
 
+    def test_a_backlog_drains_in_one_run_chunk_by_chunk(self) -> None:
+        for _ in range(5):
+            self.stage(EVENTS, [event()])
+
+        with (
+            patch("suite_cloud.telemetry.warehouse.BATCH_FILES", 2),
+            patch.object(Warehouse, "load", wraps=self.warehouse.load) as load,
+        ):
+            added = self.warehouse.load_pending()
+
+        self.assertEqual((added, load.call_count), ({"events": 5}, 3))
+        self.assertEqual(self.spool.get_pending(EVENTS, 10), [])
+
     def test_a_file_the_loader_cannot_read_is_moved_aside_and_the_rest_load(self) -> None:
         directory = self.spool.get_directory(EVENTS)
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "0-garbage.parquet").write_bytes(b"not parquet")
+        damaged = self.stage(EVENTS, [event(data='{"k": "%s"}' % ("x" * 2000))], batch_id="0-damaged")
+        content = bytearray(damaged.read_bytes())
+        content[8:40] = b"\xff" * 32  # inside the first data page; the footer and its schema stay intact
+        damaged.write_bytes(content)
         self.spool.write(
             EVENTS, METRICS.get_batch({**ENVELOPE, "batch_id": "0-wrong"}, [metric()]), "0-wrong"
         )
@@ -122,8 +139,11 @@ class TestWarehouse(IntegrationTestCase):
 
         self.assertEqual(added, {"events": 1})
         rejected = self.spool.root / "rejected" / "events"
-        self.assertEqual(sorted(p.name for p in rejected.iterdir()), ["0-garbage.parquet", "0-wrong.parquet"])
-        self.assertEqual(error_log_count(), errors + 2)
+        self.assertEqual(
+            sorted(p.name for p in rejected.iterdir()),
+            ["0-damaged.parquet", "0-garbage.parquet", "0-wrong.parquet"],
+        )
+        self.assertEqual(error_log_count(), errors + 3)
 
     def test_a_lock_that_cannot_be_taken_keeps_the_files_for_the_next_run(self) -> None:
         path = self.stage(EVENTS, [event()])

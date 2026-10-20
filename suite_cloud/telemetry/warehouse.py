@@ -72,32 +72,39 @@ class Warehouse:
         self.register_tables()
 
     def load_pending(self) -> dict[str, int]:
-        """Loads the oldest staged files of every table; returns the rows added per table.
+        """Loads every staged file of every table, oldest first; returns the rows added per table.
 
-        A table whose load fails (the lock timed out, the disk is full) keeps its files for the
-        next run and is logged; the other tables still load.
+        Files go in chunks of BATCH_FILES, each under its own lock, so a dashboard query gets its
+        turn between chunks and a backlog drains in one run. A table whose load fails (the lock
+        timed out, the disk is full) keeps its files for the next run and is logged; the other
+        tables still load.
         """
 
         added = {}
         for table in TABLES:
-            files = self.get_loadable(table)
-            if not files:
-                continue
-            try:
-                added[table.name] = self.load(table, files)
-            except Exception:
-                log_exception(f"Telemetry load of {table.name} deferred")
+            while files := self.get_loadable(table):
+                try:
+                    added[table.name] = added.get(table.name, 0) + self.load(table, files)
+                except Exception:
+                    log_exception(f"Telemetry load of {table.name} deferred")
+                    break
+                if len(files) < BATCH_FILES:
+                    break
         if added:
             self.register_tables()
         return added
 
     def get_loadable(self, table: TelemetryTable) -> list[Path]:
-        """The staged files that carry the table's schema; the others are moved aside."""
+        """The next chunk of staged files that read whole and carry the table's schema.
+
+        Each file is read in full here, outside the lock: a damaged page found inside the insert
+        would fail the whole chunk on every run, so it is moved aside instead.
+        """
 
         files = []
         for path in self.spool.get_pending(table, BATCH_FILES):
             try:
-                schema = parquet.read_schema(path)
+                schema = parquet.read_table(path).schema
             except Exception as e:
                 self.spool.reject(path, str(e))
                 continue
