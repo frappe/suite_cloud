@@ -14,7 +14,7 @@ import pyarrow.parquet as parquet
 from frappe import _
 from frappe.utils import cint
 
-from suite_cloud.telemetry import TABLES, TelemetryTable
+from suite_cloud.telemetry import DIMENSIONS, MAIL_DOMAINS, NODES, TABLES, TelemetryTable
 from suite_cloud.telemetry.spool import Spool
 from suite_cloud.utils import get_config, log_exception
 
@@ -69,6 +69,7 @@ class Warehouse:
         with self.write_connection() as db:
             for table in TABLES:
                 db.raw_sql(table.create_statement)
+        self.refresh_dimensions()
         self.register_tables()
 
     def load_pending(self) -> dict[str, int]:
@@ -90,9 +91,30 @@ class Warehouse:
                     break
                 if len(files) < BATCH_FILES:
                     break
+        try:
+            self.refresh_dimensions()
+        except Exception:
+            log_exception("Telemetry lookup tables not refreshed")
         if added:
             self.register_tables()
         return added
+
+    def refresh_dimensions(self) -> None:
+        """Rewrites the node and mail domain tables from Suite Cloud's records.
+
+        The records are read before the lock is taken, so the file is held only for two small
+        table swaps.
+        """
+
+        batches = {
+            NODES: NODES.get_batch({}, get_node_rows()),
+            MAIL_DOMAINS: MAIL_DOMAINS.get_batch({}, get_mail_domain_rows()),
+        }
+        with self.write_connection() as db:
+            for table, batch in batches.items():
+                db.con.register("dimension", batch)
+                db.con.execute(f'CREATE OR REPLACE TABLE "{table.name}" AS SELECT * FROM dimension')
+                db.con.unregister("dimension")
 
     def get_loadable(self, table: TelemetryTable) -> list[Path]:
         """The next chunk of staged files that read whole and carry the table's schema.
@@ -148,4 +170,24 @@ class Warehouse:
 
         from insights.insights.doctype.insights_table_v3.insights_table_v3 import InsightsTablev3
 
-        InsightsTablev3.bulk_create(self.data_source, [table.name for table in TABLES])
+        InsightsTablev3.bulk_create(self.data_source, [table.name for table in TABLES + DIMENSIONS])
+
+
+def get_node_rows() -> list[dict]:
+    """One row per address of every Stalwart Node, since a batch names its host by address."""
+
+    rows = []
+    fields = ["hostname", "cluster", "role", "location", "status", "ipv4_address", "ipv6_address"]
+    for node in frappe.get_all("Stalwart Node", fields=fields):
+        for address in (node.ipv4_address, node.ipv6_address):
+            if address:
+                rows.append({"host_ip": address, **{key: node[key] for key in fields[:5]}})
+    return rows
+
+
+def get_mail_domain_rows() -> list[dict]:
+    titles = dict(frappe.get_all("Suite Tenant", fields=["name", "title"], as_list=True))
+    return [
+        {"domain": domain.name, "tenant": domain.tenant, "tenant_title": titles.get(domain.tenant)}
+        for domain in frappe.get_all("Mail Domain", fields=["name", "tenant"])
+    ]

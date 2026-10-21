@@ -12,7 +12,7 @@ from duckdb import IOException
 from frappe.tests import IntegrationTestCase
 from frappe.utils import get_files_path
 
-from suite_cloud.mail.tests.fixtures import error_log_count
+from suite_cloud.mail.tests.fixtures import error_log_count, make_cluster, make_node
 from suite_cloud.telemetry import EVENTS, METRICS, TelemetryTable
 from suite_cloud.telemetry.spool import Spool
 from suite_cloud.telemetry.warehouse import Warehouse
@@ -75,7 +75,7 @@ class TestWarehouse(IntegrationTestCase):
         self.warehouse.ensure_data_source()  # a second migrate changes nothing
 
         self.assertTrue(frappe.db.exists("Insights Data Source v3", self.name))
-        self.assertEqual(self.registered(), {"events", "metrics"})
+        self.assertEqual(self.registered(), {"events", "metrics", "nodes", "mail_domains"})
         self.assertEqual((self.count(EVENTS), self.count(METRICS)), (0, 0))
 
     def test_without_insights_the_setup_fails_in_plain_words(self) -> None:
@@ -154,7 +154,7 @@ class TestWarehouse(IntegrationTestCase):
 
         self.assertEqual(added, {})
         self.assertTrue(path.exists())
-        self.assertEqual(error_log_count(), errors + 1)
+        self.assertEqual(error_log_count(), errors + 2)  # the load and the lookup refresh each log once
 
     def test_the_prune_removes_only_rows_past_the_retention(self) -> None:
         self.stage(
@@ -166,6 +166,43 @@ class TestWarehouse(IntegrationTestCase):
         self.warehouse.prune_expired()
 
         self.assertEqual((self.count(EVENTS), self.count(METRICS)), (1, 0))
+
+    def test_node_and_domain_records_are_copied_beside_the_telemetry(self) -> None:
+        cluster = make_cluster()
+        node = make_node(cluster, ipv4="203.0.113.77", ipv6_address="2001:db8::77")
+        # Inserted as rows: the documents' hooks would need an active cluster to push to.
+        tenant = frappe.get_doc(
+            {
+                "doctype": "Suite Tenant",
+                "name": str(uuid7()),
+                "title": "Acme",
+                "tenant_type": "Suite Site",
+                "user": "Administrator",
+            }
+        )
+        tenant.db_insert()
+        frappe.get_doc(
+            {
+                "doctype": "Mail Domain",
+                "domain_name": "acme.frappe.test",
+                "tenant": tenant.name,
+                "cluster": cluster.name,
+            }
+        ).db_insert()
+
+        self.warehouse.load_pending()
+
+        with self.warehouse.write_connection() as db:
+            nodes = db.con.execute(
+                'SELECT host_ip, hostname, cluster FROM "nodes" ORDER BY host_ip'
+            ).fetchall()
+            domains = db.con.execute('SELECT domain, tenant, tenant_title FROM "mail_domains"').fetchall()
+        self.assertEqual(
+            nodes,
+            [("2001:db8::77", node.hostname, cluster.name), ("203.0.113.77", node.hostname, cluster.name)],
+        )
+        self.assertEqual(domains, [("acme.frappe.test", tenant.name, "Acme")])
+        self.assertEqual(self.registered(), {"events", "metrics", "nodes", "mail_domains"})
 
     def test_a_retention_under_a_day_falls_back_to_the_default(self) -> None:
         with patch("suite_cloud.telemetry.warehouse.get_config", return_value=-5):

@@ -85,3 +85,32 @@ METRICS = TelemetryTable(
 )
 
 TABLES = (EVENTS, METRICS)
+
+# Copies of Suite Cloud's own records beside the telemetry, so a dashboard joins on the cluster
+# or the tenant inside one DuckDB instead of across data sources.
+NODES = TelemetryTable(
+    "nodes",
+    pyarrow.schema(
+        [
+            pyarrow.field("host_ip", pyarrow.string(), nullable=False),
+            pyarrow.field("hostname", pyarrow.string(), nullable=False),
+            pyarrow.field("cluster", pyarrow.string(), nullable=False),
+            pyarrow.field("role", pyarrow.string()),
+            pyarrow.field("location", pyarrow.string()),
+            pyarrow.field("status", pyarrow.string()),
+        ]
+    ),
+)
+
+MAIL_DOMAINS = TelemetryTable(
+    "mail_domains",
+    pyarrow.schema(
+        [
+            pyarrow.field("domain", pyarrow.string(), nullable=False),
+            pyarrow.field("tenant", pyarrow.string(), nullable=False),
+            pyarrow.field("tenant_title", pyarrow.string()),
+        ]
+    ),
+)
+
+DIMENSIONS = (NODES, MAIL_DOMAINS)
