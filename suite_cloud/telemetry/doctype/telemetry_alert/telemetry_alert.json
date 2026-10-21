@@ -32,7 +32,7 @@
   },
   {
    "default": "Open",
-   "description": "The checker resolves an alert when its condition clears. Resolve a Silent Host alert yourself when the node was taken out of service.",
+   "description": "The checker resolves an alert when its condition clears. Resolve a Silent Host alert yourself when the node was taken out of service; it stays resolved until the node reports again.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,

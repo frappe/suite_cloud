@@ -9,7 +9,7 @@ from uuid import uuid7
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import get_files_path
+from frappe.utils import get_files_path, now_datetime
 
 from suite_cloud.mail.tests.fixtures import error_log_count
 from suite_cloud.telemetry import EVENTS, METRICS
@@ -129,6 +129,31 @@ class TestAlerts(IntegrationTestCase):
 
         self.report(QUIET, NOW, table=METRICS)
         self.assertEqual(self.alerts.check(), {"opened": 0, "resolved": 1})
+
+    def test_a_silent_node_whose_rows_the_retention_deleted_is_not_recovered(self) -> None:
+        self.report(QUIET, NOW - timedelta(hours=2), table=METRICS)
+        self.alerts.check()
+        with self.warehouse.write_connection() as db:
+            db.con.execute('DELETE FROM "metrics"')
+
+        self.assertEqual(self.alerts.check(), {"opened": 0, "resolved": 0})
+
+        alert = frappe.get_doc("Telemetry Alert", {"host_ip": QUIET})
+        self.assertEqual((alert.status, alert.details), ("Open", "No batch received within the retention."))
+
+    def test_a_silent_host_alert_resolved_by_hand_stays_resolved_until_the_node_reports(self) -> None:
+        self.report(QUIET, NOW - timedelta(minutes=45), table=METRICS)
+        self.alerts.check()
+        alert = frappe.get_doc("Telemetry Alert", {"host_ip": QUIET})
+        alert.status = "Resolved"
+        alert.save()
+
+        self.assertEqual(self.alerts.check(), {"opened": 0, "resolved": 0})
+        self.assertEqual(frappe.db.count("Telemetry Alert"), 1)
+
+        alert.db_set("resolved_at", now_datetime() - timedelta(minutes=50))  # dismissed before the last batch
+        self.assertEqual(self.alerts.check(), {"opened": 1, "resolved": 0})
+        self.assertEqual(frappe.db.count("Telemetry Alert", {"status": "Open"}), 1)
 
     def test_a_quiet_hour_or_a_rate_under_the_threshold_opens_nothing(self) -> None:
         self.report(NOISY, NOW, self.events(errors=4))  # 4%

@@ -11,7 +11,7 @@ from datetime import UTC, datetime, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import cint, get_url_to_form, now_datetime
+from frappe.utils import cint, convert_utc_to_system_timezone, get_url_to_form, now_datetime
 
 from suite_cloud.telemetry.warehouse import Warehouse
 from suite_cloud.utils import get_config, log_exception
@@ -36,6 +36,7 @@ class Finding:
     host_ip: str
     hostname: str | None
     details: str
+    seen_at: datetime | None = None  # a silent host's last batch, in UTC
 
     @property
     def key(self) -> tuple[str, str]:
@@ -77,35 +78,64 @@ class Alerts:
         for finding in findings:
             if alert := open_alerts.pop(finding.key, None):
                 frappe.db.set_value("Telemetry Alert", alert.name, "details", finding.details)
-            else:
+            elif not self.is_dismissed(finding):
                 self.open(finding)
                 opened += 1
         for alert in open_alerts.values():
             self.resolve(alert.name)
         return {"opened": opened, "resolved": len(open_alerts)}
 
+    def is_dismissed(self, finding: Finding) -> bool:
+        """A Silent Host alert resolved by hand stays resolved until the node reports again."""
+
+        if finding.alert_type != SILENT_HOST:
+            return False
+        dismissed_after = convert_utc_to_system_timezone(finding.seen_at).replace(tzinfo=None)
+        return bool(
+            frappe.db.exists(
+                "Telemetry Alert",
+                {
+                    "alert_type": SILENT_HOST,
+                    "host_ip": finding.host_ip,
+                    "status": "Resolved",
+                    "resolved_at": (">=", dismissed_after),
+                },
+            )
+        )
+
     def find_silent_hosts(self, watched: list[str]) -> list[Finding]:
         """Nodes that reported within the lookback, or hold an open alert, but not within the
-        silence: a node silent for longer than the lookback keeps its alert until it is back."""
+        silence. A node with an open alert stays silent until a newer batch proves it is back:
+        past the lookback it keeps its alert, and once the retention has deleted its last rows
+        it is still not recovered."""
 
         now = datetime.now(UTC).replace(tzinfo=None)
         rows = self.warehouse.query(
             'WITH seen AS (SELECT host_ip, hostname, received_at FROM "events" '
             'UNION ALL SELECT host_ip, hostname, received_at FROM "metrics") '
             "SELECT host_ip, arg_max(hostname, received_at), max(received_at) FROM seen "
-            "WHERE received_at >= $lookback OR list_contains($watched, host_ip) "
-            "GROUP BY host_ip HAVING max(received_at) < $silent",
-            {"lookback": now - LOOKBACK, "watched": watched, "silent": now - self.silence},
+            "WHERE received_at >= $lookback OR list_contains($watched, host_ip) GROUP BY host_ip",
+            {"lookback": now - LOOKBACK, "watched": watched},
         )
-        return [
+        silent = now - self.silence
+        findings = [
             Finding(
                 SILENT_HOST,
                 host_ip,
                 hostname,
                 _("No batch received since {0} UTC.").format(last.strftime("%Y-%m-%d %H:%M")),
+                seen_at=last,
             )
             for host_ip, hostname, last in rows
+            if last < silent
         ]
+        seen = {host_ip for host_ip, _hostname, _last in rows}
+        findings += [
+            Finding(SILENT_HOST, host_ip, None, _("No batch received within the retention."))
+            for host_ip in watched
+            if host_ip not in seen
+        ]
+        return findings
 
     def find_error_rates(self) -> list[Finding]:
         """Nodes whose error-level share of the last hour's events is at or over the threshold."""

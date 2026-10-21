@@ -125,7 +125,7 @@ Every five minutes Suite Cloud checks the loaded data and keeps a **Telemetry Al
 
 | Alert | Condition |
 | --- | --- |
-| Silent Host | A node that reported in the last day sent nothing for **Silent Host After (Minutes)**, 30 by default. The alert stays open until the node reports again; resolve it by hand when the node was taken out of service |
+| Silent Host | A node that reported in the last day sent nothing for **Silent Host After (Minutes)**, 30 by default. The alert stays open until a newer batch proves the node is back, even once the retention has deleted its last rows; resolve it by hand when the node was taken out of service, and it stays resolved until the node reports again |
 | Error Rate | More than **Error Rate Alert (%)** of a node's events in the last hour are `error` level, 5 by default, counted only over hours with at least 100 events |
 
 **Telemetry Alert Recipients** get a mail when an alert opens and when it resolves; empty, the records are kept and nobody is mailed.
