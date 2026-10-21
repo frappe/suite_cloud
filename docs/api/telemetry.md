@@ -1,6 +1,6 @@
 # Telemetry
 
-Module `suite_cloud.api.telemetry`. The agent on each Stalwart node, egress gateway or SFU node pushes the node's logs, traces and metrics here as JSON. Suite Cloud stages every accepted batch as a parquet file, copies the files into Frappe Insights' DuckDB every five minutes and deletes rows older than the retention in **Suite Cloud Settings > Telemetry** daily. Operators read the data in the Insights dashboards Suite Cloud ships.
+Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each Stalwart node, egress gateway or SFU node pushes the node's logs, traces and metrics here as JSON. Suite Cloud stages every accepted batch as a parquet file, copies the files into Frappe Insights' DuckDB every five minutes and deletes rows older than the retention in **Suite Cloud Settings > Telemetry** daily. Operators read the data in the Insights dashboards Suite Cloud ships.
 
 | Method | Verb | Purpose |
 | --- | --- | --- |
@@ -70,7 +70,7 @@ The agent also reports the machine it runs on, under the same `source` as the pr
 
 The shipped **Machines** Insights workbook reads these for every source.
 
-For Stalwart, the agent forwards the event names as they stand in Stalwart's log file (`delivery.delivered`, `auth.error`, `smtp.ehlo`, `smtp.dkim-pass`), the metric names (`server.memory`, `queue.count`, `delivery.total-time`) and the keys of the event data (`remoteIp`, `to`, `hostname`, `details`, `elapsed`) unchanged. The shipped dashboards filter on those names; the log at `info` level holds no connection, `auth.failed` or `spam.classify` events, so the dashboards read EHLO, `auth.error` and `message-ingest.spam` instead.
+For Stalwart, the agent reads Stalwart's Prometheus endpoint for the metrics, under Stalwart's own names (`server_memory` on the endpoint is `server.memory` here), and sends a histogram's mean as its `value`. It forwards the event names as they stand in Stalwart's log file (`delivery.delivered`, `auth.error`, `smtp.ehlo`, `smtp.dkim-pass`), the metric names (`server.memory`, `queue.count`, `delivery.total-time`) and the keys of the event data (`remoteIp`, `to`, `hostname`, `details`, `elapsed`) unchanged. The shipped dashboards filter on those names; the log at `info` level holds no connection, `auth.failed` or `spam.classify` events, so the dashboards read EHLO, `auth.error` and `message-ingest.spam` instead.
 
 ```http
 POST /api/v2/method/suite_cloud.api.telemetry.events
