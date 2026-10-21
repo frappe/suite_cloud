@@ -189,17 +189,31 @@ class TestWarehouse(IntegrationTestCase):
                 "cluster": cluster.name,
             }
         ).db_insert()
+        frappe.get_doc(
+            {
+                "doctype": "Egress Gateway",
+                "name": "g1.blr.frappe.test",
+                "hostname": "g1.blr.frappe.test",
+                "cluster": cluster.name,
+                "ipv4_address": "203.0.113.88",
+                "status": "Active",
+            }
+        ).db_insert()
 
         self.warehouse.load_pending()
 
         with self.warehouse.write_connection() as db:
             nodes = db.con.execute(
-                'SELECT host_ip, hostname, cluster FROM "nodes" ORDER BY host_ip'
+                'SELECT host_ip, hostname, cluster, role FROM "nodes" ORDER BY host_ip'
             ).fetchall()
             domains = db.con.execute('SELECT domain, tenant, tenant_title FROM "mail_domains"').fetchall()
         self.assertEqual(
             nodes,
-            [("2001:db8::77", node.hostname, cluster.name), ("203.0.113.77", node.hostname, cluster.name)],
+            [
+                ("2001:db8::77", node.hostname, cluster.name, "full"),
+                ("203.0.113.77", node.hostname, cluster.name, "full"),
+                ("203.0.113.88", "g1.blr.frappe.test", cluster.name, "gateway"),
+            ],
         )
         self.assertEqual(domains, [("acme.frappe.test", tenant.name, "Acme")])
         self.assertEqual(self.registered(), {"events", "metrics", "nodes", "mail_domains"})

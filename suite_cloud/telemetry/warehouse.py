@@ -21,6 +21,7 @@ from suite_cloud.utils import get_config, log_exception
 DATA_SOURCE = "suite_cloud_telemetry"  # the Insights data source and its file under private files
 BATCH_FILES = 200  # files loaded under one lock: with 5000 rows each, seconds of hold at most
 DEFAULT_RETENTION_DAYS = 90
+NODE_FIELDS = ("hostname", "cluster", "location", "status", "ipv4_address")
 
 
 def load_staged_batches() -> None:
@@ -181,15 +182,31 @@ class Warehouse:
 
 
 def get_node_rows() -> list[dict]:
-    """One row per address of every Stalwart Node, since a batch names its host by address."""
+    """One row per address of every Stalwart Node and Egress Gateway, since a batch names its host
+    by address. A gateway runs a Stalwart of its own that sends the cluster's mail, so the
+    dashboards see it as a node of the cluster with the role ``gateway``."""
 
     rows = []
-    fields = ["hostname", "cluster", "role", "location", "status", "ipv4_address", "ipv6_address"]
-    for node in frappe.get_all("Stalwart Node", fields=fields):
-        for address in (node.ipv4_address, node.ipv6_address):
-            if address:
-                rows.append({"host_ip": address, **{key: node[key] for key in fields[:5]}})
+    for node in frappe.get_all("Stalwart Node", fields=[*NODE_FIELDS, "role", "ipv6_address"]):
+        rows += get_host_rows(node, node.role, (node.ipv4_address, node.ipv6_address))
+    for gateway in frappe.get_all("Egress Gateway", fields=NODE_FIELDS):
+        rows += get_host_rows(gateway, "gateway", (gateway.ipv4_address,))
     return rows
+
+
+def get_host_rows(record: dict, role: str, addresses: tuple[str | None, ...]) -> list[dict]:
+    return [
+        {
+            "host_ip": address,
+            "hostname": record.hostname,
+            "cluster": record.cluster,
+            "role": role,
+            "location": record.location,
+            "status": record.status,
+        }
+        for address in addresses
+        if address
+    ]
 
 
 def get_mail_domain_rows() -> list[dict]:
