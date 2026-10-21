@@ -17,6 +17,8 @@ TELEMETRY_LIMITS = (
     "telemetry_records_per_request",
     "telemetry_silence_minutes",
     "telemetry_error_rate_percent",
+    "agent_max_attempts",
+    "agent_metrics_interval_seconds",
 )
 
 
@@ -114,6 +116,8 @@ class SuiteCloudSettings(Document):
         for field in TELEMETRY_LIMITS:
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
+        if cint(self.agent_log_delete_after_days) < 0:
+            frappe.throw(_("Delete Shipped Logs After (Days) cannot be negative; 0 keeps the files."))
         self.rotate_telemetry_secret()
 
     def rotate_telemetry_secret(self) -> None:

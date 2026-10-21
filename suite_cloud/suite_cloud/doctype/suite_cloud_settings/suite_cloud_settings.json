@@ -31,6 +31,15 @@
   "column_break_telemetry_alerts",
   "telemetry_silence_minutes",
   "telemetry_error_rate_percent",
+  "agent_section",
+  "agent_max_attempts",
+  "agent_metrics_interval_seconds",
+  "agent_ship_existing_logs",
+  "agent_log_delete_after_days",
+  "column_break_agent",
+  "agent_built_version",
+  "agent_built_at",
+  "agent_build_error",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -253,6 +262,66 @@
    "fieldtype": "Int",
    "label": "Error Rate Alert (%)",
    "reqd": 1
+  },
+  {
+   "description": "The Suite Cloud Agent runs on every Stalwart node and egress gateway and ships the Stalwart log and host metrics to the telemetry API. Provisioning installs it when the telemetry secret is set and a build exists.",
+   "fieldname": "agent_section",
+   "fieldtype": "Section Break",
+   "label": "Agent"
+  },
+  {
+   "default": "8",
+   "description": "How often the agent retries a batch after a server or network failure before it skips the batch. Rate limits never count.",
+   "fieldname": "agent_max_attempts",
+   "fieldtype": "Int",
+   "label": "Agent Max Attempts",
+   "reqd": 1
+  },
+  {
+   "default": "60",
+   "description": "How often the agent samples the machine and Stalwart's metrics.",
+   "fieldname": "agent_metrics_interval_seconds",
+   "fieldtype": "Int",
+   "label": "Metrics Interval (Seconds)",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "On a node that already holds log files, ship them too the first time the agent starts there. Off: only new lines are shipped.",
+   "fieldname": "agent_ship_existing_logs",
+   "fieldtype": "Check",
+   "label": "Ship Existing Logs"
+  },
+  {
+   "default": "0",
+   "description": "The agent deletes a rotated log file this many days after it was shipped whole. 0: never. The node's tmpfiles rule removes log files after 14 days in any case.",
+   "fieldname": "agent_log_delete_after_days",
+   "fieldtype": "Int",
+   "label": "Delete Shipped Logs After (Days)"
+  },
+  {
+   "fieldname": "column_break_agent",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "The agent version Build Agent last built on this bench host; what provisioning installs.",
+   "fieldname": "agent_built_version",
+   "fieldtype": "Data",
+   "label": "Built Agent Version",
+   "read_only": 1
+  },
+  {
+   "fieldname": "agent_built_at",
+   "fieldtype": "Datetime",
+   "label": "Built At",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.agent_build_error",
+   "fieldname": "agent_build_error",
+   "fieldtype": "Small Text",
+   "label": "Last Build Error",
+   "read_only": 1
   },
   {
    "fieldname": "stalwart_tab",
@@ -592,7 +661,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-21 10:00:00.000000",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
