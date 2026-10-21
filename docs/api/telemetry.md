@@ -70,7 +70,7 @@ The agent also reports the machine it runs on, under the same `source` as the pr
 
 The shipped **Machines** Insights workbook reads these for every source.
 
-For Stalwart, the agent forwards Stalwart's own event names (`delivery.delivered`, `auth.failed`, `smtp.connection-start`), metric names (`server.memory`, `queue.count`, `delivery.total-time`) and the keys of its event data (`remoteIp`, `domain`, `queueId`) unchanged. The shipped dashboards filter on those names.
+For Stalwart, the agent forwards the event names as they stand in Stalwart's log file (`delivery.delivered`, `auth.error`, `smtp.ehlo`, `smtp.dkim-pass`), the metric names (`server.memory`, `queue.count`, `delivery.total-time`) and the keys of the event data (`remoteIp`, `to`, `hostname`, `details`, `elapsed`) unchanged. The shipped dashboards filter on those names; the log at `info` level holds no connection, `auth.failed` or `spam.classify` events, so the dashboards read EHLO, `auth.error` and `message-ingest.spam` instead.
 
 ```http
 POST /api/v2/method/suite_cloud.api.telemetry.events
