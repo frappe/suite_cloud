@@ -172,8 +172,9 @@ def _credentials_from_header() -> tuple[str, str]:
     return name, secret
 
 
-def throttle(subject: str) -> None:
-    """A fixed one-minute window per subject (a tenant, or an address that failed to authenticate)."""
+def throttle(subject: str, limit: int = RATE_LIMIT) -> None:
+    """A fixed one-minute window per subject (a tenant, a node, or an address that failed to
+    authenticate)."""
 
     if not getattr(frappe.local, "request", None):
         return
@@ -183,11 +184,9 @@ def throttle(subject: str) -> None:
     count = frappe.cache.incr(key)
     if count == 1:
         frappe.cache.expire(key, 90)
-    if count > RATE_LIMIT:
+    if count > limit:
         frappe.throw(
-            _("The tenant sent more than {0} requests in a minute. Wait a moment and try again.").format(
-                RATE_LIMIT
-            ),
+            _("More than {0} requests in a minute. Wait a moment and try again.").format(limit),
             frappe.TooManyRequestsError,
         )
 

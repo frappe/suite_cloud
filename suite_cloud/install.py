@@ -1,5 +1,8 @@
 import frappe
 
+from suite_cloud.telemetry import TELEMETRY_USER
+from suite_cloud.telemetry.warehouse import Warehouse
+
 # The role every tenant owner holds: no desk, and on each DocType only what a tenant owns
 # (see suite_cloud.mail.tenancy.permissions). Operators are System Managers.
 ROLES = (("Suite Tenant", 0),)
@@ -14,12 +17,15 @@ def after_migrate() -> None:
 
 
 def setup() -> None:
-    """Creates the roles and fills new settings defaults; safe to run on every migrate."""
+    """Creates the roles, the telemetry user and store, and fills new settings defaults; safe to
+    run on every migrate."""
 
     for role_name, desk_access in ROLES:
         ensure_role(role_name, desk_access)
 
+    ensure_user(TELEMETRY_USER, "Telemetry Agent")
     ensure_setting_defaults()
+    Warehouse().ensure_data_source()
 
 
 def ensure_role(role_name: str, desk_access: int) -> None:
@@ -29,6 +35,22 @@ def ensure_role(role_name: str, desk_access: int) -> None:
         ).insert(ignore_permissions=True)
     elif frappe.db.get_value("Role", role_name, "desk_access") != desk_access:
         frappe.db.set_value("Role", role_name, "desk_access", desk_access)
+
+
+def ensure_user(email: str, first_name: str) -> None:
+    """A Website User with no roles: it can reach nothing but the API its credential is for."""
+
+    if frappe.db.exists("User", email):
+        return
+    frappe.get_doc(
+        {
+            "doctype": "User",
+            "email": email,
+            "first_name": first_name,
+            "user_type": "Website User",
+            "send_welcome_email": 0,
+        }
+    ).insert(ignore_permissions=True)
 
 
 def ensure_setting_defaults() -> None:

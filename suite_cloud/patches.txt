@@ -21,3 +21,5 @@ suite_cloud.patches.v1_0.drop_suite_cloud_manager_role
 suite_cloud.patches.v1_0.grant_owner_role
 suite_cloud.patches.v1_0.mark_default_cluster
 suite_cloud.patches.v1_0.drop_notification_accounts
+suite_cloud.patches.v1_0.fill_telemetry_retention_default
+suite_cloud.patches.v1_0.fill_telemetry_limit_defaults

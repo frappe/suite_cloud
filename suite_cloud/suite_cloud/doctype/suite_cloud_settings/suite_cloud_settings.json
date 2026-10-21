@@ -18,6 +18,19 @@
   "tenant_email_accounts",
   "column_break_email",
   "use_tenant_title_as_sender_name",
+  "telemetry_section",
+  "telemetry_secret",
+  "telemetry_previous_secret",
+  "telemetry_previous_secret_until",
+  "column_break_telemetry",
+  "telemetry_retention_days",
+  "telemetry_requests_per_minute",
+  "telemetry_records_per_request",
+  "telemetry_alerts_section",
+  "telemetry_alert_recipients",
+  "column_break_telemetry_alerts",
+  "telemetry_silence_minutes",
+  "telemetry_error_rate_percent",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -156,6 +169,90 @@
    "fieldname": "use_tenant_title_as_sender_name",
    "fieldtype": "Check",
    "label": "Use Tenant Title as Sender Name"
+  },
+  {
+   "description": "The agents on Stalwart and SFU nodes push logs and metrics to the telemetry API; the loader copies them into Insights.",
+   "fieldname": "telemetry_section",
+   "fieldtype": "Section Break",
+   "label": "Telemetry"
+  },
+  {
+   "description": "The bearer token every telemetry agent sends. Empty: the telemetry API refuses every request. Change it to rotate: the old value moves to Previous Secret and stays accepted for a day, so agents can be updated one by one.",
+   "fieldname": "telemetry_secret",
+   "fieldtype": "Password",
+   "label": "Telemetry Secret"
+  },
+  {
+   "description": "The secret before the last rotation, accepted until the time below. Clear it to end the overlap early.",
+   "fieldname": "telemetry_previous_secret",
+   "fieldtype": "Password",
+   "label": "Telemetry Previous Secret"
+  },
+  {
+   "description": "When the previous secret stops being accepted.",
+   "fieldname": "telemetry_previous_secret_until",
+   "fieldtype": "Datetime",
+   "label": "Previous Secret Accepted Until"
+  },
+  {
+   "fieldname": "column_break_telemetry",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "90",
+   "description": "How long events and metrics are kept in Insights. Older rows are deleted daily.",
+   "fieldname": "telemetry_retention_days",
+   "fieldtype": "Int",
+   "label": "Telemetry Retention (Days)",
+   "reqd": 1
+  },
+  {
+   "default": "300",
+   "description": "How many requests one node may send per minute, counted by its address.",
+   "fieldname": "telemetry_requests_per_minute",
+   "fieldtype": "Int",
+   "label": "Telemetry Requests per Minute",
+   "reqd": 1
+  },
+  {
+   "default": "5000",
+   "description": "How many records one request may hold. Larger batches mean fewer requests; each is validated whole.",
+   "fieldname": "telemetry_records_per_request",
+   "fieldtype": "Int",
+   "label": "Telemetry Records per Request",
+   "reqd": 1
+  },
+  {
+   "description": "Every five minutes, a Telemetry Alert is opened for a node that stopped reporting or logs too many errors, and resolved when the condition clears.",
+   "fieldname": "telemetry_alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Telemetry Alerts"
+  },
+  {
+   "description": "Email addresses to notify when an alert opens or resolves, separated by commas or lines. Empty: alerts are recorded but nobody is mailed.",
+   "fieldname": "telemetry_alert_recipients",
+   "fieldtype": "Small Text",
+   "label": "Telemetry Alert Recipients"
+  },
+  {
+   "fieldname": "column_break_telemetry_alerts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "30",
+   "description": "A node that reported in the last day but sent nothing for this long is a Silent Host.",
+   "fieldname": "telemetry_silence_minutes",
+   "fieldtype": "Int",
+   "label": "Silent Host After (Minutes)",
+   "reqd": 1
+  },
+  {
+   "default": "5",
+   "description": "A node whose error-level events exceed this share of its events in the last hour (at least 100 events) has an Error Rate alert.",
+   "fieldname": "telemetry_error_rate_percent",
+   "fieldtype": "Int",
+   "label": "Error Rate Alert (%)",
+   "reqd": 1
   },
   {
    "fieldname": "stalwart_tab",
@@ -495,7 +592,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-19 12:00:00.000000",
+ "modified": "2026-10-21 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

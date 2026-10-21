@@ -7,18 +7,19 @@ This guide sets up a development site for Suite Cloud. Each part builds on the p
 | The tenant API, DocTypes and the test suite | [A bench and a site](#1-a-bench-and-a-site) and [tests and lint](#2-tests-and-lint) |
 | Mail on a real Stalwart cluster | Also [DNS zones](#3-dns-zones) and [a Stalwart cluster](#4-a-stalwart-cluster) |
 | Hosting Suite sites on Frappe Cloud | Also [a Cloudflare tunnel](#5-a-cloudflare-tunnel) and [Frappe Cloud](#6-frappe-cloud) |
+| The telemetry API and the Insights dashboards | [A bench and a site](#1-a-bench-and-a-site), [tests and lint](#2-tests-and-lint) and [telemetry](#8-telemetry) |
 
 The tests need none of the outside services. They use fakes of Stalwart, Central, Pilot, the hosted site and the DNS providers.
 
 ## 1. A bench and a site
 
-Suite Cloud runs on Frappe `develop` with Python 3.14, MariaDB and Redis.
+Suite Cloud runs on Frappe `develop` with Python 3.14, MariaDB and Redis. It requires [Frappe Insights](https://github.com/frappe/insights) `develop`, which holds the telemetry the nodes push.
 
 1. Create a bench: `bench init --python python3.14 suite-bench`.
-2. Get the app: `bench get-app https://github.com/frappe/suite_cloud`.
+2. Get the apps: `bench get-app insights` and `bench get-app https://github.com/frappe/suite_cloud`.
 3. Install the development tools: `bench setup requirements --dev`.
 4. Create a site: `bench new-site suite-cloud.localhost`.
-5. Install the app: `bench --site suite-cloud.localhost install-app suite_cloud`.
+5. Install the app: `bench --site suite-cloud.localhost install-app suite_cloud`. This installs Insights first.
 6. Turn on developer mode: `bench --site suite-cloud.localhost set-config developer_mode 1`.
 7. Start the bench: `bench start`.
 
@@ -35,7 +36,7 @@ bench --site suite-cloud.localhost set-config allow_tests true
 bench --site suite-cloud.localhost run-tests --app suite_cloud --module suite_cloud.hosting.tests.test_signup
 ```
 
-CI runs each test module on its own, in three jobs: Core (`suite_cloud/tests`), Mail (`suite_cloud/mail/tests`) and Hosting (`suite_cloud/hosting/tests`). Run the modules of the folder you changed.
+CI runs each test module on its own, in four jobs: Core (`suite_cloud/tests`), Mail (`suite_cloud/mail/tests`), Hosting (`suite_cloud/hosting/tests`) and Telemetry (`suite_cloud/telemetry/tests`). Run the modules of the folder you changed.
 
 The tests create records under `.frappe.test` and delete only those. So you can run them on the site that holds your real cluster and zones.
 
@@ -173,3 +174,22 @@ Servers and VPSs cost money until you remove them:
 2. Click **Terminate** on each Virtual Machine.
 3. Set **Ready Sites per Region** to 0 so that the pool does not create new sites.
 4. Delete the Stalwart VPS at its provider when you no longer need the cluster.
+
+## 8. Telemetry
+
+The agent on each node pushes logs and metrics to the [telemetry API](api/telemetry.md). Suite Cloud stages each batch as a parquet file under `private/files/telemetry/` and the five-minute job copies the files into the `suite_cloud_telemetry` DuckDB data source in Insights, which `migrate` creates.
+
+1. In **Suite Cloud Settings > Telemetry**, set a **Telemetry Secret**.
+2. Send a batch:
+
+   ```sh
+   curl -X POST http://suite-cloud.localhost:8000/api/v2/method/suite_cloud.api.telemetry.events \
+     -H "Authorization: Bearer <secret>" -H "Content-Type: application/json" \
+     -d '{"source": "stalwart", "host_ip": "203.0.113.5", "hostname": "n1", "records": [{"timestamp": "2026-10-20T09:59:00Z", "level": "info", "event": "delivery.delivered", "data": {"domain": "example.com"}}]}'
+   ```
+
+3. Load it without waiting for the scheduler: `bench --site suite-cloud.localhost execute suite_cloud.telemetry.warehouse.load_staged_batches`.
+4. To see an alert, set **Telemetry Alert Recipients** and run `bench --site suite-cloud.localhost execute suite_cloud.telemetry.alerts.check_telemetry_alerts` once the node from step 2 has been quiet for the configured minutes: a **Telemetry Alert** opens, and resolves on the next check after another batch.
+5. Open Insights and the **Stalwart Mail** workbook. Its dashboards read the `events` and `metrics` tables live. The `nodes` and `mail_domains` tables beside them are copies of the Stalwart Node, Egress Gateway and Mail Domain records, refreshed by the same job, which the Tenants and Clusters dashboards join on; a gateway is a node of its cluster with the role `gateway`. A delivery is attributed to the tenant by its sender domain, an incoming message by its recipient domain. The DMARC and TLS dashboards read the DMARC Report and TLS Report records live through the `Site DB` data source Insights ships; they need no telemetry. The **Machines** workbook reads the `host.*` metrics of every source, Stalwart and SFU nodes alike.
+
+The workbook ships in `suite_cloud/telemetry/insights_workbook/stalwart/stalwart.json`. With developer mode on, every change you save in the Insights UI writes that file again, so edit the dashboards there and commit the file. A new workbook becomes a shipped one with `frappe.get_doc("Insights Workbook", name).mark_as_standard(name="<file name>", module="Telemetry")` in a console. The shipped name never changes: a rename deletes the workbook on every site and creates a new one.
