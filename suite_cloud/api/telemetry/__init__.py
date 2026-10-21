@@ -7,7 +7,6 @@ the warehouse loads it later. Nothing here touches the site database.
 """
 
 import ipaddress
-import json
 import math
 import re
 import secrets
@@ -18,6 +17,7 @@ from typing import NoReturn
 from uuid import UUID, uuid7
 
 import frappe
+import orjson
 from frappe import _
 from frappe.utils import cint, get_datetime, now_datetime
 from frappe.utils.password import get_decrypted_password
@@ -257,4 +257,4 @@ class Record:
             return None
         if not isinstance(value, dict):
             self.refuse(key, _("must be an object"))
-        return json.dumps(value, separators=(",", ":"))
+        return orjson.dumps(value).decode()  # a tenth of the standard encoder's time per record
