@@ -43,12 +43,25 @@ class AgentBuild:
     on its own and a VERSION bump stays a human signal.
     """
 
-    def __init__(self, root: Path | None = None, source: Path | None = None) -> None:
+    def __init__(
+        self, root: Path | None = None, source: Path | None = None, version: str | None = None
+    ) -> None:
         self.root = root or Path(frappe.get_site_path("private", "files", "agent")).resolve()
         self.source = source or source_dir()
+        self.pinned_version = version
+
+    @classmethod
+    def last_built(cls, **kwargs) -> AgentBuild | None:
+        """The build the settings record as last completed, whatever the sources say now: what
+        the nodes get until the next build finishes."""
+
+        version = get_config("agent_built_version")
+        return cls(version=version, **kwargs) if version else None
 
     @property
     def version(self) -> str:
+        if self.pinned_version:
+            return self.pinned_version
         return f"{(self.source / 'VERSION').read_text().strip()}+{self.source_digest[:8]}"
 
     @property

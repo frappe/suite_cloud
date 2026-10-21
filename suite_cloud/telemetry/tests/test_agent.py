@@ -47,8 +47,8 @@ class AgentBuildFixture(IntegrationTestCase):
         self.addCleanup(clear_config_cache)
         self.built_before = frappe.db.get_single_value("Suite Cloud Settings", "agent_built_version")
 
-    def build(self) -> AgentBuild:
-        return AgentBuild(root=self.root, source=self.source)
+    def build(self, **kwargs) -> AgentBuild:
+        return AgentBuild(root=self.root, source=self.source, **kwargs)
 
 
 class TestAgentBuild(AgentBuildFixture):
@@ -160,7 +160,13 @@ class TestAgentDeploy(AgentBuildFixture):
                 "Egress Gateway", self.gateway.name, force=True, ignore_permissions=True, ignore_on_trash=True
             )
         )
-        self.with_build = patch.object(deploy, "AgentBuild", lambda: self.build())
+        fixture = self
+
+        class FixtureBuild(AgentBuild):
+            def __init__(self, version: str | None = None) -> None:
+                super().__init__(root=fixture.root, source=fixture.source, version=version)
+
+        self.with_build = patch.object(deploy, "AgentBuild", FixtureBuild)
         self.with_build.start()
         self.addCleanup(self.with_build.stop)
 
@@ -214,6 +220,13 @@ class TestAgentDeploy(AgentBuildFixture):
         self.assertIn("User=stalwart", variables["agent_systemd_unit"])
         self.assertIn("agent-secret", variables["__secret_values__"])
         self.assertIn(self.cluster.get_password("metrics_password"), variables["__secret_values__"])
+
+        # Sources change before the next build finishes: the nodes keep getting the last build.
+        (self.source / "cmd" / "main.go").write_text("package main\n\nfunc main() {}\n")
+        self.assertNotEqual(self.build().version, version)
+        self.assertEqual(deploy.agent_variables(self.node)["agent_version"], version)
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+            self.assertIn(version, deploy.install_agent(self.node).title)
 
         settings = frappe.get_single("Suite Cloud Settings")
         settings.telemetry_secret = ""

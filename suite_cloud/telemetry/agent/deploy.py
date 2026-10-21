@@ -121,8 +121,8 @@ def agent_variables(server: Document) -> dict:
     }
     if not has_secret():
         return disabled
-    build = AgentBuild()
-    if not build.is_built:
+    build = AgentBuild.last_built()
+    if not build or not build.is_built:
         log_error(
             "Agent not built",
             f"{server.hostname}: telemetry is on but no agent build exists; run Build Agent.",
@@ -148,13 +148,14 @@ def install_agent(server: Document) -> Document:
 
     if not has_secret():
         frappe.throw(_("Set the Telemetry Secret in Suite Cloud Settings first."))
-    if not AgentBuild().is_built:
+    build = AgentBuild.last_built()
+    if not build or not build.is_built:
         frappe.throw(_("No agent build on this bench host; run Build Agent in Suite Cloud Settings first."))
     is_gateway = server.doctype == "Egress Gateway"
     return create_server_job(
         server,
         PLAYBOOK,
-        title=f"Install agent {AgentBuild().version} on {server.hostname}",
+        title=f"Install agent {build.version} on {server.hostname}",
         context={"gateway" if is_gateway else "node": server.name},
         variables_builder=GATEWAY_BUILDER if is_gateway else NODE_BUILDER,
     )

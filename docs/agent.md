@@ -71,7 +71,7 @@ Stalwart's Prometheus endpoint is part of the cluster plan: it is turned on with
 
 ## Building
 
-Suite Cloud builds the agent on the bench host with the Go toolchain found on `PATH` or at `/usr/local/go/bin/go`. **Build Agent** in Suite Cloud Settings queues a build; a migrate queues one when the agent's sources changed since the last build. The build compiles `linux/amd64` and `linux/arm64` into `private/files/agent/<version>/` under the site, records the version in **Built Agent Version**, and keeps the previous build so a job in progress can finish. A failure is shown in **Last Build Error** and in an Error Log. The version is the `agent/VERSION` file plus a digest of the sources, so the node's version check installs a changed binary without a bump.
+Suite Cloud builds the agent on the bench host with the Go toolchain found on `PATH` or at `/usr/local/go/bin/go`. **Build Agent** in Suite Cloud Settings queues a build; a migrate queues one when the agent's sources changed since the last build. The build compiles `linux/amd64` and `linux/arm64` into `private/files/agent/<version>/` under the site, records the version in **Built Agent Version**, and keeps the previous build so a job in progress can finish. Provisioning installs the build recorded there, so a source change that is not built yet never stops a running agent. A failure is shown in **Last Build Error** and in an Error Log. The version is the `agent/VERSION` file plus a digest of the sources, so the node's version check installs a changed binary without a bump.
 
 ## Installing by hand
 
