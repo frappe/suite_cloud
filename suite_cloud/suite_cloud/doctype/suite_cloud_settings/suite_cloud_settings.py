@@ -247,6 +247,17 @@ class SuiteCloudSettings(Document):
         return [{"value": t["name"], "label": team_label(t)} for t in teams]
 
     @frappe.whitelist()
+    def build_agent(self) -> dict:
+        """Queues a build of the agent for every node architecture; one build runs at a time."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent import build
+
+        if not build.find_go():
+            frappe.throw(_("No Go toolchain found on this bench host (PATH or /usr/local/go/bin/go)."))
+        return {"queued": build.enqueue_build(), "version": build.AgentBuild().version}
+
+    @frappe.whitelist()
     def sync_regions(self) -> int:
         frappe.only_for("System Manager")
         from suite_cloud.hosting.doctype.region.region import sync_regions
