@@ -20,6 +20,15 @@ TELEMETRY_LIMITS = (
     "agent_max_attempts",
     "agent_metrics_interval_seconds",
 )
+# What the agent's own config check accepts (agent/internal/config/validate.go); a value outside
+# would install a config the agent refuses to start with.
+AGENT_RANGES = {
+    "telemetry_requests_per_minute": (1, 100000),
+    "telemetry_records_per_request": (1, 100000),
+    "agent_max_attempts": (1, 1000),
+    "agent_metrics_interval_seconds": (5, 3600),
+    "agent_log_delete_after_days": (0, 100000),
+}
 
 
 class SuiteCloudSettings(Document):
@@ -116,8 +125,11 @@ class SuiteCloudSettings(Document):
         for field in TELEMETRY_LIMITS:
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
-        if cint(self.agent_log_delete_after_days) < 0:
-            frappe.throw(_("Delete Shipped Logs After (Days) cannot be negative; 0 keeps the files."))
+        for field, (low, high) in AGENT_RANGES.items():
+            if not low <= cint(self.get(field)) <= high:
+                frappe.throw(
+                    _("{0} must be between {1} and {2}.").format(_(self.meta.get_label(field)), low, high)
+                )
         self.rotate_telemetry_secret()
 
     def rotate_telemetry_secret(self) -> None:

@@ -114,12 +114,18 @@ class TestSuiteCloudSettings(IntegrationTestCase):
                 settings.set(field, 0)
                 self.assertRaisesRegex(frappe.ValidationError, "at least 1", settings.save)
 
-    def test_log_deletion_days_cannot_be_negative(self) -> None:
-        self.settings.agent_log_delete_after_days = -1
-        self.assertRaisesRegex(frappe.ValidationError, "negative", self.settings.save)
+    def test_agent_settings_stay_within_what_the_agent_accepts(self) -> None:
+        from suite_cloud.suite_cloud.doctype.suite_cloud_settings.suite_cloud_settings import AGENT_RANGES
 
-        self.settings.reload()
+        for field, (low, high) in AGENT_RANGES.items():
+            for value in (low - 1, high + 1):
+                with self.subTest(field=field, value=value):
+                    settings = frappe.get_single("Suite Cloud Settings")
+                    settings.set(field, value)
+                    self.assertRaisesRegex(frappe.ValidationError, "between|at least 1", settings.save)
+
         self.settings.agent_log_delete_after_days = 0
+        self.settings.agent_metrics_interval_seconds = 5
         self.settings.save()
         self.assertEqual(get_config("agent_log_delete_after_days"), 0)
 
