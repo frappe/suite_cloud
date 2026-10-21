@@ -7,8 +7,10 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.mail.tests.fixtures import error_log_count
-from suite_cloud.telemetry.agent import build
+from suite_cloud.mail.cluster import bootstrap, egress
+from suite_cloud.mail.tests.fixtures import configure_settings, error_log_count, make_cluster, make_node
+from suite_cloud.provisioning.ansible import playbook_task_names
+from suite_cloud.telemetry.agent import build, deploy
 from suite_cloud.telemetry.agent.build import ARCHITECTURES, AgentBuild, AgentBuildError
 from suite_cloud.utils import clear_config_cache
 
@@ -131,3 +133,123 @@ class TestAgentBuild(AgentBuildFixture):
         ):
             self.assertEqual(settings.build_agent()["queued"], True)
 
+
+class TestAgentDeploy(AgentBuildFixture):
+    def setUp(self) -> None:
+        super().setUp()
+        frappe.flags.do_not_enqueue = True
+        self.addCleanup(lambda: setattr(frappe.flags, "do_not_enqueue", False))
+        configure_settings()
+        settings = frappe.get_single("Suite Cloud Settings")
+        settings.telemetry_secret = "agent-secret"
+        settings.public_url = "https://cloud.example.test"
+        settings.save()
+        clear_config_cache()
+        self.cluster = make_cluster()
+        self.node = make_node(self.cluster)
+        self.gateway = frappe.get_doc(
+            {
+                "doctype": "Egress Gateway",
+                "cluster": self.cluster.name,
+                "ipv4_address": "203.0.113.50",
+                "ssh_host_keys": "203.0.113.50 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFakeHostKeyForTests",
+            }
+        ).insert()
+        self.addCleanup(
+            lambda: frappe.delete_doc(
+                "Egress Gateway", self.gateway.name, force=True, ignore_permissions=True, ignore_on_trash=True
+            )
+        )
+        self.with_build = patch.object(deploy, "AgentBuild", lambda: self.build())
+        self.with_build.start()
+        self.addCleanup(self.with_build.stop)
+
+    def test_agent_config_for_a_node_a_gateway_and_an_outbound_node(self) -> None:
+        config = deploy.agent_config(self.node)
+        self.assertEqual(config["suite_cloud"]["url"], "https://cloud.example.test")
+        self.assertEqual(config["suite_cloud"]["secret"], "agent-secret")
+        self.assertEqual(
+            (config["suite_cloud"]["requests_per_minute"], config["suite_cloud"]["records_per_request"]),
+            (300, 5000),
+        )
+        self.assertEqual(config["suite_cloud"]["max_attempts"], 8)
+        self.assertEqual(
+            config["node"],
+            {"source": "stalwart", "host_ip": self.node.ipv4_address, "hostname": self.node.hostname},
+        )
+        self.assertEqual(config["logs"][0]["path"], "/var/log/stalwart/stalwart.*")
+        self.assertEqual(
+            (config["logs"][0]["ship_existing"], config["logs"][0]["delete_after_days"]), (False, 0)
+        )
+        self.assertEqual(config["metrics"]["interval_seconds"], 60)
+        stalwart = config["metrics"]["stalwart"]
+        self.assertEqual(stalwart["url"], "https://127.0.0.1:443/metrics/prometheus")
+        self.assertEqual(
+            (stalwart["username"], stalwart["tls_server_name"]), ("telemetry", self.node.hostname)
+        )
+        self.assertEqual(stalwart["password"], self.cluster.get_password("metrics_password"))
+        self.assertTrue(stalwart["verify_tls"])
+
+        gateway_config = deploy.agent_config(self.gateway)
+        self.assertEqual(gateway_config["node"]["host_ip"], "203.0.113.50")
+        self.assertEqual(
+            gateway_config["metrics"]["stalwart"]["password"], self.gateway.get_password("metrics_password")
+        )
+
+        outbound = make_node(self.cluster, ipv4="203.0.113.11", role="outbound")
+        self.assertNotIn("stalwart", deploy.agent_config(outbound)["metrics"])
+
+    def test_agent_variables_follow_the_settings_and_the_build(self) -> None:
+        self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])  # no build yet
+        version = self.build().run()
+
+        variables = deploy.agent_variables(self.node)
+        self.assertTrue(variables["agent_enabled"])
+        self.assertEqual(variables["agent_version"], version)
+        self.assertEqual(
+            variables["agent_binaries"],
+            {arch: str(self.build().binary_path(arch)) for arch in ("x86_64", "aarch64")},
+        )
+        self.assertIn('"host_ip": "203.0.113.10"', variables["agent_config_json"])
+        self.assertIn("User=stalwart", variables["agent_systemd_unit"])
+        self.assertIn("agent-secret", variables["__secret_values__"])
+        self.assertIn(self.cluster.get_password("metrics_password"), variables["__secret_values__"])
+
+        settings = frappe.get_single("Suite Cloud Settings")
+        settings.telemetry_secret = ""
+        settings.save()
+        clear_config_cache()
+        self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])
+
+    def test_node_and_gateway_jobs_carry_the_agent_variables_as_secrets(self) -> None:
+        self.build().run()
+        for variables in (
+            bootstrap.build_node_variables({"node": self.node.name}),
+            egress.build_gateway_variables({"gateway": self.gateway.name}),
+        ):
+            self.assertIn("agent_config_json", variables["__secret_keys__"])
+            self.assertIn("agent-secret", variables["__secret_values__"])
+            self.assertTrue(variables["agent_enabled"])
+            self.assertIn("agent-secret", variables["agent_config_json"])
+
+        names = playbook_task_names("configure-node.yml")
+        self.assertLess(names.index("Install the Stalwart binary"), names.index("Install the agent binary"))
+        self.assertIn("Stop the agent while telemetry is off", playbook_task_names("upgrade-stalwart.yml"))
+
+    def test_install_agent_jobs(self) -> None:
+        self.assertRaisesRegex(frappe.ValidationError, "Build Agent", deploy.install_agent, self.node)
+        version = self.build().run()
+
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+            job = deploy.install_agent(self.node)
+            self.assertEqual(
+                (job.playbook, job.callback, job.server), ("install-agent.yml", None, self.node.name)
+            )
+            self.assertIn(version, job.title)
+            self.assertEqual(frappe.db.get_value("Stalwart Node", self.node.name, "status"), self.node.status)
+
+            self.node.db_set("status", "Active")
+            self.gateway.db_set("status", "Active")
+            jobs = deploy.upgrade_agents(self.cluster)
+            servers = {frappe.db.get_value("Server Job", name, "server") for name in jobs}
+            self.assertEqual(servers, {self.node.name, self.gateway.name})

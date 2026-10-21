@@ -501,6 +501,7 @@ def upgrade_gateway(gateway: Document) -> Document:
 
 def build_gateway_variables(context: dict) -> dict:
     from suite_cloud.mail.cluster.bootstrap import SECRET_VARIABLES
+    from suite_cloud.telemetry.agent.deploy import agent_variables
     from suite_cloud.utils import get_config
 
     gateway = frappe.get_doc("Egress Gateway", context["gateway"])
@@ -537,6 +538,9 @@ def build_gateway_variables(context: dict) -> dict:
             *plan.secret_strings(recovery_plan),
         ],
     }
+    agent = agent_variables(gateway)
+    variables["__secret_values__"] += agent.pop("__secret_values__")
+    variables.update(agent)
     return variables
 
 
