@@ -19,9 +19,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 20
     },
@@ -87,9 +87,9 @@
     ],
     "rows": [
      {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      {
       "column_name": "mount",
@@ -281,9 +281,9 @@
     ],
     "rows": [
      {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      {
       "column_name": "host_ip",
@@ -300,7 +300,7 @@
      {
       "data_type": "Decimal",
       "expression": {
-       "expression": "max(value, where=metric == 'host.uptime.seconds') / 86400",
+       "expression": "value.argmax(timestamp, where=metric == 'host.uptime.seconds') / 86400",
        "type": "expression"
       },
       "measure_name": "Uptime Days"
@@ -334,7 +334,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "A host whose last sample is old has a silent agent.",
+   "info": "Uptime is the latest sample, so a reboot shows at once. A host whose last sample is old has a silent agent.",
    "name": "machines-hosts",
    "query": "machines-host-metrics",
    "sort_order": 11,
@@ -429,7 +429,7 @@
      {
       "data_type": "Integer",
       "expression": {
-       "expression": "distinct_count(hostname)",
+       "expression": "distinct_count(host)",
        "type": "expression"
       },
       "id": "Hosts",
@@ -496,9 +496,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 20
     },
@@ -555,9 +555,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 20
     },
@@ -673,9 +673,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 20
     },
@@ -713,7 +713,7 @@
    "workbook": "machines"
   }
  },
- "creation": "2026-10-21 10:34:52.998846",
+ "creation": "2026-10-21 12:17:19.414696",
  "dashboards": {
   "machines-overview": {
    "items": [
@@ -751,23 +751,23 @@
      "icon": "server",
      "layout": {
       "h": 2,
-      "i": "filter-hostname",
+      "i": "filter-host",
       "w": 4,
       "x": 4,
       "y": 0
      },
      "links": {
-      "machines-cpu": "`machines-host-metrics`.`hostname`",
-      "machines-disk": "`machines-host-metrics`.`hostname`",
-      "machines-disk-growth-gib": "`machines-host-metrics`.`hostname`",
-      "machines-disk-i-o-mib-s": "`machines-host-metrics`.`hostname`",
-      "machines-hosts": "`machines-host-metrics`.`hostname`",
-      "machines-load": "`machines-host-metrics`.`hostname`",
-      "machines-machine-readings": "`machines-host-metrics`.`hostname`",
-      "machines-memory-used": "`machines-host-metrics`.`hostname`",
-      "machines-network-by-host-mib-s": "`machines-host-metrics`.`hostname`",
-      "machines-network-mib-s": "`machines-host-metrics`.`hostname`",
-      "machines-swap-mib": "`machines-host-metrics`.`hostname`"
+      "machines-cpu": "`machines-host-metrics`.`host`",
+      "machines-disk": "`machines-host-metrics`.`host`",
+      "machines-disk-growth-gib": "`machines-host-metrics`.`host`",
+      "machines-disk-i-o-mib-s": "`machines-host-metrics`.`host`",
+      "machines-hosts": "`machines-host-metrics`.`host`",
+      "machines-load": "`machines-host-metrics`.`host`",
+      "machines-machine-readings": "`machines-host-metrics`.`host`",
+      "machines-memory-used": "`machines-host-metrics`.`host`",
+      "machines-network-by-host-mib-s": "`machines-host-metrics`.`host`",
+      "machines-network-mib-s": "`machines-host-metrics`.`host`",
+      "machines-swap-mib": "`machines-host-metrics`.`host`"
      },
      "type": "filter"
     },
@@ -973,7 +973,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 10:34:57.552745",
+ "modified": "2026-10-21 12:17:22.691263",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "machines",
@@ -1019,6 +1019,15 @@
     {
      "data_type": "String",
      "expression": {
+      "expression": "coalesce(hostname, host_ip)",
+      "type": "expression"
+     },
+     "new_name": "host",
+     "type": "mutate"
+    },
+    {
+     "data_type": "String",
+     "expression": {
       "expression": "json_value(labels, 'mount')",
       "type": "expression"
      },
@@ -1046,6 +1055,7 @@
     {
      "column_names": [
       "timestamp",
+      "host",
       "hostname",
       "host_ip",
       "source",

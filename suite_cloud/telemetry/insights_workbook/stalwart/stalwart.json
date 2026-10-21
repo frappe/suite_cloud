@@ -30,9 +30,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -508,9 +508,9 @@
       "dimension_name": "cluster"
      },
      {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      {
       "column_name": "role",
@@ -578,7 +578,7 @@
      {
       "data_type": "Integer",
       "expression": {
-       "expression": "distinct_count(hostname)",
+       "expression": "distinct_count(host)",
        "type": "expression"
       },
       "id": "Hosts",
@@ -965,9 +965,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -2306,9 +2306,9 @@
     ],
     "rows": [
      {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      {
       "column_name": "host_ip",
@@ -2635,9 +2635,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -2829,9 +2829,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -3034,9 +3034,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -3103,9 +3103,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -3479,9 +3479,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -3927,9 +3927,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -4080,7 +4080,7 @@
       },
       {
        "column": {
-        "column_name": "hostname",
+        "column_name": "host",
         "type": "column"
        },
        "operator": "is_set",
@@ -4101,9 +4101,9 @@
     ],
     "x_axis": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      }
     },
     "y_axis": {
@@ -4549,9 +4549,9 @@
     ],
     "split_by": {
      "dimension": {
-      "column_name": "hostname",
+      "column_name": "host",
       "data_type": "String",
-      "dimension_name": "hostname"
+      "dimension_name": "host"
      },
      "max_split_values": 10
     },
@@ -5163,7 +5163,7 @@
    "workbook": "stalwart"
   }
  },
- "creation": "2026-10-21 12:04:04.826390",
+ "creation": "2026-10-21 12:17:24.468223",
  "dashboards": {
   "stalwart-authentication": {
    "items": [
@@ -5203,13 +5203,13 @@
       "y": 0
      },
      "links": {
-      "stalwart-authentication-readings": "`stalwart-events`.`hostname`",
-      "stalwart-dkim-results": "`stalwart-events`.`hostname`",
-      "stalwart-dmarc-results": "`stalwart-events`.`hostname`",
-      "stalwart-failing-sender-domains": "`stalwart-events`.`hostname`",
-      "stalwart-reverse-dns": "`stalwart-events`.`hostname`",
-      "stalwart-spf-ehlo-results": "`stalwart-events`.`hostname`",
-      "stalwart-spf-results": "`stalwart-events`.`hostname`"
+      "stalwart-authentication-readings": "`stalwart-events`.`host`",
+      "stalwart-dkim-results": "`stalwart-events`.`host`",
+      "stalwart-dmarc-results": "`stalwart-events`.`host`",
+      "stalwart-failing-sender-domains": "`stalwart-events`.`host`",
+      "stalwart-reverse-dns": "`stalwart-events`.`host`",
+      "stalwart-spf-ehlo-results": "`stalwart-events`.`host`",
+      "stalwart-spf-results": "`stalwart-events`.`host`"
      },
      "type": "filter"
     },
@@ -5374,11 +5374,11 @@
       "y": 0
      },
      "links": {
-      "stalwart-backend-latency-ms": "`stalwart-metrics`.`hostname`",
-      "stalwart-capacity-readings": "`stalwart-metrics`.`hostname`",
-      "stalwart-connections-by-protocol": "`stalwart-metrics`.`hostname`",
-      "stalwart-message-size-kib": "`stalwart-metrics`.`hostname`",
-      "stalwart-users-and-domains": "`stalwart-metrics`.`hostname`"
+      "stalwart-backend-latency-ms": "`stalwart-metrics`.`host`",
+      "stalwart-capacity-readings": "`stalwart-metrics`.`host`",
+      "stalwart-connections-by-protocol": "`stalwart-metrics`.`host`",
+      "stalwart-message-size-kib": "`stalwart-metrics`.`host`",
+      "stalwart-users-and-domains": "`stalwart-metrics`.`host`"
      },
      "type": "filter"
     },
@@ -5497,11 +5497,11 @@
       "y": 0
      },
      "links": {
-      "stalwart-cluster-nodes": "`stalwart-events-by-cluster`.`hostname`",
-      "stalwart-cluster-readings": "`stalwart-events-by-cluster`.`hostname`",
-      "stalwart-connections-by-cluster": "`stalwart-events-by-cluster`.`hostname`",
-      "stalwart-memory-by-cluster-mib": "`stalwart-metrics-by-cluster`.`hostname`",
-      "stalwart-sent-by-cluster": "`stalwart-events-by-cluster`.`hostname`"
+      "stalwart-cluster-nodes": "`stalwart-events-by-cluster`.`host`",
+      "stalwart-cluster-readings": "`stalwart-events-by-cluster`.`host`",
+      "stalwart-connections-by-cluster": "`stalwart-events-by-cluster`.`host`",
+      "stalwart-memory-by-cluster-mib": "`stalwart-metrics-by-cluster`.`host`",
+      "stalwart-sent-by-cluster": "`stalwart-events-by-cluster`.`host`"
      },
      "type": "filter"
     },
@@ -5667,13 +5667,13 @@
       "y": 0
      },
      "links": {
-      "stalwart-bounce-codes": "`stalwart-events`.`hostname`",
-      "stalwart-bounces": "`stalwart-events`.`hostname`",
-      "stalwart-deliverability-readings": "`stalwart-events`.`hostname`",
-      "stalwart-destinations": "`stalwart-events`.`hostname`",
-      "stalwart-outgoing-reports": "`stalwart-events`.`hostname`",
-      "stalwart-policy-failures": "`stalwart-events`.`hostname`",
-      "stalwart-retries": "`stalwart-events`.`hostname`"
+      "stalwart-bounce-codes": "`stalwart-events`.`host`",
+      "stalwart-bounces": "`stalwart-events`.`host`",
+      "stalwart-deliverability-readings": "`stalwart-events`.`host`",
+      "stalwart-destinations": "`stalwart-events`.`host`",
+      "stalwart-outgoing-reports": "`stalwart-events`.`host`",
+      "stalwart-policy-failures": "`stalwart-events`.`host`",
+      "stalwart-retries": "`stalwart-events`.`host`"
      },
      "type": "filter"
     },
@@ -5839,12 +5839,12 @@
       "y": 0
      },
      "links": {
-      "stalwart-delivery-problems": "`stalwart-events`.`hostname`",
-      "stalwart-delivery-readings": "`stalwart-events`.`hostname`",
-      "stalwart-delivery-time-ms": "`stalwart-events`.`hostname`",
-      "stalwart-failing-domains": "`stalwart-events`.`hostname`",
-      "stalwart-failure-reasons": "`stalwart-events`.`hostname`",
-      "stalwart-outcomes": "`stalwart-events`.`hostname`"
+      "stalwart-delivery-problems": "`stalwart-events`.`host`",
+      "stalwart-delivery-readings": "`stalwart-events`.`host`",
+      "stalwart-delivery-time-ms": "`stalwart-events`.`host`",
+      "stalwart-failing-domains": "`stalwart-events`.`host`",
+      "stalwart-failure-reasons": "`stalwart-events`.`host`",
+      "stalwart-outcomes": "`stalwart-events`.`host`"
      },
      "type": "filter"
     },
@@ -6195,9 +6195,9 @@
       "y": 0
      },
      "links": {
-      "stalwart-ingest-readings": "`stalwart-events`.`hostname`",
-      "stalwart-received-per-day": "`stalwart-events`.`hostname`",
-      "stalwart-spam-received-by-host": "`stalwart-events`.`hostname`"
+      "stalwart-ingest-readings": "`stalwart-events`.`host`",
+      "stalwart-received-per-day": "`stalwart-events`.`host`",
+      "stalwart-spam-received-by-host": "`stalwart-events`.`host`"
      },
      "type": "filter"
     },
@@ -6309,14 +6309,14 @@
       "y": 0
      },
      "links": {
-      "stalwart-error-events": "`stalwart-events`.`hostname`",
-      "stalwart-health-readings": "`stalwart-events`.`hostname`",
-      "stalwart-hosts": "`stalwart-events`.`hostname`",
-      "stalwart-lifecycle-events": "`stalwart-events`.`hostname`",
-      "stalwart-process-memory-mib": "`stalwart-metrics`.`hostname`",
-      "stalwart-startups": "`stalwart-events`.`hostname`",
-      "stalwart-store-errors": "`stalwart-events`.`hostname`",
-      "stalwart-warnings-and-errors": "`stalwart-events`.`hostname`"
+      "stalwart-error-events": "`stalwart-events`.`host`",
+      "stalwart-health-readings": "`stalwart-events`.`host`",
+      "stalwart-hosts": "`stalwart-events`.`host`",
+      "stalwart-lifecycle-events": "`stalwart-events`.`host`",
+      "stalwart-process-memory-mib": "`stalwart-metrics`.`host`",
+      "stalwart-startups": "`stalwart-events`.`host`",
+      "stalwart-store-errors": "`stalwart-events`.`host`",
+      "stalwart-warnings-and-errors": "`stalwart-events`.`host`"
      },
      "type": "filter"
     },
@@ -6493,12 +6493,12 @@
       "y": 0
      },
      "links": {
-      "stalwart-bans-and-blocks": "`stalwart-events`.`hostname`",
-      "stalwart-failed-logins": "`stalwart-events`.`hostname`",
-      "stalwart-failing-addresses": "`stalwart-events`.`hostname`",
-      "stalwart-offenders": "`stalwart-events`.`hostname`",
-      "stalwart-security-readings": "`stalwart-events`.`hostname`",
-      "stalwart-targeted-mailboxes": "`stalwart-events`.`hostname`"
+      "stalwart-bans-and-blocks": "`stalwart-events`.`host`",
+      "stalwart-failed-logins": "`stalwart-events`.`host`",
+      "stalwart-failing-addresses": "`stalwart-events`.`host`",
+      "stalwart-offenders": "`stalwart-events`.`host`",
+      "stalwart-security-readings": "`stalwart-events`.`host`",
+      "stalwart-targeted-mailboxes": "`stalwart-events`.`host`"
      },
      "type": "filter"
     },
@@ -6652,11 +6652,11 @@
       "y": 0
      },
      "links": {
-      "stalwart-active-connections": "`stalwart-metrics`.`hostname`",
-      "stalwart-mail-by-listener": "`stalwart-events`.`hostname`",
-      "stalwart-queue": "`stalwart-metrics`.`hostname`",
-      "stalwart-sessions": "`stalwart-events`.`hostname`",
-      "stalwart-smtp-readings": "`stalwart-events`.`hostname`"
+      "stalwart-active-connections": "`stalwart-metrics`.`host`",
+      "stalwart-mail-by-listener": "`stalwart-events`.`host`",
+      "stalwart-queue": "`stalwart-metrics`.`host`",
+      "stalwart-sessions": "`stalwart-events`.`host`",
+      "stalwart-smtp-readings": "`stalwart-events`.`host`"
      },
      "type": "filter"
     },
@@ -6775,11 +6775,11 @@
       "y": 0
      },
      "links": {
-      "stalwart-received-spam-and-ham": "`stalwart-events`.`hostname`",
-      "stalwart-rejections": "`stalwart-events`.`hostname`",
-      "stalwart-spam-readings": "`stalwart-events`.`hostname`",
-      "stalwart-spam-recipient-domains": "`stalwart-events`.`hostname`",
-      "stalwart-spam-senders": "`stalwart-events`.`hostname`"
+      "stalwart-received-spam-and-ham": "`stalwart-events`.`host`",
+      "stalwart-rejections": "`stalwart-events`.`host`",
+      "stalwart-spam-readings": "`stalwart-events`.`host`",
+      "stalwart-spam-recipient-domains": "`stalwart-events`.`host`",
+      "stalwart-spam-senders": "`stalwart-events`.`host`"
      },
      "type": "filter"
     },
@@ -6910,11 +6910,11 @@
       "y": 0
      },
      "links": {
-      "stalwart-send-failures-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
-      "stalwart-sent-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
-      "stalwart-spam-received-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
-      "stalwart-tenant-overview": "`stalwart-events-by-tenant`.`hostname`",
-      "stalwart-tenant-readings": "`stalwart-events-by-tenant`.`hostname`"
+      "stalwart-send-failures-by-tenant": "`stalwart-events-by-tenant`.`host`",
+      "stalwart-sent-by-tenant": "`stalwart-events-by-tenant`.`host`",
+      "stalwart-spam-received-by-tenant": "`stalwart-events-by-tenant`.`host`",
+      "stalwart-tenant-overview": "`stalwart-events-by-tenant`.`host`",
+      "stalwart-tenant-readings": "`stalwart-events-by-tenant`.`host`"
      },
      "type": "filter"
     },
@@ -7234,7 +7234,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 12:04:48.395670",
+ "modified": "2026-10-21 12:18:10.423078",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -7487,6 +7487,15 @@
     {
      "data_type": "String",
      "expression": {
+      "expression": "coalesce(hostname, host_ip)",
+      "type": "expression"
+     },
+     "new_name": "host",
+     "type": "mutate"
+    },
+    {
+     "data_type": "String",
+     "expression": {
       "expression": "json_value(data, 'remoteIp')",
       "type": "expression"
      },
@@ -7604,6 +7613,7 @@
     {
      "column_names": [
       "timestamp",
+      "host",
       "hostname",
       "host_ip",
       "source",
@@ -7800,8 +7810,18 @@
      "type": "rename"
     },
     {
+     "data_type": "String",
+     "expression": {
+      "expression": "coalesce(hostname, host_ip)",
+      "type": "expression"
+     },
+     "new_name": "host",
+     "type": "mutate"
+    },
+    {
      "column_names": [
       "timestamp",
+      "host",
       "hostname",
       "host_ip",
       "source",
