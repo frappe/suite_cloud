@@ -63,7 +63,16 @@
    "config": {
     "columns": [],
     "filters": {
-     "filters": [],
+     "filters": [
+      {
+       "column": {
+        "column_name": "mount",
+        "type": "column"
+       },
+       "operator": "is_set",
+       "value": null
+      }
+     ],
      "logical_operator": "And"
     },
     "limit": 50,
@@ -704,7 +713,7 @@
    "workbook": "machines"
   }
  },
- "creation": "2026-10-21 10:09:49.826330",
+ "creation": "2026-10-21 10:25:08.875801",
  "dashboards": {
   "machines-overview": {
    "items": [
@@ -794,7 +803,7 @@
      "layout": {
       "h": 4,
       "i": "reading-0",
-      "w": 4,
+      "w": 5,
       "x": 0,
       "y": 2
      },
@@ -806,8 +815,8 @@
      "layout": {
       "h": 4,
       "i": "reading-1",
-      "w": 4,
-      "x": 4,
+      "w": 5,
+      "x": 5,
       "y": 2
      },
      "reading": "CPU %",
@@ -818,8 +827,8 @@
      "layout": {
       "h": 4,
       "i": "reading-2",
-      "w": 4,
-      "x": 8,
+      "w": 5,
+      "x": 10,
       "y": 2
      },
      "reading": "Memory Used",
@@ -830,8 +839,8 @@
      "layout": {
       "h": 4,
       "i": "reading-3",
-      "w": 4,
-      "x": 12,
+      "w": 5,
+      "x": 15,
       "y": 2
      },
      "reading": "Root Disk Used",
@@ -893,24 +902,13 @@
      "type": "chart"
     },
     {
-     "chart": "machines-disk",
-     "layout": {
-      "h": 20,
-      "i": "disk",
-      "w": 10,
-      "x": 10,
-      "y": 46
-     },
-     "type": "chart"
-    },
-    {
      "chart": "machines-network",
      "layout": {
       "h": 20,
       "i": "network",
       "w": 10,
-      "x": 0,
-      "y": 66
+      "x": 10,
+      "y": 46
      },
      "type": "chart"
     },
@@ -920,7 +918,7 @@
       "h": 20,
       "i": "network_by_host",
       "w": 10,
-      "x": 10,
+      "x": 0,
       "y": 66
      },
      "type": "chart"
@@ -931,6 +929,17 @@
       "h": 20,
       "i": "disk_io",
       "w": 10,
+      "x": 10,
+      "y": 66
+     },
+     "type": "chart"
+    },
+    {
+     "chart": "machines-disk",
+     "layout": {
+      "h": 20,
+      "i": "disk",
+      "w": 20,
       "x": 0,
       "y": 86
      },
@@ -941,9 +950,9 @@
      "layout": {
       "h": 20,
       "i": "uptime",
-      "w": 10,
-      "x": 10,
-      "y": 86
+      "w": 20,
+      "x": 0,
+      "y": 106
      },
      "type": "chart"
     }
@@ -964,7 +973,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 10:09:54.180260",
+ "modified": "2026-10-21 10:25:13.326458",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "machines",
