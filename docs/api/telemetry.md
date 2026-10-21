@@ -118,3 +118,14 @@ An agent retries on 429 and on any 5xx or network failure, with a backoff. It do
 Give every batch a `batch_id` and keep it across retries. A retry of a batch Suite Cloud already staged replaces the staged file, and a batch already loaded into Insights is not loaded twice, so a request whose answer was lost in transit is safe to send again.
 
 Each node may make **Telemetry Requests per Minute** requests (300 by default), counted per `host_ip` in fixed one-minute windows. Both limits are in **Suite Cloud Settings > Telemetry**; a larger batch costs one request, and a batch is validated whole, so a change needs no release.
+
+## Alerts
+
+Every five minutes Suite Cloud checks the loaded data and keeps a **Telemetry Alert** record per condition, open until it clears:
+
+| Alert | Condition |
+| --- | --- |
+| Silent Host | A node that reported in the last day sent nothing for **Silent Host After (Minutes)**, 30 by default. The alert stays open until the node reports again; resolve it by hand when the node was taken out of service |
+| Error Rate | More than **Error Rate Alert (%)** of a node's events in the last hour are `error` level, 5 by default, counted only over hours with at least 100 events |
+
+**Telemetry Alert Recipients** get a mail when an alert opens and when it resolves; empty, the records are kept and nobody is mailed.

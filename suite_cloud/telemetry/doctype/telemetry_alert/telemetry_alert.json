@@ -1,0 +1,134 @@
+{
+ "actions": [],
+ "autoname": "hash",
+ "creation": "2026-10-21 10:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "alert_type",
+  "status",
+  "title",
+  "column_break_host",
+  "hostname",
+  "host_ip",
+  "section_break_time",
+  "opened_at",
+  "column_break_time",
+  "resolved_at",
+  "section_break_details",
+  "details"
+ ],
+ "fields": [
+  {
+   "description": "Silent Host: the node reported in the last day but sent nothing for the configured minutes. Error Rate: more than the configured share of the node's events in the last hour are errors.",
+   "fieldname": "alert_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Alert Type",
+   "options": "Silent Host\nError Rate",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "description": "The checker resolves an alert when its condition clears. Resolve a Silent Host alert yourself when the node was taken out of service.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Open\nResolved",
+   "reqd": 1
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Title",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_host",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "hostname",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Hostname",
+   "length": 253,
+   "read_only": 1
+  },
+  {
+   "fieldname": "host_ip",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Host IP",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_time",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "opened_at",
+   "fieldtype": "Datetime",
+   "label": "Opened At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_time",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "resolved_at",
+   "fieldtype": "Datetime",
+   "label": "Resolved At",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_details",
+   "fieldtype": "Section Break"
+  },
+  {
+   "description": "What the checker last measured.",
+   "fieldname": "details",
+   "fieldtype": "Small Text",
+   "in_list_view": 1,
+   "label": "Details",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-21 10:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Telemetry",
+ "name": "Telemetry Alert",
+ "naming_rule": "Random",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "search_fields": "hostname,host_ip",
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 0
+}

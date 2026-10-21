@@ -162,6 +162,13 @@ class Warehouse:
                 db.con.execute(f'DELETE FROM "{table.name}" WHERE timestamp < $cutoff', {"cutoff": cutoff})
             db.raw_sql("CHECKPOINT")
 
+    def query(self, statement: str, parameters: dict) -> list[tuple]:
+        """A read under the writer's lock: a job must leave no reader open, since one open in a
+        worker would block the next load."""
+
+        with self.write_connection() as db:
+            return db.con.execute(statement, parameters).fetchall()
+
     def write_connection(self):
         return frappe.get_doc("Insights Data Source v3", self.data_source).write_connection()
 
