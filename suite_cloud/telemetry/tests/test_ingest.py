@@ -9,7 +9,7 @@ from uuid import UUID
 import frappe
 import pyarrow.parquet as parquet
 from frappe.tests import IntegrationTestCase
-from frappe.utils import get_test_client
+from frappe.utils import add_to_date, get_test_client, now_datetime
 
 from suite_cloud.api.telemetry import MAX_RECORDS, authenticate, events, metrics
 from suite_cloud.api.tenant import InvalidInputError
@@ -81,6 +81,20 @@ class TestAuthentication(TelemetryApiTestCase):
         frappe.set_user("Administrator")
         configure_settings(telemetry_secret="")
 
+        with self.assertRaisesRegex(frappe.AuthenticationError, "failed"):
+            self.request(SECRET)
+
+    def test_the_previous_secret_is_accepted_until_its_overlap_ends(self) -> None:
+        frappe.set_user("Administrator")
+        configure_settings(telemetry_secret="rotated-secret")  # the rotation keeps SECRET for a day
+
+        self.request(SECRET)
+        self.assertEqual(frappe.session.user, TELEMETRY_USER)
+        self.request("rotated-secret")
+        self.assertEqual(frappe.session.user, TELEMETRY_USER)
+
+        frappe.set_user("Administrator")
+        configure_settings(telemetry_previous_secret_until=add_to_date(now_datetime(), minutes=-1))
         with self.assertRaisesRegex(frappe.AuthenticationError, "failed"):
             self.request(SECRET)
 

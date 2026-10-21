@@ -15,7 +15,7 @@ Every agent sends the telemetry secret from **Suite Cloud Settings > Telemetry**
 Authorization: Bearer <telemetry secret>
 ```
 
-The secret is accepted only on these two methods and runs them as a user without any role, so it opens nothing else. An empty secret turns the API off: every request is refused with a 401. To rotate, change the setting and give the agents the new value. There is no overlap window: an agent still sending the old secret gets a 401 until it is updated.
+The secret is accepted only on these two methods and runs them as a user without any role, so it opens nothing else. An empty secret turns the API off: every request is refused with a 401. To rotate, change the setting: the old value moves to **Telemetry Previous Secret** and stays accepted until **Previous Secret Accepted Until**, a day later by default, so the agents can be updated one by one. Shorten or clear the previous secret to end the overlap early. An agent still sending the old secret after that gets a 401 until it is updated.
 
 ## Request
 

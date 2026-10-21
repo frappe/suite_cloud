@@ -19,6 +19,7 @@ from uuid import UUID, uuid7
 
 import frappe
 from frappe import _
+from frappe.utils import get_datetime, now_datetime
 from frappe.utils.password import get_decrypted_password
 
 from suite_cloud.api.tenant import InvalidInputError, assert_arguments, throttle
@@ -26,6 +27,7 @@ from suite_cloud.telemetry import EVENTS, METRICS, TELEMETRY_USER, TelemetryTabl
 from suite_cloud.telemetry.spool import Spool
 
 API_PATHS = ("/api/v2/method/suite_cloud.api.telemetry.", "/api/method/suite_cloud.api.telemetry.")
+SETTINGS = ("Suite Cloud Settings", "Suite Cloud Settings")
 MAX_RECORDS = 5000  # records in one request
 HOSTNAME_LIMIT = 253
 SOURCE_PATTERN = re.compile(r"[a-z0-9_-]{1,64}")
@@ -43,10 +45,8 @@ def authenticate() -> None:
     if scheme.lower() != "bearer" or not frappe.request.path.startswith(API_PATHS):
         return
 
-    stored = get_decrypted_password(
-        "Suite Cloud Settings", "Suite Cloud Settings", "telemetry_secret", raise_exception=False
-    )
-    if not stored or not secrets.compare_digest(stored, secret.strip()):
+    secret = secret.strip()
+    if not any(secrets.compare_digest(accepted, secret) for accepted in get_accepted_secrets()):
         request_ip = getattr(frappe.local, "request_ip", None)
         throttle(f"address:{request_ip or 'unknown'}")  # guessing secrets is paced like everything else
         raise frappe.AuthenticationError(_("Telemetry authentication failed."))
@@ -54,6 +54,21 @@ def authenticate() -> None:
     form_dict = frappe.local.form_dict
     frappe.set_user(TELEMETRY_USER)
     frappe.local.form_dict = form_dict  # set_user clears the request body Frappe already parsed
+
+
+def get_accepted_secrets() -> list[str]:
+    """The current secret, and the previous one while its overlap after a rotation lasts."""
+
+    accepted = []
+    current = get_decrypted_password(*SETTINGS, "telemetry_secret", raise_exception=False)
+    if current:
+        accepted.append(current)
+    until = frappe.get_cached_value(*SETTINGS, "telemetry_previous_secret_until")
+    if until and get_datetime(until) > now_datetime():
+        previous = get_decrypted_password(*SETTINGS, "telemetry_previous_secret", raise_exception=False)
+        if previous:
+            accepted.append(previous)
+    return accepted
 
 
 def telemetry_api(fn: Callable) -> Callable:

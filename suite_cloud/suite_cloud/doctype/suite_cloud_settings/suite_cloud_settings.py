@@ -4,12 +4,20 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import cint
+from frappe.utils import add_to_date, cint, now_datetime
+from frappe.utils.password import get_decrypted_password
 
 from suite_cloud.utils import clear_config_cache, validate_version
 
 # Set all together or not at all; the form marks them with the same rule (mandatory_depends_on).
 CENTRAL_CONNECTION_FIELDS = ("central_url", "central_team", "central_api_key", "central_api_secret")
+TELEMETRY_SECRET_OVERLAP_HOURS = 24  # how long the previous telemetry secret stays accepted
+TELEMETRY_LIMITS = (
+    "telemetry_requests_per_minute",
+    "telemetry_records_per_request",
+    "telemetry_silence_minutes",
+    "telemetry_error_rate_percent",
+)
 
 
 class SuiteCloudSettings(Document):
@@ -58,8 +66,15 @@ class SuiteCloudSettings(Document):
         stalwart_version: DF.Data
         suite_app_ref: DF.Data
         suite_app_repo: DF.Data
+        telemetry_alert_recipients: DF.SmallText | None
+        telemetry_error_rate_percent: DF.Int
+        telemetry_previous_secret: DF.Password | None
+        telemetry_previous_secret_until: DF.Datetime | None
+        telemetry_records_per_request: DF.Int
+        telemetry_requests_per_minute: DF.Int
         telemetry_retention_days: DF.Int
         telemetry_secret: DF.Password | None
+        telemetry_silence_minutes: DF.Int
         tenant_email_accounts: DF.Table[TenantEmailAccount]
         tenant_mail_zone: DF.Link | None
         tls_report_retention_days: DF.Int
@@ -76,6 +91,7 @@ class SuiteCloudSettings(Document):
             self.spam_filter_rules_version, _("Spam Filter Rules Version")
         )
         self.validate_report_retention()
+        self.validate_telemetry()
         self.validate_tenant_email_accounts()
         self.validate_hosting()
 
@@ -93,6 +109,30 @@ class SuiteCloudSettings(Document):
         for field in ("dmarc_report_retention_days", "tls_report_retention_days", "telemetry_retention_days"):
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least one day.").format(_(self.meta.get_label(field))))
+
+    def validate_telemetry(self) -> None:
+        for field in TELEMETRY_LIMITS:
+            if cint(self.get(field)) < 1:
+                frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
+        self.rotate_telemetry_secret()
+
+    def rotate_telemetry_secret(self) -> None:
+        """A new secret keeps the old one accepted for a while, so agents can be updated one by
+        one; clearing the secret turns the API off, previous secret included."""
+
+        secret = self.telemetry_secret
+        if secret and self.is_dummy_password(secret):
+            return  # the form sends the saved secret masked
+        if not secret:
+            self.telemetry_previous_secret = None
+            self.telemetry_previous_secret_until = None
+            return
+        previous = get_decrypted_password(self.doctype, self.name, "telemetry_secret", raise_exception=False)
+        if previous and previous != secret:
+            self.telemetry_previous_secret = previous
+            self.telemetry_previous_secret_until = add_to_date(
+                now_datetime(), hours=TELEMETRY_SECRET_OVERLAP_HOURS, as_datetime=True
+            )
 
     def validate_tenant_email_accounts(self) -> None:
         seen = set()
