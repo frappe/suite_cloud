@@ -364,6 +364,11 @@ class TestEgress(IntegrationTestCase):
         )
         role = operations["ClusterRole"]["value"]["gateway-role"]
         self.assertEqual(role["name"], "egress")
+        gateway_password = self.gateway.get_password("metrics_password")
+        self.assertEqual(
+            operations["Metrics"]["value"]["prometheus"]["authSecret"]["secret"], gateway_password
+        )
+        self.assertNotEqual(gateway_password, self.cluster.get_password("metrics_password"))
         self.assertEqual(role["listeners"], {"@type": "EnableAll"})  # the firewall limits exposure
         # The gateway's own domain: its name, a certificate that also covers every pool hostname,
         # DKIM keys of its own (a domain shared between gateways would publish clashing selectors)

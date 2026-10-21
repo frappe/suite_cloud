@@ -43,6 +43,7 @@ class EgressGateway(Document):
         ssh_verified: DF.Check
         stalwart_version: DF.Data | None
         location: DF.Data | None
+        metrics_password: DF.Password | None
         title: DF.Data | None
         status: DF.Literal["Pending", "Provisioning", "Provisioned", "Active", "Failed", "Disabled"]
     # end: auto-generated types
@@ -58,6 +59,8 @@ class EgressGateway(Document):
         self.admin_username = self.admin_username or "admin"
         if not self.admin_password:
             self.admin_password = frappe.generate_hash(length=32)
+        if not self.metrics_password:
+            self.metrics_password = frappe.generate_hash(length=32)
         if not self.data_store:
             self.data_store = self.create_local_store().name
 

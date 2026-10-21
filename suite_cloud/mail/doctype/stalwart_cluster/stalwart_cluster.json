@@ -40,6 +40,7 @@
   "admin_section",
   "admin_username",
   "admin_password",
+  "metrics_password",
   "column_break_admin",
   "api_key",
   "ssh_section",
@@ -289,6 +290,13 @@
    "label": "Admin Password"
   },
   {
+   "description": "Generated on save. The agent on each node reads Stalwart's Prometheus metrics with it.",
+   "fieldname": "metrics_password",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Metrics Password"
+  },
+  {
    "fieldname": "column_break_admin",
    "fieldtype": "Column Break"
   },
@@ -464,7 +472,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-16 23:30:00.000000",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

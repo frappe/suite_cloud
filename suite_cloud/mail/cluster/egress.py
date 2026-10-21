@@ -395,6 +395,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
         )
     operations.extend(gateway_defaults_plan())
     operations.append(plan.tracer_operation())
+    operations.append(plan.metrics_operation(gateway.get_password("metrics_password")))
     operations.append(
         {
             "@type": "update",
@@ -504,7 +505,7 @@ def build_gateway_variables(context: dict) -> dict:
 
     gateway = frappe.get_doc("Egress Gateway", context["gateway"])
     relay_ports = sorted({p.relay_port for p in gateway.pools()})
-    return {
+    variables = {
         "node_hostname": gateway.hostname,
         "cluster_hostname": gateway.get_cluster().hostname,
         "ssh_port": gateway.ssh_port or gateway.get_cluster().ssh_port,
@@ -536,6 +537,7 @@ def build_gateway_variables(context: dict) -> dict:
             *plan.secret_strings(recovery_plan),
         ],
     }
+    return variables
 
 
 def after_gateway_provision(gateway: Document, job: Document) -> None:

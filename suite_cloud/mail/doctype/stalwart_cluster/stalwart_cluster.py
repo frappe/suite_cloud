@@ -59,6 +59,7 @@ class StalwartCluster(Document):
         is_default: DF.Check
         label: DF.Data | None
         last_config_sync_at: DF.Datetime | None
+        metrics_password: DF.Password | None
         regions: DF.Table[StalwartClusterRegion]
         relay_password: DF.Password | None
         relay_username: DF.Data | None
@@ -80,6 +81,8 @@ class StalwartCluster(Document):
         self.admin_username = self.admin_username or "admin"
         if not self.admin_password:
             self.admin_password = frappe.generate_hash(length=32)
+        if not self.metrics_password:
+            self.metrics_password = frappe.generate_hash(length=32)
         self.relay_username = self.relay_username or "relay"
         if not self.relay_password:
             self.relay_password = frappe.generate_hash(length=32)

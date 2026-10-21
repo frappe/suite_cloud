@@ -115,6 +115,19 @@ def tracer_operation() -> dict:
     }
 
 
+METRICS_USERNAME = "telemetry"  # the agent's basic-auth user on /metrics/prometheus
+
+
+def metrics_operation(secret: str) -> dict:
+    """The Prometheus exporter behind a password: it sits on the public HTTPS listener, and without
+    credentials Stalwart serves it to anyone."""
+
+    if not secret:
+        raise ValueError("The metrics password is not set")
+    prometheus = {"@type": "Enabled", "authUsername": METRICS_USERNAME, "authSecret": secret_value(secret)}
+    return {"@type": "update", "object": "Metrics", "value": {"prometheus": prometheus}}
+
+
 # --- DNS resolution -------------------------------------------------------------------
 
 LOCAL_RESOLVER = "127.0.0.1"  # Unbound, installed and checked by install-stalwart.yml
@@ -168,6 +181,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
         {"@type": "update", "object": "Coordinator", "value": {"@type": cluster.coordinator or "Disabled"}},
         *defaults_plan(),
         tracer_operation(),
+        metrics_operation(cluster.get_password("metrics_password")),
     ]
 
     dns_server = dns_server_object(cluster)

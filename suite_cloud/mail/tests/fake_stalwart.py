@@ -36,6 +36,7 @@ SINGLETONS = {
     "DnsResolver",
     "SpamSettings",
     "Enterprise",
+    "Metrics",
 }
 ACCOUNT_SCOPED = {"AppPassword", "ApiKey"}
 ADDRESS_TYPES = ("Account", "MailingList")

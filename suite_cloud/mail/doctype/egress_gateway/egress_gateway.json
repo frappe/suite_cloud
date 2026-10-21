@@ -26,6 +26,7 @@
   "data_store",
   "admin_username",
   "admin_password",
+  "metrics_password",
   "column_break_stalwart",
   "api_key",
   "state_section",
@@ -185,6 +186,13 @@
    "label": "Admin Password"
   },
   {
+   "description": "Generated on save. The agent on the gateway reads Stalwart's Prometheus metrics with it.",
+   "fieldname": "metrics_password",
+   "fieldtype": "Password",
+   "hidden": 1,
+   "label": "Metrics Password"
+  },
+  {
    "fieldname": "column_break_stalwart",
    "fieldtype": "Column Break"
   },
@@ -269,7 +277,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-09-26 12:00:00.000000",
+ "modified": "2026-10-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress Gateway",

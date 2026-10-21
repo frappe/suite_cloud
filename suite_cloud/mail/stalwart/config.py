@@ -26,6 +26,7 @@ SINGLETON_TYPES = frozenset(
         "Security",
         "Cache",
         "TaskManager",
+        "Metrics",
     }
 )
 
