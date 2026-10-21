@@ -24,6 +24,7 @@ build-backend = "flit_core.buildapi"
 
 [tool.bench.frappe-dependencies]
 frappe = ">=16.0.0,<18.0.0"
+insights = ">=4.0.0-dev,<5.0.0"
 
 # Installed from Ubuntu repositories when the app is hosted on Frappe Cloud
 [deploy.dependencies.apt]
