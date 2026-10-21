@@ -598,6 +598,7 @@
     "number_column_options": [
      {},
      {},
+     {},
      {}
     ],
     "number_columns": [
@@ -625,8 +626,17 @@
        "expression": "count_if(event == 'delivery.delivered')",
        "type": "expression"
       },
-      "id": "Delivered",
-      "measure_name": "Delivered"
+      "id": "Sent",
+      "measure_name": "Sent"
+     },
+     {
+      "data_type": "Integer",
+      "expression": {
+       "expression": "count_if((event == 'message-ingest.ham') | (event == 'message-ingest.spam'))",
+       "type": "expression"
+      },
+      "id": "Received",
+      "measure_name": "Received"
      }
     ],
     "number_formats": {},
@@ -887,122 +897,6 @@
    "query": "stalwart-events",
    "sort_order": 10,
    "title": "Deliverability Readings",
-   "workbook": "stalwart"
-  },
-  "stalwart-deliveries-by-cluster": {
-   "chart_type": "Line",
-   "config": {
-    "filters": {
-     "filters": [],
-     "logical_operator": "And"
-    },
-    "limit": 100,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "timestamp",
-       "type": "column"
-      },
-      "direction": "asc"
-     }
-    ],
-    "split_by": {
-     "dimension": {
-      "column_name": "cluster",
-      "data_type": "String",
-      "dimension_name": "cluster"
-     },
-     "max_split_values": 10
-    },
-    "x_axis": {
-     "dimension": {
-      "column_name": "timestamp",
-      "data_type": "Datetime",
-      "dimension_name": "timestamp",
-      "granularity": "day"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "count_if(event == 'delivery.delivered')",
-         "type": "expression"
-        },
-        "measure_name": "Delivered"
-       }
-      }
-     ],
-     "show_data_labels": false
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": null,
-   "name": "stalwart-deliveries-by-cluster",
-   "query": "stalwart-events-by-cluster",
-   "sort_order": 62,
-   "title": "Deliveries by Cluster",
-   "workbook": "stalwart"
-  },
-  "stalwart-deliveries-by-tenant": {
-   "chart_type": "Row",
-   "config": {
-    "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "event",
-        "type": "column"
-       },
-       "operator": "=",
-       "value": "delivery.delivered"
-      }
-     ],
-     "logical_operator": "And"
-    },
-    "limit": 10,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "Events",
-       "type": "column"
-      },
-      "direction": "desc"
-     }
-    ],
-    "x_axis": {
-     "dimension": {
-      "column_name": "tenant_label",
-      "data_type": "String",
-      "dimension_name": "tenant_label"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "count()",
-         "type": "expression"
-        },
-        "measure_name": "Events"
-       }
-      }
-     ],
-     "show_data_labels": true
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": "delivery.delivered attributed by the sender's domain.",
-   "name": "stalwart-deliveries-by-tenant",
-   "query": "stalwart-events-by-tenant",
-   "sort_order": 57,
-   "title": "Deliveries by Tenant",
    "workbook": "stalwart"
   },
   "stalwart-delivery-readings": {
@@ -1614,69 +1508,6 @@
    "title": "Failure Reasons",
    "workbook": "stalwart"
   },
-  "stalwart-failures-by-tenant": {
-   "chart_type": "Row",
-   "config": {
-    "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "event",
-        "type": "column"
-       },
-       "operator": "in",
-       "value": [
-        "delivery.failed",
-        "delivery.dsn-perm-fail",
-        "delivery.dsn-temp-fail",
-        "delivery.double-bounce"
-       ]
-      }
-     ],
-     "logical_operator": "And"
-    },
-    "limit": 10,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "Events",
-       "type": "column"
-      },
-      "direction": "desc"
-     }
-    ],
-    "x_axis": {
-     "dimension": {
-      "column_name": "tenant_label",
-      "data_type": "String",
-      "dimension_name": "tenant_label"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "count()",
-         "type": "expression"
-        },
-        "measure_name": "Events"
-       }
-      }
-     ],
-     "show_data_labels": true
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": null,
-   "name": "stalwart-failures-by-tenant",
-   "query": "stalwart-events-by-tenant",
-   "sort_order": 58,
-   "title": "Failures by Tenant",
-   "workbook": "stalwart"
-  },
   "stalwart-health-readings": {
    "chart_type": "Number",
    "config": {
@@ -1819,8 +1650,8 @@
        "expression": "count_if(event == 'message-ingest.ham')",
        "type": "expression"
       },
-      "id": "Ham",
-      "measure_name": "Ham"
+      "id": "Received Ham",
+      "measure_name": "Received Ham"
      },
      {
       "data_type": "Integer",
@@ -1828,13 +1659,13 @@
        "expression": "count_if(event == 'message-ingest.spam')",
        "type": "expression"
       },
-      "id": "Spam",
-      "measure_name": "Spam"
+      "id": "Received Spam",
+      "measure_name": "Received Spam"
      },
      {
       "data_type": "Decimal",
       "expression": {
-       "expression": "count_if(event == 'message-ingest.spam') / count_if(category == 'message-ingest')",
+       "expression": "count_if(event == 'message-ingest.spam') / count_if((event == 'message-ingest.ham') | (event == 'message-ingest.spam'))",
        "type": "expression"
       },
       "format": "percent",
@@ -2191,67 +2022,6 @@
    "title": "Message Size",
    "workbook": "stalwart"
   },
-  "stalwart-messages-per-day": {
-   "chart_type": "Bar",
-   "config": {
-    "filters": {
-     "filters": [],
-     "logical_operator": "And"
-    },
-    "limit": 100,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "timestamp",
-       "type": "column"
-      },
-      "direction": "asc"
-     }
-    ],
-    "x_axis": {
-     "dimension": {
-      "column_name": "timestamp",
-      "data_type": "Datetime",
-      "dimension_name": "timestamp",
-      "granularity": "day"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "count_if(event == 'message-ingest.ham')",
-         "type": "expression"
-        },
-        "measure_name": "Ham"
-       }
-      },
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "count_if(event == 'message-ingest.spam')",
-         "type": "expression"
-        },
-        "measure_name": "Spam"
-       }
-      }
-     ],
-     "show_data_labels": false,
-     "stack": true
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": null,
-   "name": "stalwart-messages-per-day",
-   "query": "stalwart-events",
-   "sort_order": 41,
-   "title": "Messages per Day",
-   "workbook": "stalwart"
-  },
   "stalwart-offenders": {
    "chart_type": "Table",
    "config": {
@@ -2573,6 +2343,128 @@
    "title": "Queue",
    "workbook": "stalwart"
   },
+  "stalwart-received-per-day": {
+   "chart_type": "Bar",
+   "config": {
+    "filters": {
+     "filters": [],
+     "logical_operator": "And"
+    },
+    "limit": 100,
+    "order_by": [
+     {
+      "column": {
+       "column_name": "timestamp",
+       "type": "column"
+      },
+      "direction": "asc"
+     }
+    ],
+    "x_axis": {
+     "dimension": {
+      "column_name": "timestamp",
+      "data_type": "Datetime",
+      "dimension_name": "timestamp",
+      "granularity": "day"
+     }
+    },
+    "y_axis": {
+     "series": [
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "count_if(event == 'message-ingest.ham')",
+         "type": "expression"
+        },
+        "measure_name": "Received Ham"
+       }
+      },
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "count_if(event == 'message-ingest.spam')",
+         "type": "expression"
+        },
+        "measure_name": "Received Spam"
+       }
+      }
+     ],
+     "show_data_labels": false,
+     "stack": true
+    }
+   },
+   "description": null,
+   "folder": null,
+   "info": "Mail the tenants' mailboxes received, as this server's filter classed it.",
+   "name": "stalwart-received-per-day",
+   "query": "stalwart-events",
+   "sort_order": 41,
+   "title": "Received per Day",
+   "workbook": "stalwart"
+  },
+  "stalwart-received-spam-and-ham": {
+   "chart_type": "Bar",
+   "config": {
+    "filters": {
+     "filters": [],
+     "logical_operator": "And"
+    },
+    "limit": 100,
+    "order_by": [
+     {
+      "column": {
+       "column_name": "timestamp",
+       "type": "column"
+      },
+      "direction": "asc"
+     }
+    ],
+    "x_axis": {
+     "dimension": {
+      "column_name": "timestamp",
+      "data_type": "Datetime",
+      "dimension_name": "timestamp",
+      "granularity": "day"
+     }
+    },
+    "y_axis": {
+     "series": [
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "count_if(event == 'message-ingest.ham')",
+         "type": "expression"
+        },
+        "measure_name": "Received Ham"
+       }
+      },
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "count_if(event == 'message-ingest.spam')",
+         "type": "expression"
+        },
+        "measure_name": "Received Spam"
+       }
+      }
+     ],
+     "show_data_labels": false,
+     "stack": true
+    }
+   },
+   "description": null,
+   "folder": null,
+   "info": "Mail the tenants' mailboxes received, as this server's filter classed it: message-ingest.ham and message-ingest.spam per day.",
+   "name": "stalwart-received-spam-and-ham",
+   "query": "stalwart-events",
+   "sort_order": 24,
+   "title": "Received Spam and Ham",
+   "workbook": "stalwart"
+  },
   "stalwart-rejections": {
    "chart_type": "Row",
    "config": {
@@ -2820,6 +2712,185 @@
    "title": "Security Readings",
    "workbook": "stalwart"
   },
+  "stalwart-send-failures-by-tenant": {
+   "chart_type": "Row",
+   "config": {
+    "filters": {
+     "filters": [
+      {
+       "column": {
+        "column_name": "event",
+        "type": "column"
+       },
+       "operator": "in",
+       "value": [
+        "delivery.failed",
+        "delivery.dsn-perm-fail",
+        "delivery.dsn-temp-fail",
+        "delivery.double-bounce"
+       ]
+      }
+     ],
+     "logical_operator": "And"
+    },
+    "limit": 10,
+    "order_by": [
+     {
+      "column": {
+       "column_name": "Send Failures",
+       "type": "column"
+      },
+      "direction": "desc"
+     }
+    ],
+    "x_axis": {
+     "dimension": {
+      "column_name": "tenant_label",
+      "data_type": "String",
+      "dimension_name": "tenant_label"
+     }
+    },
+    "y_axis": {
+     "series": [
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "count()",
+         "type": "expression"
+        },
+        "measure_name": "Send Failures"
+       }
+      }
+     ],
+     "show_data_labels": true
+    }
+   },
+   "description": null,
+   "folder": null,
+   "info": "Outbound: deliveries that failed or bounced, attributed by the sender's domain.",
+   "name": "stalwart-send-failures-by-tenant",
+   "query": "stalwart-events-by-tenant",
+   "sort_order": 58,
+   "title": "Send Failures by Tenant",
+   "workbook": "stalwart"
+  },
+  "stalwart-sent-by-cluster": {
+   "chart_type": "Line",
+   "config": {
+    "filters": {
+     "filters": [],
+     "logical_operator": "And"
+    },
+    "limit": 100,
+    "order_by": [
+     {
+      "column": {
+       "column_name": "timestamp",
+       "type": "column"
+      },
+      "direction": "asc"
+     }
+    ],
+    "split_by": {
+     "dimension": {
+      "column_name": "cluster",
+      "data_type": "String",
+      "dimension_name": "cluster"
+     },
+     "max_split_values": 10
+    },
+    "x_axis": {
+     "dimension": {
+      "column_name": "timestamp",
+      "data_type": "Datetime",
+      "dimension_name": "timestamp",
+      "granularity": "day"
+     }
+    },
+    "y_axis": {
+     "series": [
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "count_if(event == 'delivery.delivered')",
+         "type": "expression"
+        },
+        "measure_name": "Sent"
+       }
+      }
+     ],
+     "show_data_labels": false
+    }
+   },
+   "description": null,
+   "folder": null,
+   "info": "Outbound deliveries per day and cluster.",
+   "name": "stalwart-sent-by-cluster",
+   "query": "stalwart-events-by-cluster",
+   "sort_order": 62,
+   "title": "Sent by Cluster",
+   "workbook": "stalwart"
+  },
+  "stalwart-sent-by-tenant": {
+   "chart_type": "Row",
+   "config": {
+    "filters": {
+     "filters": [
+      {
+       "column": {
+        "column_name": "event",
+        "type": "column"
+       },
+       "operator": "=",
+       "value": "delivery.delivered"
+      }
+     ],
+     "logical_operator": "And"
+    },
+    "limit": 10,
+    "order_by": [
+     {
+      "column": {
+       "column_name": "Sent",
+       "type": "column"
+      },
+      "direction": "desc"
+     }
+    ],
+    "x_axis": {
+     "dimension": {
+      "column_name": "tenant_label",
+      "data_type": "String",
+      "dimension_name": "tenant_label"
+     }
+    },
+    "y_axis": {
+     "series": [
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "count()",
+         "type": "expression"
+        },
+        "measure_name": "Sent"
+       }
+      }
+     ],
+     "show_data_labels": true
+    }
+   },
+   "description": null,
+   "folder": null,
+   "info": "Outbound: delivery.delivered, attributed to the tenant by the sender's domain.",
+   "name": "stalwart-sent-by-tenant",
+   "query": "stalwart-events-by-tenant",
+   "sort_order": 57,
+   "title": "Sent by Tenant",
+   "workbook": "stalwart"
+  },
   "stalwart-smtp-funnel": {
    "chart_type": "Funnel",
    "config": {
@@ -2915,68 +2986,72 @@
    "title": "SMTP Readings",
    "workbook": "stalwart"
   },
-  "stalwart-spam-and-ham": {
-   "chart_type": "Bar",
+  "stalwart-spam-readings": {
+   "chart_type": "Number",
    "config": {
     "filters": {
      "filters": [],
      "logical_operator": "And"
     },
     "limit": 100,
-    "order_by": [
+    "number_column_options": [
+     {},
+     {},
+     {},
+     {}
+    ],
+    "number_columns": [
      {
-      "column": {
-       "column_name": "timestamp",
-       "type": "column"
+      "data_type": "Integer",
+      "expression": {
+       "expression": "count_if(event == 'message-ingest.ham')",
+       "type": "expression"
       },
-      "direction": "asc"
+      "id": "Received Ham",
+      "measure_name": "Received Ham"
+     },
+     {
+      "data_type": "Integer",
+      "expression": {
+       "expression": "count_if(event == 'message-ingest.spam')",
+       "type": "expression"
+      },
+      "id": "Received Spam",
+      "measure_name": "Received Spam"
+     },
+     {
+      "data_type": "Decimal",
+      "expression": {
+       "expression": "count_if(event == 'message-ingest.spam') / count_if((event == 'message-ingest.ham') | (event == 'message-ingest.spam'))",
+       "type": "expression"
+      },
+      "format": "percent",
+      "id": "Spam Rate",
+      "measure_name": "Spam Rate"
+     },
+     {
+      "data_type": "Integer",
+      "expression": {
+       "expression": "count_if(event == 'spam.classify')",
+       "type": "expression"
+      },
+      "id": "Classified",
+      "measure_name": "Classified"
      }
     ],
-    "x_axis": {
-     "dimension": {
-      "column_name": "timestamp",
-      "data_type": "Datetime",
-      "dimension_name": "timestamp",
-      "granularity": "day"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "count_if(event == 'message-ingest.ham')",
-         "type": "expression"
-        },
-        "measure_name": "Ham"
-       }
-      },
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "count_if(event == 'message-ingest.spam')",
-         "type": "expression"
-        },
-        "measure_name": "Spam"
-       }
-      }
-     ],
-     "show_data_labels": false,
-     "stack": true
-    }
+    "number_formats": {},
+    "sparkline": false
    },
    "description": null,
    "folder": null,
-   "info": "message-ingest.ham and message-ingest.spam per day.",
-   "name": "stalwart-spam-and-ham",
+   "info": null,
+   "name": "stalwart-spam-readings",
    "query": "stalwart-events",
-   "sort_order": 24,
-   "title": "Spam and Ham",
+   "sort_order": 23,
+   "title": "Spam Readings",
    "workbook": "stalwart"
   },
-  "stalwart-spam-by-host": {
+  "stalwart-spam-received-by-host": {
    "chart_type": "Row",
    "config": {
     "filters": {
@@ -3028,13 +3103,13 @@
    "description": null,
    "folder": null,
    "info": null,
-   "name": "stalwart-spam-by-host",
+   "name": "stalwart-spam-received-by-host",
    "query": "stalwart-events",
    "sort_order": 42,
-   "title": "Spam by Host",
+   "title": "Spam Received by Host",
    "workbook": "stalwart"
   },
-  "stalwart-spam-by-tenant": {
+  "stalwart-spam-received-by-tenant": {
    "chart_type": "Row",
    "config": {
     "filters": {
@@ -3054,7 +3129,7 @@
     "order_by": [
      {
       "column": {
-       "column_name": "Events",
+       "column_name": "Received Spam",
        "type": "column"
       },
       "direction": "desc"
@@ -3076,7 +3151,7 @@
          "expression": "count()",
          "type": "expression"
         },
-        "measure_name": "Events"
+        "measure_name": "Received Spam"
        }
       }
      ],
@@ -3085,76 +3160,11 @@
    },
    "description": null,
    "folder": null,
-   "info": "message-ingest.spam attributed by the recipient's domain.",
-   "name": "stalwart-spam-by-tenant",
+   "info": "Inbound: message-ingest.spam, attributed to the tenant by the recipient's domain. The spam verdict is this server's own filter.",
+   "name": "stalwart-spam-received-by-tenant",
    "query": "stalwart-events-by-tenant",
    "sort_order": 59,
-   "title": "Spam by Tenant",
-   "workbook": "stalwart"
-  },
-  "stalwart-spam-readings": {
-   "chart_type": "Number",
-   "config": {
-    "filters": {
-     "filters": [],
-     "logical_operator": "And"
-    },
-    "limit": 100,
-    "number_column_options": [
-     {},
-     {},
-     {},
-     {}
-    ],
-    "number_columns": [
-     {
-      "data_type": "Integer",
-      "expression": {
-       "expression": "count_if(event == 'message-ingest.ham')",
-       "type": "expression"
-      },
-      "id": "Ham",
-      "measure_name": "Ham"
-     },
-     {
-      "data_type": "Integer",
-      "expression": {
-       "expression": "count_if(event == 'message-ingest.spam')",
-       "type": "expression"
-      },
-      "id": "Spam",
-      "measure_name": "Spam"
-     },
-     {
-      "data_type": "Decimal",
-      "expression": {
-       "expression": "count_if(event == 'message-ingest.spam') / count_if(category == 'message-ingest')",
-       "type": "expression"
-      },
-      "format": "percent",
-      "id": "Spam Rate",
-      "measure_name": "Spam Rate"
-     },
-     {
-      "data_type": "Integer",
-      "expression": {
-       "expression": "count_if(event == 'spam.classify')",
-       "type": "expression"
-      },
-      "id": "Classified",
-      "measure_name": "Classified"
-     }
-    ],
-    "number_formats": {},
-    "sparkline": false
-   },
-   "description": null,
-   "folder": null,
-   "info": null,
-   "name": "stalwart-spam-readings",
-   "query": "stalwart-events",
-   "sort_order": 23,
-   "title": "Spam Readings",
+   "title": "Spam Received by Tenant",
    "workbook": "stalwart"
   },
   "stalwart-spam-scores": {
@@ -3266,7 +3276,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "The sender domain of message-ingest.spam.",
+   "info": "The sender domain of the spam the tenants' mailboxes received.",
    "name": "stalwart-spam-senders",
    "query": "stalwart-events",
    "sort_order": 26,
@@ -3534,7 +3544,7 @@
     "order_by": [
      {
       "column": {
-       "column_name": "Delivered",
+       "column_name": "Sent",
        "type": "column"
       },
       "direction": "desc"
@@ -3554,7 +3564,7 @@
        "expression": "count_if(event == 'delivery.delivered')",
        "type": "expression"
       },
-      "measure_name": "Delivered"
+      "measure_name": "Sent"
      },
      {
       "data_type": "Integer",
@@ -3562,15 +3572,15 @@
        "expression": "count_if((event == 'delivery.failed') | (event == 'delivery.dsn-perm-fail'))",
        "type": "expression"
       },
-      "measure_name": "Failed"
+      "measure_name": "Send Failures"
      },
      {
       "data_type": "Integer",
       "expression": {
-       "expression": "count_if(event == 'message-ingest.ham')",
+       "expression": "count_if((event == 'message-ingest.ham') | (event == 'message-ingest.spam'))",
        "type": "expression"
       },
-      "measure_name": "Ham"
+      "measure_name": "Received"
      },
      {
       "data_type": "Integer",
@@ -3578,13 +3588,13 @@
        "expression": "count_if(event == 'message-ingest.spam')",
        "type": "expression"
       },
-      "measure_name": "Spam"
+      "measure_name": "Received Spam"
      }
     ]
    },
    "description": null,
    "folder": null,
-   "info": null,
+   "info": "Sent and Send Failures are outbound mail by the sender's domain; Received and Received Spam are inbound mail by the recipient's domain.",
    "name": "stalwart-tenant-overview",
    "query": "stalwart-events-by-tenant",
    "sort_order": 60,
@@ -3600,6 +3610,7 @@
     },
     "limit": 100,
     "number_column_options": [
+     {},
      {},
      {},
      {}
@@ -3620,8 +3631,17 @@
        "expression": "count_if(event == 'delivery.delivered')",
        "type": "expression"
       },
-      "id": "Delivered",
-      "measure_name": "Delivered"
+      "id": "Sent",
+      "measure_name": "Sent"
+     },
+     {
+      "data_type": "Integer",
+      "expression": {
+       "expression": "count_if((event == 'message-ingest.ham') | (event == 'message-ingest.spam'))",
+       "type": "expression"
+      },
+      "id": "Received",
+      "measure_name": "Received"
      },
      {
       "data_type": "Integer",
@@ -3629,8 +3649,8 @@
        "expression": "count_if(event == 'message-ingest.spam')",
        "type": "expression"
       },
-      "id": "Spam",
-      "measure_name": "Spam"
+      "id": "Received Spam",
+      "measure_name": "Received Spam"
      }
     ],
     "number_formats": {},
@@ -3777,7 +3797,7 @@
    "workbook": "stalwart"
   }
  },
- "creation": "2026-10-21 09:41:32.942635",
+ "creation": "2026-10-21 09:46:12.684347",
  "dashboards": {
   "stalwart-authentication": {
    "items": [
@@ -4080,8 +4100,8 @@
       "stalwart-cluster-nodes": "`stalwart-events-by-cluster`.`timestamp`",
       "stalwart-cluster-readings": "`stalwart-events-by-cluster`.`timestamp`",
       "stalwart-connections-by-cluster": "`stalwart-events-by-cluster`.`timestamp`",
-      "stalwart-deliveries-by-cluster": "`stalwart-events-by-cluster`.`timestamp`",
-      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`timestamp`"
+      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`timestamp`",
+      "stalwart-sent-by-cluster": "`stalwart-events-by-cluster`.`timestamp`"
      },
      "type": "filter"
     },
@@ -4101,8 +4121,8 @@
       "stalwart-cluster-nodes": "`stalwart-events-by-cluster`.`hostname`",
       "stalwart-cluster-readings": "`stalwart-events-by-cluster`.`hostname`",
       "stalwart-connections-by-cluster": "`stalwart-events-by-cluster`.`hostname`",
-      "stalwart-deliveries-by-cluster": "`stalwart-events-by-cluster`.`hostname`",
-      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`hostname`"
+      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`hostname`",
+      "stalwart-sent-by-cluster": "`stalwart-events-by-cluster`.`hostname`"
      },
      "type": "filter"
     },
@@ -4122,8 +4142,8 @@
       "stalwart-cluster-nodes": "`stalwart-events-by-cluster`.`cluster`",
       "stalwart-cluster-readings": "`stalwart-events-by-cluster`.`cluster`",
       "stalwart-connections-by-cluster": "`stalwart-events-by-cluster`.`cluster`",
-      "stalwart-deliveries-by-cluster": "`stalwart-events-by-cluster`.`cluster`",
-      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`cluster`"
+      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`cluster`",
+      "stalwart-sent-by-cluster": "`stalwart-events-by-cluster`.`cluster`"
      },
      "type": "filter"
     },
@@ -4160,11 +4180,23 @@
       "x": 8,
       "y": 2
      },
-     "reading": "Delivered",
+     "reading": "Sent",
      "type": "chart"
     },
     {
-     "chart": "stalwart-deliveries-by-cluster",
+     "chart": "stalwart-cluster-readings",
+     "layout": {
+      "h": 4,
+      "i": "cluster_readings-3",
+      "w": 4,
+      "x": 12,
+      "y": 2
+     },
+     "reading": "Received",
+     "type": "chart"
+    },
+    {
+     "chart": "stalwart-sent-by-cluster",
      "layout": {
       "h": 20,
       "i": "deliveries_by_cluster",
@@ -4542,8 +4574,8 @@
      },
      "links": {
       "stalwart-ingest-readings": "`stalwart-events`.`timestamp`",
-      "stalwart-messages-per-day": "`stalwart-events`.`timestamp`",
-      "stalwart-spam-by-host": "`stalwart-events`.`timestamp`"
+      "stalwart-received-per-day": "`stalwart-events`.`timestamp`",
+      "stalwart-spam-received-by-host": "`stalwart-events`.`timestamp`"
      },
      "type": "filter"
     },
@@ -4561,8 +4593,8 @@
      },
      "links": {
       "stalwart-ingest-readings": "`stalwart-events`.`hostname`",
-      "stalwart-messages-per-day": "`stalwart-events`.`hostname`",
-      "stalwart-spam-by-host": "`stalwart-events`.`hostname`"
+      "stalwart-received-per-day": "`stalwart-events`.`hostname`",
+      "stalwart-spam-received-by-host": "`stalwart-events`.`hostname`"
      },
      "type": "filter"
     },
@@ -4575,7 +4607,7 @@
       "x": 0,
       "y": 2
      },
-     "reading": "Ham",
+     "reading": "Received Ham",
      "type": "chart"
     },
     {
@@ -4587,7 +4619,7 @@
       "x": 4,
       "y": 2
      },
-     "reading": "Spam",
+     "reading": "Received Spam",
      "type": "chart"
     },
     {
@@ -4603,7 +4635,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-messages-per-day",
+     "chart": "stalwart-received-per-day",
      "layout": {
       "h": 20,
       "i": "ingest",
@@ -4614,7 +4646,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-spam-by-host",
+     "chart": "stalwart-spam-received-by-host",
      "layout": {
       "h": 20,
       "i": "spam_by_host",
@@ -5119,9 +5151,9 @@
       "y": 0
      },
      "links": {
+      "stalwart-received-spam-and-ham": "`stalwart-events`.`timestamp`",
       "stalwart-rejections": "`stalwart-events`.`timestamp`",
       "stalwart-reverse-dns": "`stalwart-events`.`timestamp`",
-      "stalwart-spam-and-ham": "`stalwart-events`.`timestamp`",
       "stalwart-spam-readings": "`stalwart-events`.`timestamp`",
       "stalwart-spam-scores": "`stalwart-events`.`timestamp`",
       "stalwart-spam-senders": "`stalwart-events`.`timestamp`"
@@ -5141,9 +5173,9 @@
       "y": 0
      },
      "links": {
+      "stalwart-received-spam-and-ham": "`stalwart-events`.`hostname`",
       "stalwart-rejections": "`stalwart-events`.`hostname`",
       "stalwart-reverse-dns": "`stalwart-events`.`hostname`",
-      "stalwart-spam-and-ham": "`stalwart-events`.`hostname`",
       "stalwart-spam-readings": "`stalwart-events`.`hostname`",
       "stalwart-spam-scores": "`stalwart-events`.`hostname`",
       "stalwart-spam-senders": "`stalwart-events`.`hostname`"
@@ -5159,7 +5191,7 @@
       "x": 0,
       "y": 2
      },
-     "reading": "Ham",
+     "reading": "Received Ham",
      "type": "chart"
     },
     {
@@ -5171,7 +5203,7 @@
       "x": 4,
       "y": 2
      },
-     "reading": "Spam",
+     "reading": "Received Spam",
      "type": "chart"
     },
     {
@@ -5199,7 +5231,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-spam-and-ham",
+     "chart": "stalwart-received-spam-and-ham",
      "layout": {
       "h": 20,
       "i": "spam_and_ham",
@@ -5279,9 +5311,9 @@
       "y": 0
      },
      "links": {
-      "stalwart-deliveries-by-tenant": "`stalwart-events-by-tenant`.`timestamp`",
-      "stalwart-failures-by-tenant": "`stalwart-events-by-tenant`.`timestamp`",
-      "stalwart-spam-by-tenant": "`stalwart-events-by-tenant`.`timestamp`",
+      "stalwart-send-failures-by-tenant": "`stalwart-events-by-tenant`.`timestamp`",
+      "stalwart-sent-by-tenant": "`stalwart-events-by-tenant`.`timestamp`",
+      "stalwart-spam-received-by-tenant": "`stalwart-events-by-tenant`.`timestamp`",
       "stalwart-tenant-overview": "`stalwart-events-by-tenant`.`timestamp`",
       "stalwart-tenant-readings": "`stalwart-events-by-tenant`.`timestamp`"
      },
@@ -5300,9 +5332,9 @@
       "y": 0
      },
      "links": {
-      "stalwart-deliveries-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
-      "stalwart-failures-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
-      "stalwart-spam-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
+      "stalwart-send-failures-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
+      "stalwart-sent-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
+      "stalwart-spam-received-by-tenant": "`stalwart-events-by-tenant`.`hostname`",
       "stalwart-tenant-overview": "`stalwart-events-by-tenant`.`hostname`",
       "stalwart-tenant-readings": "`stalwart-events-by-tenant`.`hostname`"
      },
@@ -5321,9 +5353,9 @@
       "y": 0
      },
      "links": {
-      "stalwart-deliveries-by-tenant": "`stalwart-events-by-tenant`.`tenant_label`",
-      "stalwart-failures-by-tenant": "`stalwart-events-by-tenant`.`tenant_label`",
-      "stalwart-spam-by-tenant": "`stalwart-events-by-tenant`.`tenant_label`",
+      "stalwart-send-failures-by-tenant": "`stalwart-events-by-tenant`.`tenant_label`",
+      "stalwart-sent-by-tenant": "`stalwart-events-by-tenant`.`tenant_label`",
+      "stalwart-spam-received-by-tenant": "`stalwart-events-by-tenant`.`tenant_label`",
       "stalwart-tenant-overview": "`stalwart-events-by-tenant`.`tenant_label`",
       "stalwart-tenant-readings": "`stalwart-events-by-tenant`.`tenant_label`"
      },
@@ -5350,7 +5382,7 @@
       "x": 4,
       "y": 2
      },
-     "reading": "Delivered",
+     "reading": "Sent",
      "type": "chart"
     },
     {
@@ -5362,11 +5394,23 @@
       "x": 8,
       "y": 2
      },
-     "reading": "Spam",
+     "reading": "Received",
      "type": "chart"
     },
     {
-     "chart": "stalwart-deliveries-by-tenant",
+     "chart": "stalwart-tenant-readings",
+     "layout": {
+      "h": 4,
+      "i": "tenant_readings-3",
+      "w": 4,
+      "x": 12,
+      "y": 2
+     },
+     "reading": "Received Spam",
+     "type": "chart"
+    },
+    {
+     "chart": "stalwart-sent-by-tenant",
      "layout": {
       "h": 20,
       "i": "deliveries_by_tenant",
@@ -5377,7 +5421,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-failures-by-tenant",
+     "chart": "stalwart-send-failures-by-tenant",
      "layout": {
       "h": 20,
       "i": "failures_by_tenant",
@@ -5388,7 +5432,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-spam-by-tenant",
+     "chart": "stalwart-spam-received-by-tenant",
      "layout": {
       "h": 20,
       "i": "spam_by_tenant",
@@ -5426,7 +5470,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 09:42:02.976107",
+ "modified": "2026-10-21 09:46:42.451313",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
