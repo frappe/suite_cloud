@@ -53,6 +53,23 @@ A metric record:
 
 Unknown fields in a record are ignored, so an agent may add fields before Suite Cloud learns them.
 
+### Machine metrics
+
+The agent also reports the machine it runs on, under the same `source` as the product on it, with these names. All are gauges the agent has already normalized, so a dashboard needs no counter arithmetic.
+
+| Name | Value | Labels |
+| --- | --- | --- |
+| `host.cpu.percent` | Busy share of all cores, 0 to 100 | |
+| `host.load.1m`, `host.load.5m`, `host.load.15m` | Load averages | |
+| `host.memory.total.bytes`, `host.memory.used.bytes` | Memory size and what is in use (total minus available) | |
+| `host.swap.used.bytes` | Swap in use | |
+| `host.disk.total.bytes`, `host.disk.used.bytes` | Size and use of one mount | `mount` |
+| `host.disk.read.bytes_per_second`, `host.disk.write.bytes_per_second` | Throughput of one device over the sample interval | `device` |
+| `host.network.receive.bytes_per_second`, `host.network.transmit.bytes_per_second` | Throughput of one interface over the sample interval | `interface` |
+| `host.uptime.seconds` | Seconds since the machine booted | |
+
+The shipped **Machines** Insights workbook reads these for every source.
+
 For Stalwart, the agent forwards Stalwart's own event names (`delivery.delivered`, `auth.failed`, `smtp.connection-start`), metric names (`server.memory`, `queue.count`, `delivery.total-time`) and the keys of its event data (`remoteIp`, `domain`, `queueId`) unchanged. The shipped dashboards filter on those names.
 
 ```http
