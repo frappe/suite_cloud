@@ -351,6 +351,15 @@ class StalwartCluster(Document):
         frappe.only_for("System Manager")
         return [bootstrap.upgrade_node(node).name for node in self.get_nodes(("Active",))]
 
+    @frappe.whitelist()
+    def upgrade_agents(self) -> list[str]:
+        """Installs the built Suite Cloud Agent on every active node and gateway; Stalwart keeps running."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.deploy import upgrade_agents
+
+        return upgrade_agents(self)
+
 
 def check_all_clusters() -> None:
     """Daily: drift reports for active clusters."""

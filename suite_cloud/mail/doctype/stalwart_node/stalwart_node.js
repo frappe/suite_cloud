@@ -39,6 +39,9 @@ frappe.ui.form.on('Stalwart Node', {
 			frm.add_custom_button(__('Drain'), () => frm.events.call(frm, 'drain', __('Removing from ingress DNS...')), __('Actions'))
 			frm.add_custom_button(__('Upgrade'), () => frm.events.call(frm, 'upgrade', __('Queueing upgrade...')), __('Actions'))
 		}
+		if (['Provisioned', 'Active', 'Draining'].includes(frm.doc.status)) {
+			frm.add_custom_button(__('Install Agent'), () => frm.events.call(frm, 'install_agent', __('Queueing the agent install...')), __('Actions'))
+		}
 		if (frm.doc.status === 'Draining') {
 			frm.add_custom_button(__('Restore'), () => frm.events.call(frm, 'restore', __('Adding to ingress DNS...')), __('Actions'))
 		}

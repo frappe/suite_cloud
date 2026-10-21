@@ -249,6 +249,13 @@ class EgressGateway(Document):
         return egress.upgrade_gateway(self).name
 
     @frappe.whitelist()
+    def install_agent(self) -> str:
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.deploy import install_agent
+
+        return install_agent(self).name
+
+    @frappe.whitelist()
     def replace_dkim_keys(self) -> None:
         """Emergency replacement of the gateway domain's keys after a leak, same selectors."""
 

@@ -23,6 +23,7 @@ frappe.ui.form.on('Egress Gateway', {
 			frm.add_custom_button(__('Provision'), () => frm.events.call(frm, 'provision', __('Queueing...')), __('Actions'))
 		}
 		if (['Provisioned', 'Active'].includes(frm.doc.status)) {
+			frm.add_custom_button(__('Install Agent'), () => frm.events.call(frm, 'install_agent', __('Queueing...')), __('Actions'))
 			frm.add_custom_button(
 				__('Re-provision'),
 				() =>
