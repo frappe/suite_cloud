@@ -82,7 +82,7 @@ func (t *Tailer) Step(ctx context.Context) (idle bool, err error) {
 	t.append(cursor, lines, end)
 
 	switch {
-	case len(t.buffer) >= t.BatchSize, len(t.buffer) == 0 && end > cursor.Offset:
+	case len(t.buffer) >= t.BatchSize, end-cursor.Offset >= maxBatchBytes, len(t.buffer) == 0 && end > cursor.Offset:
 		return false, t.ship(ctx, cursor)
 	case end > from:
 		if t.flushDue() {

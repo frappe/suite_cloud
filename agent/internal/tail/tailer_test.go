@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -265,6 +266,47 @@ func TestPendingBatchIsResentUnderTheSameId(t *testing.T) {
 	h.step()
 	if len(h.sender.batches) != 2 || h.sender.batches[1].Records[0].(telemetry.Event).Data["n"] != int64(3) {
 		t.Fatalf("batches %+v", h.sender.batches)
+	}
+}
+
+func TestLongLinesBoundTheBatchAndRecoverWhole(t *testing.T) {
+	previous := maxBatchBytes
+	maxBatchBytes = 4096
+	defer func() { maxBatchBytes = previous }()
+	h := newHarness(t, true, 5000)
+	long := make([]string, 0, 40)
+	for i := 0; i < 40; i++ {
+		long = append(long, line(i)+`, details = "`+strings.Repeat("x", 300)+`"`)
+	}
+	path := h.write("stalwart.2026-10-20", long...)
+
+	h.step()
+	if len(h.sender.batches) != 1 || len(h.sender.batches[0].Records) >= 40 {
+		t.Fatalf("a batch past the byte bound was not shipped early: %d batches", len(h.sender.batches))
+	}
+	first := len(h.sender.batches[0].Records)
+
+	// A pending batch larger than one read must come back whole after a restart.
+	files, _ := Discover(h.tailer.Def.Path)
+	err := h.store.Update(func(s *state.State) error {
+		log := s.Log("stalwart")
+		log.Cursors[0].Offset = 0
+		log.Pending = &state.Pending{BatchID: "0199f7e0-0000-7000-8000-000000000002", Path: path, Identity: files[0].Identity, Start: 0, End: size(t, path), Records: 40}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h.reopen(true, 5000)
+	if err := h.tailer.Recover(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	resent := h.sender.batches[len(h.sender.batches)-1]
+	if resent.ID != "0199f7e0-0000-7000-8000-000000000002" || len(resent.Records) != 40 {
+		t.Fatalf("recovered %d of 40 records (first batch had %d)", len(resent.Records), first)
+	}
+	if c := h.cursor(path); c.Offset != size(t, path) {
+		t.Fatalf("cursor %+v", c)
 	}
 }
 
