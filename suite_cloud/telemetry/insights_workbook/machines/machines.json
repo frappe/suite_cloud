@@ -55,7 +55,7 @@
    "name": "machines-cpu",
    "query": "machines-host-metrics",
    "sort_order": 2,
-   "title": "CPU",
+   "title": "CPU (%)",
    "workbook": "machines"
   },
   "machines-disk": {
@@ -134,7 +134,7 @@
    "title": "Disk",
    "workbook": "machines"
   },
-  "machines-disk-growth": {
+  "machines-disk-growth-gib": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -195,13 +195,13 @@
    "description": null,
    "folder": null,
    "info": "host.disk.used.bytes per mount, to see how long the space lasts.",
-   "name": "machines-disk-growth",
+   "name": "machines-disk-growth-gib",
    "query": "machines-host-metrics",
    "sort_order": 7,
-   "title": "Disk Growth",
+   "title": "Disk Growth (GiB)",
    "workbook": "machines"
   },
-  "machines-disk-i-o": {
+  "machines-disk-i-o-mib-s": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -255,10 +255,10 @@
    "description": null,
    "folder": null,
    "info": null,
-   "name": "machines-disk-i-o",
+   "name": "machines-disk-i-o-mib-s",
    "query": "machines-host-metrics",
    "sort_order": 8,
-   "title": "Disk I/O",
+   "title": "Disk I/O (MiB/s)",
    "workbook": "machines"
   },
   "machines-hosts": {
@@ -477,7 +477,7 @@
    "title": "Machine Readings",
    "workbook": "machines"
   },
-  "machines-memory": {
+  "machines-memory-used": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -530,13 +530,71 @@
    "description": null,
    "folder": null,
    "info": "host.memory.used.bytes over host.memory.total.bytes per hour.",
-   "name": "machines-memory",
+   "name": "machines-memory-used",
    "query": "machines-host-metrics",
    "sort_order": 4,
-   "title": "Memory",
+   "title": "Memory Used (%)",
    "workbook": "machines"
   },
-  "machines-network": {
+  "machines-network-by-host-mib-s": {
+   "chart_type": "Line",
+   "config": {
+    "filters": {
+     "filters": [],
+     "logical_operator": "And"
+    },
+    "limit": 5000,
+    "order_by": [
+     {
+      "column": {
+       "column_name": "timestamp",
+       "type": "column"
+      },
+      "direction": "asc"
+     }
+    ],
+    "split_by": {
+     "dimension": {
+      "column_name": "hostname",
+      "data_type": "String",
+      "dimension_name": "hostname"
+     },
+     "max_split_values": 20
+    },
+    "x_axis": {
+     "dimension": {
+      "column_name": "timestamp",
+      "data_type": "Datetime",
+      "dimension_name": "timestamp",
+      "granularity": "hour"
+     }
+    },
+    "y_axis": {
+     "series": [
+      {
+       "measure": {
+        "data_type": "Decimal",
+        "expression": {
+         "expression": "avg(value, where=metric == 'host.network.transmit.bytes_per_second') / 1048576",
+         "type": "expression"
+        },
+        "measure_name": "Out MiB/s"
+       }
+      }
+     ],
+     "show_data_labels": false
+    }
+   },
+   "description": null,
+   "folder": null,
+   "info": "Transmitted bytes per second per host; an SFU node sends far more than a mail node.",
+   "name": "machines-network-by-host-mib-s",
+   "query": "machines-host-metrics",
+   "sort_order": 10,
+   "title": "Network by Host (MiB/s)",
+   "workbook": "machines"
+  },
+  "machines-network-mib-s": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -590,71 +648,13 @@
    "description": null,
    "folder": null,
    "info": null,
-   "name": "machines-network",
+   "name": "machines-network-mib-s",
    "query": "machines-host-metrics",
    "sort_order": 9,
-   "title": "Network",
+   "title": "Network (MiB/s)",
    "workbook": "machines"
   },
-  "machines-network-by-host": {
-   "chart_type": "Line",
-   "config": {
-    "filters": {
-     "filters": [],
-     "logical_operator": "And"
-    },
-    "limit": 5000,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "timestamp",
-       "type": "column"
-      },
-      "direction": "asc"
-     }
-    ],
-    "split_by": {
-     "dimension": {
-      "column_name": "hostname",
-      "data_type": "String",
-      "dimension_name": "hostname"
-     },
-     "max_split_values": 20
-    },
-    "x_axis": {
-     "dimension": {
-      "column_name": "timestamp",
-      "data_type": "Datetime",
-      "dimension_name": "timestamp",
-      "granularity": "hour"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Decimal",
-        "expression": {
-         "expression": "avg(value, where=metric == 'host.network.transmit.bytes_per_second') / 1048576",
-         "type": "expression"
-        },
-        "measure_name": "Out MiB/s"
-       }
-      }
-     ],
-     "show_data_labels": false
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": "Transmitted bytes per second per host; an SFU node sends far more than a mail node.",
-   "name": "machines-network-by-host",
-   "query": "machines-host-metrics",
-   "sort_order": 10,
-   "title": "Network by Host",
-   "workbook": "machines"
-  },
-  "machines-swap": {
+  "machines-swap-mib": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -706,14 +706,14 @@
    "description": null,
    "folder": null,
    "info": "host.swap.used.bytes; a machine that swaps is short of memory.",
-   "name": "machines-swap",
+   "name": "machines-swap-mib",
    "query": "machines-host-metrics",
    "sort_order": 5,
-   "title": "Swap",
+   "title": "Swap (MiB)",
    "workbook": "machines"
   }
  },
- "creation": "2026-10-21 10:25:08.875801",
+ "creation": "2026-10-21 10:34:52.998846",
  "dashboards": {
   "machines-overview": {
    "items": [
@@ -732,15 +732,15 @@
      "links": {
       "machines-cpu": "`machines-host-metrics`.`timestamp`",
       "machines-disk": "`machines-host-metrics`.`timestamp`",
-      "machines-disk-growth": "`machines-host-metrics`.`timestamp`",
-      "machines-disk-i-o": "`machines-host-metrics`.`timestamp`",
+      "machines-disk-growth-gib": "`machines-host-metrics`.`timestamp`",
+      "machines-disk-i-o-mib-s": "`machines-host-metrics`.`timestamp`",
       "machines-hosts": "`machines-host-metrics`.`timestamp`",
       "machines-load": "`machines-host-metrics`.`timestamp`",
       "machines-machine-readings": "`machines-host-metrics`.`timestamp`",
-      "machines-memory": "`machines-host-metrics`.`timestamp`",
-      "machines-network": "`machines-host-metrics`.`timestamp`",
-      "machines-network-by-host": "`machines-host-metrics`.`timestamp`",
-      "machines-swap": "`machines-host-metrics`.`timestamp`"
+      "machines-memory-used": "`machines-host-metrics`.`timestamp`",
+      "machines-network-by-host-mib-s": "`machines-host-metrics`.`timestamp`",
+      "machines-network-mib-s": "`machines-host-metrics`.`timestamp`",
+      "machines-swap-mib": "`machines-host-metrics`.`timestamp`"
      },
      "type": "filter"
     },
@@ -759,15 +759,15 @@
      "links": {
       "machines-cpu": "`machines-host-metrics`.`hostname`",
       "machines-disk": "`machines-host-metrics`.`hostname`",
-      "machines-disk-growth": "`machines-host-metrics`.`hostname`",
-      "machines-disk-i-o": "`machines-host-metrics`.`hostname`",
+      "machines-disk-growth-gib": "`machines-host-metrics`.`hostname`",
+      "machines-disk-i-o-mib-s": "`machines-host-metrics`.`hostname`",
       "machines-hosts": "`machines-host-metrics`.`hostname`",
       "machines-load": "`machines-host-metrics`.`hostname`",
       "machines-machine-readings": "`machines-host-metrics`.`hostname`",
-      "machines-memory": "`machines-host-metrics`.`hostname`",
-      "machines-network": "`machines-host-metrics`.`hostname`",
-      "machines-network-by-host": "`machines-host-metrics`.`hostname`",
-      "machines-swap": "`machines-host-metrics`.`hostname`"
+      "machines-memory-used": "`machines-host-metrics`.`hostname`",
+      "machines-network-by-host-mib-s": "`machines-host-metrics`.`hostname`",
+      "machines-network-mib-s": "`machines-host-metrics`.`hostname`",
+      "machines-swap-mib": "`machines-host-metrics`.`hostname`"
      },
      "type": "filter"
     },
@@ -786,15 +786,15 @@
      "links": {
       "machines-cpu": "`machines-host-metrics`.`source`",
       "machines-disk": "`machines-host-metrics`.`source`",
-      "machines-disk-growth": "`machines-host-metrics`.`source`",
-      "machines-disk-i-o": "`machines-host-metrics`.`source`",
+      "machines-disk-growth-gib": "`machines-host-metrics`.`source`",
+      "machines-disk-i-o-mib-s": "`machines-host-metrics`.`source`",
       "machines-hosts": "`machines-host-metrics`.`source`",
       "machines-load": "`machines-host-metrics`.`source`",
       "machines-machine-readings": "`machines-host-metrics`.`source`",
-      "machines-memory": "`machines-host-metrics`.`source`",
-      "machines-network": "`machines-host-metrics`.`source`",
-      "machines-network-by-host": "`machines-host-metrics`.`source`",
-      "machines-swap": "`machines-host-metrics`.`source`"
+      "machines-memory-used": "`machines-host-metrics`.`source`",
+      "machines-network-by-host-mib-s": "`machines-host-metrics`.`source`",
+      "machines-network-mib-s": "`machines-host-metrics`.`source`",
+      "machines-swap-mib": "`machines-host-metrics`.`source`"
      },
      "type": "filter"
     },
@@ -858,7 +858,7 @@
      "type": "chart"
     },
     {
-     "chart": "machines-memory",
+     "chart": "machines-memory-used",
      "layout": {
       "h": 20,
       "i": "memory",
@@ -880,7 +880,7 @@
      "type": "chart"
     },
     {
-     "chart": "machines-swap",
+     "chart": "machines-swap-mib",
      "layout": {
       "h": 20,
       "i": "swap",
@@ -891,7 +891,7 @@
      "type": "chart"
     },
     {
-     "chart": "machines-disk-growth",
+     "chart": "machines-disk-growth-gib",
      "layout": {
       "h": 20,
       "i": "disk_trend",
@@ -902,7 +902,7 @@
      "type": "chart"
     },
     {
-     "chart": "machines-network",
+     "chart": "machines-network-mib-s",
      "layout": {
       "h": 20,
       "i": "network",
@@ -913,7 +913,7 @@
      "type": "chart"
     },
     {
-     "chart": "machines-network-by-host",
+     "chart": "machines-network-by-host-mib-s",
      "layout": {
       "h": 20,
       "i": "network_by_host",
@@ -924,7 +924,7 @@
      "type": "chart"
     },
     {
-     "chart": "machines-disk-i-o",
+     "chart": "machines-disk-i-o-mib-s",
      "layout": {
       "h": 20,
       "i": "disk_io",
@@ -973,7 +973,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 10:25:13.326458",
+ "modified": "2026-10-21 10:34:57.552745",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "machines",

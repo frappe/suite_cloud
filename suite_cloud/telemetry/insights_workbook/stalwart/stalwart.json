@@ -198,7 +198,7 @@
    "title": "Authentication Readings",
    "workbook": "stalwart"
   },
-  "stalwart-backend-latency": {
+  "stalwart-backend-latency-ms": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -265,10 +265,10 @@
    "description": null,
    "folder": null,
    "info": "Mean store and DNS latency per day. These histograms exist on the enterprise build only.",
-   "name": "stalwart-backend-latency",
+   "name": "stalwart-backend-latency-ms",
    "query": "stalwart-metrics",
    "sort_order": 52,
-   "title": "Backend Latency",
+   "title": "Backend Latency (ms)",
    "workbook": "stalwart"
   },
   "stalwart-bans": {
@@ -961,7 +961,7 @@
    "title": "Delivery Readings",
    "workbook": "stalwart"
   },
-  "stalwart-delivery-time": {
+  "stalwart-delivery-time-ms": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -1024,10 +1024,10 @@
    "description": null,
    "folder": null,
    "info": "Mean delivery time per day from the delivery.total-time histogram.",
-   "name": "stalwart-delivery-time",
+   "name": "stalwart-delivery-time-ms",
    "query": "stalwart-metrics",
    "sort_order": 12,
-   "title": "Delivery Time",
+   "title": "Delivery Time (ms)",
    "workbook": "stalwart"
   },
   "stalwart-dispositions": {
@@ -2253,7 +2253,7 @@
    "title": "Ingest Readings",
    "workbook": "stalwart"
   },
-  "stalwart-latency-by-destination": {
+  "stalwart-latency-by-destination-ms": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -2314,10 +2314,10 @@
    "description": null,
    "folder": null,
    "info": "Mean elapsed milliseconds of delivery.delivered per day, split by the recipient domain.",
-   "name": "stalwart-latency-by-destination",
+   "name": "stalwart-latency-by-destination-ms",
    "query": "stalwart-events",
    "sort_order": 20,
-   "title": "Latency by Destination",
+   "title": "Latency by Destination (ms)",
    "workbook": "stalwart"
   },
   "stalwart-lifecycle-events": {
@@ -2383,7 +2383,7 @@
    "title": "Lifecycle Events",
    "workbook": "stalwart"
   },
-  "stalwart-memory-by-cluster": {
+  "stalwart-memory-by-cluster-mib": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -2446,13 +2446,13 @@
    "description": null,
    "folder": null,
    "info": null,
-   "name": "stalwart-memory-by-cluster",
+   "name": "stalwart-memory-by-cluster-mib",
    "query": "stalwart-metrics-by-cluster",
    "sort_order": 86,
-   "title": "Memory by Cluster",
+   "title": "Memory by Cluster (MiB)",
    "workbook": "stalwart"
   },
-  "stalwart-message-size": {
+  "stalwart-message-size-kib": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -2515,10 +2515,10 @@
    "description": null,
    "folder": null,
    "info": "Mean message size per day from the message.size histogram.",
-   "name": "stalwart-message-size",
+   "name": "stalwart-message-size-kib",
    "query": "stalwart-metrics",
    "sort_order": 51,
-   "title": "Message Size",
+   "title": "Message Size (KiB)",
    "workbook": "stalwart"
   },
   "stalwart-offenders": {
@@ -2836,7 +2836,7 @@
    "title": "Policy Failures",
    "workbook": "stalwart"
   },
-  "stalwart-process-memory": {
+  "stalwart-process-memory-mib": {
    "chart_type": "Line",
    "config": {
     "filters": {
@@ -2899,10 +2899,10 @@
    "description": null,
    "folder": null,
    "info": "Mean of Stalwart's server.memory gauge per day: the memory of the Stalwart process, not of the machine (see the Machines workbook).",
-   "name": "stalwart-process-memory",
+   "name": "stalwart-process-memory-mib",
    "query": "stalwart-metrics",
    "sort_order": 54,
-   "title": "Process Memory",
+   "title": "Process Memory (MiB)",
    "workbook": "stalwart"
   },
   "stalwart-queue": {
@@ -4824,7 +4824,7 @@
    "workbook": "stalwart"
   }
  },
- "creation": "2026-10-21 10:29:23.710015",
+ "creation": "2026-10-21 10:34:13.579534",
  "dashboards": {
   "stalwart-authentication": {
    "items": [
@@ -5001,10 +5001,10 @@
       "y": 0
      },
      "links": {
-      "stalwart-backend-latency": "`stalwart-metrics`.`timestamp`",
+      "stalwart-backend-latency-ms": "`stalwart-metrics`.`timestamp`",
       "stalwart-capacity-readings": "`stalwart-metrics`.`timestamp`",
       "stalwart-connections-by-protocol": "`stalwart-metrics`.`timestamp`",
-      "stalwart-message-size": "`stalwart-metrics`.`timestamp`",
+      "stalwart-message-size-kib": "`stalwart-metrics`.`timestamp`",
       "stalwart-users-and-domains": "`stalwart-metrics`.`timestamp`"
      },
      "type": "filter"
@@ -5022,10 +5022,10 @@
       "y": 0
      },
      "links": {
-      "stalwart-backend-latency": "`stalwart-metrics`.`hostname`",
+      "stalwart-backend-latency-ms": "`stalwart-metrics`.`hostname`",
       "stalwart-capacity-readings": "`stalwart-metrics`.`hostname`",
       "stalwart-connections-by-protocol": "`stalwart-metrics`.`hostname`",
-      "stalwart-message-size": "`stalwart-metrics`.`hostname`",
+      "stalwart-message-size-kib": "`stalwart-metrics`.`hostname`",
       "stalwart-users-and-domains": "`stalwart-metrics`.`hostname`"
      },
      "type": "filter"
@@ -5077,7 +5077,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-message-size",
+     "chart": "stalwart-message-size-kib",
      "layout": {
       "h": 20,
       "i": "message_size",
@@ -5088,7 +5088,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-backend-latency",
+     "chart": "stalwart-backend-latency-ms",
      "layout": {
       "h": 20,
       "i": "backend_latency",
@@ -5127,7 +5127,7 @@
       "stalwart-cluster-nodes": "`stalwart-events-by-cluster`.`timestamp`",
       "stalwart-cluster-readings": "`stalwart-events-by-cluster`.`timestamp`",
       "stalwart-connections-by-cluster": "`stalwart-events-by-cluster`.`timestamp`",
-      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`timestamp`",
+      "stalwart-memory-by-cluster-mib": "`stalwart-metrics-by-cluster`.`timestamp`",
       "stalwart-sent-by-cluster": "`stalwart-events-by-cluster`.`timestamp`"
      },
      "type": "filter"
@@ -5148,7 +5148,7 @@
       "stalwart-cluster-nodes": "`stalwart-events-by-cluster`.`hostname`",
       "stalwart-cluster-readings": "`stalwart-events-by-cluster`.`hostname`",
       "stalwart-connections-by-cluster": "`stalwart-events-by-cluster`.`hostname`",
-      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`hostname`",
+      "stalwart-memory-by-cluster-mib": "`stalwart-metrics-by-cluster`.`hostname`",
       "stalwart-sent-by-cluster": "`stalwart-events-by-cluster`.`hostname`"
      },
      "type": "filter"
@@ -5169,7 +5169,7 @@
       "stalwart-cluster-nodes": "`stalwart-events-by-cluster`.`cluster`",
       "stalwart-cluster-readings": "`stalwart-events-by-cluster`.`cluster`",
       "stalwart-connections-by-cluster": "`stalwart-events-by-cluster`.`cluster`",
-      "stalwart-memory-by-cluster": "`stalwart-metrics-by-cluster`.`cluster`",
+      "stalwart-memory-by-cluster-mib": "`stalwart-metrics-by-cluster`.`cluster`",
       "stalwart-sent-by-cluster": "`stalwart-events-by-cluster`.`cluster`"
      },
      "type": "filter"
@@ -5245,7 +5245,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-memory-by-cluster",
+     "chart": "stalwart-memory-by-cluster-mib",
      "layout": {
       "h": 20,
       "i": "memory_by_cluster",
@@ -5295,7 +5295,7 @@
       "stalwart-bounce-codes": "`stalwart-events`.`timestamp`",
       "stalwart-bounces": "`stalwart-events`.`timestamp`",
       "stalwart-deliverability-readings": "`stalwart-events`.`timestamp`",
-      "stalwart-latency-by-destination": "`stalwart-events`.`timestamp`",
+      "stalwart-latency-by-destination-ms": "`stalwart-events`.`timestamp`",
       "stalwart-outgoing-reports": "`stalwart-events`.`timestamp`",
       "stalwart-policy-failures": "`stalwart-events`.`timestamp`",
       "stalwart-retries": "`stalwart-events`.`timestamp`"
@@ -5318,7 +5318,7 @@
       "stalwart-bounce-codes": "`stalwart-events`.`hostname`",
       "stalwart-bounces": "`stalwart-events`.`hostname`",
       "stalwart-deliverability-readings": "`stalwart-events`.`hostname`",
-      "stalwart-latency-by-destination": "`stalwart-events`.`hostname`",
+      "stalwart-latency-by-destination-ms": "`stalwart-events`.`hostname`",
       "stalwart-outgoing-reports": "`stalwart-events`.`hostname`",
       "stalwart-policy-failures": "`stalwart-events`.`hostname`",
       "stalwart-retries": "`stalwart-events`.`hostname`"
@@ -5418,7 +5418,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-latency-by-destination",
+     "chart": "stalwart-latency-by-destination-ms",
      "layout": {
       "h": 20,
       "i": "latency_by_destination",
@@ -5466,7 +5466,7 @@
      },
      "links": {
       "stalwart-delivery-readings": "`stalwart-events`.`timestamp`",
-      "stalwart-delivery-time": "`stalwart-metrics`.`timestamp`",
+      "stalwart-delivery-time-ms": "`stalwart-metrics`.`timestamp`",
       "stalwart-failing-domains": "`stalwart-events`.`timestamp`",
       "stalwart-failure-reasons": "`stalwart-events`.`timestamp`",
       "stalwart-outcomes": "`stalwart-events`.`timestamp`"
@@ -5487,7 +5487,7 @@
      },
      "links": {
       "stalwart-delivery-readings": "`stalwart-events`.`hostname`",
-      "stalwart-delivery-time": "`stalwart-metrics`.`hostname`",
+      "stalwart-delivery-time-ms": "`stalwart-metrics`.`hostname`",
       "stalwart-failing-domains": "`stalwart-events`.`hostname`",
       "stalwart-failure-reasons": "`stalwart-events`.`hostname`",
       "stalwart-outcomes": "`stalwart-events`.`hostname`"
@@ -5542,7 +5542,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-delivery-time",
+     "chart": "stalwart-delivery-time-ms",
      "layout": {
       "h": 20,
       "i": "delivery_time",
@@ -5924,7 +5924,7 @@
       "stalwart-health-readings": "`stalwart-events`.`timestamp`",
       "stalwart-hosts": "`stalwart-events`.`timestamp`",
       "stalwart-lifecycle-events": "`stalwart-events`.`timestamp`",
-      "stalwart-process-memory": "`stalwart-metrics`.`timestamp`",
+      "stalwart-process-memory-mib": "`stalwart-metrics`.`timestamp`",
       "stalwart-startups": "`stalwart-events`.`timestamp`",
       "stalwart-store-errors": "`stalwart-events`.`timestamp`",
       "stalwart-warnings-and-errors": "`stalwart-events`.`timestamp`"
@@ -5948,7 +5948,7 @@
       "stalwart-health-readings": "`stalwart-events`.`hostname`",
       "stalwart-hosts": "`stalwart-events`.`hostname`",
       "stalwart-lifecycle-events": "`stalwart-events`.`hostname`",
-      "stalwart-process-memory": "`stalwart-metrics`.`hostname`",
+      "stalwart-process-memory-mib": "`stalwart-metrics`.`hostname`",
       "stalwart-startups": "`stalwart-events`.`hostname`",
       "stalwart-store-errors": "`stalwart-events`.`hostname`",
       "stalwart-warnings-and-errors": "`stalwart-events`.`hostname`"
@@ -6004,7 +6004,7 @@
      "type": "chart"
     },
     {
-     "chart": "stalwart-process-memory",
+     "chart": "stalwart-process-memory-mib",
      "layout": {
       "h": 20,
       "i": "memory",
@@ -6894,7 +6894,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 10:29:59.608292",
+ "modified": "2026-10-21 10:34:51.273184",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
