@@ -11,7 +11,7 @@ import pyarrow.parquet as parquet
 from frappe.tests import IntegrationTestCase
 from frappe.utils import add_to_date, get_test_client, now_datetime
 
-from suite_cloud.api.telemetry import MAX_RECORDS, authenticate, events, metrics
+from suite_cloud.api.telemetry import DEFAULT_RECORDS_PER_REQUEST, authenticate, events, metrics
 from suite_cloud.api.tenant import InvalidInputError
 from suite_cloud.telemetry import EVENTS, METRICS, TELEMETRY_USER
 from suite_cloud.telemetry.spool import Spool
@@ -113,7 +113,7 @@ class TestValidation(TelemetryApiTestCase):
             ({"hostname": "x" * 254}, "hostname"),
             ({"batch_id": "nope"}, "batch_id"),
             ({"records": []}, "at least one"),
-            ({"records": [EVENT] * (MAX_RECORDS + 1)}, "at most"),
+            ({"records": [EVENT] * (DEFAULT_RECORDS_PER_REQUEST + 1)}, "at most"),
             ({"records": ["x"]}, r"records\[0\] must be an object"),
             ({"records": [{**EVENT, "timestamp": "yesterday"}]}, r"records\[0\].timestamp"),
             ({"records": [{**EVENT, "timestamp": "2026-10-20T09:59:00"}]}, "UTC offset"),
@@ -147,6 +147,20 @@ class TestValidation(TelemetryApiTestCase):
     def test_a_missing_argument_is_a_400(self) -> None:
         with self.assertRaisesRegex(InvalidInputError, "source field is required"):
             events(host_ip="203.0.113.5", records=[EVENT])
+
+    def test_the_batch_and_request_limits_come_from_the_settings(self) -> None:
+        frappe.set_user("Administrator")
+        configure_settings(telemetry_records_per_request=2, telemetry_requests_per_minute=2)
+        self.request(SECRET)
+        host = {**HOST, "host_ip": "198.51.100.77"}  # a window of its own; the counter outlives the test
+        frappe.cache.delete_keys("suite_cloud:ratelimit:telemetry:198.51.100.77")
+
+        with self.assertRaisesRegex(InvalidInputError, "at most 2"):
+            events(**host, records=[EVENT] * 3)  # refused, but counted
+        events(**host, records=[EVENT] * 2)
+        with self.assertRaisesRegex(frappe.TooManyRequestsError, "More than 2 requests"):
+            events(**host, records=[EVENT])
+        self.assertEqual(len(self.staged()), 1)
 
 
 class TestStaging(TelemetryApiTestCase):

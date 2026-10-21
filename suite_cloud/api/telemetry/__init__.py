@@ -19,16 +19,18 @@ from uuid import UUID, uuid7
 
 import frappe
 from frappe import _
-from frappe.utils import get_datetime, now_datetime
+from frappe.utils import cint, get_datetime, now_datetime
 from frappe.utils.password import get_decrypted_password
 
 from suite_cloud.api.tenant import InvalidInputError, assert_arguments, throttle
 from suite_cloud.telemetry import EVENTS, METRICS, TELEMETRY_USER, TelemetryTable
 from suite_cloud.telemetry.spool import Spool
+from suite_cloud.utils import get_config
 
 API_PATHS = ("/api/v2/method/suite_cloud.api.telemetry.", "/api/method/suite_cloud.api.telemetry.")
 SETTINGS = ("Suite Cloud Settings", "Suite Cloud Settings")
-MAX_RECORDS = 5000  # records in one request
+DEFAULT_REQUESTS_PER_MINUTE = 300  # the settings' defaults, used until the site has them
+DEFAULT_RECORDS_PER_REQUEST = 5000
 HOSTNAME_LIMIT = 253
 SOURCE_PATTERN = re.compile(r"[a-z0-9_-]{1,64}")
 METRIC_TYPES = ("counter", "gauge", "histogram")
@@ -138,7 +140,7 @@ def get_envelope(source: str, host_ip: str, hostname: str | None, batch_id: str 
         except ValueError:
             frappe.throw(_("batch_id must be a UUID."), InvalidInputError)
 
-    throttle(f"telemetry:{address}")
+    throttle(f"telemetry:{address}", get_limit("telemetry_requests_per_minute", DEFAULT_REQUESTS_PER_MINUTE))
     return {
         "batch_id": batch_id or str(uuid7()),
         "received_at": datetime.now(UTC).replace(tzinfo=None),
@@ -151,14 +153,19 @@ def get_envelope(source: str, host_ip: str, hostname: str | None, batch_id: str 
 def get_records(records: list) -> list[Record]:
     if not records:
         frappe.throw(_("records must hold at least one record."), InvalidInputError)
-    if len(records) > MAX_RECORDS:
+    limit = get_limit("telemetry_records_per_request", DEFAULT_RECORDS_PER_REQUEST)
+    if len(records) > limit:
         frappe.throw(
-            _("records holds {0} records; send at most {1} in one request.").format(
-                len(records), MAX_RECORDS
-            ),
+            _("records holds {0} records; send at most {1} in one request.").format(len(records), limit),
             InvalidInputError,
         )
     return [Record(index, record) for index, record in enumerate(records)]
+
+
+def get_limit(key: str, default: int) -> int:
+    """A limit from the settings; a site that has not filled the field yet gets the default."""
+
+    return cint(get_config(key)) or default
 
 
 def parse_event(record: Record) -> dict:

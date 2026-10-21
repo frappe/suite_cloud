@@ -27,7 +27,7 @@ Both methods take the same envelope and a list of records. A batch is checked wh
 | `host_ip` | string | Required. The node's IPv4 or IPv6 address, stored in its normalized form |
 | `hostname` | string | Optional. The node's hostname, at most 253 characters |
 | `batch_id` | string | Optional. A UUID the agent gives the batch, see [retries](#retries). Suite Cloud generates a UUIDv7 when it is left out |
-| `records` | array | Required. 1 to 5000 records |
+| `records` | array | Required. 1 to **Telemetry Records per Request** (5000 by default) records |
 
 An event record:
 
@@ -104,11 +104,11 @@ An accepted batch answers 200 with the batch id and the number of records staged
 
 | Status | Type | Meaning |
 | --- | --- | --- |
-| 400 | `InvalidInputError` | A required parameter left out, a bad address, source, hostname, batch id or timestamp, more than 5000 records, or a bad field; the message names the record, such as `records[12].timestamp must carry a UTC offset.` |
+| 400 | `InvalidInputError` | A required parameter left out, a bad address, source, hostname, batch id or timestamp, more records than the setting allows, or a bad field; the message names the record, such as `records[12].timestamp must carry a UTC offset.` |
 | 401 | `AuthenticationError` | The secret is wrong or not set |
 | 403 | `PermissionError` | A verb other than POST, or a caller that is not a telemetry agent |
 | 417 | `FrappeTypeError` | A parameter of the wrong JSON type, such as `records` sent as a string |
-| 429 | `TooManyRequestsError` | The node sent more than 300 requests in the current minute |
+| 429 | `TooManyRequestsError` | The node sent more requests in the current minute than **Telemetry Requests per Minute** allows |
 | 500 | | The batch could not be written, for example because the disk is full; nothing was staged |
 
 ## Retries
@@ -117,4 +117,4 @@ An agent retries on 429 and on any 5xx or network failure, with a backoff. It do
 
 Give every batch a `batch_id` and keep it across retries. A retry of a batch Suite Cloud already staged replaces the staged file, and a batch already loaded into Insights is not loaded twice, so a request whose answer was lost in transit is safe to send again.
 
-Each node may make 300 requests per minute, counted per `host_ip` in fixed one-minute windows.
+Each node may make **Telemetry Requests per Minute** requests (300 by default), counted per `host_ip` in fixed one-minute windows. Both limits are in **Suite Cloud Settings > Telemetry**; a larger batch costs one request, and a batch is validated whole, so a change needs no release.
