@@ -86,7 +86,8 @@ class Alerts:
         return {"opened": opened, "resolved": len(open_alerts)}
 
     def is_dismissed(self, finding: Finding) -> bool:
-        """A Silent Host alert resolved by hand stays resolved until the node reports again."""
+        """A Silent Host alert resolved by hand stays resolved until the node reports again. One
+        the checker resolved does not count: the node was back, and a new silence is a new alert."""
 
         if finding.alert_type != SILENT_HOST:
             return False
@@ -97,7 +98,7 @@ class Alerts:
                 {
                     "alert_type": SILENT_HOST,
                     "host_ip": finding.host_ip,
-                    "status": "Resolved",
+                    "dismissed": 1,
                     "resolved_at": (">=", dismissed_after),
                 },
             )
@@ -177,6 +178,7 @@ class Alerts:
         alert = frappe.get_doc("Telemetry Alert", name)
         alert.status = "Resolved"
         alert.details = _("{0} The condition cleared.").format(alert.details)
+        alert.flags.resolved_by_check = True
         alert.save(ignore_permissions=True)
         self.notify(alert)
 

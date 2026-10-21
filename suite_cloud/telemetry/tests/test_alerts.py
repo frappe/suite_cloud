@@ -148,12 +148,24 @@ class TestAlerts(IntegrationTestCase):
         alert.status = "Resolved"
         alert.save()
 
+        self.assertEqual(alert.dismissed, 1)
         self.assertEqual(self.alerts.check(), {"opened": 0, "resolved": 0})
         self.assertEqual(frappe.db.count("Telemetry Alert"), 1)
 
         alert.db_set("resolved_at", now_datetime() - timedelta(minutes=50))  # dismissed before the last batch
         self.assertEqual(self.alerts.check(), {"opened": 1, "resolved": 0})
         self.assertEqual(frappe.db.count("Telemetry Alert", {"status": "Open"}), 1)
+
+    def test_a_node_that_recovered_and_fell_silent_again_gets_a_new_alert(self) -> None:
+        self.report(QUIET, NOW - timedelta(minutes=45), table=METRICS)
+        self.alerts.check()
+        self.report(QUIET, NOW - timedelta(minutes=20), table=METRICS)
+        self.assertEqual(self.alerts.check(), {"opened": 0, "resolved": 1})
+        self.assertEqual(frappe.db.get_value("Telemetry Alert", {"host_ip": QUIET}, "dismissed"), 0)
+
+        configure_settings(telemetry_silence_minutes=10)  # the 20 minute old batch is now a silence
+        self.assertEqual(self.alerts.check(), {"opened": 1, "resolved": 0})
+        self.assertEqual(frappe.db.count("Telemetry Alert", {"host_ip": QUIET, "status": "Open"}), 1)
 
     def test_a_quiet_hour_or_a_rate_under_the_threshold_opens_nothing(self) -> None:
         self.report(NOISY, NOW, self.events(errors=4))  # 4%

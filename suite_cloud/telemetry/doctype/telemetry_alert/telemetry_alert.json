@@ -15,6 +15,7 @@
   "opened_at",
   "column_break_time",
   "resolved_at",
+  "dismissed",
   "section_break_details",
   "details"
  ],
@@ -90,6 +91,14 @@
    "read_only": 1
   },
   {
+   "default": "0",
+   "description": "Resolved by hand. The checker opens no new Silent Host alert for the node until it reports again.",
+   "fieldname": "dismissed",
+   "fieldtype": "Check",
+   "label": "Dismissed",
+   "read_only": 1
+  },
+  {
    "fieldname": "section_break_details",
    "fieldtype": "Section Break"
   },
@@ -104,7 +113,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-21 10:00:00.000000",
+ "modified": "2026-10-21 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "Telemetry Alert",

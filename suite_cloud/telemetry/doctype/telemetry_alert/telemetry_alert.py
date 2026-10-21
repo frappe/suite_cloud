@@ -18,6 +18,7 @@ class TelemetryAlert(Document):
 
         alert_type: DF.Literal["Silent Host", "Error Rate"]
         details: DF.SmallText | None
+        dismissed: DF.Check
         host_ip: DF.Data
         hostname: DF.Data | None
         opened_at: DF.Datetime | None
@@ -27,8 +28,13 @@ class TelemetryAlert(Document):
     # end: auto-generated types
 
     def validate(self) -> None:
+        """Resolved by anyone but the checker is a dismissal, which the checker honors until the
+        node reports again."""
+
         self.title = f"{self.alert_type}: {self.hostname or self.host_ip}"
         if self.status == "Open":
             self.resolved_at = None
+            self.dismissed = 0
         elif not self.resolved_at:
             self.resolved_at = now_datetime()
+            self.dismissed = 0 if self.flags.resolved_by_check else 1
