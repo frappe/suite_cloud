@@ -542,7 +542,7 @@ def build_gateway_variables(context: dict) -> dict:
             *plan.secret_strings(recovery_plan),
         ],
     }
-    agent = agent_variables(gateway)
+    agent = agent_variables(gateway, restart=bool(context.get("agent_restart")))
     variables["__secret_values__"] += agent.pop("__secret_values__")
     variables.update(agent)
     return variables

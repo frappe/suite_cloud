@@ -27,15 +27,9 @@
             - /etc/suite-cloud-agent
             - /var/lib/suite-cloud-agent
 
-        - name: Read the installed agent version
-          command: /usr/local/bin/suite-cloud-agent --version
-          register: installed_agent
-          changed_when: false
-          failed_when: false
-
-        # copy writes beside the running binary and renames it into place.
+        # copy skips a binary with the same checksum, and writes a new one beside the running
+        # binary before renaming it into place.
         - name: Install the agent binary
-          when: agent_version not in (installed_agent.stdout | default(''))
           copy:
             src: "{{ agent_binaries[ansible_architecture] }}"
             dest: /usr/local/bin/suite-cloud-agent
@@ -68,7 +62,7 @@
           systemd:
             name: suite-cloud-agent
             enabled: true
-            state: "{{ 'restarted' if (agent_binary_file.changed or agent_config_file.changed or agent_unit_file.changed) else 'started' }}"
+            state: "{{ 'restarted' if (agent_restart | bool or agent_binary_file.changed or agent_config_file.changed or agent_unit_file.changed) else 'started' }}"
 
         - name: Check that the agent stays up
           command: systemctl is-active suite-cloud-agent

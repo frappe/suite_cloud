@@ -197,7 +197,7 @@ The workbook ships in `suite_cloud/telemetry/insights_workbook/stalwart/stalwart
 
 ## 9. The agent
 
-The [Suite Cloud Agent](agent.md) is the Go program in `agent/` that the nodes run. It needs the Go version in `agent/go.mod` or newer, and nothing else: the module has no dependencies.
+The [Suite Cloud Agent](agent.md) is the Go program in `agent/` that the nodes run. It needs the Go version in `agent/go.mod` or newer, and nothing else: the module has no dependencies. `sudo apt install golang-go` is enough on Ubuntu 24.04; otherwise unpack a release from [go.dev/dl](https://go.dev/dl/) under `/usr/local`, as [the agent](agent.md#building) shows.
 
 ```sh
 cd agent
@@ -206,4 +206,4 @@ go test -race ./...
 
 `STALWART_LOG_DIR=<folder of stalwart.* files> go test ./internal/format/stalwart -run TestRealLogs -v` runs the parser over real log files and reports every line it does not take.
 
-The bench host builds the binaries the nodes get: install Go there, then click **Build Agent** in Suite Cloud Settings, or run `bench --site suite-cloud.localhost execute suite_cloud.telemetry.agent.build.build_agent`. The build lands in `sites/suite-cloud.localhost/private/files/agent/<version>/`. The Python tests of the build use a fake `go` on `PATH`, so they need no toolchain.
+The bench host builds the binaries the nodes get: install Go there the same way, then click **Build Agent** in Suite Cloud Settings, or run `bench --site suite-cloud.localhost execute suite_cloud.telemetry.agent.build.build_agent`. The build lands in `sites/suite-cloud.localhost/private/files/agent/<version>/`. The Python tests of the build use a fake `go` on `PATH`, so they need no toolchain.

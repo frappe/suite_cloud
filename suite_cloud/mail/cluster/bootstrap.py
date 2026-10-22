@@ -156,7 +156,7 @@ def build_node_variables(context: dict) -> dict:
             *plan.secret_strings(recovery_plan),
         ],
     }
-    agent = agent_variables(node)
+    agent = agent_variables(node, restart=bool(context.get("agent_restart")))
     variables["__secret_values__"] += agent.pop("__secret_values__")
     variables.update(agent)
     return variables

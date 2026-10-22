@@ -110,9 +110,10 @@ def has_secret() -> bool:
     return bool(settings.get_password("telemetry_secret", raise_exception=False))
 
 
-def agent_variables(server: Document) -> dict:
+def agent_variables(server: Document, restart: bool = False) -> dict:
     """What install-agent.yml needs, merged into the node and gateway variables so the two never
-    differ. Without a secret or a build the play stops the agent instead of installing it."""
+    differ. Without a secret or a build the play stops the agent instead of installing it. With
+    ``restart`` the play restarts the agent even when nothing on the node changed."""
 
     disabled = {
         "agent_enabled": False,
@@ -120,6 +121,7 @@ def agent_variables(server: Document) -> dict:
         "agent_binaries": {},
         "agent_config_json": "",
         "agent_systemd_unit": "",
+        "agent_restart": restart,
         "__secret_values__": [],
     }
     if not has_secret():
@@ -142,12 +144,14 @@ def agent_variables(server: Document) -> dict:
         "agent_binaries": {arch: str(build.binary_path(arch)) for arch in ARCHITECTURES},
         "agent_config_json": frappe.as_json(config),
         "agent_systemd_unit": systemd_unit(),
+        "agent_restart": restart,
         "__secret_values__": secrets,
     }
 
 
 def install_agent(server: Document) -> Document:
-    """A Server Job that installs or updates the agent only: no drain, no Stalwart restart."""
+    """A Server Job that installs the agent only: no drain, no Stalwart restart. The binary, the
+    config and the unit are rewritten where they differ and the agent restarts in any case."""
 
     if not has_secret():
         frappe.throw(_("Set the Telemetry Secret in Suite Cloud Settings first."))
@@ -159,7 +163,7 @@ def install_agent(server: Document) -> Document:
         server,
         PLAYBOOK,
         title=f"Install agent {build.version} on {server.hostname}",
-        context={"gateway" if is_gateway else "node": server.name},
+        context={"gateway" if is_gateway else "node": server.name, "agent_restart": True},
         variables_builder=GATEWAY_BUILDER if is_gateway else NODE_BUILDER,
     )
 

@@ -1,3 +1,4 @@
+import json
 import os
 import stat
 import tempfile
@@ -228,6 +229,8 @@ class TestAgentDeploy(AgentBuildFixture):
         )
         self.assertIn('"host_ip": "203.0.113.10"', variables["agent_config_json"])
         self.assertIn("User=stalwart", variables["agent_systemd_unit"])
+        self.assertFalse(variables["agent_restart"])
+        self.assertTrue(deploy.agent_variables(self.node, restart=True)["agent_restart"])
         self.assertIn("agent-secret", variables["__secret_values__"])
         self.assertIn(self.cluster.get_password("metrics_password"), variables["__secret_values__"])
 
@@ -270,6 +273,9 @@ class TestAgentDeploy(AgentBuildFixture):
             )
             self.assertIn(version, job.title)
             self.assertEqual(frappe.db.get_value("Stalwart Node", self.node.name, "status"), self.node.status)
+            # A reinstall rewrites what differs and restarts the agent whatever its version.
+            self.assertTrue(bootstrap.build_node_variables(json.loads(job.context))["agent_restart"])
+            self.assertFalse(bootstrap.build_node_variables({"node": self.node.name})["agent_restart"])
 
             self.node.db_set("status", "Active")
             self.gateway.db_set("status", "Active")
