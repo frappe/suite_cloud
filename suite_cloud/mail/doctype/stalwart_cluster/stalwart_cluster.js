@@ -33,6 +33,7 @@ frappe.ui.form.on('Stalwart Cluster', {
 			frm.add_custom_button(__('Rotate API Key'), () => frm.trigger('rotate_api_key'), __('Access'))
 			frm.add_custom_button(__('Replace DKIM Keys'), () => frm.trigger('replace_dkim_keys'), __('Access'))
 			frm.add_custom_button(__('Upgrade Nodes'), () => frm.trigger('upgrade_nodes'), __('Nodes'))
+			frm.add_custom_button(__('Upgrade Agents'), () => frm.trigger('upgrade_agents'), __('Nodes'))
 		}
 		if (frm.doc.status === 'Bootstrapping') {
 			frm.add_custom_button(__('Finish Bootstrap'), () => frm.trigger('finish_bootstrap'), __('Nodes'))
@@ -57,6 +58,13 @@ frappe.ui.form.on('Stalwart Cluster', {
 				'blue',
 				true,
 			)
+		}
+		if (frm.doc.status === 'Active') {
+			frappe.xcall('suite_cloud.telemetry.agent.status.get_agent_summary', { cluster: frm.doc.name }).then((summary) => {
+				if (!summary.message) return
+				const colors = { ok: 'green', outdated: 'orange', silent: 'red', unknown: 'blue' }
+				frm.dashboard.add_comment(frappe.utils.escape_html(summary.message), colors[summary.state], true)
+			})
 		}
 		if (frm.doc.drift_report) {
 			const report = JSON.parse(frm.doc.drift_report)
@@ -136,6 +144,12 @@ frappe.ui.form.on('Stalwart Cluster', {
 	upgrade_nodes(frm) {
 		frappe.confirm(__('Upgrade every active node to {0}, one at a time?', [frm.doc.stalwart_version]), () => {
 			frm.events.call(frm, 'upgrade_nodes', {}, __('Queueing upgrades...'))
+		})
+	},
+
+	upgrade_agents(frm) {
+		frappe.confirm(__('Install the current Suite Cloud Agent build on every active or draining node and every active gateway? Stalwart keeps running.'), () => {
+			frm.events.call(frm, 'upgrade_agents', {}, __('Queueing agent installs...'))
 		})
 	},
 

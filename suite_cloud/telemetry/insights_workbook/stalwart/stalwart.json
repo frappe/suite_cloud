@@ -18,7 +18,7 @@
      ],
      "logical_operator": "And"
     },
-    "limit": 100,
+    "limit": 5000,
     "order_by": [
      {
       "column": {
@@ -41,7 +41,7 @@
       "column_name": "timestamp",
       "data_type": "Datetime",
       "dimension_name": "timestamp",
-      "granularity": "day"
+      "granularity": "hour"
      }
     },
     "y_axis": {
@@ -62,7 +62,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Mean of the smtp.active-connections gauge per day.",
+   "info": "Mean of the smtp.active-connections gauge per hour.",
    "name": "stalwart-active-connections",
    "query": "stalwart-metrics",
    "sort_order": 37,
@@ -144,79 +144,6 @@
    "query": "stalwart-events",
    "sort_order": 23,
    "title": "Authentication Readings",
-   "workbook": "stalwart"
-  },
-  "stalwart-backend-latency-ms": {
-   "chart_type": "Line",
-   "config": {
-    "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "metric",
-        "type": "column"
-       },
-       "operator": "in",
-       "value": [
-        "store.data-read-time",
-        "store.data-write-time",
-        "store.blob-read-time",
-        "store.blob-write-time",
-        "dns.lookup-time"
-       ]
-      }
-     ],
-     "logical_operator": "And"
-    },
-    "limit": 100,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "timestamp",
-       "type": "column"
-      },
-      "direction": "asc"
-     }
-    ],
-    "split_by": {
-     "dimension": {
-      "column_name": "metric",
-      "data_type": "String",
-      "dimension_name": "metric"
-     },
-     "max_split_values": 10
-    },
-    "x_axis": {
-     "dimension": {
-      "column_name": "timestamp",
-      "data_type": "Datetime",
-      "dimension_name": "timestamp",
-      "granularity": "day"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Decimal",
-        "expression": {
-         "expression": "sum(total) / sum(samples) / 1",
-         "type": "expression"
-        },
-        "measure_name": "Milliseconds"
-       }
-      }
-     ],
-     "show_data_labels": false
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": "Mean store and DNS latency per day. These histograms exist on the enterprise build only.",
-   "name": "stalwart-backend-latency-ms",
-   "query": "stalwart-metrics",
-   "sort_order": 53,
-   "title": "Backend Latency (ms)",
    "workbook": "stalwart"
   },
   "stalwart-bans-and-blocks": {
@@ -689,7 +616,7 @@
      ],
      "logical_operator": "And"
     },
-    "limit": 100,
+    "limit": 5000,
     "order_by": [
      {
       "column": {
@@ -712,7 +639,7 @@
       "column_name": "timestamp",
       "data_type": "Datetime",
       "dimension_name": "timestamp",
-      "granularity": "day"
+      "granularity": "hour"
      }
     },
     "y_axis": {
@@ -733,7 +660,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Mean of every *.active-connections gauge per day.",
+   "info": "Mean of every *.active-connections gauge per hour.",
    "name": "stalwart-connections-by-protocol",
    "query": "stalwart-metrics",
    "sort_order": 50,
@@ -2554,7 +2481,7 @@
      ],
      "logical_operator": "And"
     },
-    "limit": 100,
+    "limit": 5000,
     "order_by": [
      {
       "column": {
@@ -2577,7 +2504,7 @@
       "column_name": "timestamp",
       "data_type": "Datetime",
       "dimension_name": "timestamp",
-      "granularity": "day"
+      "granularity": "hour"
      }
     },
     "y_axis": {
@@ -2623,7 +2550,7 @@
      ],
      "logical_operator": "And"
     },
-    "limit": 100,
+    "limit": 5000,
     "order_by": [
      {
       "column": {
@@ -2646,7 +2573,7 @@
       "column_name": "timestamp",
       "data_type": "Datetime",
       "dimension_name": "timestamp",
-      "granularity": "day"
+      "granularity": "hour"
      }
     },
     "y_axis": {
@@ -2667,7 +2594,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Mean message size per day from the message.size histogram.",
+   "info": "Mean message size per hour from the message.size histogram.",
    "name": "stalwart-message-size-kib",
    "query": "stalwart-metrics",
    "sort_order": 52,
@@ -3022,7 +2949,7 @@
      ],
      "logical_operator": "And"
     },
-    "limit": 100,
+    "limit": 5000,
     "order_by": [
      {
       "column": {
@@ -3045,7 +2972,7 @@
       "column_name": "timestamp",
       "data_type": "Datetime",
       "dimension_name": "timestamp",
-      "granularity": "day"
+      "granularity": "hour"
      }
     },
     "y_axis": {
@@ -3066,80 +2993,11 @@
    },
    "description": null,
    "folder": null,
-   "info": "Mean of Stalwart's server.memory gauge per day: the memory of the Stalwart process, not of the machine (see the Machines workbook).",
+   "info": "Mean of Stalwart's server.memory gauge per hour: the memory of the Stalwart process, not of the machine (see the Machines workbook).",
    "name": "stalwart-process-memory-mib",
    "query": "stalwart-metrics",
    "sort_order": 55,
    "title": "Process Memory (MiB)",
-   "workbook": "stalwart"
-  },
-  "stalwart-queue": {
-   "chart_type": "Line",
-   "config": {
-    "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "metric",
-        "type": "column"
-       },
-       "operator": "in",
-       "value": [
-        "queue.count"
-       ]
-      }
-     ],
-     "logical_operator": "And"
-    },
-    "limit": 100,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "timestamp",
-       "type": "column"
-      },
-      "direction": "asc"
-     }
-    ],
-    "split_by": {
-     "dimension": {
-      "column_name": "host",
-      "data_type": "String",
-      "dimension_name": "host"
-     },
-     "max_split_values": 10
-    },
-    "x_axis": {
-     "dimension": {
-      "column_name": "timestamp",
-      "data_type": "Datetime",
-      "dimension_name": "timestamp",
-      "granularity": "day"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "max(value)",
-         "type": "expression"
-        },
-        "measure_name": "Messages"
-       }
-      }
-     ],
-     "show_data_labels": false
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": "Largest queue.count reading per day. The gauge exists on the enterprise build only.",
-   "name": "stalwart-queue",
-   "query": "stalwart-metrics",
-   "sort_order": 38,
-   "title": "Queue",
    "workbook": "stalwart"
   },
   "stalwart-received-per-day": {
@@ -5050,7 +4908,7 @@
      ],
      "logical_operator": "And"
     },
-    "limit": 100,
+    "limit": 5000,
     "order_by": [
      {
       "column": {
@@ -5073,7 +4931,7 @@
       "column_name": "timestamp",
       "data_type": "Datetime",
       "dimension_name": "timestamp",
-      "granularity": "day"
+      "granularity": "hour"
      }
     },
     "y_axis": {
@@ -5353,7 +5211,6 @@
       "y": 0
      },
      "links": {
-      "stalwart-backend-latency-ms": "`stalwart-metrics`.`timestamp`",
       "stalwart-capacity-readings": "`stalwart-metrics`.`timestamp`",
       "stalwart-connections-by-protocol": "`stalwart-metrics`.`timestamp`",
       "stalwart-message-size-kib": "`stalwart-metrics`.`timestamp`",
@@ -5374,7 +5231,6 @@
       "y": 0
      },
      "links": {
-      "stalwart-backend-latency-ms": "`stalwart-metrics`.`host`",
       "stalwart-capacity-readings": "`stalwart-metrics`.`host`",
       "stalwart-connections-by-protocol": "`stalwart-metrics`.`host`",
       "stalwart-message-size-kib": "`stalwart-metrics`.`host`",
@@ -5433,19 +5289,8 @@
      "layout": {
       "h": 20,
       "i": "message_size",
-      "w": 10,
+      "w": 20,
       "x": 0,
-      "y": 26
-     },
-     "type": "chart"
-    },
-    {
-     "chart": "stalwart-backend-latency-ms",
-     "layout": {
-      "h": 20,
-      "i": "backend_latency",
-      "w": 10,
-      "x": 10,
       "y": 26
      },
      "type": "chart"
@@ -6633,7 +6478,6 @@
      "links": {
       "stalwart-active-connections": "`stalwart-metrics`.`timestamp`",
       "stalwart-mail-by-listener": "`stalwart-events`.`timestamp`",
-      "stalwart-queue": "`stalwart-metrics`.`timestamp`",
       "stalwart-sessions": "`stalwart-events`.`timestamp`",
       "stalwart-smtp-readings": "`stalwart-events`.`timestamp`"
      },
@@ -6654,7 +6498,6 @@
      "links": {
       "stalwart-active-connections": "`stalwart-metrics`.`host`",
       "stalwart-mail-by-listener": "`stalwart-events`.`host`",
-      "stalwart-queue": "`stalwart-metrics`.`host`",
       "stalwart-sessions": "`stalwart-events`.`host`",
       "stalwart-smtp-readings": "`stalwart-events`.`host`"
      },
@@ -6711,19 +6554,8 @@
      "layout": {
       "h": 20,
       "i": "active_connections",
-      "w": 10,
+      "w": 20,
       "x": 0,
-      "y": 26
-     },
-     "type": "chart"
-    },
-    {
-     "chart": "stalwart-queue",
-     "layout": {
-      "h": 20,
-      "i": "queue",
-      "w": 10,
-      "x": 10,
       "y": 26
      },
      "type": "chart"
@@ -7234,7 +7066,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 12:18:10.423078",
+ "modified": "2026-10-22 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",

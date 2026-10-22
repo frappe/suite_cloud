@@ -17,7 +17,18 @@ TELEMETRY_LIMITS = (
     "telemetry_records_per_request",
     "telemetry_silence_minutes",
     "telemetry_error_rate_percent",
+    "agent_max_attempts",
+    "agent_metrics_interval_seconds",
 )
+# What the agent's own config check accepts (agent/internal/config/validate.go); a value outside
+# would install a config the agent refuses to start with.
+AGENT_RANGES = {
+    "telemetry_requests_per_minute": (1, 100000),
+    "telemetry_records_per_request": (1, 100000),
+    "agent_max_attempts": (1, 1000),
+    "agent_metrics_interval_seconds": (5, 3600),
+    "agent_log_delete_after_days": (0, 100000),
+}
 
 
 class SuiteCloudSettings(Document):
@@ -104,6 +115,10 @@ class SuiteCloudSettings(Document):
             )
 
             enqueue_recheck_of_vouched_domains()
+        if self.flags.telemetry_secret_changed:
+            from suite_cloud.telemetry.agent.deploy import roll_out_agents
+
+            roll_out_agents(secret_set=self.flags.telemetry_secret_set)
 
     def validate_report_retention(self) -> None:
         for field in ("dmarc_report_retention_days", "tls_report_retention_days", "telemetry_retention_days"):
@@ -114,20 +129,27 @@ class SuiteCloudSettings(Document):
         for field in TELEMETRY_LIMITS:
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
+        for field, (low, high) in AGENT_RANGES.items():
+            if not low <= cint(self.get(field)) <= high:
+                frappe.throw(
+                    _("{0} must be between {1} and {2}.").format(_(self.meta.get_label(field)), low, high)
+                )
         self.rotate_telemetry_secret()
 
     def rotate_telemetry_secret(self) -> None:
-        """A new secret keeps the old one accepted for a while, so agents can be updated one by
-        one; clearing the secret turns the API off, previous secret included."""
+        """A new secret keeps the old one accepted for a while, and on_update sends it to the
+        agents; clearing the secret turns the API off, previous secret included."""
 
         secret = self.telemetry_secret
         if secret and self.is_dummy_password(secret):
             return  # the form sends the saved secret masked
+        previous = get_decrypted_password(self.doctype, self.name, "telemetry_secret", raise_exception=False)
+        self.flags.telemetry_secret_changed = (previous or "") != (secret or "")
+        self.flags.telemetry_secret_set = bool(secret)
         if not secret:
             self.telemetry_previous_secret = None
             self.telemetry_previous_secret_until = None
             return
-        previous = get_decrypted_password(self.doctype, self.name, "telemetry_secret", raise_exception=False)
         if previous and previous != secret:
             self.telemetry_previous_secret = previous
             self.telemetry_previous_secret_until = add_to_date(
@@ -241,6 +263,17 @@ class SuiteCloudSettings(Document):
         except central.CentralError as e:
             frappe.throw(_("Central did not list the teams: {0}").format(e))
         return [{"value": t["name"], "label": team_label(t)} for t in teams]
+
+    @frappe.whitelist()
+    def build_agent(self) -> dict:
+        """Queues a build of the agent for every node architecture; one build runs at a time."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent import build
+
+        if not build.find_go():
+            frappe.throw(_("No Go toolchain found on this bench host (PATH or /usr/local/go/bin/go)."))
+        return {"queued": build.enqueue_build(), "version": build.AgentBuild().version}
 
     @frappe.whitelist()
     def sync_regions(self) -> int:

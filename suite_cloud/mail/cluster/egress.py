@@ -396,6 +396,11 @@ def gateway_plan(gateway: Document) -> list[dict]:
     operations.extend(gateway_defaults_plan())
     operations.append(plan.tracer_operation())
     operations.append(
+        plan.metrics_operation(
+            gateway.get_password("metrics_password"), bool(gateway.get_cluster().enable_metrics)
+        )
+    )
+    operations.append(
         {
             "@type": "update",
             "object": "MtaStageAuth",
@@ -500,11 +505,12 @@ def upgrade_gateway(gateway: Document) -> Document:
 
 def build_gateway_variables(context: dict) -> dict:
     from suite_cloud.mail.cluster.bootstrap import SECRET_VARIABLES
+    from suite_cloud.telemetry.agent.deploy import agent_variables
     from suite_cloud.utils import get_config
 
     gateway = frappe.get_doc("Egress Gateway", context["gateway"])
     relay_ports = sorted({p.relay_port for p in gateway.pools()})
-    return {
+    variables = {
         "node_hostname": gateway.hostname,
         "cluster_hostname": gateway.get_cluster().hostname,
         "ssh_port": gateway.ssh_port or gateway.get_cluster().ssh_port,
@@ -536,6 +542,10 @@ def build_gateway_variables(context: dict) -> dict:
             *plan.secret_strings(recovery_plan),
         ],
     }
+    agent = agent_variables(gateway, restart=bool(context.get("agent_restart")))
+    variables["__secret_values__"] += agent.pop("__secret_values__")
+    variables.update(agent)
+    return variables
 
 
 def after_gateway_provision(gateway: Document, job: Document) -> None:

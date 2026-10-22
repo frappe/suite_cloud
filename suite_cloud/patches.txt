@@ -23,3 +23,5 @@ suite_cloud.patches.v1_0.mark_default_cluster
 suite_cloud.patches.v1_0.drop_notification_accounts
 suite_cloud.patches.v1_0.fill_telemetry_retention_default
 suite_cloud.patches.v1_0.fill_telemetry_limit_defaults
+suite_cloud.patches.v1_0.fill_agent_defaults
+suite_cloud.patches.v1_0.fill_metrics_passwords

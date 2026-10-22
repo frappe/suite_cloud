@@ -198,6 +198,13 @@ class StalwartNode(Document):
         return bootstrap.upgrade_node(self).name
 
     @frappe.whitelist()
+    def install_agent(self) -> str:
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.deploy import install_agent
+
+        return install_agent(self).name
+
+    @frappe.whitelist()
     def drain(self) -> None:
         frappe.only_for("System Manager")
         bootstrap.drain_node(self)

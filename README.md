@@ -34,7 +34,7 @@ The app has three modules, so one CODEOWNERS line can cover each product:
 | --- | --- | --- |
 | **Suite Cloud** | `suite_cloud/suite_cloud` | What every hosted product shares: DNS Zone, DNS Record, Server Job, Suite Tenant, Suite Cloud Settings, plus `provisioning` (Ansible over SSH) and `dns` (provider client, resolver). |
 | **Mail** | `suite_cloud/mail` | The mail product: Stalwart Store, Cluster, Node, Egress Gateway and IP Pool, the mail directory (Mail Domain, Mail Account, Mail Group, Mailing List), and the `stalwart`, `cluster` and `tenancy` packages. |
-| **Telemetry** | `suite_cloud/telemetry` | The logs, traces and metrics the agents on the nodes push: the API that stages a batch as parquet, the `Warehouse` that loads the files into Frappe Insights' DuckDB and prunes them, and the Insights dashboards for Stalwart. |
+| **Telemetry** | `suite_cloud/telemetry` | The logs, traces and metrics the agents on the nodes push: the API that stages a batch as parquet, the `Warehouse` that loads the files into Frappe Insights' DuckDB and prunes them, the Insights dashboards for Stalwart, and the `agent` package that builds the Suite Cloud Agent (the Go program in `agent/`) and installs it on the nodes. |
 | **Hosting** | `suite_cloud/hosting` | Suite sites on Frappe Cloud: Region, Virtual Machine, Suite Site, Suite Tenant Request, the `central` clients (Central, Pilot, the site's REST API) and the `machines`, `sites`, `domains` and `capacity` steps. |
 
 The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what any product needs
@@ -115,7 +115,9 @@ contact email; everything else sits at permission level 1, for System Managers.
 
 Day-to-day buttons: **Drain** takes a node out of DNS before maintenance, **Upgrade Nodes** rolls a
 new Stalwart version out one node at a time, **Sync Config** pushes the generated configuration
-again, and **Check Drift** reports what differs from it without changing anything.
+again, **Check Drift** reports what differs from it without changing anything, and **Upgrade Agents**
+installs the current [Suite Cloud Agent](docs/agent.md) build on every active or draining node and every active gateway;
+the cluster, node and gateway forms show which build each agent runs and when it last reported.
 
 ### Adopting a server that already has a directory
 
@@ -241,8 +243,8 @@ of its own to see where they take a message: from a temporary directory, on loop
 a local sink as its only way out. It needs a `stalwart` on `PATH` of the version new clusters
 install and is skipped without one; CI installs it.
 
-CI (`.github/workflows/ci.yml`) runs one job per module folder (Core, Mail, Hosting) plus Ruff, so a
-future product adds a matrix entry rather than a workflow.
+CI (`.github/workflows/ci.yml`) runs one job per module folder (Core, Mail, Hosting, Telemetry) plus
+Ruff and a Go job for the agent, so a future product adds a matrix entry rather than a workflow.
 
 The bootstrap path has been run end to end against a real single-node cluster on Stalwart
 v0.16.20 (DigitalOcean DNS, Let's Encrypt wildcard certificate through DNS-01). Lessons that

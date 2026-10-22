@@ -43,6 +43,7 @@ class EgressGateway(Document):
         ssh_verified: DF.Check
         stalwart_version: DF.Data | None
         location: DF.Data | None
+        metrics_password: DF.Password | None
         title: DF.Data | None
         status: DF.Literal["Pending", "Provisioning", "Provisioned", "Active", "Failed", "Disabled"]
     # end: auto-generated types
@@ -58,6 +59,8 @@ class EgressGateway(Document):
         self.admin_username = self.admin_username or "admin"
         if not self.admin_password:
             self.admin_password = frappe.generate_hash(length=32)
+        if not self.metrics_password:
+            self.metrics_password = frappe.generate_hash(length=32)
         if not self.data_store:
             self.data_store = self.create_local_store().name
 
@@ -244,6 +247,13 @@ class EgressGateway(Document):
     def upgrade(self) -> str:
         frappe.only_for("System Manager")
         return egress.upgrade_gateway(self).name
+
+    @frappe.whitelist()
+    def install_agent(self) -> str:
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.deploy import install_agent
+
+        return install_agent(self).name
 
     @frappe.whitelist()
     def replace_dkim_keys(self) -> None:

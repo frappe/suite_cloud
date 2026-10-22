@@ -95,6 +95,40 @@ class TestSuiteCloudSettings(IntegrationTestCase):
                 settings.set(field, 0)
                 self.assertRaisesRegex(frappe.ValidationError, "at least 1", settings.save)
 
+    def test_agent_defaults_are_backfilled_and_must_be_positive(self) -> None:
+        from suite_cloud.patches.v1_0 import fill_agent_defaults as patch
+
+        for field in patch.FIELDS:
+            frappe.db.set_single_value(patch.SETTINGS, field, 0)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, "agent_max_attempts"), 8)
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, "agent_metrics_interval_seconds"), 60)
+
+        frappe.db.set_single_value(patch.SETTINGS, "agent_max_attempts", 3)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, "agent_max_attempts"), 3)
+
+        for field in patch.FIELDS:
+            with self.subTest(field):
+                settings = frappe.get_single("Suite Cloud Settings")
+                settings.set(field, 0)
+                self.assertRaisesRegex(frappe.ValidationError, "at least 1", settings.save)
+
+    def test_agent_settings_stay_within_what_the_agent_accepts(self) -> None:
+        from suite_cloud.suite_cloud.doctype.suite_cloud_settings.suite_cloud_settings import AGENT_RANGES
+
+        for field, (low, high) in AGENT_RANGES.items():
+            for value in (low - 1, high + 1):
+                with self.subTest(field=field, value=value):
+                    settings = frappe.get_single("Suite Cloud Settings")
+                    settings.set(field, value)
+                    self.assertRaisesRegex(frappe.ValidationError, "between|at least 1", settings.save)
+
+        self.settings.agent_log_delete_after_days = 0
+        self.settings.agent_metrics_interval_seconds = 5
+        self.settings.save()
+        self.assertEqual(get_config("agent_log_delete_after_days"), 0)
+
     def test_a_new_telemetry_secret_keeps_the_old_one_for_a_day(self) -> None:
         from frappe.utils.password import get_decrypted_password
 
