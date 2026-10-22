@@ -18,7 +18,7 @@ def after_migrate() -> None:
 
 
 def setup() -> None:
-    """Creates the roles, the telemetry user and store, fills new settings defaults and queues an
+    """Creates the roles, the telemetry user and data source, fills new settings defaults and queues an
     agent build when its sources changed; safe to run on every migrate."""
 
     for role_name, desk_access in ROLES:

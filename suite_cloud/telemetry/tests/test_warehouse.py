@@ -78,6 +78,7 @@ class TestWarehouse(IntegrationTestCase):
         self.spool = Spool(Path(get_files_path(self.name, is_private=1)))
         self.warehouse = Warehouse(self.name, self.spool)
         self.warehouse.ensure_data_source()
+        self.warehouse.refresh_tables()
 
     def remove_store(self) -> None:
         shutil.rmtree(self.spool.root, ignore_errors=True)
@@ -108,6 +109,12 @@ class TestWarehouse(IntegrationTestCase):
         ):
             Warehouse("telemetry_missing").ensure_data_source()
 
+    def test_a_migrate_does_not_wait_for_the_store_file(self) -> None:
+        with patch.object(Warehouse, "write_connection", side_effect=IOException("Could not set lock")):
+            self.warehouse.ensure_data_source()
+
+        self.assertEqual(self.registered(), {"events", "metrics", "nodes", "mail_domains"})
+
     def test_a_load_inserts_every_staged_file_and_deletes_it(self) -> None:
         self.stage(EVENTS, [event(), event(level="warn"), event()])
         self.stage(EVENTS, [event(span_id="7", data='{"a":1}')])
@@ -118,6 +125,16 @@ class TestWarehouse(IntegrationTestCase):
         self.assertEqual(added, {"events": 4, "metrics": 1})
         self.assertEqual((self.count(EVENTS), self.count(METRICS)), (4, 1))
         self.assertEqual(self.spool.get_pending(EVENTS, 10) + self.spool.get_pending(METRICS, 10), [])
+
+    def test_the_first_load_into_a_new_store_creates_its_tables(self) -> None:
+        Path(get_files_path(f"{self.name}.duckdb", is_private=1)).unlink()
+        self.warehouse.ensure_data_source()
+        self.stage(EVENTS, [event()])
+
+        added = self.warehouse.load_pending()
+
+        self.assertEqual(added, {"events": 1})
+        self.assertEqual((self.count(EVENTS), self.count(METRICS)), (1, 0))
 
     def test_a_load_extracts_the_event_data_the_dashboards_read(self) -> None:
         self.stage(
@@ -133,7 +150,7 @@ class TestWarehouse(IntegrationTestCase):
 
         self.assertEqual(self.event_data_columns(), [STALWART_COLUMNS, CODE_ONLY_COLUMNS, NO_DATA_COLUMNS])
 
-    def test_a_table_from_before_the_extracted_columns_gets_them_filled_on_migrate(self) -> None:
+    def test_a_table_from_before_the_extracted_columns_gets_them_filled_on_the_next_load(self) -> None:
         legacy = TelemetryTable(EVENTS.name, EVENTS.schema)
         batch = legacy.get_batch({**ENVELOPE, "batch_id": "old"}, [event(data=STALWART_DATA)])
         with self.warehouse.write_connection() as db:
@@ -142,7 +159,7 @@ class TestWarehouse(IntegrationTestCase):
             db.con.register("batch", batch)
             db.con.execute(f'INSERT INTO "{EVENTS.name}" SELECT * FROM batch')
 
-        self.warehouse.ensure_data_source()
+        self.warehouse.load_pending()
 
         self.assertEqual(self.event_data_columns(), [STALWART_COLUMNS])
 
@@ -211,7 +228,7 @@ class TestWarehouse(IntegrationTestCase):
 
         self.assertEqual(added, {})
         self.assertTrue(path.exists())
-        self.assertEqual(error_log_count(), errors + 2)  # the load and the lookup refresh each log once
+        self.assertEqual(error_log_count(), errors + 1)  # the table refresh fails, so no load is tried
 
     def test_the_prune_removes_only_rows_past_the_retention(self) -> None:
         self.stage(
