@@ -1,6 +1,6 @@
 # Telemetry
 
-Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each Stalwart node, egress gateway or SFU node pushes the node's logs, traces and metrics here as JSON. Suite Cloud stages every accepted batch as a parquet file, copies the files into Frappe Insights' DuckDB every five minutes and deletes rows older than the retention in **Suite Cloud Settings > Telemetry** daily. Operators read the data in the Insights dashboards Suite Cloud ships.
+Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each Stalwart node, egress gateway or SFU node pushes the node's logs, traces and metrics here as JSON. Suite Cloud stages every accepted batch as a parquet file, copies the files into Frappe Insights' DuckDB every five minutes and deletes rows older than the retention in **Suite Cloud Settings > Telemetry** daily. Operators read the data in the Insights dashboards Suite Cloud ships. Each dashboard opens on yesterday and today; the DMARC and TLS dashboards, which read daily reports, open on the last week.
 
 | Method | Verb | Purpose |
 | --- | --- | --- |

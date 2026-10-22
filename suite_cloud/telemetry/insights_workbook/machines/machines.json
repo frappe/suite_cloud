@@ -719,6 +719,7 @@
    "items": [
     {
      "default_operator": "within",
+     "default_value": "Last 1 Day (include current)",
      "filter_name": "Date Range",
      "filter_type": "Date",
      "icon": "calendar",
@@ -973,7 +974,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 12:17:22.691263",
+ "modified": "2026-10-22 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "machines",

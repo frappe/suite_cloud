@@ -23,3 +23,15 @@ class TestShippedWorkbooks(unittest.TestCase):
                     self.assertEqual(x_axis.get("granularity"), "hour")
                     self.assertGreaterEqual(chart["config"].get("limit", 0), 1000)
                     self.assertNotIn("per day", chart.get("info") or "")
+
+    def test_every_dashboard_opens_on_a_bounded_date_range(self) -> None:
+        """Without a default every chart reads the whole retention on the first load."""
+
+        for workbook in ("stalwart", "machines"):
+            for name, dashboard in shipped_workbook(workbook)["dashboards"].items():
+                for item in dashboard["items"]:
+                    if item["type"] == "filter" and item["filter_type"] == "Date":
+                        with self.subTest(dashboard=name):
+                            self.assertEqual(item["default_operator"], "within")
+                            self.assertTrue(item.get("default_value"))
+
