@@ -283,6 +283,42 @@ class TestAgentDeploy(AgentBuildFixture):
             servers = {frappe.db.get_value("Server Job", name, "server") for name in jobs}
             self.assertEqual(servers, {self.node.name, self.gateway.name})
 
+    def test_a_changed_secret_rolls_the_agents_out(self) -> None:
+        self.node.db_set("status", "Active")
+        self.gateway.db_set("status", "Active")
+        settings = frappe.get_single("Suite Cloud Settings")
+
+        def jobs_after(secret: str) -> list[dict]:
+            before = frappe.get_all("Server Job", pluck="name")
+            settings.reload()
+            settings.telemetry_secret = secret
+            with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+                settings.save()
+            self.assertTrue(settings.flags.telemetry_secret_changed)
+            return frappe.get_all("Server Job", {"name": ["not in", before]}, ["server", "title"])
+
+        # No build yet: an Error Log instead of jobs the play would refuse.
+        errors = error_log_count()
+        self.assertEqual(jobs_after("rotated-once"), [])
+        self.assertEqual(error_log_count(), errors + 1)
+
+        version = self.build().run()
+        jobs = jobs_after("rotated-twice")
+        self.assertEqual({job.server for job in jobs}, {self.node.name, self.gateway.name})
+        self.assertTrue(all(job.title.startswith(f"Install agent {version}") for job in jobs))
+
+        # Cleared: the agents are stopped, build or not.
+        jobs = jobs_after("")
+        self.assertEqual(
+            {job.title for job in jobs},
+            {f"Stop agent on {self.node.hostname}", f"Stop agent on {self.gateway.hostname}"},
+        )
+
+        # The form sends the saved secret masked: nothing happens.
+        settings.reload()
+        settings.save()
+        self.assertFalse(settings.flags.telemetry_secret_changed)
+
     def test_agent_status_follows_the_last_batch_and_the_build(self) -> None:
         status.forget_contacts()
         self.addCleanup(status.forget_contacts)

@@ -196,3 +196,22 @@ def active_servers(cluster: Document | None = None) -> list[Document]:
         *(frappe.get_doc("Egress Gateway", name) for name in gateways),
     ]
 
+
+def roll_out_agents(secret_set: bool) -> list[str]:
+    """After the Telemetry Secret changed: every Active node and gateway gets the new config, or
+    its agent stopped when the secret was cleared. Runs inside the settings save, so a missing
+    build is an Error Log, not an exception."""
+
+    servers = active_servers()
+    if not servers:
+        return []
+    build = None
+    if secret_set:
+        build = AgentBuild.last_built()
+        if not build or not build.is_built:
+            log_error(
+                "Agent not built",
+                "The Telemetry Secret changed but no agent build exists; run Build Agent, then Upgrade Agents on every cluster.",
+            )
+            return []
+    return [agent_job(server, build).name for server in servers]

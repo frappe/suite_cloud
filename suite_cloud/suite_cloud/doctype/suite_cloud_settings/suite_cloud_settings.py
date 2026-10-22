@@ -115,6 +115,10 @@ class SuiteCloudSettings(Document):
             )
 
             enqueue_recheck_of_vouched_domains()
+        if self.flags.telemetry_secret_changed:
+            from suite_cloud.telemetry.agent.deploy import roll_out_agents
+
+            roll_out_agents(secret_set=self.flags.telemetry_secret_set)
 
     def validate_report_retention(self) -> None:
         for field in ("dmarc_report_retention_days", "tls_report_retention_days", "telemetry_retention_days"):
@@ -133,17 +137,19 @@ class SuiteCloudSettings(Document):
         self.rotate_telemetry_secret()
 
     def rotate_telemetry_secret(self) -> None:
-        """A new secret keeps the old one accepted for a while, so agents can be updated one by
-        one; clearing the secret turns the API off, previous secret included."""
+        """A new secret keeps the old one accepted for a while, and on_update sends it to the
+        agents; clearing the secret turns the API off, previous secret included."""
 
         secret = self.telemetry_secret
         if secret and self.is_dummy_password(secret):
             return  # the form sends the saved secret masked
+        previous = get_decrypted_password(self.doctype, self.name, "telemetry_secret", raise_exception=False)
+        self.flags.telemetry_secret_changed = (previous or "") != (secret or "")
+        self.flags.telemetry_secret_set = bool(secret)
         if not secret:
             self.telemetry_previous_secret = None
             self.telemetry_previous_secret_until = None
             return
-        previous = get_decrypted_password(self.doctype, self.name, "telemetry_secret", raise_exception=False)
         if previous and previous != secret:
             self.telemetry_previous_secret = previous
             self.telemetry_previous_secret_until = add_to_date(
