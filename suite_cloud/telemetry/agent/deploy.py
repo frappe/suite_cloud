@@ -158,11 +158,20 @@ def install_agent(server: Document) -> Document:
     build = AgentBuild.last_built()
     if not build or not build.is_built:
         frappe.throw(_("No agent build on this bench host; run Build Agent in Suite Cloud Settings first."))
+    return agent_job(server, build)
+
+
+def agent_job(server: Document, build: AgentBuild | None) -> Document:
+    """Without a build the job runs the play with the secret gone, which stops the agent."""
+
     is_gateway = server.doctype == "Egress Gateway"
+    title = (
+        f"Install agent {build.version} on {server.hostname}" if build else f"Stop agent on {server.hostname}"
+    )
     return create_server_job(
         server,
         PLAYBOOK,
-        title=f"Install agent {build.version} on {server.hostname}",
+        title=title,
         context={"gateway" if is_gateway else "node": server.name, "agent_restart": True},
         variables_builder=GATEWAY_BUILDER if is_gateway else NODE_BUILDER,
     )
@@ -171,9 +180,19 @@ def install_agent(server: Document) -> Document:
 def upgrade_agents(cluster: Document) -> list[str]:
     """Rolls the built agent out to every Active node and gateway of the cluster."""
 
-    gateways = frappe.get_all("Egress Gateway", {"cluster": cluster.name, "status": "Active"}, pluck="name")
-    servers = [
-        *cluster.get_nodes(("Active",)),
+    return [install_agent(server).name for server in active_servers(cluster)]
+
+
+def active_servers(cluster: Document | None = None) -> list[Document]:
+    """The Active nodes and gateways of one cluster, or of every cluster."""
+
+    filters = {"status": "Active"}
+    if cluster:
+        filters["cluster"] = cluster.name
+    nodes = frappe.get_all("Stalwart Node", filters, pluck="name")
+    gateways = frappe.get_all("Egress Gateway", filters, pluck="name")
+    return [
+        *(frappe.get_doc("Stalwart Node", name) for name in nodes),
         *(frappe.get_doc("Egress Gateway", name) for name in gateways),
     ]
-    return [install_agent(server).name for server in servers]
+

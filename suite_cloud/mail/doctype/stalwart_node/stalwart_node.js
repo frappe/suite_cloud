@@ -54,6 +54,14 @@ frappe.ui.form.on('Stalwart Node', {
 				true,
 			)
 		}
+		if (['Provisioned', 'Active', 'Draining'].includes(frm.doc.status)) frm.events.show_agent_status(frm)
+	},
+
+	show_agent_status(frm) {
+		frappe.xcall('suite_cloud.telemetry.agent.status.get_agent_status', { doctype: frm.doctype, name: frm.doc.name }).then((status) => {
+			const colors = { ok: 'green', outdated: 'orange', silent: 'red', unknown: 'blue' }
+			frm.dashboard.add_comment(frappe.utils.escape_html(status.message), colors[status.state], true)
+		})
 	},
 
 	call(frm, method, freeze_message) {

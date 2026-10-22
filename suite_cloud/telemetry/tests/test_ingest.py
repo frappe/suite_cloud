@@ -14,6 +14,7 @@ from frappe.utils import add_to_date, get_test_client, now_datetime
 from suite_cloud.api.telemetry import DEFAULT_RECORDS_PER_REQUEST, authenticate, events, metrics
 from suite_cloud.api.tenant import InvalidInputError
 from suite_cloud.telemetry import EVENTS, METRICS, TELEMETRY_USER
+from suite_cloud.telemetry.agent.status import CACHE_KEY, forget_contacts
 from suite_cloud.telemetry.spool import Spool
 from suite_cloud.tests.fixtures import configure_settings
 
@@ -48,7 +49,9 @@ class TelemetryApiTestCase(IntegrationTestCase):
     def request(self, secret: str | None, path: str = PATH, scheme: str = "Bearer") -> None:
         """A request as the auth hook sees it: signed in only when the bearer is the secret."""
 
-        headers = {"Authorization": f"{scheme} {secret}"} if secret is not None else {}
+        headers = {"User-Agent": "suite-cloud-agent/0.1.0+abcdef12"}
+        if secret is not None:
+            headers["Authorization"] = f"{scheme} {secret}"
         frappe.set_user("Guest")
         frappe.utils.set_request(method="POST", path=path, headers=headers)
         frappe.local.form_dict = frappe._dict()
@@ -188,6 +191,13 @@ class TestStaging(TelemetryApiTestCase):
         self.assertEqual((rows[1]["span_id"], rows[1]["data"]), (None, None))
         self.assertTrue(before <= rows[0]["received_at"] <= datetime.now(UTC).replace(tzinfo=None))
         UUID(response["batch_id"])
+
+        # The host's last contact and agent version, for the status on the node forms.
+        contact = frappe.cache.hget(CACHE_KEY, "203.0.113.5")
+        self.assertEqual(contact["version"], "0.1.0+abcdef12")
+        self.assertTrue(before <= frappe.utils.get_datetime(contact["seen_at"]))
+        forget_contacts()
+        self.assertIsNone(frappe.cache.hget(CACHE_KEY, "203.0.113.5"))
 
     def test_a_metric_batch_keeps_its_numbers_and_converts_the_offset(self) -> None:
         response = metrics(

@@ -59,6 +59,13 @@ frappe.ui.form.on('Stalwart Cluster', {
 				true,
 			)
 		}
+		if (frm.doc.status === 'Active') {
+			frappe.xcall('suite_cloud.telemetry.agent.status.get_agent_summary', { cluster: frm.doc.name }).then((summary) => {
+				if (!summary.message) return
+				const colors = { ok: 'green', outdated: 'orange', silent: 'red', unknown: 'blue' }
+				frm.dashboard.add_comment(frappe.utils.escape_html(summary.message), colors[summary.state], true)
+			})
+		}
 		if (frm.doc.drift_report) {
 			const report = JSON.parse(frm.doc.drift_report)
 			if (report.differences && report.differences.length) {

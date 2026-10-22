@@ -11,7 +11,7 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.mail.cluster import bootstrap, egress
 from suite_cloud.mail.tests.fixtures import configure_settings, error_log_count, make_cluster, make_node
 from suite_cloud.provisioning.ansible import playbook_task_names
-from suite_cloud.telemetry.agent import build, deploy
+from suite_cloud.telemetry.agent import build, deploy, status
 from suite_cloud.telemetry.agent.build import ARCHITECTURES, AgentBuild, AgentBuildError
 from suite_cloud.utils import clear_config_cache
 
@@ -282,3 +282,37 @@ class TestAgentDeploy(AgentBuildFixture):
             jobs = deploy.upgrade_agents(self.cluster)
             servers = {frappe.db.get_value("Server Job", name, "server") for name in jobs}
             self.assertEqual(servers, {self.node.name, self.gateway.name})
+
+    def test_agent_status_follows_the_last_batch_and_the_build(self) -> None:
+        status.forget_contacts()
+        self.addCleanup(status.forget_contacts)
+        self.assertEqual(status.agent_status(self.node)["state"], "unknown")
+
+        version = self.build().run()
+        status.record_contact(self.node.ipv4_address, f"suite-cloud-agent/{version}")
+        current = status.agent_status(self.node)
+        self.assertEqual(
+            (current["state"], current["version"], current["built_version"]), ("ok", version, version)
+        )
+        self.assertIn(version, current["message"])
+
+        status.record_contact(self.gateway.ipv4_address, "suite-cloud-agent/0.0.9+00000000")
+        self.assertEqual(status.agent_status(self.gateway)["state"], "outdated")
+
+        stale = frappe.utils.add_to_date(frappe.utils.now_datetime(), hours=-2).isoformat()
+        frappe.cache.hset(status.CACHE_KEY, self.node.ipv4_address, {"seen_at": stale, "version": version})
+        self.assertEqual(status.agent_status(self.node)["state"], "silent")
+
+        self.node.db_set("status", "Active")
+        self.gateway.db_set("status", "Active")
+        summary = status.agent_summary(self.cluster)
+        self.assertEqual(summary["state"], "silent")
+        self.assertEqual(
+            summary["message"],
+            f"Agents: 1 outdated ({self.gateway.hostname}), 1 silent ({self.node.hostname}).",
+        )
+        self.assertEqual(status.get_agent_status("Stalwart Node", self.node.name)["state"], "silent")
+        self.assertEqual(status.get_agent_summary(self.cluster.name)["state"], "silent")
+        self.assertRaises(
+            frappe.ValidationError, status.get_agent_status, "Stalwart Cluster", self.cluster.name
+        )

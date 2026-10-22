@@ -116,7 +116,8 @@ contact email; everything else sits at permission level 1, for System Managers.
 Day-to-day buttons: **Drain** takes a node out of DNS before maintenance, **Upgrade Nodes** rolls a
 new Stalwart version out one node at a time, **Sync Config** pushes the generated configuration
 again, **Check Drift** reports what differs from it without changing anything, and **Upgrade Agents**
-installs the current [Suite Cloud Agent](docs/agent.md) build on every active node and gateway.
+installs the current [Suite Cloud Agent](docs/agent.md) build on every active node and gateway;
+the cluster, node and gateway forms show which build each agent runs and when it last reported.
 
 ### Adopting a server that already has a directory
 

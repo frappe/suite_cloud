@@ -3,7 +3,8 @@
 An agent sends ``Authorization: Bearer <telemetry secret>``; the ``authenticate`` auth hook checks
 the secret and runs the request as the telemetry user, which holds no role, so the secret opens
 nothing but these methods. A batch is validated whole, staged as one parquet file and acknowledged;
-the warehouse loads it later. Nothing here touches the site database.
+the warehouse loads it later. Nothing here touches the site database; the cache notes which host
+sent a batch last, for the agent status on the node forms.
 """
 
 import ipaddress
@@ -24,6 +25,7 @@ from frappe.utils.password import get_decrypted_password
 
 from suite_cloud.api.tenant import InvalidInputError, assert_arguments, throttle
 from suite_cloud.telemetry import EVENTS, METRICS, TELEMETRY_USER, TelemetryTable
+from suite_cloud.telemetry.agent.status import record_contact
 from suite_cloud.telemetry.spool import Spool
 from suite_cloud.utils import get_config
 
@@ -119,6 +121,7 @@ def accept(
     envelope = get_envelope(source, host_ip, hostname, batch_id)
     rows = [parse(record) for record in get_records(records)]
     Spool().write(table, table.get_batch(envelope, rows), envelope["batch_id"])
+    record_contact(envelope["host_ip"], frappe.get_request_header("User-Agent"))
     return {"batch_id": envelope["batch_id"], "accepted": len(rows)}
 
 
