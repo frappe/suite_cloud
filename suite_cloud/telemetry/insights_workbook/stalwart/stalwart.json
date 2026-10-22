@@ -158,11 +158,11 @@
        },
        "operator": "in",
        "value": [
-        "store.data-read-time",
-        "store.data-write-time",
-        "store.blob-read-time",
-        "store.blob-write-time",
-        "dns.lookup-time"
+        "store.data-read-time.p95",
+        "store.data-write-time.p95",
+        "store.blob-read-time.p95",
+        "store.blob-write-time.p95",
+        "dns.lookup-time.p95"
        ]
       }
      ],
@@ -200,7 +200,7 @@
        "measure": {
         "data_type": "Decimal",
         "expression": {
-         "expression": "sum(total) / sum(samples) / 1",
+         "expression": "avg(value)",
          "type": "expression"
         },
         "measure_name": "Milliseconds"
@@ -212,7 +212,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Mean store and DNS latency per hour. These histograms exist on the enterprise build only.",
+   "info": "95th percentile of store and DNS latency per hour, from Stalwart's histogram buckets between two scrapes of the agent. These histograms exist on the enterprise build only.",
    "name": "stalwart-backend-latency-ms",
    "query": "stalwart-metrics",
    "sort_order": 53,
@@ -7234,7 +7234,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-21 22:30:00.000000",
+ "modified": "2026-10-22 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",

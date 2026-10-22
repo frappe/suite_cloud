@@ -46,7 +46,7 @@ A metric record:
 | `timestamp` | string | Required. As above |
 | `name` | string | Required. The metric name, at most 128 characters |
 | `type` | string | Required. `counter`, `gauge` or `histogram` |
-| `value` | number | Required. The counter total, the gauge reading, or the histogram's last observation |
+| `value` | number | Required. The counter total, the gauge reading, or the histogram's mean |
 | `count` | integer | Optional. A histogram's number of observations |
 | `sum` | number | Optional. A histogram's sum of observations |
 | `labels` | object | Optional. The metric's labels, stored as JSON text |
@@ -70,7 +70,7 @@ The agent also reports the machine it runs on, under the same `source` as the pr
 
 The shipped **Machines** Insights workbook reads these for every source.
 
-For Stalwart, the agent reads Stalwart's Prometheus endpoint for the metrics, under Stalwart's own names (`server_memory` on the endpoint is `server.memory` here), and sends a histogram's mean as its `value`. It forwards the event names as they stand in Stalwart's log file (`delivery.delivered`, `auth.error`, `smtp.ehlo`, `smtp.dkim-pass`), the metric names (`server.memory`, `queue.count`, `delivery.total-time`) and the keys of the event data (`remoteIp`, `to`, `hostname`, `details`, `elapsed`) unchanged. The shipped dashboards filter on those names; the log at `info` level holds no connection, `auth.failed` or `spam.classify` events, so the dashboards read EHLO, `auth.error` and `message-ingest.spam` instead.
+For Stalwart, the agent reads Stalwart's Prometheus endpoint for the metrics, under Stalwart's own names (`server_memory` on the endpoint is `server.memory` here), and sends a histogram's mean since Stalwart started as its `value`, with `<name>.p50`, `<name>.p95` and `<name>.p99` gauges for the percentiles of the observations between two scrapes. It forwards the event names as they stand in Stalwart's log file (`delivery.delivered`, `auth.error`, `smtp.ehlo`, `smtp.dkim-pass`), the metric names (`server.memory`, `queue.count`, `delivery.total-time`) and the keys of the event data (`remoteIp`, `to`, `hostname`, `details`, `elapsed`) unchanged. The shipped dashboards filter on those names; the log at `info` level holds no connection, `auth.failed` or `spam.classify` events, so the dashboards read EHLO, `auth.error` and `message-ingest.spam` instead.
 
 ```http
 POST /api/v2/method/suite_cloud.api.telemetry.events

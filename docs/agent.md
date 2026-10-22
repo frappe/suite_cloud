@@ -43,7 +43,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 
 Every line of a Stalwart log file becomes one event: the timestamp, the level in lowercase, the event name in the parentheses, and the `key = value` pairs as `data`, with the line's description as `data.description`. Nested events become objects with `event` and `description`, durations become milliseconds, and a key that appears twice keeps the later value, as in Stalwart's own JSON tracer. Lines written with colour codes by older nodes are read too. A line the parser does not understand is counted and logged, and the agent moves on.
 
-Every interval the agent sends the `host.*` gauges listed in the [telemetry API](api/telemetry.md#machine-metrics), computed from `/proc`, and Stalwart's own metrics from `/metrics/prometheus`, under Stalwart's names: `server_memory` on the endpoint is `server.memory` in Suite Cloud. A histogram's `value` is its mean, with `count` and `sum` beside it.
+Every interval the agent sends the `host.*` gauges listed in the [telemetry API](api/telemetry.md#machine-metrics), computed from `/proc`, and Stalwart's own metrics from `/metrics/prometheus`, under Stalwart's names: `server_memory` on the endpoint is `server.memory` in Suite Cloud. A histogram's `value` is its mean since Stalwart started, with `count` and `sum` beside it. From the second scrape on, the agent also sends `<name>.p50`, `<name>.p95` and `<name>.p99` gauges: the percentiles of the observations made since the previous scrape, estimated from the histogram's buckets the way Prometheus's `histogram_quantile` does. An interval without observations, or one in which Stalwart restarted, has no percentiles.
 
 ## Delivery and state
 
