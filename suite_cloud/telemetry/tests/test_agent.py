@@ -286,6 +286,9 @@ class TestAgentDeploy(AgentBuildFixture):
     def test_a_changed_secret_rolls_the_agents_out(self) -> None:
         self.node.db_set("status", "Active")
         self.gateway.db_set("status", "Active")
+        draining = make_node(self.cluster, ipv4="203.0.113.12")
+        draining.db_set("status", "Draining")
+        make_node(self.cluster, ipv4="203.0.113.13").db_set("status", "Provisioned")
         settings = frappe.get_single("Suite Cloud Settings")
 
         def jobs_after(secret: str) -> list[dict]:
@@ -304,14 +307,14 @@ class TestAgentDeploy(AgentBuildFixture):
 
         version = self.build().run()
         jobs = jobs_after("rotated-twice")
-        self.assertEqual({job.server for job in jobs}, {self.node.name, self.gateway.name})
+        self.assertEqual({job.server for job in jobs}, {self.node.name, draining.name, self.gateway.name})
         self.assertTrue(all(job.title.startswith(f"Install agent {version}") for job in jobs))
 
         # Cleared: the agents are stopped, build or not.
         jobs = jobs_after("")
         self.assertEqual(
             {job.title for job in jobs},
-            {f"Stop agent on {self.node.hostname}", f"Stop agent on {self.gateway.hostname}"},
+            {f"Stop agent on {s.hostname}" for s in (self.node, draining, self.gateway)},
         )
 
         # The form sends the saved secret masked: nothing happens.

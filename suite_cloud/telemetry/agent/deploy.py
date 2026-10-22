@@ -178,31 +178,36 @@ def agent_job(server: Document, build: AgentBuild | None) -> Document:
 
 
 def upgrade_agents(cluster: Document) -> list[str]:
-    """Rolls the built agent out to every Active node and gateway of the cluster."""
+    """Rolls the built agent out to every server of the cluster that runs an agent."""
 
-    return [install_agent(server).name for server in active_servers(cluster)]
+    return [install_agent(server).name for server in agent_servers(cluster)]
 
 
-def active_servers(cluster: Document | None = None) -> list[Document]:
-    """The Active nodes and gateways of one cluster, or of every cluster."""
+def agent_servers(cluster: Document | None = None) -> list[Document]:
+    """The servers that run an agent, in one cluster or in every cluster: Active and Draining
+    nodes (a draining node still ships its log) and Active gateways."""
 
-    filters = {"status": "Active"}
-    if cluster:
-        filters["cluster"] = cluster.name
-    nodes = frappe.get_all("Stalwart Node", filters, pluck="name")
-    gateways = frappe.get_all("Egress Gateway", filters, pluck="name")
+    nodes = frappe.get_all("Stalwart Node", filters_for(cluster, ("Active", "Draining")), pluck="name")
+    gateways = frappe.get_all("Egress Gateway", filters_for(cluster, ("Active",)), pluck="name")
     return [
         *(frappe.get_doc("Stalwart Node", name) for name in nodes),
         *(frappe.get_doc("Egress Gateway", name) for name in gateways),
     ]
 
 
+def filters_for(cluster: Document | None, statuses: tuple[str, ...]) -> dict:
+    filters = {"status": ("in", statuses)}
+    if cluster:
+        filters["cluster"] = cluster.name
+    return filters
+
+
 def roll_out_agents(secret_set: bool) -> list[str]:
-    """After the Telemetry Secret changed: every Active node and gateway gets the new config, or
-    its agent stopped when the secret was cleared. Runs inside the settings save, so a missing
+    """After the Telemetry Secret changed: every server that runs an agent gets the new config,
+    or its agent stopped when the secret was cleared. Runs inside the settings save, so a missing
     build is an Error Log, not an exception."""
 
-    servers = active_servers()
+    servers = agent_servers()
     if not servers:
         return []
     build = None

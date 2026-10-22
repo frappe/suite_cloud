@@ -146,79 +146,6 @@
    "title": "Authentication Readings",
    "workbook": "stalwart"
   },
-  "stalwart-backend-latency-ms": {
-   "chart_type": "Line",
-   "config": {
-    "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "metric",
-        "type": "column"
-       },
-       "operator": "in",
-       "value": [
-        "store.data-read-time.p95",
-        "store.data-write-time.p95",
-        "store.blob-read-time.p95",
-        "store.blob-write-time.p95",
-        "dns.lookup-time.p95"
-       ]
-      }
-     ],
-     "logical_operator": "And"
-    },
-    "limit": 5000,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "timestamp",
-       "type": "column"
-      },
-      "direction": "asc"
-     }
-    ],
-    "split_by": {
-     "dimension": {
-      "column_name": "metric",
-      "data_type": "String",
-      "dimension_name": "metric"
-     },
-     "max_split_values": 10
-    },
-    "x_axis": {
-     "dimension": {
-      "column_name": "timestamp",
-      "data_type": "Datetime",
-      "dimension_name": "timestamp",
-      "granularity": "hour"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Decimal",
-        "expression": {
-         "expression": "avg(value)",
-         "type": "expression"
-        },
-        "measure_name": "Milliseconds"
-       }
-      }
-     ],
-     "show_data_labels": false
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": "95th percentile of store and DNS latency per hour, from Stalwart's histogram buckets between two scrapes of the agent. These histograms exist on the enterprise build only.",
-   "name": "stalwart-backend-latency-ms",
-   "query": "stalwart-metrics",
-   "sort_order": 53,
-   "title": "Backend Latency (ms)",
-   "workbook": "stalwart"
-  },
   "stalwart-bans-and-blocks": {
    "chart_type": "Bar",
    "config": {
@@ -3073,75 +3000,6 @@
    "title": "Process Memory (MiB)",
    "workbook": "stalwart"
   },
-  "stalwart-queue": {
-   "chart_type": "Line",
-   "config": {
-    "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "metric",
-        "type": "column"
-       },
-       "operator": "in",
-       "value": [
-        "queue.count"
-       ]
-      }
-     ],
-     "logical_operator": "And"
-    },
-    "limit": 5000,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "timestamp",
-       "type": "column"
-      },
-      "direction": "asc"
-     }
-    ],
-    "split_by": {
-     "dimension": {
-      "column_name": "host",
-      "data_type": "String",
-      "dimension_name": "host"
-     },
-     "max_split_values": 10
-    },
-    "x_axis": {
-     "dimension": {
-      "column_name": "timestamp",
-      "data_type": "Datetime",
-      "dimension_name": "timestamp",
-      "granularity": "hour"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "max(value)",
-         "type": "expression"
-        },
-        "measure_name": "Messages"
-       }
-      }
-     ],
-     "show_data_labels": false
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": "Largest queue.count reading per hour. The gauge exists on the enterprise build only.",
-   "name": "stalwart-queue",
-   "query": "stalwart-metrics",
-   "sort_order": 38,
-   "title": "Queue",
-   "workbook": "stalwart"
-  },
   "stalwart-received-per-day": {
    "chart_type": "Bar",
    "config": {
@@ -5353,7 +5211,6 @@
       "y": 0
      },
      "links": {
-      "stalwart-backend-latency-ms": "`stalwart-metrics`.`timestamp`",
       "stalwart-capacity-readings": "`stalwart-metrics`.`timestamp`",
       "stalwart-connections-by-protocol": "`stalwart-metrics`.`timestamp`",
       "stalwart-message-size-kib": "`stalwart-metrics`.`timestamp`",
@@ -5374,7 +5231,6 @@
       "y": 0
      },
      "links": {
-      "stalwart-backend-latency-ms": "`stalwart-metrics`.`host`",
       "stalwart-capacity-readings": "`stalwart-metrics`.`host`",
       "stalwart-connections-by-protocol": "`stalwart-metrics`.`host`",
       "stalwart-message-size-kib": "`stalwart-metrics`.`host`",
@@ -5433,19 +5289,8 @@
      "layout": {
       "h": 20,
       "i": "message_size",
-      "w": 10,
+      "w": 20,
       "x": 0,
-      "y": 26
-     },
-     "type": "chart"
-    },
-    {
-     "chart": "stalwart-backend-latency-ms",
-     "layout": {
-      "h": 20,
-      "i": "backend_latency",
-      "w": 10,
-      "x": 10,
       "y": 26
      },
      "type": "chart"
@@ -6633,7 +6478,6 @@
      "links": {
       "stalwart-active-connections": "`stalwart-metrics`.`timestamp`",
       "stalwart-mail-by-listener": "`stalwart-events`.`timestamp`",
-      "stalwart-queue": "`stalwart-metrics`.`timestamp`",
       "stalwart-sessions": "`stalwart-events`.`timestamp`",
       "stalwart-smtp-readings": "`stalwart-events`.`timestamp`"
      },
@@ -6654,7 +6498,6 @@
      "links": {
       "stalwart-active-connections": "`stalwart-metrics`.`host`",
       "stalwart-mail-by-listener": "`stalwart-events`.`host`",
-      "stalwart-queue": "`stalwart-metrics`.`host`",
       "stalwart-sessions": "`stalwart-events`.`host`",
       "stalwart-smtp-readings": "`stalwart-events`.`host`"
      },
@@ -6711,19 +6554,8 @@
      "layout": {
       "h": 20,
       "i": "active_connections",
-      "w": 10,
+      "w": 20,
       "x": 0,
-      "y": 26
-     },
-     "type": "chart"
-    },
-    {
-     "chart": "stalwart-queue",
-     "layout": {
-      "h": 20,
-      "i": "queue",
-      "w": 10,
-      "x": 10,
       "y": 26
      },
      "type": "chart"
@@ -7234,7 +7066,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-22 12:00:00.000000",
+ "modified": "2026-10-22 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",

@@ -354,7 +354,7 @@ class StalwartCluster(Document):
 
     @frappe.whitelist()
     def upgrade_agents(self) -> list[str]:
-        """Installs the built Suite Cloud Agent on every active node and gateway; Stalwart keeps running."""
+        """Installs the built Suite Cloud Agent on every active or draining node and every active gateway; Stalwart keeps running."""
 
         frappe.only_for("System Manager")
         from suite_cloud.telemetry.agent.deploy import upgrade_agents

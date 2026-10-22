@@ -10,7 +10,7 @@ from frappe import _
 from frappe.utils import cint, get_datetime, now_datetime, pretty_date
 
 from suite_cloud.telemetry.agent.build import AgentBuild
-from suite_cloud.telemetry.agent.deploy import active_servers
+from suite_cloud.telemetry.agent.deploy import agent_servers
 from suite_cloud.telemetry.alerts import DEFAULT_SILENCE_MINUTES
 from suite_cloud.utils import get_config
 
@@ -70,9 +70,9 @@ def agent_status(server: Document) -> dict:
 
 
 def agent_summary(cluster: Document) -> dict:
-    """One line for the cluster form over its Active nodes and gateways; ``state`` is the worst."""
+    """One line for the cluster form over the servers that run an agent; ``state`` is the worst."""
 
-    statuses = [agent_status(server) for server in active_servers(cluster)]
+    statuses = [agent_status(server) for server in agent_servers(cluster)]
     if not statuses:
         return {"state": "ok", "message": "", "statuses": []}
 

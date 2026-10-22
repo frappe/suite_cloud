@@ -148,7 +148,7 @@ frappe.ui.form.on('Stalwart Cluster', {
 	},
 
 	upgrade_agents(frm) {
-		frappe.confirm(__('Install the current Suite Cloud Agent build on every active node and gateway? Stalwart keeps running.'), () => {
+		frappe.confirm(__('Install the current Suite Cloud Agent build on every active or draining node and every active gateway? Stalwart keeps running.'), () => {
 			frm.events.call(frm, 'upgrade_agents', {}, __('Queueing agent installs...'))
 		})
 	},
