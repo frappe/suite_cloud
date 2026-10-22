@@ -13,13 +13,36 @@ from frappe.tests import IntegrationTestCase
 from frappe.utils import get_files_path
 
 from suite_cloud.mail.tests.fixtures import error_log_count, make_cluster, make_node
-from suite_cloud.telemetry import EVENTS, METRICS, TelemetryTable
+from suite_cloud.telemetry import EVENT_DATA_COLUMNS, EVENTS, METRICS, TelemetryTable
 from suite_cloud.telemetry.spool import Spool
 from suite_cloud.telemetry.warehouse import Warehouse
 from suite_cloud.tests.fixtures import configure_settings
 
 NOW = datetime.now(UTC).replace(tzinfo=None)
 ENVELOPE = {"received_at": NOW, "source": "stalwart", "host_ip": "203.0.113.5", "hostname": "n1"}
+STALWART_DATA = (
+    '{"accountName": "ana", "remoteIp": "198.51.100.7", "listenerId": "smtp", "domain": "example.com", '
+    '"hostname": "mx.example.com", "details": "Remote said: 550 5.1.1 no such user", '
+    '"from": "ana@acme.test", "to": "bo@example.com", "elapsed": 412}'
+)
+# remote_ip, listener, domain, mx, reason, code, account, sender, recipient, sender_domain,
+# recipient_domain, elapsed
+STALWART_COLUMNS = (
+    "198.51.100.7",
+    "smtp",
+    "example.com",
+    "mx.example.com",
+    "Remote said: 550 5.1.1 no such user",
+    "550",
+    "ana",
+    "ana@acme.test",
+    "bo@example.com",
+    "acme.test",
+    "example.com",
+    412.0,
+)
+CODE_ONLY_COLUMNS = (None, None, None, None, "550 rejected", "421", None, None, None, None, None, None)
+NO_DATA_COLUMNS = (None,) * len(EVENT_DATA_COLUMNS)
 
 
 def event(**fields) -> dict:
@@ -95,6 +118,40 @@ class TestWarehouse(IntegrationTestCase):
         self.assertEqual(added, {"events": 4, "metrics": 1})
         self.assertEqual((self.count(EVENTS), self.count(METRICS)), (4, 1))
         self.assertEqual(self.spool.get_pending(EVENTS, 10) + self.spool.get_pending(METRICS, 10), [])
+
+    def test_a_load_extracts_the_event_data_the_dashboards_read(self) -> None:
+        self.stage(
+            EVENTS,
+            [
+                event(data=STALWART_DATA),
+                event(data='{"code": "421", "details": "550 rejected", "elapsed": "soon"}'),
+                event(),
+            ],
+        )
+
+        self.warehouse.load_pending()
+
+        self.assertEqual(self.event_data_columns(), [STALWART_COLUMNS, CODE_ONLY_COLUMNS, NO_DATA_COLUMNS])
+
+    def test_a_table_from_before_the_extracted_columns_gets_them_filled_on_migrate(self) -> None:
+        legacy = TelemetryTable(EVENTS.name, EVENTS.schema)
+        batch = legacy.get_batch({**ENVELOPE, "batch_id": "old"}, [event(data=STALWART_DATA)])
+        with self.warehouse.write_connection() as db:
+            db.con.execute(f'DROP TABLE "{EVENTS.name}"')
+            db.raw_sql(legacy.create_statement)
+            db.con.register("batch", batch)
+            db.con.execute(f'INSERT INTO "{EVENTS.name}" SELECT * FROM batch')
+
+        self.warehouse.ensure_data_source()
+
+        self.assertEqual(self.event_data_columns(), [STALWART_COLUMNS])
+
+    def event_data_columns(self) -> list[tuple]:
+        names = ", ".join(f'"{column.name}"' for column in EVENT_DATA_COLUMNS)
+        with self.warehouse.write_connection() as db:
+            return db.con.execute(
+                f'SELECT {names} FROM "{EVENTS.name}" ORDER BY "data" NULLS LAST'
+            ).fetchall()
 
     def test_a_file_left_behind_after_its_commit_is_not_loaded_twice(self) -> None:
         self.stage(EVENTS, [event(), event()], batch_id="b1")

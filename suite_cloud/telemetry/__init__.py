@@ -30,11 +30,25 @@ ENVELOPE_FIELDS = (
 
 
 @dataclass(frozen=True)
+class DerivedColumn:
+    """A column the loader computes from a row's own columns, so a dashboard reads it instead of
+    parsing the row on every query."""
+
+    name: str
+    type: str
+    expression: str
+
+
+@dataclass(frozen=True)
 class TelemetryTable:
-    """One kind of telemetry: its DuckDB table, its spool folder and its columns."""
+    """One kind of telemetry: its DuckDB table, its spool folder and its columns.
+
+    The schema is what a staged batch carries; the derived columns exist only in DuckDB.
+    """
 
     name: str
     schema: pyarrow.Schema
+    derived: tuple[DerivedColumn, ...] = ()
 
     @property
     def columns(self) -> list[str]:
@@ -42,17 +56,48 @@ class TelemetryTable:
 
     @property
     def create_statement(self) -> str:
-        columns = ", ".join(
+        columns = [
             f'"{field.name}" {DUCKDB_TYPES[field.type]}{"" if field.nullable else " NOT NULL"}'
             for field in self.schema
-        )
-        return f'CREATE TABLE IF NOT EXISTS "{self.name}" ({columns})'
+        ]
+        columns += [f'"{column.name}" {column.type}' for column in self.derived]
+        return f'CREATE TABLE IF NOT EXISTS "{self.name}" ({", ".join(columns)})'
 
     def get_batch(self, envelope: dict, rows: list[dict]) -> pyarrow.Table:
         """The rows of one request as a parquet-ready table, each carrying the envelope."""
 
         return pyarrow.Table.from_pylist([{**envelope, **row} for row in rows], schema=self.schema)
 
+
+def data_text(*keys: str) -> str:
+    """The first of the event data's keys that is set, as text; ``data`` is always valid JSON."""
+
+    values = [f"(data ->> '$.{key}')" for key in keys]
+    return values[0] if len(values) == 1 else f"coalesce({', '.join(values)})"
+
+
+EMAIL_DOMAIN = "'@([A-Za-z0-9.-]+)'"
+SMTP_CODE = "'(^|[^0-9])([245][0-9][0-9])([^0-9]|$)'"
+
+# The event data fields the shipped dashboards read, under Stalwart's key names.
+EVENT_DATA_COLUMNS = (
+    DerivedColumn("remote_ip", "VARCHAR", data_text("remoteIp")),
+    DerivedColumn("listener", "VARCHAR", data_text("listenerId")),
+    DerivedColumn("domain", "VARCHAR", data_text("domain")),
+    DerivedColumn("mx", "VARCHAR", data_text("hostname")),
+    DerivedColumn("reason", "VARCHAR", data_text("details", "reason")),
+    DerivedColumn(
+        "code",
+        "VARCHAR",
+        f"coalesce({data_text('code')}, regexp_extract({data_text('details', 'reason')}, {SMTP_CODE}, 2))",
+    ),
+    DerivedColumn("account", "VARCHAR", data_text("accountName", "accountId")),
+    DerivedColumn("sender", "VARCHAR", data_text("from")),
+    DerivedColumn("recipient", "VARCHAR", data_text("to")),
+    DerivedColumn("sender_domain", "VARCHAR", f"regexp_extract({data_text('from')}, {EMAIL_DOMAIN}, 1)"),
+    DerivedColumn("recipient_domain", "VARCHAR", f"regexp_extract({data_text('to')}, {EMAIL_DOMAIN}, 1)"),
+    DerivedColumn("elapsed", "DOUBLE", f"try_cast({data_text('elapsed')} AS DOUBLE)"),
+)
 
 EVENTS = TelemetryTable(
     "events",
@@ -66,6 +111,7 @@ EVENTS = TelemetryTable(
             pyarrow.field("data", pyarrow.string()),
         ]
     ),
+    EVENT_DATA_COLUMNS,
 )
 
 METRICS = TelemetryTable(
