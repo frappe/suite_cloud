@@ -130,6 +130,20 @@ class TestAlerts(IntegrationTestCase):
         self.report(QUIET, NOW, table=METRICS)
         self.assertEqual(self.alerts.check(), {"opened": 0, "resolved": 1})
 
+    def test_a_check_reads_the_whole_history_only_for_a_watched_node_silent_past_the_lookback(self) -> None:
+        self.report(QUIET, NOW - timedelta(hours=2), table=METRICS)
+        self.alerts.check()
+
+        with patch.object(self.warehouse, "query", wraps=self.warehouse.query) as query:
+            self.alerts.check()
+            self.assertFalse(any("list_contains" in call.args[0] for call in query.call_args_list))
+
+            with patch("suite_cloud.telemetry.alerts.LOOKBACK", timedelta(hours=1)):
+                self.alerts.check()
+            self.assertEqual(
+                [call.args[1]["hosts"] for call in query.call_args_list if "hosts" in call.args[1]], [[QUIET]]
+            )
+
     def test_a_silent_node_whose_rows_the_retention_deleted_is_not_recovered(self) -> None:
         self.report(QUIET, NOW - timedelta(hours=2), table=METRICS)
         self.alerts.check()

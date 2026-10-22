@@ -111,13 +111,10 @@ class Alerts:
         it is still not recovered."""
 
         now = datetime.now(UTC).replace(tzinfo=None)
-        rows = self.warehouse.query(
-            'WITH seen AS (SELECT host_ip, hostname, received_at FROM "events" '
-            'UNION ALL SELECT host_ip, hostname, received_at FROM "metrics") '
-            "SELECT host_ip, arg_max(hostname, received_at), max(received_at) FROM seen "
-            "WHERE received_at >= $lookback OR list_contains($watched, host_ip) GROUP BY host_ip",
-            {"lookback": now - LOOKBACK, "watched": watched},
-        )
+        rows = self.get_last_batches("received_at >= $since", {"since": now - LOOKBACK})
+        recent = {host_ip for host_ip, _hostname, _last in rows}
+        if stale := [host_ip for host_ip in watched if host_ip not in recent]:
+            rows += self.get_last_batches("list_contains($hosts, host_ip)", {"hosts": stale})
         silent = now - self.silence
         findings = [
             Finding(
@@ -137,6 +134,18 @@ class Alerts:
             if host_ip not in seen
         ]
         return findings
+
+    def get_last_batches(self, condition: str, parameters: dict) -> list[tuple]:
+        """``(host_ip, hostname, received_at)`` of each host's last batch among the rows matching
+        the condition. A condition on ``received_at`` alone lets DuckDB skip the older row groups;
+        only a host silent past the lookback needs the whole history read."""
+
+        return self.warehouse.query(
+            f'WITH seen AS (SELECT host_ip, hostname, received_at FROM "events" WHERE {condition} '
+            f'UNION ALL SELECT host_ip, hostname, received_at FROM "metrics" WHERE {condition}) '
+            "SELECT host_ip, arg_max(hostname, received_at), max(received_at) FROM seen GROUP BY host_ip",
+            parameters,
+        )
 
     def find_error_rates(self) -> list[Finding]:
         """Nodes whose error-level share of the last hour's events is at or over the threshold."""
