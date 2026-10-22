@@ -38,6 +38,7 @@ class TestAlerts(IntegrationTestCase):
         self.addCleanup(Path(get_files_path(f"{name}.duckdb", is_private=1)).unlink, missing_ok=True)
         self.warehouse = Warehouse(name, self.spool)
         self.warehouse.ensure_data_source()
+        self.warehouse.refresh_tables()
         self.alerts = Alerts(self.warehouse)
         self.mails = patch("suite_cloud.telemetry.alerts.frappe.sendmail").start()
         self.addCleanup(patch.stopall)

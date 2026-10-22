@@ -52,7 +52,11 @@ class Warehouse:
         return days if days > 0 else DEFAULT_RETENTION_DAYS
 
     def ensure_data_source(self) -> None:
-        """Install and migrate: the Insights data source, its tables and their registration."""
+        """Install and migrate: the Insights data source and its table registration.
+
+        The file itself is left to the loader: a dashboard reading it can hold it longer than a
+        migrate should wait.
+        """
 
         if "insights" not in frappe.get_installed_apps():
             frappe.throw(_("Install the insights app before migrating Suite Cloud: it holds the telemetry."))
@@ -66,19 +70,13 @@ class Warehouse:
                     "database_name": self.data_source,
                 }
             ).insert(ignore_permissions=True)
-
-        with self.write_connection() as db:
-            for table in TABLES:
-                db.raw_sql(table.create_statement)
-                self.add_derived_columns(db, table)
-        self.refresh_dimensions()
         self.register_tables()
 
     def add_derived_columns(self, db, table: TelemetryTable) -> None:
         """Adds the derived columns a table created before them lacks, filled from its rows.
 
         One transaction: a failed backfill leaves the table without the columns, so the next
-        migrate tries again.
+        load tries again.
         """
 
         existing = {
@@ -100,11 +98,18 @@ class Warehouse:
     def load_pending(self) -> dict[str, int]:
         """Loads every staged file of every table, oldest first; returns the rows added per table.
 
-        Files go in chunks of BATCH_FILES, each under its own lock, so a dashboard query gets its
-        turn between chunks and a backlog drains in one run. A table whose load fails (the lock
-        timed out, the disk is full) keeps its files for the next run and is logged; the other
-        tables still load.
+        The tables are refreshed first, so a load never meets a table without its columns. Files
+        go in chunks of BATCH_FILES, each under its own lock, so a dashboard query gets its turn
+        between chunks and a backlog drains in one run. A table whose load fails (the lock timed
+        out, the disk is full) keeps its files for the next run and is logged; the other tables
+        still load.
         """
+
+        try:
+            self.refresh_tables()
+        except Exception:
+            log_exception("Telemetry tables not refreshed")
+            return {}
 
         added = {}
         for table in TABLES:
@@ -116,19 +121,16 @@ class Warehouse:
                     break
                 if len(files) < BATCH_FILES:
                     break
-        try:
-            self.refresh_dimensions()
-        except Exception:
-            log_exception("Telemetry lookup tables not refreshed")
         if added:
             self.register_tables()
         return added
 
-    def refresh_dimensions(self) -> None:
-        """Rewrites the node and mail domain tables from Suite Cloud's records.
+    def refresh_tables(self) -> None:
+        """Creates the telemetry tables, adds the derived columns an older one lacks, and rewrites
+        the node and mail domain tables from Suite Cloud's records.
 
-        The records are read before the lock is taken, so the file is held only for two small
-        table swaps.
+        The records are read before the lock is taken. Past a one-time backfill, the file is held
+        only for the table checks and two small table swaps.
         """
 
         batches = {
@@ -136,6 +138,9 @@ class Warehouse:
             MAIL_DOMAINS: MAIL_DOMAINS.get_batch({}, get_mail_domain_rows()),
         }
         with self.write_connection() as db:
+            for table in TABLES:
+                db.raw_sql(table.create_statement)
+                self.add_derived_columns(db, table)
             for table, batch in batches.items():
                 db.con.register("dimension", batch)
                 db.con.execute(f'CREATE OR REPLACE TABLE "{table.name}" AS SELECT * FROM dimension')
@@ -174,7 +179,6 @@ class Warehouse:
         values += [f'{column.expression} AS "{column.name}"' for column in table.derived]
         columns = ", ".join(f'"{name}"' for name in names)
         with self.write_connection() as db:
-            db.raw_sql(table.create_statement)
             result = db.con.execute(
                 f'INSERT INTO "{table.name}" ({columns}) SELECT {", ".join(values)} FROM read_parquet($files) '
                 f'WHERE batch_id NOT IN (SELECT batch_id FROM "{table.name}" WHERE batch_id IN (SELECT unnest($ids)))',
