@@ -2,6 +2,8 @@ import json
 import unittest
 from pathlib import Path
 
+from suite_cloud.telemetry import EVENT_DATA_COLUMNS
+
 WORKBOOKS = Path(__file__).resolve().parents[1] / "insights_workbook"
 
 
@@ -35,3 +37,11 @@ class TestShippedWorkbooks(unittest.TestCase):
                             self.assertEqual(item["default_operator"], "within")
                             self.assertTrue(item.get("default_value"))
 
+    def test_the_events_query_reads_the_extracted_columns_instead_of_parsing_data(self) -> None:
+        query = shipped_workbook("stalwart")["queries"]["stalwart-events"]
+        mutates = [operation for operation in query["operations"] if operation["type"] == "mutate"]
+        selected = next(operation for operation in query["operations"] if operation["type"] == "select")
+
+        for mutate in mutates:
+            self.assertNotIn("data", mutate["expression"]["expression"])
+        self.assertLessEqual({column.name for column in EVENT_DATA_COLUMNS}, set(selected["column_names"]))

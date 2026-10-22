@@ -70,8 +70,32 @@ class Warehouse:
         with self.write_connection() as db:
             for table in TABLES:
                 db.raw_sql(table.create_statement)
+                self.add_derived_columns(db, table)
         self.refresh_dimensions()
         self.register_tables()
+
+    def add_derived_columns(self, db, table: TelemetryTable) -> None:
+        """Adds the derived columns a table created before them lacks, filled from its rows.
+
+        One transaction: a failed backfill leaves the table without the columns, so the next
+        migrate tries again.
+        """
+
+        existing = {
+            name
+            for (name,) in db.con.execute(
+                "SELECT column_name FROM duckdb_columns() WHERE table_name = $table", {"table": table.name}
+            ).fetchall()
+        }
+        missing = [column for column in table.derived if column.name not in existing]
+        if not missing:
+            return
+        db.con.begin()
+        for column in missing:
+            db.con.execute(f'ALTER TABLE "{table.name}" ADD COLUMN "{column.name}" {column.type}')
+        assignments = ", ".join(f'"{column.name}" = {column.expression}' for column in missing)
+        db.con.execute(f'UPDATE "{table.name}" SET {assignments}')
+        db.con.commit()
 
     def load_pending(self) -> dict[str, int]:
         """Loads every staged file of every table, oldest first; returns the rows added per table.
@@ -140,15 +164,19 @@ class Warehouse:
     def load(self, table: TelemetryTable, files: list[Path]) -> int:
         """Inserts the files' rows in one statement and deletes the files once it is committed.
 
-        A batch already in the table is skipped, so a run that died between the commit and the
-        delete adds nothing twice. The lookup is bounded to the ids being loaded.
+        The derived columns are computed here, once per row. A batch already in the table is
+        skipped, so a run that died between the commit and the delete adds nothing twice. The
+        lookup is bounded to the ids being loaded.
         """
 
-        columns = ", ".join(f'"{column}"' for column in table.columns)
+        names = [*table.columns, *(column.name for column in table.derived)]
+        values = [f'"{column}"' for column in table.columns]
+        values += [f'{column.expression} AS "{column.name}"' for column in table.derived]
+        columns = ", ".join(f'"{name}"' for name in names)
         with self.write_connection() as db:
             db.raw_sql(table.create_statement)
             result = db.con.execute(
-                f'INSERT INTO "{table.name}" ({columns}) SELECT {columns} FROM read_parquet($files) '
+                f'INSERT INTO "{table.name}" ({columns}) SELECT {", ".join(values)} FROM read_parquet($files) '
                 f'WHERE batch_id NOT IN (SELECT batch_id FROM "{table.name}" WHERE batch_id IN (SELECT unnest($ids)))',
                 {"files": [str(path) for path in files], "ids": [path.stem for path in files]},
             ).fetchone()

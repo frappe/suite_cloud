@@ -7079,7 +7079,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-22 18:00:00.000000",
+ "modified": "2026-10-22 18:30:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -7341,118 +7341,10 @@
     {
      "data_type": "String",
      "expression": {
-      "expression": "json_value(data, 'remoteIp')",
-      "type": "expression"
-     },
-     "new_name": "remote_ip",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "json_value(data, 'listenerId')",
-      "type": "expression"
-     },
-     "new_name": "listener",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "json_value(data, 'domain')",
-      "type": "expression"
-     },
-     "new_name": "domain",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "json_value(data, 'hostname')",
-      "type": "expression"
-     },
-     "new_name": "mx",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "coalesce(json_value(data, 'details'), json_value(data, 'reason'))",
-      "type": "expression"
-     },
-     "new_name": "reason",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "coalesce(json_value(data, 'code'), reason.re_extract('(^|[^0-9])([245][0-9][0-9])([^0-9]|$)', 2))",
-      "type": "expression"
-     },
-     "new_name": "code",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "coalesce(json_value(data, 'accountName'), json_value(data, 'accountId'))",
-      "type": "expression"
-     },
-     "new_name": "account",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "json_value(data, 'from')",
-      "type": "expression"
-     },
-     "new_name": "sender",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "json_value(data, 'to')",
-      "type": "expression"
-     },
-     "new_name": "recipient",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "sender.re_extract('@([A-Za-z0-9.-]+)', 1)",
-      "type": "expression"
-     },
-     "new_name": "sender_domain",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
-      "expression": "recipient.re_extract('@([A-Za-z0-9.-]+)', 1)",
-      "type": "expression"
-     },
-     "new_name": "recipient_domain",
-     "type": "mutate"
-    },
-    {
-     "data_type": "String",
-     "expression": {
       "expression": "if_else((category == 'delivery') | (category == 'queue'), sender_domain, recipient_domain)",
       "type": "expression"
      },
      "new_name": "tenant_domain",
-     "type": "mutate"
-    },
-    {
-     "data_type": "Decimal",
-     "expression": {
-      "expression": "json_value(data, 'elapsed', 'float')",
-      "type": "expression"
-     },
-     "new_name": "elapsed",
      "type": "mutate"
     },
     {
