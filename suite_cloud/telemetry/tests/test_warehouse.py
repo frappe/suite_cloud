@@ -126,6 +126,16 @@ class TestWarehouse(IntegrationTestCase):
         self.assertEqual((self.count(EVENTS), self.count(METRICS)), (4, 1))
         self.assertEqual(self.spool.get_pending(EVENTS, 10) + self.spool.get_pending(METRICS, 10), [])
 
+    def test_the_first_load_into_a_new_store_creates_its_tables(self) -> None:
+        Path(get_files_path(f"{self.name}.duckdb", is_private=1)).unlink()
+        self.warehouse.ensure_data_source()
+        self.stage(EVENTS, [event()])
+
+        added = self.warehouse.load_pending()
+
+        self.assertEqual(added, {"events": 1})
+        self.assertEqual((self.count(EVENTS), self.count(METRICS)), (1, 0))
+
     def test_a_load_extracts_the_event_data_the_dashboards_read(self) -> None:
         self.stage(
             EVENTS,
