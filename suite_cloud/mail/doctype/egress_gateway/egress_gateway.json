@@ -186,10 +186,9 @@
    "label": "Admin Password"
   },
   {
-   "description": "Generated on save. The agent on the gateway reads Stalwart's Prometheus metrics with it.",
+   "description": "Generated on save, unique per gateway. The agent signs in with it when the cluster has Prometheus metrics enabled.",
    "fieldname": "metrics_password",
    "fieldtype": "Password",
-   "hidden": 1,
    "label": "Metrics Password"
   },
   {
@@ -277,7 +276,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-10-21 12:00:00.000000",
+ "modified": "2026-10-22 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress Gateway",

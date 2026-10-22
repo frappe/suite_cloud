@@ -51,7 +51,7 @@ def agent_config(server: Document) -> dict:
         ],
         "metrics": {"interval_seconds": cint(get_config("agent_metrics_interval_seconds")), "mounts": ["/"]},
     }
-    if has_https_listener(server):
+    if scrapes_metrics(server):
         owner = server if server.doctype == "Egress Gateway" else server.get_cluster()
         config["metrics"]["stalwart"] = {
             "url": PROMETHEUS_URL,
@@ -63,9 +63,12 @@ def agent_config(server: Document) -> dict:
     return config
 
 
-def has_https_listener(server: Document) -> bool:
-    """A gateway keeps every listener on; an outbound-only node runs none, so nothing to scrape."""
+def scrapes_metrics(server: Document) -> bool:
+    """The cluster's switch turns the exporter on. A gateway keeps every listener on; an
+    outbound-only node runs none, so there is nothing to scrape."""
 
+    if not server.get_cluster().enable_metrics:
+        return False
     return server.doctype == "Egress Gateway" or (server.role or "full") != "outbound"
 
 

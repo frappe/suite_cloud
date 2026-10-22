@@ -53,6 +53,7 @@ class StalwartCluster(Document):
         default_egress_pool: DF.Link | None
         dns_zone: DF.Link
         drift_report: DF.JSON | None
+        enable_metrics: DF.Check
         enabled: DF.Check
         hostname: DF.Data
         in_memory_store: DF.Link | None

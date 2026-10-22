@@ -35,7 +35,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 | `metrics.enabled` | `true` | Host and Stalwart metrics |
 | `metrics.interval_seconds` | **Metrics Interval (Seconds)** | One metrics batch per interval |
 | `metrics.mounts` | `["/"]` | Mounts reported as `host.disk.*` |
-| `metrics.stalwart` | The cluster's metrics password | Absent on an outbound-only node, which has no listener |
+| `metrics.stalwart` | **Enable Prometheus Metrics** and **Metrics Password** of the cluster or gateway | Absent when the cluster has the switch off, and on an outbound-only node, which has no listener |
 
 `suite-cloud-agent --config <path> --check` validates the file, the state directory and the log paths without a request. `--version` prints the version.
 
@@ -67,7 +67,7 @@ The service runs as the `stalwart` user, since the log directory belongs to it, 
 
 Provisioning installs the agent as part of every Provision, Upgrade and Re-provision job of a node or gateway, after Stalwart. The job copies the binary of the node's architecture from the bench host, writes `config.json` and the unit, and restarts the agent when any of them changed. When the **Telemetry Secret** is empty or no agent build exists, the job stops and disables the agent on the node instead, and an Error Log names the missing build. **Install Agent** on a Stalwart Node or Egress Gateway runs that step on its own, without draining or restarting Stalwart; **Upgrade Agents** on a Stalwart Cluster runs it on every Active node and gateway. After a secret rotation, run Upgrade Agents within the day the previous secret stays accepted.
 
-Stalwart's Prometheus endpoint is part of the cluster plan: it is turned on with the user `telemetry` and a password generated per cluster and per gateway, and reaches existing clusters with their next Sync Config.
+Stalwart's Prometheus endpoint is part of the cluster plan. **Enable Prometheus Metrics** on the Stalwart Cluster, on by default, turns it on with the user `telemetry` and the **Metrics Password** generated per cluster and per gateway; off, the exporter is disabled on every node and gateway of the cluster and the agents report host metrics only. A change reaches Stalwart with the next Sync Config, and the agents with the next Install Agent or Upgrade Agents job.
 
 ## Building
 

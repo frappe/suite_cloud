@@ -205,6 +205,16 @@ class TestAgentDeploy(AgentBuildFixture):
         outbound = make_node(self.cluster, ipv4="203.0.113.11", role="outbound")
         self.assertNotIn("stalwart", deploy.agent_config(outbound)["metrics"])
 
+        # The cluster's switch turns the scrape off for its nodes and gateways alike.
+        self.cluster.db_set("enable_metrics", 0)
+        try:
+            for server in (self.node, self.gateway):
+                self.assertNotIn(
+                    "stalwart", deploy.agent_config(frappe.get_doc(server.doctype, server.name))["metrics"]
+                )
+        finally:
+            self.cluster.db_set("enable_metrics", 1)
+
     def test_agent_variables_follow_the_settings_and_the_build(self) -> None:
         self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])  # no build yet
         version = self.build().run()

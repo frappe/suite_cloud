@@ -369,6 +369,16 @@ class TestEgress(IntegrationTestCase):
             operations["Metrics"]["value"]["prometheus"]["authSecret"]["secret"], gateway_password
         )
         self.assertNotEqual(gateway_password, self.cluster.get_password("metrics_password"))
+        # The gateway's exporter follows the cluster's switch.
+        self.cluster.db_set("enable_metrics", 0)
+        try:
+            off = {
+                op["object"]: op
+                for op in egress.gateway_plan(frappe.get_doc("Egress Gateway", self.gateway.name))
+            }
+            self.assertEqual(off["Metrics"]["value"], {"prometheus": {"@type": "Disabled"}})
+        finally:
+            self.cluster.db_set("enable_metrics", 1)
         self.assertEqual(role["listeners"], {"@type": "EnableAll"})  # the firewall limits exposure
         # The gateway's own domain: its name, a certificate that also covers every pool hostname,
         # DKIM keys of its own (a domain shared between gateways would publish clashing selectors)

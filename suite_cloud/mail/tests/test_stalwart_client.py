@@ -256,6 +256,7 @@ class TestStalwartClient(UnitTestCase):
             _drifted("Metrics", off, operation["value"]), [{"object": "Metrics", "property": "prometheus"}]
         )
         self.assertRaises(ValueError, metrics_operation, "")
+        self.assertEqual(metrics_operation("", enabled=False)["value"], {"prometheus": {"@type": "Disabled"}})
 
     def test_plan_apply_resends_secrets_without_counting_them_as_changes(self) -> None:
         plan = [

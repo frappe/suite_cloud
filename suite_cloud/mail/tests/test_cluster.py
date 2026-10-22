@@ -593,6 +593,10 @@ class TestStalwartCluster(IntegrationTestCase):
         )
         self.assertIn(metrics_password, plan.secret_strings(plan.cluster_plan(cluster)))
         self.assertNotIn(metrics_password, plan.redacted(plan.cluster_plan(cluster)))
+        cluster.enable_metrics = 0
+        off = {op["object"]: op for op in plan.cluster_plan(cluster)}
+        self.assertEqual(off["Metrics"]["value"], {"prometheus": {"@type": "Disabled"}})
+        cluster.enable_metrics = 1
         self.assertEqual(operations["Coordinator"]["value"], {"@type": "Default"})
         self.assertEqual(set(operations["ClusterRole"]["value"]), {"full", "frontend", "outbound"})
         self.assertNotIn("DnsServer", operations)  # no DNS provider configured in tests

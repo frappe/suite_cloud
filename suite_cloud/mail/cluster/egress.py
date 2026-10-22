@@ -395,7 +395,11 @@ def gateway_plan(gateway: Document) -> list[dict]:
         )
     operations.extend(gateway_defaults_plan())
     operations.append(plan.tracer_operation())
-    operations.append(plan.metrics_operation(gateway.get_password("metrics_password")))
+    operations.append(
+        plan.metrics_operation(
+            gateway.get_password("metrics_password"), bool(gateway.get_cluster().enable_metrics)
+        )
+    )
     operations.append(
         {
             "@type": "update",
