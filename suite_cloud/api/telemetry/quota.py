@@ -73,8 +73,9 @@ def limits(host_ip: str, since_version: str | None = None) -> dict:
 @frappe.whitelist(methods=["POST"])
 @telemetry_api
 def usage(host_ip: str, records: list) -> dict:
-    """Stores reported totals: ``{account, period, sent}`` each. Accounts of other clusters and
-    periods other than today, this month and the ones before are dropped."""
+    """Stores reported totals: ``{account, period, sent, refused}`` each, ``refused`` counting
+    messages refused over a limit. Accounts of other clusters and periods other than today, this
+    month and the ones before are dropped."""
 
     cluster = get_cluster_for_host(host_ip)
     rows = [parse_usage(record) for record in get_records(records)]
@@ -130,11 +131,13 @@ def parse_cursor(value: str) -> tuple[datetime, str]:
 
 
 def parse_usage(record: Record) -> dict:
-    sent = record.number("sent", required=True, integer=True)
-    if sent < 0:
-        record.refuse("sent", _("must not be negative"))
+    counts = {}
+    for key in ("sent", "refused"):
+        counts[key] = record.number(key, required=key == "sent", integer=True) or 0
+        if counts[key] < 0:
+            record.refuse(key, _("must not be negative"))
     return {
         "account": record.text("account", required=True, limit=320).lower(),
         "period": record.text("period", required=True, limit=10),
-        "sent": sent,
+        **counts,
     }

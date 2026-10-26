@@ -315,7 +315,8 @@ def account_payload(
     send_usage: dict[str, int],
 ) -> dict:
     """The API shape of an account, from a document or a query row plus its related rows.
-    ``send_usage`` is what the Agents last reported for the UTC day and month."""
+    ``send_usage`` is what the Agents last reported for the UTC day and month: recipients sent
+    and messages refused over a limit."""
 
     return {
         "email": row.email,

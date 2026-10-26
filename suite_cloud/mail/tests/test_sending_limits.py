@@ -100,9 +100,12 @@ class TestLimitsApi(SendingLimitsTestCase):
 
 
 class TestUsageApi(SendingLimitsTestCase):
-    def push(self, *records: tuple[str, str, int]) -> dict:
+    def push(self, *records: tuple) -> dict:
+        """``(account, period, sent)`` or ``(account, period, sent, refused)`` each."""
+
         self.as_agent()
-        return quota_api.usage(NODE_IP, [{"account": a, "period": p, "sent": s} for a, p, s in records])
+        keys = ("account", "period", "sent", "refused")
+        return quota_api.usage(NODE_IP, [dict(zip(keys, record, strict=False)) for record in records])
 
     def sent(self, account: str, period: str) -> int | None:
         return frappe.db.get_value("Mail Send Usage", f"{account}:{period}", "sent")
@@ -115,6 +118,11 @@ class TestUsageApi(SendingLimitsTestCase):
         self.push(("alice@acme.com", day, 7))
         self.assertEqual((self.sent("alice@acme.com", day), self.sent("alice@acme.com", month)), (7, 40))
 
+        # Refusals are kept the same way, and an Agent that sends none leaves them as they are.
+        self.push(("alice@acme.com", day, 7, 2))
+        self.push(("alice@acme.com", day, 7, 1), ("alice@acme.com", day, 7))
+        self.assertEqual(frappe.db.get_value("Mail Send Usage", f"alice@acme.com:{day}", "refused"), 2)
+
     def test_unknown_accounts_and_old_periods_are_dropped(self) -> None:
         day, _month = current_periods()
         old_day, _old_month = periods_at(datetime.now(UTC) - timedelta(days=3))
@@ -125,24 +133,26 @@ class TestUsageApi(SendingLimitsTestCase):
         self.assertEqual(self.sent("alice@acme.com", day), 1)
         self.assertIsNone(self.sent("bob@acme.com", old_day))
         self.assertRaises(InvalidInputError, self.push, ("bob@acme.com", day, -1))
+        self.assertRaises(InvalidInputError, self.push, ("bob@acme.com", day, 1, -1))
 
     def test_form_and_api_show_the_usage_and_delete_takes_it(self) -> None:
         day, month = current_periods()
-        self.push(("alice@acme.com", day, 80), ("alice@acme.com", month, 900))
+        self.push(("alice@acme.com", day, 80, 3), ("alice@acme.com", month, 900, 5))
+        usage = {"day": 80, "month": 900, "refused_day": 3, "refused_month": 5}
         frappe.set_user("Administrator")
         doc = frappe.get_doc("Mail Account", "alice@acme.com")
         doc.run_method("onload")
-        self.assertEqual(doc.get_onload().send_usage, {"day": 80, "month": 900})
+        self.assertEqual(doc.get_onload().send_usage, usage)
 
         self.act_as(self.tenant)
         payload = accounts.get_account("alice@acme.com")
         self.assertEqual(
             (payload["daily_send_limit"], payload["monthly_send_limit"], payload["send_usage"]),
-            (100, 0, {"day": 80, "month": 900}),
+            (100, 0, usage),
         )
         listed = {item["email"]: item for item in accounts.list_accounts()["items"]}
-        self.assertEqual(listed["alice@acme.com"]["send_usage"], {"day": 80, "month": 900})
-        self.assertEqual(listed["bob@acme.com"]["send_usage"], {"day": 0, "month": 0})
+        self.assertEqual(listed["alice@acme.com"]["send_usage"], usage)
+        self.assertEqual(listed["bob@acme.com"]["send_usage"], dict.fromkeys(usage, 0))
 
         accounts.delete_account("alice@acme.com")
         self.assertFalse(frappe.db.exists("Mail Send Usage", {"account": "alice@acme.com"}))
@@ -151,7 +161,9 @@ class TestUsageApi(SendingLimitsTestCase):
         yesterday = datetime.now(UTC) - timedelta(days=1)
         old = datetime.now(UTC) - timedelta(days=40)
         rows = [*periods_at(yesterday), *current_periods(), *periods_at(old)]
-        upsert_usage([{"account": "alice@acme.com", "period": period, "sent": 1} for period in set(rows)])
+        upsert_usage(
+            [{"account": "alice@acme.com", "period": period, "sent": 1, "refused": 0} for period in set(rows)]
+        )
         prune_usage()
         kept = set(frappe.get_all("Mail Send Usage", {"account": "alice@acme.com"}, pluck="period"))
         self.assertEqual(kept, {*periods_at(yesterday), *current_periods()})

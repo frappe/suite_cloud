@@ -125,6 +125,7 @@ type usageRecord struct {
 	Account string `json:"account"`
 	Period  string `json:"period"`
 	Sent    int64  `json:"sent"`
+	Refused int64  `json:"refused"`
 }
 
 // Run pushes on every tick, and once more on the way out.
@@ -166,7 +167,10 @@ func (u *Usage) Push(ctx context.Context) error {
 		records := make([]usageRecord, 0, len(batch)*recordsPerAccount)
 		for _, account := range batch {
 			count := counts[account]
-			records = append(records, usageRecord{account, periods.Day, count.Day}, usageRecord{account, periods.Month, count.Month})
+			records = append(records,
+				usageRecord{account, periods.Day, count.Day, count.RefusedDay},
+				usageRecord{account, periods.Month, count.Month, count.RefusedMonth},
+			)
 		}
 		var answer struct{}
 		if err := u.Caller.Call(ctx, usageMethod, map[string]any{"host_ip": u.HostIP, "records": records}, &answer); err != nil {

@@ -102,8 +102,8 @@ func (h *Hook) check(ctx context.Context, account string, recipients int64) (hoo
 	if err != nil {
 		return hookAnswer{}, err
 	}
+	h.Touched.Add(account)
 	if verdict == Accepted {
-		h.Touched.Add(account)
 		return hookAnswer{Action: "accept"}, nil
 	}
 	h.Logger.Info("message over the sending limit", "account", account, "recipients", recipients, "over", verdict.String())

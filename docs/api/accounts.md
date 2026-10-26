@@ -43,7 +43,7 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
   "used_disk_bytes": 734003200,
   "daily_send_limit": 500,
   "monthly_send_limit": 10000,
-  "send_usage": { "day": 120, "month": 2340 },
+  "send_usage": { "day": 120, "month": 2340, "refused_day": 0, "refused_month": 3 },
   "locale": "en-US",
   "time_zone": "Europe/Berlin",
   "aliases": [ { "email": "j.doe@acme.example", "enabled": true, "description": null } ],
@@ -63,7 +63,7 @@ An account's disk quota is whatever the tenant sets: `disk_quota_gb` of 0, or no
 
 ### Send limits
 
-`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50, and 0 means no limit. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about a minute. `send_usage` is what the account sent today and this month, as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits; `update_account` leaves out what it is not given.
+`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50, and 0 means no limit. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about a minute. `send_usage` is what the account sent today and this month, in recipients, and how many of its messages were refused over a limit (`refused_day`, `refused_month`), as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits; `update_account` leaves out what it is not given.
 
 ### Aliases
 

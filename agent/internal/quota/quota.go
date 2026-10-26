@@ -45,17 +45,20 @@ func (v Verdict) String() string {
 	return [...]string{"accepted", "daily", "monthly"}[v]
 }
 
-// Count is what an account sent in the current day and month.
+// Count is what an account sent in the current day and month, in recipients, and how many of
+// its messages were refused.
 type Count struct {
-	Day   int64
-	Month int64
+	Day          int64
+	Month        int64
+	RefusedDay   int64
+	RefusedMonth int64
 }
 
 // Store holds the limits and the counters. Every Agent of a cluster shares one, so a limit holds
 // across nodes.
 type Store interface {
 	// Add counts n recipients in both periods, unless that takes the account over a limit; then
-	// nothing is counted and the limit that refused it is returned.
+	// only the refused message is counted, and the limit that refused it is returned.
 	Add(ctx context.Context, account string, n int64, periods Periods) (Verdict, Limit, error)
 	// SetLimits stores each entry whose version is newer than the stored one.
 	SetLimits(ctx context.Context, limits map[string]Limit) error

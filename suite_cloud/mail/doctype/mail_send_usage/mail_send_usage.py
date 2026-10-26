@@ -22,6 +22,7 @@ class MailSendUsage(Document):
 
         account: DF.Link
         period: DF.Data
+        refused: DF.Int
         reported_at: DF.Datetime | None
         sent: DF.Int
     # end: auto-generated types
@@ -48,25 +49,29 @@ def reportable_periods() -> set[str]:
 
 
 def sent_by_account(accounts: list[str]) -> dict[str, dict[str, int]]:
-    """``{account: {"day": n, "month": n}}`` for the current periods, in one query."""
+    """``{account: {day, month, refused_day, refused_month}}`` for the current periods: recipients
+    sent and messages refused, in one query."""
 
     day, month = current_periods()
-    usage = {account: {"day": 0, "month": 0} for account in accounts}
+    usage = {account: {"day": 0, "month": 0, "refused_day": 0, "refused_month": 0} for account in accounts}
     if not accounts:
         return usage
     rows = frappe.get_all(
         "Mail Send Usage",
         filters={"account": ("in", accounts), "period": ("in", (day, month))},
-        fields=["account", "period", "sent"],
+        fields=["account", "period", "sent", "refused"],
     )
     for row in rows:
-        usage[row.account]["day" if row.period == day else "month"] = row.sent
+        key = "day" if row.period == day else "month"
+        usage[row.account][key] = row.sent
+        usage[row.account][f"refused_{key}"] = row.refused
     return usage
 
 
 def upsert_usage(rows: list[dict]) -> None:
-    """Stores ``{account, period, sent}`` rows in one statement. Agents on several nodes report the
-    same counter, and a counter only grows within its period, so the higher count is kept."""
+    """Stores ``{account, period, sent, refused}`` rows in one statement. Agents on several nodes
+    report the same counters, and a counter only grows within its period, so the higher count is
+    kept."""
 
     if not rows:
         return
@@ -74,15 +79,16 @@ def upsert_usage(rows: list[dict]) -> None:
     user = frappe.session.user
     values = []
     for row in rows:
-        values += [f"{row['account']}:{row['period']}", row["account"], row["period"], row["sent"], now]
-        values += [now, now, user, user]
-    placeholders = ", ".join(["(%s, %s, %s, %s, %s, %s, %s, %s, %s)"] * len(rows))
+        values += [f"{row['account']}:{row['period']}", row["account"], row["period"], row["sent"]]
+        values += [row["refused"], now, now, now, user, user]
+    placeholders = ", ".join(["(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"] * len(rows))
     frappe.db.sql(
         f"""insert into `tabMail Send Usage`
-            (name, account, period, sent, reported_at, creation, modified, owner, modified_by)
+            (name, account, period, sent, refused, reported_at, creation, modified, owner, modified_by)
         values {placeholders}
         on duplicate key update
             sent = greatest(sent, values(sent)),
+            refused = greatest(refused, values(refused)),
             reported_at = values(reported_at),
             modified = values(modified)""",
         values,

@@ -133,7 +133,7 @@ The Agent on a Stalwart node uses two more methods to enforce the [sending limit
 
 `daily` and `monthly` are recipients per UTC day and month; 0 means no limit. `version` is the account's modified time, so an older entry never replaces a newer one. Send `next_version` as the next `since_version`, and an empty one to read everything again. A save is served once it is 5 seconds old.
 
-`telemetry.quota.usage` takes `host_ip` and `records`, each `{"account", "period", "sent"}`, where `period` is `d:YYYYMMDD` or `m:YYYYMM` and `sent` the counter's current value. Suite Cloud keeps the higher of the stored and the reported count, since several nodes report the same counter and it only grows within its period. Accounts of other clusters, and periods other than today, yesterday and their months, are dropped. It answers `{"data": {"accepted": n}}`.
+`telemetry.quota.usage` takes `host_ip` and `records`, each `{"account", "period", "sent", "refused"}`, where `period` is `d:YYYYMMDD` or `m:YYYYMM`, `sent` the recipients counted so far and `refused` the messages refused over a limit, 0 when left out. Suite Cloud keeps the higher of the stored and the reported count, since several nodes report the same counter and it only grows within its period. Accounts of other clusters, and periods other than today, yesterday and their months, are dropped. It answers `{"data": {"accepted": n}}`.
 
 ## Alerts
 

@@ -48,7 +48,7 @@ func TestHookCountsRecipientsAndAccepts(t *testing.T) {
 		t.Fatalf("%d %+v", recorder.Code, answer)
 	}
 	counts, _ := store.Counts(context.Background(), []string{"a@example.com"}, PeriodsAt(hook.Now()))
-	if counts["a@example.com"] != (Count{2, 2}) {
+	if counts["a@example.com"] != (Count{Day: 2, Month: 2}) {
 		t.Fatalf("counts %+v", counts)
 	}
 	if touched := hook.Touched.Take(); len(touched) != 1 || touched[0] != "a@example.com" {
@@ -59,7 +59,8 @@ func TestHookCountsRecipientsAndAccepts(t *testing.T) {
 func TestHookRejectsInStalwartsShape(t *testing.T) {
 	store, _ := OpenMemory(t.TempDir())
 	setLimit(t, store, "a@example.com", 1, 0, "1")
-	recorder, _ := call(newHook(t, store), "Bearer t0ken", strings.Replace(hookRequest, "%s", "hi", 1))
+	hook := newHook(t, store)
+	recorder, _ := call(hook, "Bearer t0ken", strings.Replace(hookRequest, "%s", "hi", 1))
 	var raw map[string]any
 	json.Unmarshal(recorder.Body.Bytes(), &raw)
 	response, _ := raw["response"].(map[string]any)
@@ -68,6 +69,9 @@ func TestHookRejectsInStalwartsShape(t *testing.T) {
 	}
 	if !strings.Contains(response["message"].(string), "Daily sending limit of 1 recipients") {
 		t.Fatalf("message %v", response["message"])
+	}
+	if touched := hook.Touched.Take(); len(touched) != 1 {
+		t.Fatalf("a refused account must be pushed too: %v", touched)
 	}
 }
 

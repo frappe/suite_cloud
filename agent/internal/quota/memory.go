@@ -22,6 +22,18 @@ type memoryData struct {
 	Version int                         `json:"version"`
 	Limits  map[string]Limit            `json:"limits"`
 	Usage   map[string]map[string]int64 `json:"usage"`
+	Refused map[string]map[string]int64 `json:"refused"`
+}
+
+// counters is an account's counters by period, created on first use.
+func counters(all *map[string]map[string]int64, account string) map[string]int64 {
+	if *all == nil {
+		*all = map[string]map[string]int64{}
+	}
+	if (*all)[account] == nil {
+		(*all)[account] = map[string]int64{}
+	}
+	return (*all)[account]
 }
 
 // MemoryStore is the store of a single-node cluster: one Agent, so one lock makes each check
@@ -55,23 +67,22 @@ func (m *MemoryStore) Add(_ context.Context, account string, n int64, periods Pe
 	defer m.mu.Unlock()
 	limit := m.data.Limits[account]
 	usage := m.data.Usage[account]
+	verdict := Accepted
 	switch {
 	case limit.Daily > 0 && usage[periods.Day]+n > limit.Daily:
-		return OverDaily, limit, nil
+		verdict = OverDaily
 	case limit.Monthly > 0 && usage[periods.Month]+n > limit.Monthly:
-		return OverMonthly, limit, nil
+		verdict = OverMonthly
 	}
-	if usage == nil {
-		if m.data.Usage == nil {
-			m.data.Usage = map[string]map[string]int64{}
-		}
-		usage = map[string]int64{}
-		m.data.Usage[account] = usage
+	counted, by := n, &m.data.Usage
+	if verdict != Accepted {
+		counted, by = 1, &m.data.Refused
 	}
-	usage[periods.Day] += n
-	usage[periods.Month] += n
+	accountCounters := counters(by, account)
+	accountCounters[periods.Day] += counted
+	accountCounters[periods.Month] += counted
 	m.dirty = true
-	return Accepted, limit, nil
+	return verdict, limit, nil
 }
 
 func (m *MemoryStore) SetLimits(_ context.Context, limits map[string]Limit) error {
@@ -117,8 +128,8 @@ func (m *MemoryStore) Counts(_ context.Context, accounts []string, periods Perio
 	defer m.mu.Unlock()
 	counts := make(map[string]Count, len(accounts))
 	for _, account := range accounts {
-		usage := m.data.Usage[account]
-		counts[account] = Count{Day: usage[periods.Day], Month: usage[periods.Month]}
+		usage, refused := m.data.Usage[account], m.data.Refused[account]
+		counts[account] = Count{usage[periods.Day], usage[periods.Month], refused[periods.Day], refused[periods.Month]}
 	}
 	return counts, nil
 }
@@ -147,19 +158,24 @@ func (m *MemoryStore) Save() error {
 		return nil
 	}
 	periods := PeriodsAt(m.now())
-	for account, usage := range m.data.Usage {
-		for period := range usage {
-			if period != periods.Day && period != periods.Month {
-				delete(usage, period)
-			}
-		}
-		if len(usage) == 0 {
-			delete(m.data.Usage, account)
-		}
-	}
+	prune(m.data.Usage, periods)
+	prune(m.data.Refused, periods)
 	if err := state.WriteFile(m.dir, memoryFileName, m.data); err != nil {
 		return err
 	}
 	m.dirty = false
 	return nil
+}
+
+func prune(all map[string]map[string]int64, periods Periods) {
+	for account, byPeriod := range all {
+		for period := range byPeriod {
+			if period != periods.Day && period != periods.Month {
+				delete(byPeriod, period)
+			}
+		}
+		if len(byPeriod) == 0 {
+			delete(all, account)
+		}
+	}
 }

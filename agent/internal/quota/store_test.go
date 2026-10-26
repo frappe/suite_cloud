@@ -80,8 +80,8 @@ func TestStoreReachingTheLimitIsAcceptedAndOneOverIsNot(t *testing.T) {
 				t.Fatalf("one over: %v %+v", verdict, limit)
 			}
 			counts, _ := store.Counts(context.Background(), []string{"a@example.com"}, october)
-			if counts["a@example.com"] != (Count{10, 10}) {
-				t.Fatalf("a refused message was counted: %+v", counts)
+			if counts["a@example.com"] != (Count{Day: 10, Month: 10, RefusedDay: 1, RefusedMonth: 1}) {
+				t.Fatalf("a refused message counted as sent, or not as refused: %+v", counts)
 			}
 		})
 	}

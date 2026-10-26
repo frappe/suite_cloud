@@ -21,19 +21,21 @@ const (
 )
 
 // Every key of an account shares the hash tag {account}, so the scripts work on Redis Cluster.
+// KEYS: day and month counters, limit hash, refused day and month counters.
 var addScript = redis.NewScript(`
 local n = tonumber(ARGV[1])
 local lim = redis.call('HMGET', KEYS[3], 'daily', 'monthly')
 local dl, ml = tonumber(lim[1]) or 0, tonumber(lim[2]) or 0
 local d = tonumber(redis.call('GET', KEYS[1]) or '0')
 local m = tonumber(redis.call('GET', KEYS[2]) or '0')
-if dl > 0 and d + n > dl then return {1, dl, ml} end
-if ml > 0 and m + n > ml then return {2, dl, ml} end
-redis.call('INCRBY', KEYS[1], n)
-redis.call('EXPIRE', KEYS[1], ARGV[2])
-redis.call('INCRBY', KEYS[2], n)
-redis.call('EXPIRE', KEYS[2], ARGV[3])
-return {0, dl, ml}
+local verdict, day, month = 0, KEYS[1], KEYS[2]
+if dl > 0 and d + n > dl then verdict = 1 elseif ml > 0 and m + n > ml then verdict = 2 end
+if verdict > 0 then n, day, month = 1, KEYS[4], KEYS[5] end
+redis.call('INCRBY', day, n)
+redis.call('EXPIRE', day, ARGV[2])
+redis.call('INCRBY', month, n)
+redis.call('EXPIRE', month, ARGV[3])
+return {verdict, dl, ml}
 `)
 
 var setLimitScript = redis.NewScript(`
@@ -108,8 +110,15 @@ func limitKey(account string) string { return "sca:quota:limit:{" + account + "}
 
 func counterKey(account, period string) string { return "sca:quota:{" + account + "}:" + period }
 
+func refusedKey(account, period string) string {
+	return "sca:quota:{" + account + "}:refused:" + period
+}
+
 func (r *RedisStore) Add(ctx context.Context, account string, n int64, periods Periods) (Verdict, Limit, error) {
-	keys := []string{counterKey(account, periods.Day), counterKey(account, periods.Month), limitKey(account)}
+	keys := []string{
+		counterKey(account, periods.Day), counterKey(account, periods.Month), limitKey(account),
+		refusedKey(account, periods.Day), refusedKey(account, periods.Month),
+	}
 	result, err := addScript.Run(ctx, r.client, keys, n, int(dayTTL.Seconds()), int(monthTTL.Seconds())).Int64Slice()
 	if err != nil {
 		return Accepted, Limit{}, err
@@ -153,20 +162,25 @@ func (r *RedisStore) Accounts(ctx context.Context) ([]string, error) {
 
 func (r *RedisStore) Counts(ctx context.Context, accounts []string, periods Periods) (map[string]Count, error) {
 	pipe := r.client.Pipeline()
-	days := make([]*redis.StringCmd, len(accounts))
-	months := make([]*redis.StringCmd, len(accounts))
+	reads := make([][4]*redis.StringCmd, len(accounts))
 	for i, account := range accounts {
-		days[i] = pipe.Get(ctx, counterKey(account, periods.Day))
-		months[i] = pipe.Get(ctx, counterKey(account, periods.Month))
+		reads[i] = [4]*redis.StringCmd{
+			pipe.Get(ctx, counterKey(account, periods.Day)),
+			pipe.Get(ctx, counterKey(account, periods.Month)),
+			pipe.Get(ctx, refusedKey(account, periods.Day)),
+			pipe.Get(ctx, refusedKey(account, periods.Month)),
+		}
 	}
 	if _, err := pipe.Exec(ctx); err != nil && err != redis.Nil {
 		return nil, err
 	}
 	counts := make(map[string]Count, len(accounts))
 	for i, account := range accounts {
-		day, _ := days[i].Int64() // a missing counter is 0
-		month, _ := months[i].Int64()
-		counts[account] = Count{Day: day, Month: month}
+		var values [4]int64
+		for j, read := range reads[i] {
+			values[j], _ = read.Int64() // a missing counter is 0
+		}
+		counts[account] = Count{values[0], values[1], values[2], values[3]}
 	}
 	return counts, nil
 }

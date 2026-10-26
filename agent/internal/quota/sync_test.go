@@ -103,6 +103,8 @@ func TestPushSendsDayAndMonthOfTouchedAccounts(t *testing.T) {
 		add(t, store, account, 3, periods)
 		usage.Touched.Add(account)
 	}
+	setLimit(t, store, "a@example.com", 3, 0, "1")
+	add(t, store, "a@example.com", 1, periods) // refused
 	if err := usage.Push(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -116,6 +118,9 @@ func TestPushSendsDayAndMonthOfTouchedAccounts(t *testing.T) {
 		first, second := records[0].(map[string]any), records[1].(map[string]any)
 		if first["period"] != "d:20261026" || second["period"] != "m:202610" || first["sent"] != 3.0 {
 			t.Fatalf("records %v", records)
+		}
+		if refused := map[any]float64{"a@example.com": 1, "b@example.com": 0}[first["account"]]; first["refused"] != refused || second["refused"] != refused {
+			t.Fatalf("refused %v", records)
 		}
 		accounts = append(accounts, first["account"].(string))
 	}
