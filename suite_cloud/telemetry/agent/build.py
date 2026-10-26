@@ -18,7 +18,8 @@ JOB_ID = "agent-build"
 BUILD_TIMEOUT = 600  # seconds, per architecture
 GO_FALLBACK = "/usr/local/go/bin/go"
 ARCHITECTURES = {"x86_64": "amd64", "aarch64": "arm64"}  # ansible_architecture -> GOARCH
-SOURCE_GLOBS = ("VERSION", "go.mod", "**/*.go")
+SOURCE_GLOBS = ("VERSION", "go.mod", "go.sum", "vendor/modules.txt", "**/*.go")
+QUOTA_RELEASE = (0, 2, 0)  # the first release that answers the sending-limit hook
 
 
 class AgentBuildError(Exception):
@@ -63,6 +64,13 @@ class AgentBuild:
         if self.pinned_version:
             return self.pinned_version
         return f"{(self.source / 'VERSION').read_text().strip()}+{self.source_digest[:8]}"
+
+    @property
+    def has_quota(self) -> bool:
+        """Older builds refuse a config.json with a quota section, so it waits for this one."""
+
+        release = self.version.split("+", 1)[0]
+        return tuple(int(part) for part in release.split(".")) >= QUOTA_RELEASE
 
     @property
     def source_digest(self) -> str:
@@ -115,7 +123,7 @@ class AgentBuild:
             "GOOS": "linux",
             "GOARCH": goarch,
             "GOCACHE": str(self.root / ".gocache"),
-            "GOFLAGS": "-mod=mod",
+            "GOFLAGS": "-mod=vendor",
             "GOTOOLCHAIN": "local",
         }
         command = [

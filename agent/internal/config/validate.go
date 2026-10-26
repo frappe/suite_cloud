@@ -91,7 +91,36 @@ func (c *Config) Validate() error {
 			fail("metrics.stalwart.username and password are required")
 		}
 	}
+	if q := c.Quota; q != nil {
+		validateQuota(fail, q)
+	}
 	return errors.Join(problems...)
+}
+
+func validateQuota(fail func(string, ...any), q *Quota) {
+	checkRange(fail, "quota.hook_port", q.HookPort, 1024, 65535)
+	if strings.TrimSpace(q.HookToken) == "" {
+		fail("quota.hook_token is required")
+	}
+	checkRange(fail, "quota.limits_poll_seconds", q.LimitsPollSeconds, 5, 3600)
+	checkRange(fail, "quota.usage_push_seconds", q.UsagePushSeconds, 5, 3600)
+	switch q.Store.Type {
+	case "memory":
+	case "redis", "redis_cluster", "redis_sentinel":
+		if len(q.Store.URLs) == 0 {
+			fail("quota.store.urls is required for %s", q.Store.Type)
+		}
+		for _, raw := range q.Store.URLs {
+			if parsed, err := url.Parse(raw); err != nil || parsed.Scheme != "redis" && parsed.Scheme != "rediss" || parsed.Host == "" {
+				fail("quota.store.urls: %q must be a redis:// or rediss:// URL", raw)
+			}
+		}
+		if q.Store.Type == "redis" && len(q.Store.URLs) != 1 {
+			fail("quota.store.urls must hold one URL for redis")
+		}
+	default:
+		fail("quota.store.type must be memory, redis, redis_cluster or redis_sentinel")
+	}
 }
 
 // Summary describes the config for the startup log without its secrets.
@@ -104,6 +133,9 @@ func (c *Config) Summary() string {
 		fmt.Fprintf(&b, " log[%s]=%s format=%s ship_existing=%t delete_after_days=%d", log.Name, log.Path, log.Format, log.ShipExisting, log.DeleteAfterDays)
 	}
 	fmt.Fprintf(&b, " metrics=%t interval=%ds stalwart_scrape=%t", c.Metrics.IsEnabled(), c.Metrics.IntervalSeconds, c.Metrics.Stalwart != nil)
+	if q := c.Quota; q != nil {
+		fmt.Fprintf(&b, " quota_port=%d quota_token=%s quota_store=%s", q.HookPort, setOrNot(q.HookToken), q.Store.Type)
+	}
 	return b.String()
 }
 

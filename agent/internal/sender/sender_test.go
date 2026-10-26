@@ -233,3 +233,32 @@ func TestErrorMessage(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+func TestCallDecodesTheAnswerData(t *testing.T) {
+	server, requests := newServer(t, 200)
+	s, _ := newSender(t, server.URL, 300, 8)
+	var answer struct {
+		Accepted int `json:"accepted"`
+	}
+	payload := map[string]any{"batch_id": "b", "records": []int{1, 2}}
+	if err := s.Call(context.Background(), "quota.usage", payload, &answer); err != nil {
+		t.Fatal(err)
+	}
+	r := (*requests)[0]
+	if r.path != "/api/v2/method/suite_cloud.api.telemetry.quota.usage" || r.auth != "Bearer s3cret" || answer.Accepted != 2 {
+		t.Fatalf("request %+v answer %+v", r, answer)
+	}
+}
+
+func TestCallMakesOneAttempt(t *testing.T) {
+	for _, status := range []int{400, 429, 500} {
+		server, requests := newServer(t, status, 200)
+		s, _ := newSender(t, server.URL, 300, 8)
+		if err := s.Call(context.Background(), "quota.limits", map[string]any{}, &struct{}{}); err == nil {
+			t.Fatalf("status %d accepted", status)
+		}
+		if len(*requests) != 1 {
+			t.Fatalf("status %d: %d requests", status, len(*requests))
+		}
+	}
+}

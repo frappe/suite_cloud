@@ -1,0 +1,210 @@
+package quota
+
+import (
+	"context"
+	"os"
+	"sync"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/frappe/suite_cloud/agent/internal/config"
+)
+
+var october = PeriodsAt(time.Date(2026, 10, 26, 23, 59, 0, 0, time.UTC))
+
+// stores gives every store under test a fresh, empty instance. Redis runs only when
+// SCA_TEST_REDIS_URL names a server the test may write sca:quota:* keys to.
+func stores(t *testing.T) map[string]func(t *testing.T) Store {
+	t.Helper()
+	all := map[string]func(t *testing.T) Store{
+		"memory": func(t *testing.T) Store {
+			store, err := OpenMemory(t.TempDir())
+			if err != nil {
+				t.Fatal(err)
+			}
+			return store
+		},
+	}
+	if url := os.Getenv("SCA_TEST_REDIS_URL"); url != "" {
+		all["redis"] = func(t *testing.T) Store {
+			store, err := OpenRedis(config.QuotaStore{Type: "redis", URLs: []string{url}})
+			if err != nil {
+				t.Fatal(err)
+			}
+			clearRedis(t, store)
+			t.Cleanup(func() { clearRedis(t, store); store.client.Close() })
+			return store
+		}
+	}
+	return all
+}
+
+func clearRedis(t *testing.T, store *RedisStore) {
+	ctx := context.Background()
+	keys, err := store.client.Keys(ctx, "sca:quota:*").Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(keys) > 0 {
+		store.client.Del(ctx, keys...)
+	}
+}
+
+func setLimit(t *testing.T, store Store, account string, daily, monthly int64, version string) {
+	t.Helper()
+	if err := store.SetLimits(context.Background(), map[string]Limit{account: {daily, monthly, version}}); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func add(t *testing.T, store Store, account string, n int64, periods Periods) Verdict {
+	t.Helper()
+	verdict, _, err := store.Add(context.Background(), account, n, periods)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return verdict
+}
+
+func TestStoreReachingTheLimitIsAcceptedAndOneOverIsNot(t *testing.T) {
+	for name, open := range stores(t) {
+		t.Run(name, func(t *testing.T) {
+			store := open(t)
+			setLimit(t, store, "a@example.com", 10, 0, "1")
+			if v := add(t, store, "a@example.com", 10, october); v != Accepted {
+				t.Fatalf("reaching the limit: %v", v)
+			}
+			verdict, limit, _ := store.Add(context.Background(), "a@example.com", 1, october)
+			if verdict != OverDaily || limit.Daily != 10 {
+				t.Fatalf("one over: %v %+v", verdict, limit)
+			}
+			counts, _ := store.Counts(context.Background(), []string{"a@example.com"}, october)
+			if counts["a@example.com"] != (Count{10, 10}) {
+				t.Fatalf("a refused message was counted: %+v", counts)
+			}
+		})
+	}
+}
+
+func TestStoreMonthlyLimitAndNoLimit(t *testing.T) {
+	for name, open := range stores(t) {
+		t.Run(name, func(t *testing.T) {
+			store := open(t)
+			setLimit(t, store, "a@example.com", 0, 5, "1")
+			if v := add(t, store, "a@example.com", 6, october); v != OverMonthly {
+				t.Fatalf("monthly: %v", v)
+			}
+			if v := add(t, store, "free@example.com", 1000000, october); v != Accepted {
+				t.Fatalf("no limit: %v", v)
+			}
+			counts, _ := store.Counts(context.Background(), []string{"free@example.com"}, october)
+			if counts["free@example.com"].Month != 1000000 {
+				t.Fatalf("an account without a limit is still counted: %+v", counts)
+			}
+		})
+	}
+}
+
+func TestStoreCountersRollOverWithThePeriod(t *testing.T) {
+	for name, open := range stores(t) {
+		t.Run(name, func(t *testing.T) {
+			store := open(t)
+			setLimit(t, store, "a@example.com", 10, 15, "1")
+			add(t, store, "a@example.com", 10, october)
+			nextDay := PeriodsAt(time.Date(2026, 10, 27, 0, 0, 0, 0, time.UTC))
+			if v := add(t, store, "a@example.com", 5, nextDay); v != Accepted {
+				t.Fatalf("a new day: %v", v)
+			}
+			if v := add(t, store, "a@example.com", 1, nextDay); v != OverMonthly {
+				t.Fatalf("the month still counts: %v", v)
+			}
+			november := PeriodsAt(time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC))
+			if v := add(t, store, "a@example.com", 10, november); v != Accepted {
+				t.Fatalf("a new month: %v", v)
+			}
+		})
+	}
+}
+
+func TestStoreOlderLimitNeverReplacesANewerOne(t *testing.T) {
+	for name, open := range stores(t) {
+		t.Run(name, func(t *testing.T) {
+			store := open(t)
+			setLimit(t, store, "a@example.com", 10, 0, "2026-10-26 10:00:00.000002")
+			setLimit(t, store, "a@example.com", 99, 0, "2026-10-26 10:00:00.000001")
+			if v := add(t, store, "a@example.com", 11, october); v != OverDaily {
+				t.Fatalf("the older limit won: %v", v)
+			}
+			if err := store.ClearLimits(context.Background(), []string{"a@example.com"}); err != nil {
+				t.Fatal(err)
+			}
+			if v := add(t, store, "a@example.com", 11, october); v != Accepted {
+				t.Fatalf("cleared limit still applies: %v", v)
+			}
+			setLimit(t, store, "a@example.com", 1, 0, "2026-10-26 10:00:00.000002")
+			if v := add(t, store, "a@example.com", 1, october); v != Accepted {
+				t.Fatalf("a cleared account took a stale entry: %v", v)
+			}
+			accounts, _ := store.Accounts(context.Background())
+			if len(accounts) != 1 || accounts[0] != "a@example.com" {
+				t.Fatalf("accounts %v", accounts)
+			}
+		})
+	}
+}
+
+func TestStoreNeverPassesTheLimitUnderConcurrency(t *testing.T) {
+	for name, open := range stores(t) {
+		t.Run(name, func(t *testing.T) {
+			store := open(t)
+			setLimit(t, store, "a@example.com", 100, 0, "1")
+			var accepted atomic.Int64
+			var wg sync.WaitGroup
+			for i := 0; i < 200; i++ {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					verdict, _, err := store.Add(context.Background(), "a@example.com", 1, october)
+					if err == nil && verdict == Accepted {
+						accepted.Add(1)
+					}
+				}()
+			}
+			wg.Wait()
+			if accepted.Load() != 100 {
+				t.Fatalf("%d of 200 accepted, want 100", accepted.Load())
+			}
+		})
+	}
+}
+
+func TestMemoryStoreSurvivesARestart(t *testing.T) {
+	dir := t.TempDir()
+	store, _ := OpenMemory(dir)
+	store.now = func() time.Time { return time.Date(2026, 10, 26, 23, 59, 0, 0, time.UTC) }
+	setLimit(t, store, "a@example.com", 10, 0, "1")
+	add(t, store, "a@example.com", 4, october)
+	add(t, store, "a@example.com", 1, PeriodsAt(time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)))
+	if err := store.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := OpenMemory(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if v := add(t, reopened, "a@example.com", 7, october); v != OverDaily {
+		t.Fatalf("limit or count lost: %v", v)
+	}
+	if usage := reopened.data.Usage["a@example.com"]; len(usage) != 2 || usage["d:20261025"] != 0 {
+		t.Fatalf("a past day was kept: %v", usage)
+	}
+}
+
+func TestMemoryStoreRefusesAnUnreadableFile(t *testing.T) {
+	dir := t.TempDir()
+	os.WriteFile(dir+"/quota.json", []byte("{"), 0o600)
+	if _, err := OpenMemory(dir); err == nil {
+		t.Fatal("opened")
+	}
+}

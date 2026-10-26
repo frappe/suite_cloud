@@ -19,6 +19,7 @@ type Config struct {
 	LogLevel   string     `json:"log_level"`
 	Logs       []LogDef   `json:"logs"`
 	Metrics    Metrics    `json:"metrics"`
+	Quota      *Quota     `json:"quota,omitempty"`
 }
 
 // SuiteCloud is where batches go and the limits the site enforces on them.
@@ -64,6 +65,27 @@ type StalwartMetrics struct {
 	Password      string `json:"password"`
 	TLSServerName string `json:"tls_server_name"`
 	VerifyTLS     *bool  `json:"verify_tls"`
+}
+
+// Quota is the sending-limit hook Stalwart calls on this node, and where its counters live.
+type Quota struct {
+	HookPort          int        `json:"hook_port"`
+	HookToken         string     `json:"hook_token"`
+	Store             QuotaStore `json:"store"`
+	LimitsPollSeconds int        `json:"limits_poll_seconds"`
+	UsagePushSeconds  int        `json:"usage_push_seconds"`
+}
+
+// QuotaStore is "memory" on a single node, or the cluster's Redis: "redis" (one URL),
+// "redis_cluster" (its nodes' URLs) or "redis_sentinel" (the sentinels' URLs).
+type QuotaStore struct {
+	Type             string   `json:"type"`
+	URLs             []string `json:"urls,omitempty"`
+	Username         string   `json:"username,omitempty"`
+	Password         string   `json:"password,omitempty"`
+	ServiceName      string   `json:"service_name,omitempty"`
+	SentinelUsername string   `json:"sentinel_username,omitempty"`
+	SentinelPassword string   `json:"sentinel_password,omitempty"`
 }
 
 // Load reads, completes and validates a config file. Unknown keys are errors, so a typo cannot
@@ -125,6 +147,10 @@ func (c *Config) ApplyDefaults() {
 			*s.VerifyTLS = true
 		}
 	}
+	if q := c.Quota; q != nil {
+		setInt(&q.LimitsPollSeconds, 30)
+		setInt(&q.UsagePushSeconds, 60)
+	}
 }
 
 func (c *Config) RequestTimeout() time.Duration {
@@ -140,6 +166,13 @@ func (l LogDef) FlushInterval() time.Duration {
 
 func (m Metrics) IsEnabled() bool         { return m.Enabled != nil && *m.Enabled }
 func (m Metrics) Interval() time.Duration { return time.Duration(m.IntervalSeconds) * time.Second }
+
+func (q Quota) LimitsPollInterval() time.Duration {
+	return time.Duration(q.LimitsPollSeconds) * time.Second
+}
+func (q Quota) UsagePushInterval() time.Duration {
+	return time.Duration(q.UsagePushSeconds) * time.Second
+}
 
 func (s StalwartMetrics) ShouldVerifyTLS() bool { return s.VerifyTLS == nil || *s.VerifyTLS }
 
