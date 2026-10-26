@@ -2,7 +2,7 @@
 
 The agent runs on every Stalwart node and egress gateway as a systemd service. It tails Stalwart's log files, samples the machine, scrapes Stalwart's Prometheus endpoint and pushes batches to the [telemetry API](../docs/api/telemetry.md). On a Stalwart node it also answers the sending-limit hook (`internal/quota`). [docs/agent.md](../docs/agent.md) describes the configuration, the state it keeps and how Suite Cloud builds and installs it.
 
-The only dependency is `github.com/redis/go-redis/v9`, for the quota counters on multi-node clusters. It is vendored, so a build needs no network. After a dependency change, run `go mod tidy && go mod vendor` and commit `vendor/`.
+The only dependency is `github.com/redis/go-redis/v9`, for the quota counters on multi-node clusters. A build downloads it from the Go module proxy and checks it against `go.sum`. After a dependency change, run `go mod tidy` and commit `go.mod` and `go.sum`.
 
 ```sh
 go test -race ./...

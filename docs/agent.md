@@ -94,7 +94,7 @@ The telemetry API notes the last batch each host sent and the agent version in i
 
 ## Building
 
-Suite Cloud builds the agent on the bench host with the Go toolchain found on `PATH` or at `/usr/local/go/bin/go`. The build needs Go 1.22 or newer and nothing else: the one dependency, `go-redis`, is vendored under `agent/vendor`, so it compiles offline with `-mod=vendor`. Ubuntu 24.04 ships a recent enough `golang-go` package; on older releases, or to pick the version, install the release from [go.dev/dl](https://go.dev/dl/) under `/usr/local`, where Suite Cloud finds it without a `PATH` change:
+Suite Cloud builds the agent on the bench host with the Go toolchain found on `PATH` or at `/usr/local/go/bin/go`. The build needs Go 1.22 or newer and access to the Go module proxy, `proxy.golang.org` by default: it downloads the one dependency, `go-redis`, checks it against `agent/go.sum` and keeps it under `private/files/agent/.gomodcache`, so later builds need no network. A host behind a proxy sets `GOPROXY` for the bench's workers. Ubuntu 24.04 ships a recent enough `golang-go` package; on older releases, or to pick the version, install the release from [go.dev/dl](https://go.dev/dl/) under `/usr/local`, where Suite Cloud finds it without a `PATH` change:
 
 ```sh
 sudo apt install golang-go                          # Ubuntu 24.04 or newer
@@ -102,7 +102,7 @@ curl -fsSL https://go.dev/dl/go1.22.12.linux-amd64.tar.gz | sudo tar -C /usr/loc
 /usr/local/go/bin/go version
 ```
 
-The bench's workers run the build, so the toolchain must be readable by the bench user. **Build Agent** in Suite Cloud Settings queues a build; a migrate queues one when the agent's sources changed since the last build. The build compiles `linux/amd64` and `linux/arm64` into `private/files/agent/<version>/` under the site, records the version in **Built Agent Version**, and keeps the previous build so a job in progress can finish. Provisioning installs the build recorded there, so a source change that is not built yet never stops a running agent. A failure is shown in **Last Build Error** and in an Error Log. The version is the `agent/VERSION` file plus a digest of the sources, `go.sum` and `vendor/modules.txt`, so a source change makes a new build without a bump; the install job compares the binary's checksum with the node's and copies it only when it differs.
+The bench's workers run the build, so the toolchain must be readable by the bench user. **Build Agent** in Suite Cloud Settings queues a build; a migrate queues one when the agent's sources changed since the last build. The build compiles `linux/amd64` and `linux/arm64` into `private/files/agent/<version>/` under the site, records the version in **Built Agent Version**, and keeps the previous build so a job in progress can finish. Provisioning installs the build recorded there, so a source change that is not built yet never stops a running agent. A failure is shown in **Last Build Error** and in an Error Log. The version is the `agent/VERSION` file plus a digest of the sources and `go.sum`, so a source change makes a new build without a bump; the install job compares the binary's checksum with the node's and copies it only when it differs.
 
 ## Installing by hand
 

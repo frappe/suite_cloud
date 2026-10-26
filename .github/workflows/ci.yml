@@ -177,10 +177,10 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: agent/go.mod
-          cache: false  # the dependencies are vendored
+          cache-dependency-path: agent/go.sum
 
       - name: Format
-        run: test -z "$(gofmt -l cmd internal)" || { gofmt -l cmd internal; exit 1; }
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
 
       - name: Vet
         run: go vet ./...

@@ -18,7 +18,7 @@ JOB_ID = "agent-build"
 BUILD_TIMEOUT = 600  # seconds, per architecture
 GO_FALLBACK = "/usr/local/go/bin/go"
 ARCHITECTURES = {"x86_64": "amd64", "aarch64": "arm64"}  # ansible_architecture -> GOARCH
-SOURCE_GLOBS = ("VERSION", "go.mod", "go.sum", "vendor/modules.txt", "**/*.go")
+SOURCE_GLOBS = ("VERSION", "go.mod", "go.sum", "**/*.go")
 QUOTA_RELEASE = (0, 2, 0)  # the first release that answers the sending-limit hook
 
 
@@ -123,7 +123,9 @@ class AgentBuild:
             "GOOS": "linux",
             "GOARCH": goarch,
             "GOCACHE": str(self.root / ".gocache"),
-            "GOFLAGS": "-mod=vendor",
+            # Modules are downloaded once and checked against go.sum; the sources are never edited.
+            "GOMODCACHE": str(self.root / ".gomodcache"),
+            "GOFLAGS": "-mod=readonly",
             "GOTOOLCHAIN": "local",
         }
         command = [
