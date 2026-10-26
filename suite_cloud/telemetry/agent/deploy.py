@@ -81,7 +81,7 @@ def quota_config(cluster: Document) -> dict:
         "hook_port": quota.HOOK_PORT,
         "hook_token": cluster.get_password("quota_hook_token"),
         "store": quota.store_config(cluster),
-        "limits_poll_seconds": 30,
+        "limits_poll_seconds": 60,
         "usage_push_seconds": 60,
     }
 

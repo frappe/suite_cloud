@@ -63,7 +63,7 @@ An account's disk quota is whatever the tenant sets: `disk_quota_gb` of 0, or no
 
 ### Send limits
 
-`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50, and 0 means no limit. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about 30 seconds. `send_usage` is what the account sent today and this month, as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits; `update_account` leaves out what it is not given.
+`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50, and 0 means no limit. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about a minute. `send_usage` is what the account sent today and this month, as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits; `update_account` leaves out what it is not given.
 
 ### Aliases
 

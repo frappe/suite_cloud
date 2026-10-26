@@ -99,7 +99,7 @@ func TestLoadQuotaAppliesDefaults(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.Quota.LimitsPollSeconds != 30 || cfg.Quota.UsagePushSeconds != 60 {
+	if cfg.Quota.LimitsPollSeconds != 60 || cfg.Quota.UsagePushSeconds != 60 {
 		t.Fatalf("quota %+v", cfg.Quota)
 	}
 	if strings.Contains(cfg.Summary(), "t0ken") || !strings.Contains(cfg.Summary(), "quota_token=set") {

@@ -258,7 +258,7 @@ class TestAgentDeploy(AgentBuildFixture):
         section = deploy.agent_config(self.node)["quota"]
         self.assertEqual(
             (section["hook_port"], section["limits_poll_seconds"], section["usage_push_seconds"]),
-            (8095, 30, 60),
+            (8095, 60, 60),
         )
         self.assertEqual(section["hook_token"], self.cluster.get_password("quota_hook_token"))
         self.assertEqual(section["store"], {"type": "redis", "urls": ["redis://redis.example.test:6379"]})

@@ -148,7 +148,7 @@ func (c *Config) ApplyDefaults() {
 		}
 	}
 	if q := c.Quota; q != nil {
-		setInt(&q.LimitsPollSeconds, 30)
+		setInt(&q.LimitsPollSeconds, 60)
 		setInt(&q.UsagePushSeconds, 60)
 	}
 }

@@ -176,7 +176,7 @@
    "read_only": 1
   },
   {
-   "description": "Suite Cloud's own limit on outgoing mail, which Stalwart's storage quotas below do not cover. Counted by the Agents on the cluster's nodes and applied within about 30 seconds of saving.",
+   "description": "Suite Cloud's own limit on outgoing mail, which Stalwart's storage quotas below do not cover. Counted by the Agents on the cluster's nodes and applied within about a minute of saving.",
    "fieldname": "sending_limits_section",
    "fieldtype": "Section Break",
    "label": "Sending Limits"

@@ -13,7 +13,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
   "state_dir": "/var/lib/suite-cloud-agent",
   "logs": [{"name": "stalwart", "path": "/var/log/stalwart/stalwart.*", "format": "stalwart", "ship_existing": false, "delete_after_days": 0}],
   "metrics": {"interval_seconds": 60, "mounts": ["/"], "stalwart": {"url": "https://127.0.0.1:443/metrics/prometheus", "username": "telemetry", "password": "<metrics password>", "tls_server_name": "n1.c1.example.com", "verify_tls": true}},
-  "quota": {"hook_port": 8095, "hook_token": "<quota hook token>", "store": {"type": "memory"}, "limits_poll_seconds": 30, "usage_push_seconds": 60}
+  "quota": {"hook_port": 8095, "hook_token": "<quota hook token>", "store": {"type": "memory"}, "limits_poll_seconds": 60, "usage_push_seconds": 60}
 }
 ```
 
@@ -39,7 +39,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 | `metrics.stalwart` | **Enable Prometheus Metrics** and **Metrics Password** of the cluster or gateway | Absent when the cluster has the switch off, and on an outbound-only node, which has no listener |
 | `quota.hook_port`, `quota.hook_token` | 8095, **Quota Hook Token** of the cluster | The loopback port and bearer token of the sending-limit hook. The whole section is absent on gateways and outbound-only nodes, which take no client mail, and until the last build is 0.2.0 or newer |
 | `quota.store` | The cluster's in-memory store | `{"type": "memory"}`, or `redis`, `redis_cluster` or `redis_sentinel` with the store's `urls` and credentials |
-| `quota.limits_poll_seconds`, `usage_push_seconds` | 30, 60 | How often limits are pulled and counts pushed |
+| `quota.limits_poll_seconds`, `usage_push_seconds` | 60, 60 | How often limits are pulled and counts pushed |
 
 `suite-cloud-agent --config <path> --check` validates the file, the state directory and the log paths without a request. `--version` prints the version.
 
@@ -82,7 +82,7 @@ A Mail Account's **Daily Send Limit** and **Monthly Send Limit** count recipient
 | Single node, no Redis | The Agent's memory, saved to `quota.json` in the state directory every 5 seconds and on shutdown |
 | With a Redis in-memory store (every multi-node cluster) | That Redis under `sca:quota:`. A Lua script checks and counts, and every key of an account shares the hash tag `{account}`, so it also works on Redis Cluster |
 
-The Agent pulls the cluster's changed limits every 30 seconds and all of them on start and every hour; a full pull also clears the limits of deleted accounts. It pushes the day and month totals of the accounts it counted every 60 seconds and on shutdown, and keeps them for the next push when one fails. Both calls are in the [telemetry API](api/telemetry.md#sending-limits). The Mail Account form shows the last pushed totals: orange from 80% of a limit, red at 100%.
+The Agent pulls the limits changed since its last pull every 60 seconds and all of them on start and every hour; a full pull also clears the limits of deleted accounts. It pushes the day and month totals of the accounts it counted every 60 seconds and on shutdown, and keeps them for the next push when one fails. Both calls are in the [telemetry API](api/telemetry.md#sending-limits). The Mail Account form shows the last pushed totals: orange from 80% of a limit, red at 100%.
 
 Nothing in the quota path stops mail. When the Agent fails or takes longer than 2 seconds, Stalwart accepts the message uncounted. A native throttle, `suite-cloud-quota-backstop`, caps every signed-in account meanwhile at the cluster's **Backstop Messages per Day**, 5,000 by default, and 0 turns it off. It counts messages, not recipients, so keep it above the highest daily limit. A change applies with the next Sync Config. A message the hook accepted stays counted when Stalwart refuses it later, for example over a queue quota.
 
