@@ -25,3 +25,4 @@ suite_cloud.patches.v1_0.fill_telemetry_retention_default
 suite_cloud.patches.v1_0.fill_telemetry_limit_defaults
 suite_cloud.patches.v1_0.fill_agent_defaults
 suite_cloud.patches.v1_0.fill_metrics_passwords
+suite_cloud.patches.v1_0.name_records_with_uuid7

@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+from uuid import uuid7
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -25,6 +27,9 @@ class MailingListRecipient(Document):
         mailing_list: DF.Link
         tenant: DF.Link | None
     # end: auto-generated types
+
+    def autoname(self) -> None:
+        self.name = str(uuid7())
 
     def validate(self) -> None:
         self.email = validate_email_address(self.email)
