@@ -61,6 +61,7 @@ class StalwartCluster(Document):
         label: DF.Data | None
         last_config_sync_at: DF.Datetime | None
         metrics_password: DF.Password | None
+        quota_backstop_per_day: DF.Int
         quota_hook_token: DF.Password | None
         regions: DF.Table[StalwartClusterRegion]
         relay_password: DF.Password | None

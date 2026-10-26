@@ -46,6 +46,9 @@
   "enable_metrics",
   "column_break_metrics",
   "metrics_password",
+  "sending_limits_section",
+  "quota_backstop_per_day",
+  "column_break_sending_limits",
   "quota_hook_token",
   "ssh_section",
   "ssh_user",
@@ -325,6 +328,23 @@
    "fieldname": "metrics_password",
    "fieldtype": "Password",
    "label": "Metrics Password"
+  },
+  {
+   "fieldname": "sending_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Sending Limits"
+  },
+  {
+   "default": "5000",
+   "description": "Messages a signed-in account may send per UTC day, whatever its own limits. It keeps every account in check while an Agent is down, so keep it above the highest Daily Send Limit. It counts messages, not recipients. 0 turns it off. Applied by Sync Config.",
+   "fieldname": "quota_backstop_per_day",
+   "fieldtype": "Int",
+   "label": "Backstop Messages per Day",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_sending_limits",
+   "fieldtype": "Column Break"
   },
   {
    "description": "Generated on save, unique per cluster. Stalwart's sending-limit hook sends it to the Agent on each node, which checks it.",

@@ -8,6 +8,8 @@ answers the hook (``deploy.is_quota_enabled``); until then the plan leaves both 
 
 from typing import TYPE_CHECKING
 
+from frappe.utils import cint
+
 from suite_cloud.mail.cluster.plan import as_list, as_set, secret_value
 from suite_cloud.mail.doctype.stalwart_store.stalwart_store import lines
 
@@ -18,8 +20,6 @@ HOOK_PORT = 8095  # loopback only, the same on every node
 HOOK_URL = f"http://127.0.0.1:{HOOK_PORT}/hooks/quota"
 HOOK_TIMEOUT_MS = 2000
 BACKSTOP_DESCRIPTION = "suite-cloud-quota-backstop"
-# Transactions, not recipients, per account and UTC day; keep it above the highest daily limit.
-BACKSTOP_PER_DAY = 5000
 DAY_MS = 86_400_000
 SIGNED_IN = {"match": as_list([{"if": "!is_empty(authenticated_as)", "then": "true"}]), "else": "false"}
 REDIS_STORE_TYPES = {"Redis": "redis", "RedisCluster": "redis_cluster", "RedisSentinel": "redis_sentinel"}
@@ -30,7 +30,7 @@ def cluster_operations(cluster: Document) -> list[dict]:
 
     if not is_quota_enabled():
         return []
-    return [hook_operation(cluster), backstop_operation()]
+    return [hook_operation(cluster), backstop_operation(cluster)]
 
 
 def hook_operation(cluster: Document) -> dict:
@@ -52,16 +52,18 @@ def hook_operation(cluster: Document) -> dict:
     return {"@type": "upsert", "object": "MtaHook", "matchOn": ["url"], "value": {"quota": hook}}
 
 
-def backstop_operation() -> dict:
-    """A fixed cap per signed-in account, checked at MAIL FROM. Without ``match`` every
-    unauthenticated session would share one bucket, since Stalwart hashes an empty login too."""
+def backstop_operation(cluster: Document) -> dict:
+    """The cluster's cap per signed-in account and UTC day, checked at MAIL FROM; 0 disables it.
+    Without ``match`` every unauthenticated session would share one bucket, since Stalwart
+    hashes an empty login too."""
 
+    per_day = cint(cluster.quota_backstop_per_day)
     throttle = {
-        "enable": True,
+        "enable": per_day > 0,
         "description": BACKSTOP_DESCRIPTION,
         "key": as_set(["authenticatedAs"]),
         "match": SIGNED_IN,
-        "rate": {"count": BACKSTOP_PER_DAY, "period": DAY_MS},
+        "rate": {"count": max(per_day, 1), "period": DAY_MS},  # a disabled throttle keeps a valid rate
     }
     return {
         "@type": "upsert",

@@ -193,8 +193,17 @@ class TestQuotaPlan(SendingLimitsTestCase):
         # Only signed-in sessions: unauthenticated ones would share one bucket otherwise.
         self.assertEqual(throttle["match"], quota.SIGNED_IN)
         self.assertEqual(
-            (throttle["key"], throttle["rate"]),
-            ({"authenticatedAs": True}, {"count": 5000, "period": 86_400_000}),
+            (throttle["enable"], throttle["key"], throttle["rate"]),
+            (True, {"authenticatedAs": True}, {"count": 5000, "period": 86_400_000}),
+        )
+
+        # The cap is the cluster's; 0 turns the throttle off rather than leaving it behind.
+        self.cluster.db_set("quota_backstop_per_day", 0)
+        disabled = quota.backstop_operation(self.cluster)["value"]["quota-backstop"]
+        self.assertEqual((disabled["enable"], disabled["rate"]["count"]), (False, 1))
+        self.cluster.db_set("quota_backstop_per_day", 20000)
+        self.assertEqual(
+            quota.backstop_operation(self.cluster)["value"]["quota-backstop"]["rate"]["count"], 20000
         )
 
         # Stalwart adds its default throttles only when none exist, so recovery leaves ours out.
