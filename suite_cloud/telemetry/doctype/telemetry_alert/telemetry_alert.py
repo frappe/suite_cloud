@@ -3,6 +3,8 @@
 
 """One condition the alert checker (``suite_cloud.telemetry.alerts``) found on a node."""
 
+from uuid import uuid7
+
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
@@ -26,6 +28,9 @@ class TelemetryAlert(Document):
         status: DF.Literal["Open", "Resolved"]
         title: DF.Data | None
     # end: auto-generated types
+
+    def autoname(self) -> None:
+        self.name = str(uuid7())
 
     def validate(self) -> None:
         """Resolved by anyone but the checker is a dismissal, which the checker honors until the

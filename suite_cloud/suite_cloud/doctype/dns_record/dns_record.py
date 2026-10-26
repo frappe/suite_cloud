@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 from functools import cached_property
+from uuid import uuid7
 
 import frappe
 from frappe import _
@@ -43,6 +44,9 @@ class DNSRecord(Document):
         type: DF.Literal["", "A", "AAAA", "CNAME", "MX", "TXT"]
         value: DF.Text
     # end: auto-generated types
+
+    def autoname(self) -> None:
+        self.name = str(uuid7())
 
     @cached_property
     def fqdn(self) -> str:

@@ -1,6 +1,8 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+from uuid import uuid7
+
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -116,6 +118,9 @@ class StalwartStore(Document):
         use_tls: DF.Check
         verify_after_write: DF.Check
     # end: auto-generated types
+
+    def autoname(self) -> None:
+        self.name = str(uuid7())
 
     @property
     def is_embedded(self) -> bool:

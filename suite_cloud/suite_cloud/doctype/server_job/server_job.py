@@ -2,6 +2,7 @@
 # For license information, please see license.txt
 
 import json
+from uuid import uuid7
 
 import frappe
 from frappe import _
@@ -60,6 +61,9 @@ class ServerJob(Document):
     # end: auto-generated types
 
     # --- lifecycle ------------------------------------------------------------
+
+    def autoname(self) -> None:
+        self.name = str(uuid7())
 
     def validate(self) -> None:
         self.status = self.status or "Pending"

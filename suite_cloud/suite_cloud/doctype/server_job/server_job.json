@@ -1,6 +1,5 @@
 {
  "actions": [],
- "autoname": "hash",
  "creation": "2026-09-03 12:00:00.000000",
  "doctype": "DocType",
  "engine": "InnoDB",
@@ -264,11 +263,10 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-08 12:00:00.000000",
+ "modified": "2026-10-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Server Job",
- "naming_rule": "Random",
  "owner": "Administrator",
  "permissions": [
   {
