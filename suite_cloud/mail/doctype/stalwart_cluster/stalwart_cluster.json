@@ -46,6 +46,7 @@
   "enable_metrics",
   "column_break_metrics",
   "metrics_password",
+  "quota_hook_token",
   "ssh_section",
   "ssh_user",
   "ssh_port",
@@ -326,6 +327,12 @@
    "label": "Metrics Password"
   },
   {
+   "description": "Generated on save, unique per cluster. Stalwart's sending-limit hook sends it to the Agent on each node, which checks it.",
+   "fieldname": "quota_hook_token",
+   "fieldtype": "Password",
+   "label": "Quota Hook Token"
+  },
+  {
    "fieldname": "ssh_section",
    "fieldtype": "Section Break",
    "label": "SSH"
@@ -490,7 +497,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-22 10:00:00.000000",
+ "modified": "2026-10-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

@@ -247,6 +247,62 @@ class TestAgentDeploy(AgentBuildFixture):
         clear_config_cache()
         self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])
 
+    def test_the_quota_section_waits_for_a_build_that_answers_the_hook(self) -> None:
+        self.build().run()  # 0.1.0 refuses a config with a quota section
+        self.assertFalse(deploy.is_quota_enabled())
+        self.assertNotIn("quota", deploy.agent_config(self.node))
+
+        (self.source / "VERSION").write_text("0.2.0\n")
+        self.build().run()
+        self.assertTrue(deploy.is_quota_enabled())
+        section = deploy.agent_config(self.node)["quota"]
+        self.assertEqual(
+            (section["hook_port"], section["limits_poll_seconds"], section["usage_push_seconds"]),
+            (8095, 30, 60),
+        )
+        self.assertEqual(section["hook_token"], self.cluster.get_password("quota_hook_token"))
+        self.assertEqual(section["store"], {"type": "redis", "urls": ["redis://redis.example.test:6379"]})
+        self.assertNotIn("quota", deploy.agent_config(self.gateway))  # relays only, like an outbound node
+        outbound = make_node(self.cluster, ipv4="203.0.113.11", role="outbound")
+        self.assertNotIn("quota", deploy.agent_config(outbound))
+
+        secrets = deploy.agent_variables(self.node)["__secret_values__"]
+        self.assertIn(section["hook_token"], secrets)
+        self.assertIn("redis://redis.example.test:6379", secrets)
+
+    def test_the_quota_store_follows_the_in_memory_store(self) -> None:
+        from suite_cloud.mail.cluster import quota
+        from suite_cloud.mail.tests.fixtures import make_store
+
+        single = frappe._dict(get_store=lambda field: None)
+        self.assertEqual(quota.store_config(single), {"type": "memory"})
+
+        sentinel = make_store(
+            "In-Memory",
+            "RedisSentinel",
+            urls="redis://s1:26379\nredis://s2:26379",
+            auth_username="stalwart",
+            auth_secret="redis-pw",
+            sentinel_secret="sentinel-pw",
+        )
+        config = quota.store_config(frappe._dict(get_store=lambda field: sentinel))
+        self.assertEqual(
+            config,
+            {
+                "type": "redis_sentinel",
+                "urls": ["redis://s1:26379", "redis://s2:26379"],
+                "username": "stalwart",
+                "password": "redis-pw",
+                "service_name": "mymaster",
+                "sentinel_username": "",
+                "sentinel_password": "sentinel-pw",
+            },
+        )
+        self.assertEqual(
+            set(quota.store_secrets(config)),
+            {"redis://s1:26379", "redis://s2:26379", "redis-pw", "sentinel-pw"},
+        )
+
     def test_node_and_gateway_jobs_carry_the_agent_variables_as_secrets(self) -> None:
         self.build().run()
         for variables in (

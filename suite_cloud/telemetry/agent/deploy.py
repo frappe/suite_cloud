@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, get_url
 
-from suite_cloud.mail.cluster import plan
+from suite_cloud.mail.cluster import plan, quota
 from suite_cloud.mail.stalwart import verify_tls
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 from suite_cloud.telemetry.agent.build import ARCHITECTURES, AgentBuild
@@ -60,7 +60,37 @@ def agent_config(server: Document) -> dict:
             "tls_server_name": server.hostname,
             "verify_tls": verify_tls(),
         }
+    if answers_quota_hook(server):
+        config["quota"] = quota_config(server.get_cluster())
     return config
+
+
+def answers_quota_hook(server: Document) -> bool:
+    """Stalwart calls the hook on the node that took the message: a node with listeners. Gateways
+    and outbound-only nodes only relay."""
+
+    is_client_node = server.doctype == "Stalwart Node" and (server.role or "full") != "outbound"
+    return is_client_node and is_quota_enabled()
+
+
+def quota_config(cluster: Document) -> dict:
+    """The sending-limit hook the Agent answers on loopback, and the store all of the cluster's
+    Agents share."""
+
+    return {
+        "hook_port": quota.HOOK_PORT,
+        "hook_token": cluster.get_password("quota_hook_token"),
+        "store": quota.store_config(cluster),
+        "limits_poll_seconds": 30,
+        "usage_push_seconds": 60,
+    }
+
+
+def is_quota_enabled() -> bool:
+    """The hook and the Agents' quota section wait for a telemetry secret and a build with quota."""
+
+    build = AgentBuild.last_built()
+    return has_secret() and bool(build) and build.has_quota
 
 
 def scrapes_metrics(server: Document) -> bool:
@@ -138,6 +168,8 @@ def agent_variables(server: Document, restart: bool = False) -> dict:
     secrets = [config["suite_cloud"]["secret"]]
     if "stalwart" in config["metrics"]:
         secrets.append(config["metrics"]["stalwart"]["password"])
+    if "quota" in config:
+        secrets += [config["quota"]["hook_token"], *quota.store_secrets(config["quota"]["store"])]
     return {
         "agent_enabled": True,
         "agent_version": build.version,

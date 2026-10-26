@@ -76,6 +76,7 @@ scheduler_events = {
         "suite_cloud.hosting.machines.sync_fleet",
         "suite_cloud.hosting.doctype.suite_tenant_request.suite_tenant_request.expire_requests",
         "suite_cloud.telemetry.warehouse.prune_expired_rows",
+        "suite_cloud.mail.doctype.mail_send_usage.mail_send_usage.prune_usage",
     ],
 }
 

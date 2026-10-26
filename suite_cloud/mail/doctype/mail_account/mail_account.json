@@ -24,6 +24,10 @@
   "column_break_settings",
   "time_zone",
   "used_disk_bytes",
+  "sending_limits_section",
+  "daily_send_limit",
+  "column_break_sending_limits",
+  "monthly_send_limit",
   "quotas_section",
   "quotas",
   "aliases_section",
@@ -172,6 +176,32 @@
    "read_only": 1
   },
   {
+   "description": "Suite Cloud's own limit on outgoing mail, which Stalwart's storage quotas below do not cover. Counted by the Agents on the cluster's nodes and applied within about 30 seconds of saving.",
+   "fieldname": "sending_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Sending Limits"
+  },
+  {
+   "default": "0",
+   "description": "Recipients the account may send to per UTC day. A message to 50 recipients counts as 50. 0 means no limit.",
+   "fieldname": "daily_send_limit",
+   "fieldtype": "Int",
+   "label": "Daily Send Limit",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_sending_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Recipients the account may send to per UTC month. 0 means no limit.",
+   "fieldname": "monthly_send_limit",
+   "fieldtype": "Int",
+   "label": "Monthly Send Limit",
+   "non_negative": 1
+  },
+  {
    "fieldname": "quotas_section",
    "fieldtype": "Section Break",
    "label": "Quotas"
@@ -211,7 +241,7 @@
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-19 12:00:00.000000",
+ "modified": "2026-10-26 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",

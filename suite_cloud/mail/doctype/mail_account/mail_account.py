@@ -9,6 +9,7 @@ from frappe.model.document import Document
 from frappe.utils import cint, flt
 
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
+from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import delete_usage, sent_by_account
 from suite_cloud.mail.stalwart import get_account_client
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB, Account
 from suite_cloud.mail.tenancy import account_credentials, quotas, sync
@@ -44,6 +45,7 @@ class MailAccount(QuotaHolder, Document):
         api_keys: DF.Table[MailCredential]
         app_passwords: DF.Table[MailCredential]
         cluster: DF.Link | None
+        daily_send_limit: DF.Int
         description: DF.Data | None
         disable_receiving: DF.Check
         display_name: DF.Data | None
@@ -52,6 +54,7 @@ class MailAccount(QuotaHolder, Document):
         enabled: DF.Check
         groups: DF.TableMultiSelect[MailGroupMember]
         locale: DF.Data | None
+        monthly_send_limit: DF.Int
         new_password: DF.Password | None
         quotas: DF.Table[MailQuota]
         tenant: DF.Link | None
@@ -154,6 +157,7 @@ class MailAccount(QuotaHolder, Document):
 
     def on_trash(self) -> None:
         sync.push_destroy(self, "accounts")
+        delete_usage(self.name)
 
     # --- Stalwart ------------------------------------------------------------------
 
@@ -239,6 +243,7 @@ class MailAccount(QuotaHolder, Document):
     def onload(self) -> None:
         self.flags.with_usage = True  # the form shows the live figure
         account_credentials.refresh(self)
+        self.set_onload("send_usage", sent_by_account([self.name])[self.name])
 
     @property
     def used_disk_bytes(self) -> int | None:
@@ -273,6 +278,7 @@ class MailAccount(QuotaHolder, Document):
             quotas=self.quota_map(),
             mailing_lists=self.mailing_list_names() if mailing_lists is None else mailing_lists,
             used_disk_bytes=self.fetch_used_disk_bytes() if with_usage else used_disk_bytes,
+            send_usage=sent_by_account([self.name])[self.name],
         )
 
     def addresses(self) -> list[str]:
@@ -306,8 +312,10 @@ def account_payload(
     quotas: dict[str, int],
     mailing_lists: list[str],
     used_disk_bytes: int | None,
+    send_usage: dict[str, int],
 ) -> dict:
-    """The API shape of an account, from a document or a query row plus its related rows."""
+    """The API shape of an account, from a document or a query row plus its related rows.
+    ``send_usage`` is what the Agents last reported for the UTC day and month."""
 
     return {
         "email": row.email,
@@ -319,6 +327,9 @@ def account_payload(
         "disk_quota_gb": round(cint(quotas.get(DISK_QUOTA)) / GB, 6),
         "quotas": quotas,
         "used_disk_bytes": used_disk_bytes,
+        "daily_send_limit": cint(row.daily_send_limit),
+        "monthly_send_limit": cint(row.monthly_send_limit),
+        "send_usage": send_usage,
         "locale": row.locale,
         "time_zone": row.time_zone,
         "aliases": aliases,
@@ -341,6 +352,8 @@ ACCOUNT_FIELDS = [
     "description",
     "locale",
     "time_zone",
+    "daily_send_limit",
+    "monthly_send_limit",
     "creation",
 ]
 
@@ -348,8 +361,8 @@ ACCOUNT_FIELDS = [
 def account_payloads(names: list[str], with_usage: bool = True) -> list[dict]:
     """A page of accounts in a handful of queries, whatever the page size.
 
-    One query each for the accounts, their aliases, groups and quotas, one for the mailing lists
-    that deliver to any of their addresses, and one cluster call for usage.
+    One query each for the accounts, their aliases, groups, quotas and send usage, one for the
+    mailing lists that deliver to any of their addresses, and one cluster call for disk usage.
     """
 
     if not names:
@@ -365,6 +378,7 @@ def account_payloads(names: list[str], with_usage: bool = True) -> list[dict]:
     addresses = {row.name: [row.email, *[a.alias_email for a in aliases[row.name]]] for row in rows}
     lists = mailing_lists_by_address(rows[0].tenant, addresses) if rows else {}
     usage = used_disk_by_name(rows) if with_usage else {}
+    sent = sent_by_account([row.name for row in rows])
     return [
         account_payload(
             row,
@@ -373,6 +387,7 @@ def account_payloads(names: list[str], with_usage: bool = True) -> list[dict]:
             quotas={q.quota: cint(q.value) for q in quotas[row.name]},
             mailing_lists=lists.get(row.name, []),
             used_disk_bytes=usage.get(row.name),
+            send_usage=sent[row.name],
         )
         for row in rows
     ]
