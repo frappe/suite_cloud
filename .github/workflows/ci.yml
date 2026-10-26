@@ -163,6 +163,12 @@ jobs:
       run:
         working-directory: agent
 
+    services:
+      redis:  # the quota store's tests run against it
+        image: redis:alpine
+        ports:
+          - 6379:6379
+
     steps:
       - name: Clone
         uses: actions/checkout@v4
@@ -171,15 +177,17 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: agent/go.mod
-          cache: false  # the module has no dependencies to cache
+          cache: false  # the dependencies are vendored
 
       - name: Format
-        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+        run: test -z "$(gofmt -l cmd internal)" || { gofmt -l cmd internal; exit 1; }
 
       - name: Vet
         run: go vet ./...
 
       - name: Test
+        env:
+          SCA_TEST_REDIS_URL: redis://localhost:6379/7
         run: go test -race -count=1 ./...
 
       - name: Cross-compile
