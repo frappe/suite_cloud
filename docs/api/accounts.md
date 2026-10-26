@@ -8,7 +8,7 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
 | `mail.accounts.get_account` | GET | One account with its disk usage |
 | `mail.accounts.get_quotas` | GET | Disk quota and usage for up to 500 addresses at once |
 | `mail.accounts.create_account` | POST | Creates a mailbox and returns its app password once |
-| `mail.accounts.update_account` | PATCH | Changes the name, description, quotas, locale, time zone or receiving |
+| `mail.accounts.update_account` | PATCH | Changes the name, description, quotas, send limits, locale, time zone or receiving |
 | `mail.accounts.set_account_enabled` | PUT | Enables or disables login and delivery |
 | `mail.accounts.set_password` | PUT | Sets the account's own password |
 | `mail.accounts.rotate_app_password` | POST | Replaces the tenant's own app password |
@@ -41,6 +41,9 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
   "disk_quota_gb": 5,
   "quotas": { "maxDiskQuota": 5368709120, "maxEmails": 100000 },
   "used_disk_bytes": 734003200,
+  "daily_send_limit": 500,
+  "monthly_send_limit": 10000,
+  "send_usage": { "day": 120, "month": 2340 },
   "locale": "en-US",
   "time_zone": "Europe/Berlin",
   "aliases": [ { "email": "j.doe@acme.example", "enabled": true, "description": null } ],
@@ -57,6 +60,10 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
 An account's disk quota is whatever the tenant sets: `disk_quota_gb` of 0, or none, means no limit. Suite Cloud applies no default and does not check the quotas against the tenant's `max_disk_gb`.
 
 `quotas` is an object of Stalwart `StorageQuota` names to limits. `maxDiskQuota` (bytes) is the disk quota; the others are counts (messages, mailboxes, Sieve scripts, calendars, contact cards, app passwords and so on). `get_account_options` lists the other names. On a create or update, `quotas` replaces the other rows (`{}` lifts them all) and keeps the disk row unless it names `maxDiskQuota`; `disk_quota_gb` sets the disk row in GB and wins over a `maxDiskQuota` inside `quotas`. A limit of 0 lifts it. A new account gets `maxAppPasswords` and `maxApiKeys` of 10 unless `quotas` names them.
+
+### Send limits
+
+`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50, and 0 means no limit. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about 30 seconds. `send_usage` is what the account sent today and this month, as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits; `update_account` leaves out what it is not given.
 
 ### Aliases
 
@@ -103,12 +110,13 @@ Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` f
 | `locale` | string | `en-US` | One of `get_account_options` |
 | `time_zone` | string | | One of `get_account_options` |
 | `disable_receiving` | boolean | `false` | Send-only: the account logs in and sends, and mail addressed to it bounces |
+| `daily_send_limit`, `monthly_send_limit` | integer | 0 | Recipients per UTC day and month; 0 means no limit. See send limits |
 
 Answers 201 with the account object plus `app_password`, the password the tenant uses for the account's mail access. It is returned only here; `rotate_app_password` issues a fresh one. Suite Cloud stores neither the app password nor the account's own password. An inactive domain or a reached limit is a 422; a taken address is a 409; an unknown group or list is a 404.
 
 ## `update_account`
 
-Takes `email` and any of `display_name`, `description`, `disk_quota_gb`, `quotas`, `locale`, `time_zone` and `disable_receiving`. Only the fields passed change. Returns the account object.
+Takes `email` and any of `display_name`, `description`, `disk_quota_gb`, `quotas`, `daily_send_limit`, `monthly_send_limit`, `locale`, `time_zone` and `disable_receiving`. Only the fields passed change. Returns the account object.
 
 ## `set_account_enabled`
 

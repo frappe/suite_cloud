@@ -6,6 +6,8 @@ Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each
 | --- | --- | --- |
 | `telemetry.events` | POST | Stages a batch of log and trace events |
 | `telemetry.metrics` | POST | Stages a batch of metric samples |
+| `telemetry.quota.limits` | POST | A page of the caller's cluster's sending limits |
+| `telemetry.quota.usage` | POST | Stores the recipients the caller counted per account |
 
 ## Authentication
 
@@ -15,7 +17,7 @@ Every agent sends the telemetry secret from **Suite Cloud Settings > Telemetry**
 Authorization: Bearer <telemetry secret>
 ```
 
-The secret is accepted only on these two methods and runs them as a user without any role, so it opens nothing else. An empty secret turns the API off: every request is refused with a 401. To rotate, change the setting: the old value moves to **Telemetry Previous Secret** and stays accepted until **Previous Secret Accepted Until**, a day later by default, so the agents can be updated one by one. Shorten or clear the previous secret to end the overlap early. An agent still sending the old secret after that gets a 401 until it is updated.
+The secret is accepted only on these methods and runs them as a user without any role, so it opens nothing else. An empty secret turns the API off: every request is refused with a 401. To rotate, change the setting: the old value moves to **Telemetry Previous Secret** and stays accepted until **Previous Secret Accepted Until**, a day later by default, so the agents can be updated one by one. Shorten or clear the previous secret to end the overlap early. An agent still sending the old secret after that gets a 401 until it is updated.
 
 ## Request
 
@@ -118,6 +120,20 @@ An agent retries on 429 and on any 5xx or network failure, with a backoff. It do
 Give every batch a `batch_id` and keep it across retries. A retry of a batch Suite Cloud already staged replaces the staged file, and a batch already loaded into Insights is not loaded twice, so a request whose answer was lost in transit is safe to send again.
 
 Each node may make **Telemetry Requests per Minute** requests (300 by default), counted per `host_ip` in fixed one-minute windows. Both limits are in **Suite Cloud Settings > Telemetry**; a larger batch costs one request, and a batch is validated whole, so a change needs no release.
+
+## Sending limits
+
+The Agent on a Stalwart node uses two more methods to enforce the [sending limits](../agent.md#sending-limits). The secret is shared by every cluster, so each call names the node in `host_ip`, and the caller only reads and reports the accounts of that node's cluster. A `host_ip` that is not the address of exactly one Active or Draining Stalwart Node is a 403. Both calls count against **Telemetry Requests per Minute**.
+
+`telemetry.quota.limits` takes `host_ip` and `since_version`, and answers the limits changed after it, oldest first, at most 500 per page:
+
+```json
+{"data": {"limits": [{"account": "jane@acme.example", "daily": 500, "monthly": 10000, "version": "2026-10-26 10:15:02.123456"}], "next_version": "<cursor>", "has_more": false}}
+```
+
+`daily` and `monthly` are recipients per UTC day and month; 0 means no limit. `version` is the account's modified time, so an older entry never replaces a newer one. Send `next_version` as the next `since_version`, and an empty one to read everything again. A save is served once it is 5 seconds old.
+
+`telemetry.quota.usage` takes `host_ip` and `records`, each `{"account", "period", "sent"}`, where `period` is `d:YYYYMMDD` or `m:YYYYMM` and `sent` the counter's current value. Suite Cloud keeps the higher of the stored and the reported count, since several nodes report the same counter and it only grows within its period. Accounts of other clusters, and periods other than today, yesterday and their months, are dropped. It answers `{"data": {"accepted": n}}`.
 
 ## Alerts
 
