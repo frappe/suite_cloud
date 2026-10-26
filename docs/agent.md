@@ -8,7 +8,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 
 ```json
 {
-  "suite_cloud": {"url": "https://cloud.example.com", "secret": "<telemetry secret>", "requests_per_minute": 300, "records_per_request": 5000, "max_attempts": 8},
+  "suite_cloud": {"url": "https://cloud.example.com", "secret": "<agent key>:<agent secret>", "requests_per_minute": 300, "records_per_request": 5000, "max_attempts": 8},
   "node": {"source": "stalwart", "host_ip": "203.0.113.5", "hostname": "n1.c1.example.com"},
   "state_dir": "/var/lib/suite-cloud-agent",
   "logs": [{"name": "stalwart", "path": "/var/log/stalwart/stalwart.*", "format": "stalwart", "ship_existing": false, "delete_after_days": 0}],
@@ -20,7 +20,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 | Key | Source | Meaning |
 | --- | --- | --- |
 | `suite_cloud.url` | **Public URL**, else the site's own URL | Where the batches go |
-| `suite_cloud.secret` | **Telemetry Secret** | Sent as the bearer token |
+| `suite_cloud.secret` | **Agent Key** and **Agent Secret** of the cluster (a gateway uses its cluster's) | Sent as the bearer token, `<agent key>:<agent secret>` |
 | `suite_cloud.requests_per_minute`, `records_per_request` | **Telemetry Requests per Minute**, **Telemetry Records per Request** | The agent keeps to the limits the site enforces |
 | `suite_cloud.max_attempts` | **Agent Max Attempts** | Sends of one batch after server or network failures before it is skipped |
 | `suite_cloud.request_timeout_seconds` | 60 | Time allowed for one request |
@@ -69,7 +69,7 @@ A new log file is read from the start; the file before it is finished once it st
 
 The service runs as the `stalwart` user, since the log directory belongs to it, and is sandboxed away from Stalwart's configuration and data. `journalctl -u suite-cloud-agent` shows what it does; at `info` it logs the start with the files it found, every file it finishes or deletes and every batch it skips.
 
-Provisioning installs the agent as part of every Provision, Upgrade and Re-provision job of a node or gateway, after Stalwart. The job copies the binary of the node's architecture from the bench host, writes `config.json` and the unit, and restarts the agent when any of them changed. When the **Telemetry Secret** is empty or no agent build exists, the job stops and disables the agent on the node instead, and an Error Log names the missing build. **Install Agent** on a Stalwart Node or Egress Gateway runs that step on its own, without draining or restarting Stalwart: it rewrites the binary, `config.json` and the unit where they differ from the current build and settings, whatever version the node runs, and restarts the agent in any case. **Upgrade Agents** on a Stalwart Cluster runs it on every Active or Draining node and every Active gateway: a draining node still ships its log. Saving Suite Cloud Settings with a changed **Telemetry Secret** queues that job for the same servers of every cluster by itself, within the day the previous secret stays accepted; a cleared secret stops the agents the same way. Without a build at that moment an Error Log asks for Build Agent and Upgrade Agents instead.
+Provisioning installs the agent as part of every Provision, Upgrade and Re-provision job of a node or gateway, after Stalwart. The job copies the binary of the node's architecture from the bench host, writes `config.json` and the unit, and restarts the agent when any of them changed. When **Enable Telemetry** is off or no agent build exists, the job stops and disables the agent on the node instead, and an Error Log names the missing build. **Install Agent** on a Stalwart Node or Egress Gateway runs that step on its own, without draining or restarting Stalwart: it rewrites the binary, `config.json` and the unit where they differ from the current build and settings, whatever version the node runs, and restarts the agent in any case. **Upgrade Agents** on a Stalwart Cluster runs it on every Active or Draining node and every Active gateway: a draining node still ships its log. Turning **Enable Telemetry** on in Suite Cloud Settings queues that job for the same servers of every cluster by itself, and turning it off stops the agents the same way. Without a build at that moment an Error Log asks for Build Agent and Upgrade Agents instead. **Rotate Agent Secret** on a Stalwart Cluster replaces its Agent Secret and runs Upgrade Agents for it; an agent not yet reinstalled is refused and retries, and loses nothing.
 
 Stalwart's Prometheus endpoint is part of the cluster plan. **Enable Prometheus Metrics** on the Stalwart Cluster, on by default, turns it on with the user `telemetry` and the **Metrics Password** generated per cluster and per gateway; off, the exporter is disabled on every node and gateway of the cluster and the agents report host metrics only. A change reaches Stalwart with the next Sync Config, and the agents with the next Install Agent or Upgrade Agents job.
 
@@ -86,7 +86,7 @@ The Agent pulls the limits changed since its last pull every 60 seconds and all 
 
 Nothing in the quota path stops mail. When the Agent fails or takes longer than 2 seconds, Stalwart accepts the message uncounted. A native throttle, `suite-cloud-quota-backstop`, caps every signed-in account meanwhile at the cluster's **Backstop Messages per Day**, 5,000 by default, and 0 turns it off. It counts messages, not recipients, so keep it above the highest daily limit. A change applies with the next Sync Config. A message the hook accepted stays counted when Stalwart refuses it later, for example over a queue quota.
 
-The hook and the backstop are part of the cluster plan, and both they and the `quota` section of `config.json` wait for a **Telemetry Secret** and a build of 0.2.0 or newer. To turn the limits on for a cluster: run **Build Agent**, then **Upgrade Agents**, then **Sync Config**. In the other order nothing breaks, but every message logs a hook error until the Agents are up. A single-node cluster that later gets a Redis in-memory store needs Upgrade Agents again to move its counters there.
+The hook and the backstop are part of the cluster plan, and both they and the `quota` section of `config.json` wait for **Enable Telemetry** and a build of 0.2.0 or newer. To turn the limits on for a cluster: run **Build Agent**, then **Upgrade Agents**, then **Sync Config**. In the other order nothing breaks, but every message logs a hook error until the Agents are up. A single-node cluster that later gets a Redis in-memory store needs Upgrade Agents again to move its counters there.
 
 ## Status
 

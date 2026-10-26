@@ -79,7 +79,7 @@ func (s *Sender) Send(ctx context.Context, batch telemetry.Batch) (telemetry.Out
 		case status == http.StatusUnauthorized || status == http.StatusForbidden:
 			refusals++
 			delay := refusedBackoff.Delay(refusals)
-			s.log.Error("telemetry secret refused; fix the config and restart", append(fields, "message", message, "retry_in", delay)...)
+			s.log.Error("agent credentials refused; Install Agent or Upgrade Agents brings the current ones", append(fields, "message", message, "retry_in", delay)...)
 			if err := s.sleep(ctx, delay); err != nil {
 				return 0, err
 			}

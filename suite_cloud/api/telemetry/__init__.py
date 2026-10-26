@@ -1,8 +1,9 @@
 """The telemetry API: the agents on the nodes push batches of events and metrics.
 
-An agent sends ``Authorization: Bearer <telemetry secret>``; the ``authenticate`` auth hook checks
-the secret and runs the request as the telemetry user, which holds no role, so the secret opens
-nothing but these methods. A batch is validated whole, staged as one parquet file and acknowledged;
+An agent sends ``Authorization: Bearer <agent key>:<agent secret>``, its cluster's credentials. The
+``authenticate`` auth hook finds the cluster, checks the secret and runs the request as the
+telemetry user, which holds no role, so the token opens nothing but these methods, and only for
+that cluster's own servers. A batch is validated whole, staged as one parquet file and acknowledged;
 the warehouse loads it later. Nothing here touches the site database; the cache notes which host
 sent a batch last, for the agent status on the node forms.
 """
@@ -20,7 +21,7 @@ from uuid import UUID, uuid7
 import frappe
 import orjson
 from frappe import _
-from frappe.utils import cint, get_datetime, now_datetime
+from frappe.utils import cint
 from frappe.utils.password import get_decrypted_password
 
 from suite_cloud.api.tenant import InvalidInputError, assert_arguments, throttle
@@ -30,27 +31,27 @@ from suite_cloud.telemetry.spool import Spool
 from suite_cloud.utils import get_config
 
 API_PATHS = ("/api/v2/method/suite_cloud.api.telemetry.", "/api/method/suite_cloud.api.telemetry.")
-SETTINGS = ("Suite Cloud Settings", "Suite Cloud Settings")
 DEFAULT_REQUESTS_PER_MINUTE = 300  # the settings' defaults, used until the site has them
 DEFAULT_RECORDS_PER_REQUEST = 5000
 HOSTNAME_LIMIT = 253
 SOURCE_PATTERN = re.compile(r"[a-z0-9_-]{1,64}")
 METRIC_TYPES = ("counter", "gauge", "histogram")
+SERVER_DOCTYPES = ("Stalwart Node", "Egress Gateway")
 INTEGER_LIMIT = 2**63  # the metrics table stores counts as 64-bit integers
 
 
 def authenticate() -> None:
-    """Frappe auth hook: a bearer token on the telemetry API is the telemetry secret.
+    """Frappe auth hook: a bearer token on the telemetry API is an Agent's cluster credentials.
 
     Elsewhere a bearer token is Frappe's own OAuth business, so the hook leaves it alone.
     """
 
-    scheme, _space, secret = frappe.get_request_header("Authorization", "").partition(" ")
+    scheme, _space, token = frappe.get_request_header("Authorization", "").partition(" ")
     if scheme.lower() != "bearer" or not frappe.request.path.startswith(API_PATHS):
         return
 
-    secret = secret.strip()
-    if not any(secrets.compare_digest(accepted, secret) for accepted in get_accepted_secrets()):
+    cluster = get_agent_cluster(token.strip())
+    if not cluster:
         request_ip = getattr(frappe.local, "request_ip", None)
         throttle(f"address:{request_ip or 'unknown'}")  # guessing secrets is paced like everything else
         raise frappe.AuthenticationError(_("Telemetry authentication failed."))
@@ -58,29 +59,32 @@ def authenticate() -> None:
     form_dict = frappe.local.form_dict
     frappe.set_user(TELEMETRY_USER)
     frappe.local.form_dict = form_dict  # set_user clears the request body Frappe already parsed
+    frappe.local.agent_cluster = cluster
 
 
-def get_accepted_secrets() -> list[str]:
-    """The current secret, and the previous one while its overlap after a rotation lasts."""
+def get_agent_cluster(token: str) -> str | None:
+    """The cluster whose Agent Key and Agent Secret make up ``<key>:<secret>``, while telemetry is
+    on; None for anything else."""
 
-    accepted = []
-    current = get_decrypted_password(*SETTINGS, "telemetry_secret", raise_exception=False)
-    if current:
-        accepted.append(current)
-    until = frappe.get_cached_value(*SETTINGS, "telemetry_previous_secret_until")
-    if until and get_datetime(until) > now_datetime():
-        previous = get_decrypted_password(*SETTINGS, "telemetry_previous_secret", raise_exception=False)
-        if previous:
-            accepted.append(previous)
-    return accepted
+    key, separator, secret = token.partition(":")
+    if not (separator and key and secret and cint(get_config("enable_telemetry"))):
+        return None
+    cluster = frappe.db.get_value("Stalwart Cluster", {"agent_key": key}, "name")
+    stored = cluster and get_decrypted_password(
+        "Stalwart Cluster", cluster, "agent_secret", raise_exception=False
+    )
+    if not stored or not secrets.compare_digest(stored, secret):
+        return None
+    return cluster
 
 
 def telemetry_api(fn: Callable) -> Callable:
-    """Only the user the secret signs in may call the method; a missing argument is a 400."""
+    """Only an Agent the auth hook signed in for its cluster may call the method; a missing argument
+    is a 400."""
 
     @wraps(fn)
     def wrapper(*args, **kwargs):
-        if frappe.session.user != TELEMETRY_USER:
+        if frappe.session.user != TELEMETRY_USER or not getattr(frappe.local, "agent_cluster", None):
             frappe.throw(_("Only telemetry agents may call this method."), frappe.PermissionError)
         assert_arguments(fn, args, kwargs)
         return fn(*args, **kwargs)
@@ -144,6 +148,7 @@ def get_envelope(source: str, host_ip: str, hostname: str | None, batch_id: str 
             frappe.throw(_("batch_id must be a UUID."), InvalidInputError)
 
     throttle(f"telemetry:{address}", get_limit("telemetry_requests_per_minute", DEFAULT_REQUESTS_PER_MINUTE))
+    assert_cluster_server(str(address))
     return {
         "batch_id": batch_id or str(uuid7()),
         "received_at": datetime.now(UTC).replace(tzinfo=None),
@@ -151,6 +156,19 @@ def get_envelope(source: str, host_ip: str, hostname: str | None, batch_id: str 
         "host_ip": str(address),
         "hostname": hostname,
     }
+
+
+def assert_cluster_server(address: str) -> None:
+    """A batch speaks for one of the caller's cluster's own nodes or gateways, whatever their status."""
+
+    cluster = frappe.local.agent_cluster
+    for doctype in SERVER_DOCTYPES:
+        if frappe.db.exists(doctype, {"cluster": cluster, "ipv4_address": address}):
+            return
+    frappe.throw(
+        _("host_ip {0} is not a node or gateway of the Agent's cluster.").format(address),
+        frappe.PermissionError,
+    )
 
 
 def get_records(records: list) -> list[Record]:

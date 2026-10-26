@@ -39,6 +39,8 @@ class StalwartCluster(Document):
 
         acme_contact_email: DF.Data | None
         acme_directory_url: DF.Data | None
+        agent_key: DF.Data | None
+        agent_secret: DF.Password | None
         admin_password: DF.Password | None
         admin_username: DF.Data | None
         api_key: DF.Password | None
@@ -88,6 +90,9 @@ class StalwartCluster(Document):
             self.metrics_password = frappe.generate_hash(length=32)
         if not self.quota_hook_token:
             self.quota_hook_token = frappe.generate_hash(length=32)
+        self.agent_key = self.agent_key or frappe.generate_hash(length=20)
+        if not self.agent_secret:
+            self.agent_secret = frappe.generate_hash(length=40)
         self.relay_username = self.relay_username or "relay"
         if not self.relay_password:
             self.relay_password = frappe.generate_hash(length=32)
@@ -254,6 +259,12 @@ class StalwartCluster(Document):
     def get_client(self):
         return get_client(self)
 
+    @property
+    def agent_token(self) -> str:
+        """The bearer token the cluster's Agents send to Suite Cloud: ``<agent key>:<agent secret>``."""
+
+        return f"{self.agent_key}:{self.get_password('agent_secret')}"
+
     def get_admin_client(self):
         return get_admin_client(self)
 
@@ -364,6 +375,18 @@ class StalwartCluster(Document):
         from suite_cloud.telemetry.agent.deploy import upgrade_agents
 
         return upgrade_agents(self)
+
+    @frappe.whitelist()
+    def rotate_agent_secret(self) -> list[str]:
+        """Replaces the Agent Secret and reinstalls the cluster's Agents with it. An Agent not yet
+        reinstalled is refused and retries, so it loses nothing."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.deploy import is_telemetry_enabled, upgrade_agents
+
+        self.agent_secret = frappe.generate_hash(length=40)
+        self.save(ignore_permissions=True)
+        return upgrade_agents(self) if is_telemetry_enabled() else []
 
 
 def check_all_clusters() -> None:

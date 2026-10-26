@@ -11,13 +11,13 @@ Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each
 
 ## Authentication
 
-Every agent sends the telemetry secret from **Suite Cloud Settings > Telemetry** as a bearer token:
+Every agent sends its cluster's **Agent Key** and **Agent Secret**, from the Stalwart Cluster record, as a bearer token:
 
 ```http
-Authorization: Bearer <telemetry secret>
+Authorization: Bearer <agent key>:<agent secret>
 ```
 
-The secret is accepted only on these methods and runs them as a user without any role, so it opens nothing else. An empty secret turns the API off: every request is refused with a 401. To rotate, change the setting: the old value moves to **Telemetry Previous Secret** and stays accepted until **Previous Secret Accepted Until**, a day later by default, so the agents can be updated one by one. Shorten or clear the previous secret to end the overlap early. An agent still sending the old secret after that gets a 401 until it is updated.
+The token is accepted only on these methods and runs them as a user without any role, so it opens nothing else. It also holds the caller to its cluster: `host_ip` must be one of that cluster's nodes or gateways, and a batch for any other address is a 403. With **Enable Telemetry** off in **Suite Cloud Settings > Telemetry**, every request is refused with a 401. **Rotate Agent Secret** on the cluster replaces the secret at once and reinstalls the cluster's agents; an agent still sending the old secret gets a 401 and retries until its new config arrives, so nothing is lost.
 
 ## Request
 
@@ -76,7 +76,7 @@ For Stalwart, the agent reads Stalwart's Prometheus endpoint for the metrics, un
 
 ```http
 POST /api/v2/method/suite_cloud.api.telemetry.events
-Authorization: Bearer <telemetry secret>
+Authorization: Bearer <agent key>:<agent secret>
 Content-Type: application/json
 
 {
@@ -107,8 +107,8 @@ An accepted batch answers 200 with the batch id and the number of records staged
 | Status | Type | Meaning |
 | --- | --- | --- |
 | 400 | `InvalidInputError` | A required parameter left out, a bad address, source, hostname, batch id or timestamp, more records than the setting allows, or a bad field; the message names the record, such as `records[12].timestamp must carry a UTC offset.` |
-| 401 | `AuthenticationError` | The secret is wrong or not set |
-| 403 | `PermissionError` | A verb other than POST, or a caller that is not a telemetry agent |
+| 401 | `AuthenticationError` | The key or secret is wrong, or telemetry is off |
+| 403 | `PermissionError` | A verb other than POST, a caller that is not a telemetry agent, or a `host_ip` that is not a server of the agent's cluster |
 | 417 | `FrappeTypeError` | A parameter of the wrong JSON type, such as `records` sent as a string |
 | 429 | `TooManyRequestsError` | The node sent more requests in the current minute than **Telemetry Requests per Minute** allows |
 | 500 | | The batch could not be written, for example because the disk is full; nothing was staged |
@@ -123,7 +123,7 @@ Each node may make **Telemetry Requests per Minute** requests (300 by default), 
 
 ## Sending limits
 
-The Agent on a Stalwart node uses two more methods to enforce the [sending limits](../agent.md#sending-limits). The secret is shared by every cluster, so each call names the node in `host_ip`, and the caller only reads and reports the accounts of that node's cluster. A `host_ip` that is not the address of exactly one Active or Draining Stalwart Node is a 403. Both calls count against **Telemetry Requests per Minute**.
+The Agent on a Stalwart node uses two more methods to enforce the [sending limits](../agent.md#sending-limits). The caller only reads and reports the accounts of its own cluster, and `host_ip` must be one of that cluster's Active or Draining Stalwart Nodes; any other address is a 403. Both calls count against **Telemetry Requests per Minute**.
 
 `telemetry.quota.limits` takes `host_ip` and `since_version`, and answers the limits changed after it, oldest first, at most 500 per page:
 

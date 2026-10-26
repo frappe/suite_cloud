@@ -17,10 +17,11 @@ from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
     prune_usage,
     upsert_usage,
 )
-from suite_cloud.mail.tests.fixtures import make_node
+from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
 from suite_cloud.patches.v1_0 import fill_quota_hook_tokens
 from suite_cloud.telemetry import TELEMETRY_USER
+from suite_cloud.tests.fixtures import ROOT_DOMAIN
 
 NODE_IP = "203.0.113.10"
 
@@ -41,11 +42,15 @@ class SendingLimitsTestCase(TenantApiTestCase):
         self.addCleanup(settle.stop)
 
     def tearDown(self) -> None:
+        frappe.local.agent_cluster = None
         frappe.db.delete("Mail Send Usage", {"account": ("like", "%@acme.com")})
         super().tearDown()
 
-    def as_agent(self) -> None:
+    def as_agent(self, cluster: str | None = None) -> None:
+        """As the auth hook leaves a request its cluster's credentials signed in."""
+
         frappe.set_user(TELEMETRY_USER)
+        frappe.local.agent_cluster = cluster or self.cluster.name
         frappe.utils.set_request(method="POST", headers={"User-Agent": "suite-cloud-agent/0.2.0+abcdef12"})
         frappe.local.form_dict = frappe._dict()
 
@@ -88,6 +93,11 @@ class TestLimitsApi(SendingLimitsTestCase):
         for host_ip in ("198.51.100.1", "not-an-ip"):
             self.assertRaises((frappe.PermissionError, InvalidInputError), quota_api.limits, host_ip)
         self.assertRaisesRegex(InvalidInputError, "since_version", quota_api.limits, NODE_IP, "2026")
+
+        frappe.set_user("Administrator")
+        other = make_cluster("c2", hostname=f"mail.c2.{ROOT_DOMAIN}")
+        self.as_agent(other.name)  # another cluster's Agent naming this cluster's node
+        self.assertRaisesRegex(frappe.PermissionError, "Agent's cluster", quota_api.limits, NODE_IP)
 
         frappe.set_user("Administrator")
         self.node.db_set("status", "Provisioned")

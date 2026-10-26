@@ -1,4 +1,5 @@
-"""The telemetry API: the secret signs the agent in, a batch is checked whole and staged once."""
+"""The telemetry API: a cluster's credentials sign its Agents in, a batch is checked whole and
+staged once."""
 
 import tempfile
 from datetime import UTC, datetime
@@ -9,16 +10,17 @@ from uuid import UUID
 import frappe
 import pyarrow.parquet as parquet
 from frappe.tests import IntegrationTestCase
-from frappe.utils import add_to_date, get_test_client, now_datetime
+from frappe.utils import get_test_client
 
 from suite_cloud.api.telemetry import DEFAULT_RECORDS_PER_REQUEST, authenticate, events, metrics
 from suite_cloud.api.tenant import InvalidInputError
+from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.telemetry import EVENTS, METRICS, TELEMETRY_USER
 from suite_cloud.telemetry.agent.status import CACHE_KEY, forget_contacts
 from suite_cloud.telemetry.spool import Spool
-from suite_cloud.tests.fixtures import configure_settings
+from suite_cloud.tests.fixtures import ROOT_DOMAIN, configure_settings
 
-SECRET = "agent-secret-for-tests"
+NODE_IPS = ("203.0.113.5", "198.51.100.77")
 PATH = "/api/method/suite_cloud.api.telemetry.events"
 EVENT = {
     "timestamp": "2026-10-20T09:59:00Z",
@@ -33,16 +35,21 @@ HOST = {"source": "stalwart", "host_ip": "203.0.113.5", "hostname": " n1.c1.exam
 
 class TelemetryApiTestCase(IntegrationTestCase):
     def setUp(self) -> None:
-        configure_settings(telemetry_secret=SECRET)
+        configure_settings(enable_telemetry=1)
+        self.cluster = make_cluster()
+        for ip in NODE_IPS:
+            make_node(self.cluster, ipv4=ip)
+        self.token = self.cluster.agent_token
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.spool = Spool(Path(self.directory.name))
         patcher = patch("suite_cloud.api.telemetry.Spool", return_value=self.spool)
         patcher.start()
         self.addCleanup(patcher.stop)
-        self.request(SECRET)
+        self.request(self.token)
 
     def tearDown(self) -> None:
+        frappe.local.agent_cluster = None
         frappe.local.request = None
         frappe.set_user("Administrator")
 
@@ -62,44 +69,63 @@ class TelemetryApiTestCase(IntegrationTestCase):
 
 
 class TestAuthentication(TelemetryApiTestCase):
-    def test_the_secret_signs_the_telemetry_user_in(self) -> None:
+    def test_the_cluster_credentials_sign_the_telemetry_user_in(self) -> None:
         self.assertEqual(frappe.session.user, TELEMETRY_USER)
+        self.assertEqual(frappe.local.agent_cluster, self.cluster.name)
 
     def test_other_requests_pass_through_untouched(self) -> None:
         for secret, path, scheme in (
             (None, PATH, "Bearer"),
-            (SECRET, PATH, "Tenant"),
-            (SECRET, "/api/method/frappe.ping", "Bearer"),  # Frappe's own OAuth bearer tokens
+            (self.token, PATH, "Tenant"),
+            (self.token, "/api/method/frappe.ping", "Bearer"),  # Frappe's own OAuth bearer tokens
         ):
             with self.subTest(f"{scheme} on {path}"):
                 self.request(secret, path, scheme)
                 self.assertEqual(frappe.session.user, "Guest")
 
     def test_a_wrong_secret_is_refused(self) -> None:
-        for secret in ("", "not-the-secret", SECRET.upper()):
+        key = self.cluster.agent_key
+        wrong = (
+            "",
+            "not-the-secret",
+            self.token.upper(),
+            key,
+            f"{key}:",
+            f"{key}:wrong",
+            f"other:{self.token}",
+        )
+        for secret in wrong:
             with self.subTest(secret), self.assertRaisesRegex(frappe.AuthenticationError, "failed"):
                 self.request(secret)
 
-    def test_an_unset_secret_refuses_everyone(self) -> None:
+    def test_telemetry_off_refuses_everyone(self) -> None:
         frappe.set_user("Administrator")
-        configure_settings(telemetry_secret="")
+        configure_settings(enable_telemetry=0)
 
         with self.assertRaisesRegex(frappe.AuthenticationError, "failed"):
-            self.request(SECRET)
+            self.request(self.token)
 
-    def test_the_previous_secret_is_accepted_until_its_overlap_ends(self) -> None:
+    def test_a_rotated_secret_refuses_the_old_one_at_once(self) -> None:
         frappe.set_user("Administrator")
-        configure_settings(telemetry_secret="rotated-secret")  # the rotation keeps SECRET for a day
+        cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
+        with patch("suite_cloud.telemetry.agent.deploy.upgrade_agents", return_value=[]) as upgrade:
+            cluster.rotate_agent_secret()
+        upgrade.assert_called_once()
 
-        self.request(SECRET)
-        self.assertEqual(frappe.session.user, TELEMETRY_USER)
-        self.request("rotated-secret")
-        self.assertEqual(frappe.session.user, TELEMETRY_USER)
-
-        frappe.set_user("Administrator")
-        configure_settings(telemetry_previous_secret_until=add_to_date(now_datetime(), minutes=-1))
         with self.assertRaisesRegex(frappe.AuthenticationError, "failed"):
-            self.request(SECRET)
+            self.request(self.token)
+        self.request(cluster.agent_token)
+        self.assertEqual(frappe.session.user, TELEMETRY_USER)
+
+    def test_a_batch_must_come_from_a_server_of_the_cluster(self) -> None:
+        frappe.set_user("Administrator")
+        other = make_cluster("c2", hostname=f"mail.c2.{ROOT_DOMAIN}")
+        make_node(other, ipv4="192.0.2.9")
+        self.request(self.token)
+        for host_ip in ("192.0.2.9", "192.0.2.10"):  # another cluster's node, and nobody's
+            with self.subTest(host_ip), self.assertRaisesRegex(frappe.PermissionError, "Agent's cluster"):
+                events(**{**HOST, "host_ip": host_ip}, records=[EVENT])
+        self.assertEqual(self.staged(), [])
 
     def test_anyone_else_may_not_call_the_methods(self) -> None:
         frappe.set_user("Administrator")
@@ -154,7 +180,7 @@ class TestValidation(TelemetryApiTestCase):
     def test_the_batch_and_request_limits_come_from_the_settings(self) -> None:
         frappe.set_user("Administrator")
         configure_settings(telemetry_records_per_request=2, telemetry_requests_per_minute=2)
-        self.request(SECRET)
+        self.request(self.token)
         host = {**HOST, "host_ip": "198.51.100.77"}  # a window of its own; the counter outlives the test
         frappe.cache.delete_keys("suite_cloud:ratelimit:telemetry:198.51.100.77")
 
@@ -202,12 +228,12 @@ class TestStaging(TelemetryApiTestCase):
     def test_a_metric_batch_keeps_its_numbers_and_converts_the_offset(self) -> None:
         response = metrics(
             source="sfu",
-            host_ip="2001:DB8::1",
+            host_ip=NODE_IPS[1],
             records=[METRIC, {**METRIC, "type": "histogram", "count": 3, "sum": 9.5, "labels": {"q": "a"}}],
         )
 
         rows = parquet.read_table(self.staged(METRICS)[0]).to_pylist()
-        self.assertEqual(rows[0]["host_ip"], "2001:db8::1")
+        self.assertEqual(rows[0]["host_ip"], NODE_IPS[1])
         self.assertIsNone(rows[0]["hostname"])
         self.assertEqual(rows[0]["timestamp"], datetime(2026, 10, 20, 7, 59))
         self.assertEqual(
@@ -252,20 +278,20 @@ class TestHttpContract(TelemetryApiTestCase):
                 base_url="http://localhost/",
                 json=params,
             )
-        self.request(SECRET)  # the request re-initialised the thread-local
+        self.request(self.token)  # the request re-initialised the thread-local
         return response.status_code, response.get_json(silent=True)
 
     def test_the_status_codes_an_agent_relies_on(self) -> None:
         status, body = self.http("POST", "wrong", **HOST, records=[EVENT])
         self.assertEqual((status, body["errors"][0]["type"]), (401, "AuthenticationError"))
 
-        status, body = self.http("GET", SECRET, **HOST, records=[EVENT])
+        status, body = self.http("GET", self.token, **HOST, records=[EVENT])
         self.assertEqual((status, body["errors"][0]["type"]), (403, "PermissionError"))
 
-        status, body = self.http("POST", SECRET, **HOST, records=[{**EVENT, "level": ""}])
+        status, body = self.http("POST", self.token, **HOST, records=[{**EVENT, "level": ""}])
         self.assertEqual((status, body["errors"][0]["type"]), (400, "InvalidInputError"))
         self.assertEqual(body["errors"][0]["message"], "records[0].level is required.")
 
-        status, body = self.http("POST", SECRET, **HOST, records=[EVENT])
+        status, body = self.http("POST", self.token, **HOST, records=[EVENT])
         self.assertEqual((status, body["data"]["accepted"]), (200, 1))
         self.assertEqual(len(self.staged()), 1)

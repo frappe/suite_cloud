@@ -1,8 +1,7 @@
 """The sending-limit API: each node's Agent pulls its cluster's limits and pushes what it counted.
 
-The telemetry secret is shared by every cluster, so a caller is held to the cluster of the node
-whose address it names. As with telemetry, ``host_ip`` is what the Agent claims, not a checked
-address.
+The auth hook resolves the caller's cluster from its credentials; ``host_ip`` must be one of that
+cluster's Active or Draining nodes, and only that cluster's accounts are read or reported.
 """
 
 import ipaddress
@@ -93,26 +92,23 @@ def usage(host_ip: str, records: list) -> dict:
 
 
 def get_cluster_for_host(host_ip: str) -> str:
-    """The cluster of the one Active or Draining node at ``host_ip``; the host is throttled like
-    any telemetry sender and noted as in contact."""
+    """The caller's cluster, once ``host_ip`` proves to be one of its Active or Draining nodes; the
+    host is throttled like any telemetry sender and noted as in contact."""
 
     try:
         address = str(ipaddress.ip_address(host_ip))
     except ValueError:
         frappe.throw(_("host_ip must be an IPv4 or IPv6 address."), InvalidInputError)
     throttle(f"telemetry:{address}", get_limit("telemetry_requests_per_minute", DEFAULT_REQUESTS_PER_MINUTE))
-    clusters = frappe.get_all(
-        "Stalwart Node",
-        filters={"ipv4_address": address, "status": ("in", NODE_STATUSES)},
-        pluck="cluster",
-    )
-    if len(clusters) != 1:
+    cluster = frappe.local.agent_cluster
+    node = {"cluster": cluster, "ipv4_address": address, "status": ("in", NODE_STATUSES)}
+    if not frappe.db.exists("Stalwart Node", node):
         frappe.throw(
-            _("host_ip {0} is not the address of exactly one active Stalwart Node.").format(address),
+            _("host_ip {0} is not an active Stalwart Node of the Agent's cluster.").format(address),
             frappe.PermissionError,
         )
     record_contact(address, frappe.get_request_header("User-Agent"))
-    return clusters[0]
+    return cluster
 
 
 def cursor(row) -> str:

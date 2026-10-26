@@ -19,9 +19,7 @@
   "column_break_email",
   "use_tenant_title_as_sender_name",
   "telemetry_section",
-  "telemetry_secret",
-  "telemetry_previous_secret",
-  "telemetry_previous_secret_until",
+  "enable_telemetry",
   "column_break_telemetry",
   "telemetry_retention_days",
   "telemetry_requests_per_minute",
@@ -186,22 +184,11 @@
    "label": "Telemetry"
   },
   {
-   "description": "The bearer token every telemetry agent sends. Empty: the telemetry API refuses every request. Change it to rotate: the old value moves to Previous Secret and stays accepted for a day, so agents can be updated one by one.",
-   "fieldname": "telemetry_secret",
-   "fieldtype": "Password",
-   "label": "Telemetry Secret"
-  },
-  {
-   "description": "The secret before the last rotation, accepted until the time below. Clear it to end the overlap early.",
-   "fieldname": "telemetry_previous_secret",
-   "fieldtype": "Password",
-   "label": "Telemetry Previous Secret"
-  },
-  {
-   "description": "When the previous secret stops being accepted.",
-   "fieldname": "telemetry_previous_secret_until",
-   "fieldtype": "Datetime",
-   "label": "Previous Secret Accepted Until"
+   "default": "0",
+   "description": "Runs the Suite Cloud Agent on every Stalwart node and egress gateway and opens the telemetry API to them. Each Agent signs in with its cluster's Agent Key and Agent Secret. Turning this on or off queues an Install Agent job on every server that runs an Agent: off, the job stops the Agent.",
+   "fieldname": "enable_telemetry",
+   "fieldtype": "Check",
+   "label": "Enable Telemetry"
   },
   {
    "fieldname": "column_break_telemetry",
@@ -264,7 +251,7 @@
    "reqd": 1
   },
   {
-   "description": "The Suite Cloud Agent runs on every Stalwart node and egress gateway and ships the Stalwart log and host metrics to the telemetry API. Provisioning installs it when the telemetry secret is set and a build exists.",
+   "description": "The Suite Cloud Agent runs on every Stalwart node and egress gateway and ships the Stalwart log and host metrics to the telemetry API. Provisioning installs it when Enable Telemetry is on and a build exists.",
    "fieldname": "agent_section",
    "fieldtype": "Section Break",
    "label": "Agent"
@@ -661,7 +648,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-21 12:00:00.000000",
+ "modified": "2026-10-27 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

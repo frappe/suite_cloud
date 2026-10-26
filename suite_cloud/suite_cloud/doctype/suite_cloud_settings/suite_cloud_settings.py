@@ -4,14 +4,12 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import add_to_date, cint, now_datetime
-from frappe.utils.password import get_decrypted_password
+from frappe.utils import cint
 
 from suite_cloud.utils import clear_config_cache, validate_version
 
 # Set all together or not at all; the form marks them with the same rule (mandatory_depends_on).
 CENTRAL_CONNECTION_FIELDS = ("central_url", "central_team", "central_api_key", "central_api_secret")
-TELEMETRY_SECRET_OVERLAP_HOURS = 24  # how long the previous telemetry secret stays accepted
 TELEMETRY_LIMITS = (
     "telemetry_requests_per_minute",
     "telemetry_records_per_request",
@@ -59,6 +57,7 @@ class SuiteCloudSettings(Document):
         default_region: DF.Link | None
         disk_per_site_gb: DF.Int
         dmarc_report_retention_days: DF.Int
+        enable_telemetry: DF.Check
         max_sites_per_vm: DF.Int
         memory_per_site_mb: DF.Int
         min_free_site_slots: DF.Int
@@ -79,12 +78,9 @@ class SuiteCloudSettings(Document):
         suite_app_repo: DF.Data
         telemetry_alert_recipients: DF.SmallText | None
         telemetry_error_rate_percent: DF.Int
-        telemetry_previous_secret: DF.Password | None
-        telemetry_previous_secret_until: DF.Datetime | None
         telemetry_records_per_request: DF.Int
         telemetry_requests_per_minute: DF.Int
         telemetry_retention_days: DF.Int
-        telemetry_secret: DF.Password | None
         telemetry_silence_minutes: DF.Int
         tenant_email_accounts: DF.Table[TenantEmailAccount]
         tenant_mail_zone: DF.Link | None
@@ -115,10 +111,10 @@ class SuiteCloudSettings(Document):
             )
 
             enqueue_recheck_of_vouched_domains()
-        if self.flags.telemetry_secret_changed:
+        if before and cint(before.enable_telemetry) != cint(self.enable_telemetry):
             from suite_cloud.telemetry.agent.deploy import roll_out_agents
 
-            roll_out_agents(secret_set=self.flags.telemetry_secret_set)
+            roll_out_agents(enabled=bool(self.enable_telemetry))
 
     def validate_report_retention(self) -> None:
         for field in ("dmarc_report_retention_days", "tls_report_retention_days", "telemetry_retention_days"):
@@ -134,27 +130,6 @@ class SuiteCloudSettings(Document):
                 frappe.throw(
                     _("{0} must be between {1} and {2}.").format(_(self.meta.get_label(field)), low, high)
                 )
-        self.rotate_telemetry_secret()
-
-    def rotate_telemetry_secret(self) -> None:
-        """A new secret keeps the old one accepted for a while, and on_update sends it to the
-        agents; clearing the secret turns the API off, previous secret included."""
-
-        secret = self.telemetry_secret
-        if secret and self.is_dummy_password(secret):
-            return  # the form sends the saved secret masked
-        previous = get_decrypted_password(self.doctype, self.name, "telemetry_secret", raise_exception=False)
-        self.flags.telemetry_secret_changed = (previous or "") != (secret or "")
-        self.flags.telemetry_secret_set = bool(secret)
-        if not secret:
-            self.telemetry_previous_secret = None
-            self.telemetry_previous_secret_until = None
-            return
-        if previous and previous != secret:
-            self.telemetry_previous_secret = previous
-            self.telemetry_previous_secret_until = add_to_date(
-                now_datetime(), hours=TELEMETRY_SECRET_OVERLAP_HOURS, as_datetime=True
-            )
 
     def validate_tenant_email_accounts(self) -> None:
         seen = set()

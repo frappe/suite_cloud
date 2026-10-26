@@ -180,12 +180,12 @@ Servers and VPSs cost money until you remove them:
 
 The agent on each node pushes logs and metrics to the [telemetry API](api/telemetry.md). Suite Cloud stages each batch as a parquet file under `private/files/telemetry/` and the five-minute job copies the files into the `suite_cloud_telemetry` DuckDB data source in Insights, which `migrate` creates.
 
-1. In **Suite Cloud Settings > Telemetry**, set a **Telemetry Secret**.
+1. In **Suite Cloud Settings > Telemetry**, turn on **Enable Telemetry**. Take the **Agent Key** and **Agent Secret** from a Stalwart Cluster that has a node at the `host_ip` below.
 2. Send a batch:
 
    ```sh
    curl -X POST http://suite-cloud.localhost:8000/api/v2/method/suite_cloud.api.telemetry.events \
-     -H "Authorization: Bearer <secret>" -H "Content-Type: application/json" \
+     -H "Authorization: Bearer <agent key>:<agent secret>" -H "Content-Type: application/json" \
      -d '{"source": "stalwart", "host_ip": "203.0.113.5", "hostname": "n1", "records": [{"timestamp": "2026-10-20T09:59:00Z", "level": "info", "event": "delivery.delivered", "data": {"domain": "example.com"}}]}'
    ```
 

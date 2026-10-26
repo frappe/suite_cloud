@@ -34,6 +34,7 @@ frappe.ui.form.on('Stalwart Cluster', {
 			frm.add_custom_button(__('Replace DKIM Keys'), () => frm.trigger('replace_dkim_keys'), __('Access'))
 			frm.add_custom_button(__('Upgrade Nodes'), () => frm.trigger('upgrade_nodes'), __('Nodes'))
 			frm.add_custom_button(__('Upgrade Agents'), () => frm.trigger('upgrade_agents'), __('Nodes'))
+			frm.add_custom_button(__('Rotate Agent Secret'), () => frm.trigger('rotate_agent_secret'), __('Access'))
 		}
 		if (frm.doc.status === 'Bootstrapping') {
 			frm.add_custom_button(__('Finish Bootstrap'), () => frm.trigger('finish_bootstrap'), __('Nodes'))
@@ -150,6 +151,12 @@ frappe.ui.form.on('Stalwart Cluster', {
 	upgrade_agents(frm) {
 		frappe.confirm(__('Install the current Suite Cloud Agent build on every active or draining node and every active gateway? Stalwart keeps running.'), () => {
 			frm.events.call(frm, 'upgrade_agents', {}, __('Queueing agent installs...'))
+		})
+	},
+
+	rotate_agent_secret(frm) {
+		frappe.confirm(__('Replace the Agent Secret and reinstall the Agents of this cluster? Until each Agent is reinstalled, Suite Cloud refuses it and it retries.'), () => {
+			frm.events.call(frm, 'rotate_agent_secret', {}, __('Queueing agent installs...'))
 		})
 	},
 

@@ -129,40 +129,6 @@ class TestSuiteCloudSettings(IntegrationTestCase):
         self.settings.save()
         self.assertEqual(get_config("agent_log_delete_after_days"), 0)
 
-    def test_a_new_telemetry_secret_keeps_the_old_one_for_a_day(self) -> None:
-        from frappe.utils.password import get_decrypted_password
-
-        self.settings.telemetry_secret = ""  # the site may hold one already
-        self.settings.save()
-        self.settings.telemetry_secret = "first"
-        self.settings.save()
-        self.settings.reload()
-        self.settings.save()  # the form sends the masked secret back: nothing rotates
-        self.assertIsNone(self.settings.telemetry_previous_secret_until)
-
-        self.settings.telemetry_secret = "second"
-        self.settings.save()
-        previous = get_decrypted_password(
-            "Suite Cloud Settings", "Suite Cloud Settings", "telemetry_previous_secret"
-        )
-        self.assertEqual(previous, "first")
-        hours = (
-            self.settings.telemetry_previous_secret_until - frappe.utils.now_datetime()
-        ).total_seconds() / 3600
-        self.assertAlmostEqual(hours, 24, delta=0.1)
-
-        self.settings.telemetry_secret = ""
-        self.settings.save()
-        self.assertIsNone(self.settings.telemetry_previous_secret_until)
-        self.assertIsNone(
-            get_decrypted_password(
-                "Suite Cloud Settings",
-                "Suite Cloud Settings",
-                "telemetry_previous_secret",
-                raise_exception=False,
-            )
-        )
-
     def test_the_telemetry_user_is_created_without_roles(self) -> None:
         from suite_cloud.install import TELEMETRY_USER, ensure_user
 

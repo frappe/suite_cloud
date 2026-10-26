@@ -8,7 +8,7 @@ from pathlib import Path
 
 import frappe
 from frappe import _
-from frappe.utils import now
+from frappe.utils import cint, now
 from frappe.utils.background_jobs import is_job_enqueued
 
 from suite_cloud.utils import clear_config_cache, get_config, log_error, log_exception
@@ -209,7 +209,7 @@ def build_if_outdated() -> None:
         if build.version == get_config("agent_built_version") and build.is_built:
             return
         if not find_go():
-            if frappe.get_single(SETTINGS).get_password("telemetry_secret", raise_exception=False):
+            if cint(get_config("enable_telemetry")):
                 log_error("Agent not built", _("Telemetry is on but this bench host has no Go toolchain."))
             return
         enqueue_build()

@@ -29,11 +29,10 @@ def agent_config(server: Document) -> dict:
     """``config.json`` for a Stalwart Node or Egress Gateway. The Go side reads exactly this shape
     (``agent/internal/config``), so the two change together."""
 
-    settings = frappe.get_cached_doc("Suite Cloud Settings")
     config = {
         "suite_cloud": {
             "url": get_config("public_url") or get_url(),
-            "secret": settings.get_password("telemetry_secret", raise_exception=False),
+            "secret": server.get_cluster().agent_token,
             "requests_per_minute": cint(get_config("telemetry_requests_per_minute")),
             "records_per_request": cint(get_config("telemetry_records_per_request")),
             "max_attempts": cint(get_config("agent_max_attempts")),
@@ -87,10 +86,10 @@ def quota_config(cluster: Document) -> dict:
 
 
 def is_quota_enabled() -> bool:
-    """The hook and the Agents' quota section wait for a telemetry secret and a build with quota."""
+    """The hook and the Agents' quota section wait for telemetry to be on and a build with quota."""
 
     build = AgentBuild.last_built()
-    return has_secret() and bool(build) and build.has_quota
+    return is_telemetry_enabled() and bool(build) and build.has_quota
 
 
 def scrapes_metrics(server: Document) -> bool:
@@ -135,14 +134,13 @@ WantedBy=multi-user.target
 """
 
 
-def has_secret() -> bool:
-    settings = frappe.get_cached_doc("Suite Cloud Settings")
-    return bool(settings.get_password("telemetry_secret", raise_exception=False))
+def is_telemetry_enabled() -> bool:
+    return bool(cint(get_config("enable_telemetry")))
 
 
 def agent_variables(server: Document, restart: bool = False) -> dict:
     """What install-agent.yml needs, merged into the node and gateway variables so the two never
-    differ. Without a secret or a build the play stops the agent instead of installing it. With
+    differ. With telemetry off or without a build the play stops the agent instead. With
     ``restart`` the play restarts the agent even when nothing on the node changed."""
 
     disabled = {
@@ -154,7 +152,7 @@ def agent_variables(server: Document, restart: bool = False) -> dict:
         "agent_restart": restart,
         "__secret_values__": [],
     }
-    if not has_secret():
+    if not is_telemetry_enabled():
         return disabled
     build = AgentBuild.last_built()
     if not build or not build.is_built:
@@ -185,8 +183,8 @@ def install_agent(server: Document) -> Document:
     """A Server Job that installs the agent only: no drain, no Stalwart restart. The binary, the
     config and the unit are rewritten where they differ and the agent restarts in any case."""
 
-    if not has_secret():
-        frappe.throw(_("Set the Telemetry Secret in Suite Cloud Settings first."))
+    if not is_telemetry_enabled():
+        frappe.throw(_("Turn on Enable Telemetry in Suite Cloud Settings first."))
     build = AgentBuild.last_built()
     if not build or not build.is_built:
         frappe.throw(_("No agent build on this bench host; run Build Agent in Suite Cloud Settings first."))
@@ -234,21 +232,21 @@ def filters_for(cluster: Document | None, statuses: tuple[str, ...]) -> dict:
     return filters
 
 
-def roll_out_agents(secret_set: bool) -> list[str]:
-    """After the Telemetry Secret changed: every server that runs an agent gets the new config,
-    or its agent stopped when the secret was cleared. Runs inside the settings save, so a missing
-    build is an Error Log, not an exception."""
+def roll_out_agents(enabled: bool) -> list[str]:
+    """After Enable Telemetry changed: every server that runs an agent gets it installed, or
+    stopped when telemetry was turned off. Runs inside the settings save, so a missing build is an
+    Error Log, not an exception."""
 
     servers = agent_servers()
     if not servers:
         return []
     build = None
-    if secret_set:
+    if enabled:
         build = AgentBuild.last_built()
         if not build or not build.is_built:
             log_error(
                 "Agent not built",
-                "The Telemetry Secret changed but no agent build exists; run Build Agent, then Upgrade Agents on every cluster.",
+                "Telemetry was turned on but no agent build exists; run Build Agent, then Upgrade Agents on every cluster.",
             )
             return []
     return [agent_job(server, build).name for server in servers]

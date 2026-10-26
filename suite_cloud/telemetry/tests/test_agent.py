@@ -142,7 +142,7 @@ class TestAgentDeploy(AgentBuildFixture):
         self.addCleanup(lambda: setattr(frappe.flags, "do_not_enqueue", False))
         configure_settings()
         settings = frappe.get_single("Suite Cloud Settings")
-        settings.telemetry_secret = "agent-secret"
+        settings.enable_telemetry = 1
         settings.public_url = "https://cloud.example.test"
         settings.save()
         clear_config_cache()
@@ -174,7 +174,8 @@ class TestAgentDeploy(AgentBuildFixture):
     def test_agent_config_for_a_node_a_gateway_and_an_outbound_node(self) -> None:
         config = deploy.agent_config(self.node)
         self.assertEqual(config["suite_cloud"]["url"], "https://cloud.example.test")
-        self.assertEqual(config["suite_cloud"]["secret"], "agent-secret")
+        self.assertEqual(config["suite_cloud"]["secret"], self.cluster.agent_token)
+        self.assertRegex(config["suite_cloud"]["secret"], r"^[0-9a-f]{20}:[0-9a-f]{40}$")
         self.assertEqual(
             (config["suite_cloud"]["requests_per_minute"], config["suite_cloud"]["records_per_request"]),
             (300, 5000),
@@ -231,7 +232,7 @@ class TestAgentDeploy(AgentBuildFixture):
         self.assertIn("User=stalwart", variables["agent_systemd_unit"])
         self.assertFalse(variables["agent_restart"])
         self.assertTrue(deploy.agent_variables(self.node, restart=True)["agent_restart"])
-        self.assertIn("agent-secret", variables["__secret_values__"])
+        self.assertIn(self.cluster.agent_token, variables["__secret_values__"])
         self.assertIn(self.cluster.get_password("metrics_password"), variables["__secret_values__"])
 
         # Sources change before the next build finishes: the nodes keep getting the last build.
@@ -242,8 +243,9 @@ class TestAgentDeploy(AgentBuildFixture):
             self.assertIn(version, deploy.install_agent(self.node).title)
 
         settings = frappe.get_single("Suite Cloud Settings")
-        settings.telemetry_secret = ""
-        settings.save()
+        settings.enable_telemetry = 0
+        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+            settings.save()
         clear_config_cache()
         self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])
 
@@ -310,9 +312,9 @@ class TestAgentDeploy(AgentBuildFixture):
             egress.build_gateway_variables({"gateway": self.gateway.name}),
         ):
             self.assertIn("agent_config_json", variables["__secret_keys__"])
-            self.assertIn("agent-secret", variables["__secret_values__"])
+            self.assertIn(self.cluster.agent_token, variables["__secret_values__"])
             self.assertTrue(variables["agent_enabled"])
-            self.assertIn("agent-secret", variables["agent_config_json"])
+            self.assertIn(self.cluster.agent_token, variables["agent_config_json"])
 
         names = playbook_task_names("configure-node.yml")
         self.assertLess(names.index("Install the Stalwart binary"), names.index("Install the agent binary"))
@@ -339,44 +341,68 @@ class TestAgentDeploy(AgentBuildFixture):
             servers = {frappe.db.get_value("Server Job", name, "server") for name in jobs}
             self.assertEqual(servers, {self.node.name, self.gateway.name})
 
-    def test_a_changed_secret_rolls_the_agents_out(self) -> None:
+    def test_turning_telemetry_on_or_off_rolls_the_agents_out(self) -> None:
         self.node.db_set("status", "Active")
         self.gateway.db_set("status", "Active")
         draining = make_node(self.cluster, ipv4="203.0.113.12")
         draining.db_set("status", "Draining")
         make_node(self.cluster, ipv4="203.0.113.13").db_set("status", "Provisioned")
+        servers = (self.node, draining, self.gateway)
         settings = frappe.get_single("Suite Cloud Settings")
 
-        def jobs_after(secret: str) -> list[dict]:
+        def jobs_after(enabled: bool) -> list[dict]:
             before = frappe.get_all("Server Job", pluck="name")
             settings.reload()
-            settings.telemetry_secret = secret
+            settings.enable_telemetry = int(enabled)
             with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
                 settings.save()
-            self.assertTrue(settings.flags.telemetry_secret_changed)
             return frappe.get_all("Server Job", {"name": ["not in", before]}, ["server", "title"])
 
-        # No build yet: an Error Log instead of jobs the play would refuse.
+        # Off: the agents are stopped, build or not.
+        jobs = jobs_after(False)
+        self.assertEqual({job.title for job in jobs}, {f"Stop agent on {s.hostname}" for s in servers})
+
+        # On without a build: an Error Log instead of jobs the play would refuse.
         errors = error_log_count()
-        self.assertEqual(jobs_after("rotated-once"), [])
+        self.assertEqual(jobs_after(True), [])
         self.assertEqual(error_log_count(), errors + 1)
 
         version = self.build().run()
-        jobs = jobs_after("rotated-twice")
-        self.assertEqual({job.server for job in jobs}, {self.node.name, draining.name, self.gateway.name})
+        jobs_after(False)
+        jobs = jobs_after(True)
+        self.assertEqual({job.server for job in jobs}, {s.name for s in servers})
         self.assertTrue(all(job.title.startswith(f"Install agent {version}") for job in jobs))
 
-        # Cleared: the agents are stopped, build or not.
-        jobs = jobs_after("")
-        self.assertEqual(
-            {job.title for job in jobs},
-            {f"Stop agent on {s.hostname}" for s in (self.node, draining, self.gateway)},
-        )
+        # A save that leaves the switch as it is changes nothing.
+        self.assertEqual(jobs_after(True), [])
 
-        # The form sends the saved secret masked: nothing happens.
-        settings.reload()
-        settings.save()
-        self.assertFalse(settings.flags.telemetry_secret_changed)
+    def test_each_cluster_has_its_own_agent_credentials(self) -> None:
+        from frappe.utils.password import get_decrypted_password, set_encrypted_password
+
+        from suite_cloud.patches.v1_0 import move_agent_auth_to_clusters
+
+        self.assertEqual(len(self.cluster.agent_key), 20)
+        self.assertEqual(self.gateway.get_cluster().agent_token, self.cluster.agent_token)
+
+        # Older sites: the shared secret turns telemetry on and goes; clusters get credentials.
+        settings = "Suite Cloud Settings"
+        frappe.db.set_single_value(settings, "enable_telemetry", 0)
+        set_encrypted_password(settings, settings, "shared-secret", "telemetry_secret")
+        self.cluster.db_set("agent_key", None)
+        frappe.db.delete(
+            "__Auth", {"doctype": "Stalwart Cluster", "name": self.cluster.name, "fieldname": "agent_secret"}
+        )
+        move_agent_auth_to_clusters.execute()
+
+        self.assertEqual(frappe.db.get_single_value(settings, "enable_telemetry"), 1)
+        self.assertIsNone(
+            get_decrypted_password(settings, settings, "telemetry_secret", raise_exception=False)
+        )
+        cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
+        self.assertRegex(cluster.agent_token, r"^[0-9a-f]{20}:[0-9a-f]{40}$")
+        token = cluster.agent_token
+        move_agent_auth_to_clusters.execute()  # a second run keeps them
+        self.assertEqual(frappe.get_doc("Stalwart Cluster", self.cluster.name).agent_token, token)
 
     def test_agent_status_follows_the_last_batch_and_the_build(self) -> None:
         status.forget_contacts()
