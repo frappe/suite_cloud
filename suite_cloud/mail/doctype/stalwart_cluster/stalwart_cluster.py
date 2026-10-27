@@ -217,7 +217,12 @@ class StalwartCluster(Document):
         in_memory = self.get_store("in_memory_store")
         has_redis = bool(in_memory and in_memory.type.startswith("Redis"))
         self.coordinator = "Default" if has_redis and not self.single_node else "Disabled"
-        if self.node_count() > 1 and self.coordinator == "Disabled":
+        self.validate_node_count(self.node_count())
+
+    def validate_node_count(self, count: int) -> None:
+        """Nodes share coordination and sending counters through Redis, so only one may run without."""
+
+        if count > 1 and self.coordinator == "Disabled":
             frappe.throw(_("A multi-node cluster needs a Redis in-memory store to coordinate nodes."))
 
     def validate_default(self) -> None:

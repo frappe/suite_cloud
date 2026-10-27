@@ -66,6 +66,8 @@ class StalwartNode(Document):
             frappe.throw(_("Hostname must be a single label under {0}.").format(cluster.default_domain))
 
         self.validate_single_node(cluster)
+        if self.enabled and (self.is_new() or self.has_value_changed("enabled")):
+            cluster.validate_node_count(cluster.node_count() + 1)  # this node joins the count
         self.ipv4_address = validate_ip(self.ipv4_address, 4)
         self.ipv6_address = validate_ip(self.ipv6_address, 6) if self.ipv6_address else None
         self.ssh_user = self.ssh_user or cluster.ssh_user
@@ -110,8 +112,6 @@ class StalwartNode(Document):
 
         if before.enabled and not self.enabled and self.status in ("Active", "Provisioned"):
             bootstrap.drain_node(self)
-        if self.enabled and not before.enabled:
-            self.revalidate_cluster()
 
     def on_trash(self) -> None:
         if self.status not in REMOVABLE_STATUSES:
