@@ -114,6 +114,9 @@ def upsert_usage(rows: list[dict]) -> None:
     if not rows:
         return
     limits = limits_by_account(list({row["account"] for row in rows}))
+    rows = [row for row in rows if row["account"] in limits]  # deleted since the caller looked
+    if not rows:
+        return
     now = frappe.utils.now()
     user = frappe.session.user
     usage = frappe.qb.DocType("Mail Send Usage")
