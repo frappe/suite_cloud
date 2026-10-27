@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/frappe/suite_cloud/agent/internal/config"
-	"github.com/frappe/suite_cloud/agent/internal/hostmetrics"
 	"github.com/frappe/suite_cloud/agent/internal/prometheus"
 	"github.com/frappe/suite_cloud/agent/internal/telemetry"
 )
@@ -17,11 +16,16 @@ const (
 	warnInterval = 5 * time.Minute
 )
 
+// HostCollector samples the machine; hostmetrics.Collector reads /proc.
+type HostCollector interface {
+	Collect(now time.Time) ([]telemetry.Metric, error)
+}
+
 // Pipeline collects on each tick and hands the batches to the sender through a bounded queue.
 // Samples are points in time, so when the queue is full the oldest is dropped, and nothing is
 // kept across a restart.
 type Pipeline struct {
-	Host      *hostmetrics.Collector
+	Host      HostCollector
 	Scraper   *prometheus.Scraper // nil: no Stalwart listener on this node
 	Interval  time.Duration
 	BatchSize int

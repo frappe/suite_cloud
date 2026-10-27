@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/frappe/suite_cloud/agent/internal/config"
-	"github.com/frappe/suite_cloud/agent/internal/hostmetrics"
 	"github.com/frappe/suite_cloud/agent/internal/prometheus"
 	"github.com/frappe/suite_cloud/agent/internal/telemetry"
 )
@@ -32,10 +31,22 @@ func (r *recorder) Send(ctx context.Context, batch telemetry.Batch) (telemetry.O
 	return telemetry.Sent, nil
 }
 
+// fakeHost stands in for /proc, which only Linux has.
+type fakeHost struct{}
+
+func (fakeHost) Collect(now time.Time) ([]telemetry.Metric, error) {
+	stamp := now.UTC().Format(time.RFC3339)
+	var metrics []telemetry.Metric
+	for _, name := range []string{"host.memory.used.bytes", "host.memory.total.bytes", "host.load.1m", "host.uptime.seconds"} {
+		metrics = append(metrics, telemetry.Metric{Timestamp: stamp, Name: name, Type: "gauge", Value: 1})
+	}
+	return metrics, nil
+}
+
 func pipeline(scraper *prometheus.Scraper) (*Pipeline, *recorder) {
 	sender := &recorder{}
 	return &Pipeline{
-		Host:      hostmetrics.New([]string{"/"}),
+		Host:      fakeHost{},
 		Scraper:   scraper,
 		Interval:  time.Hour,
 		BatchSize: 5000,
