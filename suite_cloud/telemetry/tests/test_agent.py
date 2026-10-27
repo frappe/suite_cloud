@@ -397,13 +397,21 @@ class TestAgentDeploy(AgentBuildFixture):
         servers = (self.node, draining, self.gateway)
         settings = frappe.get_single("Suite Cloud Settings")
 
+        # Only this cluster's servers: the site may hold clusters of its own.
+        ours = [
+            name
+            for doctype in ("Stalwart Node", "Egress Gateway")
+            for name in frappe.get_all(doctype, {"cluster": self.cluster.name}, pluck="name")
+        ]
+
         def jobs_after(enabled: bool) -> list[dict]:
             before = frappe.get_all("Server Job", pluck="name")
             settings.reload()
             settings.enable_telemetry = int(enabled)
             with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
                 settings.save()
-            return frappe.get_all("Server Job", {"name": ["not in", before]}, ["server", "title"])
+            filters = {"name": ["not in", before], "server": ["in", ours]}
+            return frappe.get_all("Server Job", filters, ["server", "title"])
 
         # Off: the agents are stopped, build or not.
         jobs = jobs_after(False)
