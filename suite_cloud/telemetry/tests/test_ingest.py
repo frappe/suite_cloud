@@ -18,7 +18,7 @@ from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.telemetry import EVENTS, METRICS, TELEMETRY_USER
 from suite_cloud.telemetry.agent.status import CACHE_KEY, forget_contacts
 from suite_cloud.telemetry.spool import Spool
-from suite_cloud.tests.fixtures import ROOT_DOMAIN, configure_settings
+from suite_cloud.tests.fixtures import ROOT_DOMAIN, configure_settings, production_logging
 
 NODE_IPS = ("203.0.113.5", "198.51.100.77")
 PATH = "/api/method/suite_cloud.api.telemetry.events"
@@ -270,6 +270,7 @@ class TestHttpContract(TelemetryApiTestCase):
             patch.object(db, "commit"),
             patch.object(db, "rollback"),
             patch("frappe.destroy"),
+            production_logging(),
         ):
             response = get_test_client().open(
                 "/api/v2/method/suite_cloud.api.telemetry.events",
