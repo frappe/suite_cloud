@@ -2,6 +2,7 @@ from unittest.mock import patch
 from uuid import UUID
 
 import frappe
+from frappe.query_builder import Table
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
@@ -1233,7 +1234,11 @@ class TestMailingList(TenancyTestCase):
 
 
 def stored_credential_fields(account_name: str) -> list[str]:
-    rows = frappe.db.sql(
-        "select fieldname from `__Auth` where doctype = 'Mail Account' and name = %s", account_name
+    auth = Table("__Auth")
+    query = (
+        frappe.qb.from_(auth)
+        .select(auth.fieldname)
+        .where(auth.doctype == "Mail Account")
+        .where(auth.name == account_name)
     )
-    return sorted(row[0] for row in rows)
+    return sorted(query.run(pluck=True))

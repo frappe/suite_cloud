@@ -9,6 +9,10 @@ from datetime import UTC, datetime, timedelta
 
 import frappe
 from frappe.model.document import Document
+from frappe.query_builder import CustomFunction
+from pypika.terms import Values
+
+Greatest = CustomFunction("GREATEST", ["first", "second"])
 
 
 class MailSendUsage(Document):
@@ -77,22 +81,31 @@ def upsert_usage(rows: list[dict]) -> None:
         return
     now = frappe.utils.now()
     user = frappe.session.user
-    values = []
-    for row in rows:
-        values += [f"{row['account']}:{row['period']}", row["account"], row["period"], row["sent"]]
-        values += [row["refused"], now, now, now, user, user]
-    placeholders = ", ".join(["(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)"] * len(rows))
-    frappe.db.sql(
-        f"""insert into `tabMail Send Usage`
-            (name, account, period, sent, refused, reported_at, creation, modified, owner, modified_by)
-        values {placeholders}
-        on duplicate key update
-            sent = greatest(sent, values(sent)),
-            refused = greatest(refused, values(refused)),
-            reported_at = values(reported_at),
-            modified = values(modified)""",
-        values,
+    usage = frappe.qb.DocType("Mail Send Usage")
+    query = frappe.qb.into(usage).columns(
+        usage.name,
+        usage.account,
+        usage.period,
+        usage.sent,
+        usage.refused,
+        usage.reported_at,
+        usage.creation,
+        usage.modified,
+        usage.owner,
+        usage.modified_by,
     )
+    for row in rows:
+        name = f"{row['account']}:{row['period']}"
+        query = query.insert(
+            name, row["account"], row["period"], row["sent"], row["refused"], now, now, now, user, user
+        )
+    query = (
+        query.on_duplicate_key_update(usage.sent, Greatest(usage.sent, Values(usage.sent)))
+        .on_duplicate_key_update(usage.refused, Greatest(usage.refused, Values(usage.refused)))
+        .on_duplicate_key_update(usage.reported_at, Values(usage.reported_at))
+        .on_duplicate_key_update(usage.modified, Values(usage.modified))
+    )
+    query.run()
 
 
 def delete_usage(account: str) -> None:
