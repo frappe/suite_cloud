@@ -156,23 +156,35 @@ func TestStoreListsTheAccountsCountedOnGivenDays(t *testing.T) {
 	}
 }
 
-func TestRedisClusterTakesTheLoginFromItsURLsWhenTheFieldsAreEmpty(t *testing.T) {
-	login := func(cfg config.QuotaStore) (string, string) {
-		client, err := redisClient(cfg)
+func TestRedisClusterAndSentinelTakeTheLoginFromTheirURLsWhenTheFieldsAreEmpty(t *testing.T) {
+	urls := []string{"redis://quota:s3cret@10.0.0.21:6379", "redis://10.0.0.22:6379"}
+	options := func(cfg config.QuotaStore) *redis.UniversalOptions {
+		t.Helper()
+		cfg.URLs = urls
+		opts, err := redisOptions(cfg)
 		if err != nil {
 			t.Fatal(err)
 		}
-		defer client.Close()
-		options := client.(*redis.ClusterClient).Options()
-		return options.Username, options.Password
+		return opts
 	}
-	urls := []string{"redis://quota:s3cret@10.0.0.21:6379", "redis://10.0.0.22:6379"}
-	if user, password := login(config.QuotaStore{Type: "redis_cluster", URLs: urls}); user != "quota" || password != "s3cret" {
-		t.Fatalf("login %q %q", user, password)
+	logins := func(o *redis.UniversalOptions) [4]string {
+		return [4]string{o.Username, o.Password, o.SentinelUsername, o.SentinelPassword}
 	}
-	fields := config.QuotaStore{Type: "redis_cluster", URLs: urls, Username: "stalwart", Password: "field"}
-	if user, password := login(fields); user != "stalwart" || password != "field" {
-		t.Fatalf("the fields lost to the URL: %q %q", user, password)
+	cases := []struct {
+		name string
+		cfg  config.QuotaStore
+		want [4]string
+	}{
+		// A cluster's URLs name its nodes; Sentinel's name the sentinels, not the master.
+		{"cluster", config.QuotaStore{Type: "redis_cluster"}, [4]string{"quota", "s3cret", "", ""}},
+		{"sentinel", config.QuotaStore{Type: "redis_sentinel", ServiceName: "mymaster"}, [4]string{"", "", "quota", "s3cret"}},
+		{"cluster fields win", config.QuotaStore{Type: "redis_cluster", Username: "stalwart", Password: "field"}, [4]string{"stalwart", "field", "", ""}},
+		{"sentinel fields win", config.QuotaStore{Type: "redis_sentinel", SentinelUsername: "watch", SentinelPassword: "field", Username: "stalwart", Password: "master"}, [4]string{"stalwart", "master", "watch", "field"}},
+	}
+	for _, c := range cases {
+		if got := logins(options(c.cfg)); got != c.want {
+			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
+		}
 	}
 }
 

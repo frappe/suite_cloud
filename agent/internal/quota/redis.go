@@ -68,6 +68,18 @@ func redisClient(cfg config.QuotaStore) (redis.UniversalClient, error) {
 		options.DialTimeout, options.ReadTimeout, options.WriteTimeout = redisTimeout, redisTimeout, redisTimeout
 		return redis.NewClient(options), nil
 	}
+	options, err := redisOptions(cfg)
+	if err != nil {
+		return nil, err
+	}
+	if cfg.Type == "redis_cluster" {
+		return redis.NewClusterClient(options.Cluster()), nil
+	}
+	return redis.NewFailoverClient(options.Failover()), nil
+}
+
+// redisOptions is the connection of a Redis Cluster or Sentinel store.
+func redisOptions(cfg config.QuotaStore) (*redis.UniversalOptions, error) {
 	addresses, login, tlsConfig, err := redisAddresses(cfg.URLs)
 	if err != nil {
 		return nil, err
@@ -82,7 +94,7 @@ func redisClient(cfg config.QuotaStore) (redis.UniversalClient, error) {
 	if cfg.Type == "redis_sentinel" && sentinelUsername == "" && sentinelPassword == "" {
 		sentinelUsername, sentinelPassword = login.username, login.password
 	}
-	options := &redis.UniversalOptions{
+	return &redis.UniversalOptions{
 		Addrs:            addresses,
 		Username:         username,
 		Password:         password,
@@ -93,11 +105,7 @@ func redisClient(cfg config.QuotaStore) (redis.UniversalClient, error) {
 		DialTimeout:      redisTimeout,
 		ReadTimeout:      redisTimeout,
 		WriteTimeout:     redisTimeout,
-	}
-	if cfg.Type == "redis_cluster" {
-		return redis.NewClusterClient(options.Cluster()), nil
-	}
-	return redis.NewFailoverClient(options.Failover()), nil
+	}, nil
 }
 
 type redisLogin struct{ username, password string }
