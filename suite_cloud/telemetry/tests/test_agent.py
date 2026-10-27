@@ -134,6 +134,20 @@ class TestAgentBuild(AgentBuildFixture):
         ):
             self.assertEqual(settings.build_agent()["queued"], True)
 
+    def test_has_quota_reads_the_release_and_never_raises(self) -> None:
+        versions = {
+            "0.1.9+abcdef12": False,
+            "0.2.0+abcdef12": True,
+            "0.2.0-rc1+abcdef12": True,
+            "0.10.0": True,
+            "1.0.0": True,
+            "dev": False,
+            "0.2": False,
+        }
+        for version, expected in versions.items():
+            with self.subTest(version=version):
+                self.assertEqual(AgentBuild(version=version).has_quota, expected)
+
 
 class TestAgentDeploy(AgentBuildFixture):
     def setUp(self) -> None:
