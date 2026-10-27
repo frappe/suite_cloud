@@ -186,6 +186,23 @@ func TestRedisClusterAndSentinelTakeTheLoginFromTheirURLsWhenTheFieldsAreEmpty(t
 			t.Errorf("%s: got %q, want %q", c.name, got, c.want)
 		}
 	}
+	if name := options(config.QuotaStore{Type: "redis_sentinel", ServiceName: "mymaster"}).MasterName; name != "mymaster" {
+		t.Errorf("sentinel master %q", name)
+	}
+
+	// Each store builds its own kind of client: a failover client is a plain *redis.Client.
+	for storeType, isCluster := range map[string]bool{"redis_cluster": true, "redis_sentinel": false} {
+		client, err := redisClient(config.QuotaStore{Type: storeType, URLs: urls, ServiceName: "mymaster"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, cluster := client.(*redis.ClusterClient)
+		_, single := client.(*redis.Client)
+		if cluster != isCluster || single == isCluster {
+			t.Errorf("%s built %T", storeType, client)
+		}
+		client.Close()
+	}
 }
 
 func TestStoreOlderLimitNeverReplacesANewerOne(t *testing.T) {

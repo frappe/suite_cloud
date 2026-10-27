@@ -109,12 +109,13 @@ func TestLoadQuotaAppliesDefaults(t *testing.T) {
 
 func TestLoadRejectsBadQuota(t *testing.T) {
 	cases := map[string]string{
-		"low port":       strings.Replace(quota, "8091", "80", 1),
-		"no token":       strings.Replace(quota, "t0ken", " ", 1),
-		"unknown store":  strings.Replace(quota, `"memory"`, `"memcached"`, 1),
-		"redis no url":   strings.Replace(quota, `"memory"`, `"redis"`, 1),
-		"redis two urls": strings.Replace(quota, `"type": "memory"`, `"type": "redis", "urls": ["redis://a:6379", "redis://b:6379"]`, 1),
-		"redis bad url":  strings.Replace(quota, `"type": "memory"`, `"type": "redis_cluster", "urls": ["http://a:6379"]`, 1),
+		"low port":            strings.Replace(quota, "8091", "80", 1),
+		"no token":            strings.Replace(quota, "t0ken", " ", 1),
+		"unknown store":       strings.Replace(quota, `"memory"`, `"memcached"`, 1),
+		"redis no url":        strings.Replace(quota, `"memory"`, `"redis"`, 1),
+		"redis two urls":      strings.Replace(quota, `"type": "memory"`, `"type": "redis", "urls": ["redis://a:6379", "redis://b:6379"]`, 1),
+		"redis bad url":       strings.Replace(quota, `"type": "memory"`, `"type": "redis_cluster", "urls": ["http://a:6379"]`, 1),
+		"sentinel no service": strings.Replace(quota, `"type": "memory"`, `"type": "redis_sentinel", "urls": ["redis://a:26379"]`, 1),
 	}
 	for name, section := range cases {
 		t.Run(name, func(t *testing.T) {

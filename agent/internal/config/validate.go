@@ -118,6 +118,9 @@ func validateQuota(fail func(string, ...any), q *Quota) {
 		if q.Store.Type == "redis" && len(q.Store.URLs) != 1 {
 			fail("quota.store.urls must hold one URL for redis")
 		}
+		if q.Store.Type == "redis_sentinel" && strings.TrimSpace(q.Store.ServiceName) == "" {
+			fail("quota.store.service_name is required for redis_sentinel")
+		}
 	default:
 		fail("quota.store.type must be memory, redis, redis_cluster or redis_sentinel")
 	}
