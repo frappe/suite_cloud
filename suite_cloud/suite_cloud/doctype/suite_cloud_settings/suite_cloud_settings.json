@@ -14,6 +14,7 @@
   "column_break_jobs",
   "dmarc_report_retention_days",
   "tls_report_retention_days",
+  "send_usage_retention_days",
   "email_section",
   "tenant_email_accounts",
   "column_break_email",
@@ -152,6 +153,14 @@
    "fieldname": "tls_report_retention_days",
    "fieldtype": "Int",
    "label": "TLS Report Retention (Days)",
+   "reqd": 1
+  },
+  {
+   "default": "90",
+   "description": "How long each account's daily and monthly sent and refused counts are kept for the Sending Usage dashboard. Older rows are deleted daily.",
+   "fieldname": "send_usage_retention_days",
+   "fieldtype": "Int",
+   "label": "Sending Usage Retention (Days)",
    "reqd": 1
   },
   {

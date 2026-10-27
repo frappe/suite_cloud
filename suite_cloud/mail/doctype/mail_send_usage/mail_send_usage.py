@@ -2,16 +2,20 @@
 # For license information, please see license.txt
 
 """What the Agents report an account sent: one row per account and UTC period, named
-``{account}:{period}``. The Agents count; Suite Cloud only keeps their last report, so the Mail
-Account form never waits on a node."""
+``{account}:{period}``. The Agents count; Suite Cloud keeps their last report of each period, for
+the retention in Suite Cloud Settings, so the Mail Account form never waits on a node."""
 
 from datetime import UTC, datetime, timedelta
 
 import frappe
 from frappe.model.document import Document
 from frappe.query_builder import CustomFunction
+from frappe.utils import cint
 from pypika.terms import Values
 
+from suite_cloud.utils import get_config
+
+DEFAULT_RETENTION_DAYS = 90
 Greatest = CustomFunction("GREATEST", ["first", "second"])
 
 
@@ -113,7 +117,18 @@ def delete_usage(account: str) -> None:
 
 
 def prune_usage() -> None:
-    """Daily: only today, yesterday and their months are kept; nothing older is shown."""
+    """Daily: drops the days older than the retention and the months that ended before it."""
 
-    kept = reportable_periods()
-    frappe.db.delete("Mail Send Usage", {"period": ("not in", tuple(kept))})
+    day, month = periods_at(datetime.now(UTC) - timedelta(days=retention_days()))
+    usage = frappe.qb.DocType("Mail Send Usage")
+    old_days = usage.period.like("d:%") & (usage.period < day)
+    old_months = usage.period.like("m:%") & (usage.period < month)
+    frappe.qb.from_(usage).delete().where(old_days | old_months).run()
+
+
+def retention_days() -> int:
+    """The configured retention; anything under a day falls back to the default, since a negative
+    number would move the cutoff into the future and delete today's counts."""
+
+    days = cint(get_config("send_usage_retention_days"))
+    return days if days > 0 else DEFAULT_RETENTION_DAYS

@@ -1,5 +1,101 @@
 {
  "charts": {
+  "stalwart-account-sending-history": {
+   "chart_type": "Table",
+   "config": {
+    "columns": [],
+    "filters": {
+     "filters": [
+      {
+       "column": {
+        "column_name": "period_type",
+        "type": "column"
+       },
+       "operator": "=",
+       "value": "Day"
+      }
+     ],
+     "logical_operator": "And"
+    },
+    "limit": 1000,
+    "order_by": [
+     {
+      "column": {
+       "column_name": "Recipients",
+       "type": "column"
+      },
+      "direction": "desc"
+     },
+     {
+      "column": {
+       "column_name": "period_start",
+       "type": "column"
+      },
+      "direction": "desc"
+     }
+    ],
+    "rows": [
+     {
+      "column_name": "period_start",
+      "data_type": "Date",
+      "dimension_name": "period_start",
+      "granularity": "day"
+     },
+     {
+      "column_name": "account",
+      "data_type": "String",
+      "dimension_name": "account"
+     },
+     {
+      "column_name": "tenant_label",
+      "data_type": "String",
+      "dimension_name": "tenant_label"
+     }
+    ],
+    "values": [
+     {
+      "data_type": "Integer",
+      "expression": {
+       "expression": "sum(sent)",
+       "type": "expression"
+      },
+      "measure_name": "Recipients"
+     },
+     {
+      "data_type": "Integer",
+      "expression": {
+       "expression": "max(send_limit)",
+       "type": "expression"
+      },
+      "measure_name": "Limit"
+     },
+     {
+      "data_type": "Decimal",
+      "expression": {
+       "expression": "max(limit_used)",
+       "type": "expression"
+      },
+      "measure_name": "Used (%)"
+     },
+     {
+      "data_type": "Integer",
+      "expression": {
+       "expression": "sum(refused)",
+       "type": "expression"
+      },
+      "measure_name": "Refused"
+     }
+    ]
+   },
+   "description": null,
+   "folder": null,
+   "info": "Each account's recipients and refused messages per UTC day, newest first. Limit and Used (%) compare with the account's current daily limit. Filter by account to see one account's history.",
+   "name": "stalwart-account-sending-history",
+   "query": "stalwart-sending-usage",
+   "sort_order": 94,
+   "title": "Account Sending History",
+   "workbook": "stalwart"
+  },
   "stalwart-accounts-nearest-limits": {
    "chart_type": "Table",
    "config": {
@@ -3822,6 +3918,75 @@
    "title": "Send Failures by Tenant",
    "workbook": "stalwart"
   },
+  "stalwart-sending-by-day": {
+   "chart_type": "Line",
+   "config": {
+    "filters": {
+     "filters": [
+      {
+       "column": {
+        "column_name": "period_type",
+        "type": "column"
+       },
+       "operator": "=",
+       "value": "Day"
+      }
+     ],
+     "logical_operator": "And"
+    },
+    "limit": 5000,
+    "order_by": [
+     {
+      "column": {
+       "column_name": "period_start",
+       "type": "column"
+      },
+      "direction": "asc"
+     }
+    ],
+    "x_axis": {
+     "dimension": {
+      "column_name": "period_start",
+      "data_type": "Date",
+      "dimension_name": "period_start",
+      "granularity": "day"
+     }
+    },
+    "y_axis": {
+     "series": [
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "sum(sent)",
+         "type": "expression"
+        },
+        "measure_name": "Recipients"
+       }
+      },
+      {
+       "measure": {
+        "data_type": "Integer",
+        "expression": {
+         "expression": "sum(refused)",
+         "type": "expression"
+        },
+        "measure_name": "Refused"
+       }
+      }
+     ],
+     "show_data_labels": false
+    }
+   },
+   "description": null,
+   "folder": null,
+   "info": "Recipients and messages refused over a limit per UTC day, as far back as the Sending Usage Retention in Suite Cloud Settings.",
+   "name": "stalwart-sending-by-day",
+   "query": "stalwart-sending-usage",
+   "sort_order": 93,
+   "title": "Sending by Day",
+   "workbook": "stalwart"
+  },
   "stalwart-sending-readings": {
    "chart_type": "Number",
    "config": {
@@ -6790,9 +6955,11 @@
       "y": 0
      },
      "links": {
+      "stalwart-account-sending-history": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-accounts-nearest-limits": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-most-recipients-today": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-refused-today": "`stalwart-sending-usage`.`tenant_label`",
+      "stalwart-sending-by-day": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-sending-readings": "`stalwart-sending-usage`.`tenant_label`"
      },
      "type": "filter"
@@ -6810,10 +6977,34 @@
       "y": 0
      },
      "links": {
+      "stalwart-account-sending-history": "`stalwart-sending-usage`.`cluster`",
       "stalwart-accounts-nearest-limits": "`stalwart-sending-usage`.`cluster`",
       "stalwart-most-recipients-today": "`stalwart-sending-usage`.`cluster`",
       "stalwart-refused-today": "`stalwart-sending-usage`.`cluster`",
+      "stalwart-sending-by-day": "`stalwart-sending-usage`.`cluster`",
       "stalwart-sending-readings": "`stalwart-sending-usage`.`cluster`"
+     },
+     "type": "filter"
+    },
+    {
+     "default_operator": "in",
+     "filter_name": "Account",
+     "filter_type": "String",
+     "icon": "filter",
+     "layout": {
+      "h": 2,
+      "i": "filter-account",
+      "w": 4,
+      "x": 8,
+      "y": 0
+     },
+     "links": {
+      "stalwart-account-sending-history": "`stalwart-sending-usage`.`account`",
+      "stalwart-accounts-nearest-limits": "`stalwart-sending-usage`.`account`",
+      "stalwart-most-recipients-today": "`stalwart-sending-usage`.`account`",
+      "stalwart-refused-today": "`stalwart-sending-usage`.`account`",
+      "stalwart-sending-by-day": "`stalwart-sending-usage`.`account`",
+      "stalwart-sending-readings": "`stalwart-sending-usage`.`account`"
      },
      "type": "filter"
     },
@@ -6895,6 +7086,28 @@
       "w": 10,
       "x": 10,
       "y": 26
+     },
+     "type": "chart"
+    },
+    {
+     "chart": "stalwart-sending-by-day",
+     "layout": {
+      "h": 16,
+      "i": "sending_by_day",
+      "w": 20,
+      "x": 0,
+      "y": 46
+     },
+     "type": "chart"
+    },
+    {
+     "chart": "stalwart-account-sending-history",
+     "layout": {
+      "h": 20,
+      "i": "account_history",
+      "w": 20,
+      "x": 0,
+      "y": 62
      },
      "type": "chart"
     }
@@ -7518,7 +7731,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-27 12:00:00.000000",
+ "modified": "2026-10-27 13:05:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -8165,6 +8378,15 @@
      "type": "mutate"
     },
     {
+     "data_type": "Date",
+     "expression": {
+      "expression": "if_else(period_type == 'Day', substring(period, 2), concat(substring(period, 2), '01'))",
+      "type": "expression"
+     },
+     "new_name": "period_start",
+     "type": "mutate"
+    },
+    {
      "data_type": "Integer",
      "expression": {
       "expression": "if_else(period_type == 'Day', daily_send_limit, monthly_send_limit)",
@@ -8199,6 +8421,7 @@
       "cluster",
       "period",
       "period_type",
+      "period_start",
       "is_current",
       "sent",
       "send_limit",

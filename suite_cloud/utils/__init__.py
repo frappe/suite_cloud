@@ -25,6 +25,7 @@ CONFIG_KEYS = (
     "verify_stalwart_tls",
     "dmarc_report_retention_days",
     "tls_report_retention_days",
+    "send_usage_retention_days",
     "enable_telemetry",
     "telemetry_retention_days",
     "agent_requests_per_minute",

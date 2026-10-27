@@ -78,9 +78,23 @@ class TestSuiteCloudSettings(IntegrationTestCase):
         patch.execute()
         self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 30)
 
+    def test_send_usage_retention_is_backfilled_for_existing_sites(self) -> None:
+        from suite_cloud.patches.v1_0 import fill_send_usage_retention_default as patch
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, 0)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 90)
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, 30)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 30)
+
     def test_a_retention_under_a_day_is_refused(self) -> None:
-        self.settings.telemetry_retention_days = 0
-        self.assertRaises(frappe.ValidationError, self.settings.save)
+        for field in ("telemetry_retention_days", "send_usage_retention_days"):
+            with self.subTest(field=field):
+                settings = frappe.get_doc("Suite Cloud Settings")
+                settings.set(field, 0)
+                self.assertRaises(frappe.ValidationError, settings.save)
 
     def test_telemetry_limits_are_backfilled_and_must_be_positive(self) -> None:
         from suite_cloud.patches.v1_0 import fill_telemetry_limit_defaults as patch

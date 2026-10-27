@@ -65,6 +65,7 @@ class SuiteCloudSettings(Document):
         ready_sites_per_region: DF.Int
         reserved_disk_gb: DF.Int
         reserved_memory_mb: DF.Int
+        send_usage_retention_days: DF.Int
         server_job_timeout: DF.Int
         sign_with_ed25519: DF.Check
         site_dns_zone: DF.Link | None
@@ -115,7 +116,12 @@ class SuiteCloudSettings(Document):
             roll_out_agents(enabled=bool(self.enable_telemetry))
 
     def validate_report_retention(self) -> None:
-        for field in ("dmarc_report_retention_days", "tls_report_retention_days", "telemetry_retention_days"):
+        for field in (
+            "dmarc_report_retention_days",
+            "tls_report_retention_days",
+            "send_usage_retention_days",
+            "telemetry_retention_days",
+        ):
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least one day.").format(_(self.meta.get_label(field))))
 

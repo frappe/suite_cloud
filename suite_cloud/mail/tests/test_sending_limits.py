@@ -11,6 +11,7 @@ from suite_cloud.api.mail import accounts, domains
 from suite_cloud.api.telemetry import quota as quota_api
 from suite_cloud.api.tenant import InvalidInputError
 from suite_cloud.mail.cluster import plan, quota
+from suite_cloud.mail.doctype.mail_send_usage import mail_send_usage
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
     current_periods,
     periods_at,
@@ -167,16 +168,24 @@ class TestUsageApi(SendingLimitsTestCase):
         accounts.delete_account("alice@acme.com")
         self.assertFalse(frappe.db.exists("Mail Send Usage", {"account": "alice@acme.com"}))
 
-    def test_prune_keeps_yesterday_and_the_current_month(self) -> None:
-        yesterday = datetime.now(UTC) - timedelta(days=1)
-        old = datetime.now(UTC) - timedelta(days=40)
-        rows = [*periods_at(yesterday), *current_periods(), *periods_at(old)]
+    def test_prune_keeps_the_days_and_months_of_the_retention(self) -> None:
+        now = datetime.now(UTC)
+        inside, outside, old = (now - timedelta(days=days) for days in (29, 31, 70))
+        rows = [*current_periods(), *periods_at(inside), *periods_at(outside), *periods_at(old)]
         upsert_usage(
             [{"account": "alice@acme.com", "period": period, "sent": 1, "refused": 0} for period in set(rows)]
         )
-        prune_usage()
+        with patch(f"{mail_send_usage.__name__}.get_config", return_value=30):
+            prune_usage()
         kept = set(frappe.get_all("Mail Send Usage", {"account": "alice@acme.com"}, pluck="period"))
-        self.assertEqual(kept, {*periods_at(yesterday), *current_periods()})
+        # The month of the 31st day back is kept while the retention still reaches into it.
+        month_at_cutoff = periods_at(now - timedelta(days=30))[1]
+        self.assertEqual(kept, {*current_periods(), *periods_at(inside), month_at_cutoff})
+
+    def test_a_retention_under_a_day_falls_back_to_the_default(self) -> None:
+        for days in (0, -5):
+            with patch(f"{mail_send_usage.__name__}.get_config", return_value=days):
+                self.assertEqual(mail_send_usage.retention_days(), mail_send_usage.DEFAULT_RETENTION_DAYS)
 
 
 class TestTenantSendLimits(SendingLimitsTestCase):
