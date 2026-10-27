@@ -169,13 +169,13 @@ func TestStoreOlderLimitNeverReplacesANewerOne(t *testing.T) {
 			if v := add(t, store, "a@example.com", 11, october); v != Accepted {
 				t.Fatalf("cleared limit still applies: %v", v)
 			}
-			setLimit(t, store, "a@example.com", 1, 0, "2026-10-26 10:00:00.000002")
-			if v := add(t, store, "a@example.com", 1, october); v != Accepted {
-				t.Fatalf("a cleared account took a stale entry: %v", v)
+			if accounts, _ := store.Accounts(context.Background()); len(accounts) != 0 {
+				t.Fatalf("a cleared account is still listed: %v", accounts)
 			}
-			accounts, _ := store.Accounts(context.Background())
-			if len(accounts) != 1 || accounts[0] != "a@example.com" {
-				t.Fatalf("accounts %v", accounts)
+			// An account a pull missed and returns again takes its limit back, at the same version.
+			setLimit(t, store, "a@example.com", 1, 0, "2026-10-26 10:00:00.000002")
+			if v := add(t, store, "a@example.com", 1, october); v != OverDaily {
+				t.Fatalf("the limit was not restored: %v", v)
 			}
 		})
 	}

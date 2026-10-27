@@ -150,9 +150,12 @@ func (r *RedisStore) ClearLimits(ctx context.Context, accounts []string) error {
 		return nil
 	}
 	pipe := r.client.Pipeline()
-	for _, account := range accounts {
-		pipe.HSet(ctx, limitKey(account), "daily", 0, "monthly", 0)
+	members := make([]any, len(accounts))
+	for i, account := range accounts {
+		pipe.Del(ctx, limitKey(account))
+		members[i] = account
 	}
+	pipe.SRem(ctx, accountsKey, members...)
 	_, err := pipe.Exec(ctx)
 	return err
 }

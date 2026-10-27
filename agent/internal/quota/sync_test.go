@@ -86,7 +86,7 @@ func TestFullPullClearsAccountsMissedTwiceInARow(t *testing.T) {
 		t.Fatalf("limits after one miss %+v", store.data.Limits)
 	}
 	pull()
-	if store.data.Limits["deleted@example.com"] != (Limit{Version: "v0"}) || store.data.Limits["saved@example.com"].Daily != 4 {
+	if _, kept := store.data.Limits["deleted@example.com"]; kept || store.data.Limits["saved@example.com"].Daily != 4 {
 		t.Fatalf("limits after two misses %+v", store.data.Limits)
 	}
 	// saved@ came back in between, so its next miss starts the count again.
@@ -95,7 +95,7 @@ func TestFullPullClearsAccountsMissedTwiceInARow(t *testing.T) {
 		t.Fatalf("one miss after a return cleared the limit: %+v", store.data.Limits)
 	}
 	pull()
-	if store.data.Limits["saved@example.com"] != (Limit{Version: "v2"}) || store.data.Limits["kept@example.com"].Daily != 5 {
+	if _, kept := store.data.Limits["saved@example.com"]; kept || store.data.Limits["kept@example.com"].Daily != 5 {
 		t.Fatalf("limits %+v", store.data.Limits)
 	}
 }

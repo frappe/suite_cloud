@@ -105,8 +105,8 @@ func (m *MemoryStore) ClearLimits(_ context.Context, accounts []string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	for _, account := range accounts {
-		if limit, ok := m.data.Limits[account]; ok {
-			m.data.Limits[account] = Limit{Version: limit.Version}
+		if _, ok := m.data.Limits[account]; ok {
+			delete(m.data.Limits, account)
 			m.dirty = true
 		}
 	}

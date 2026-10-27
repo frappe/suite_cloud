@@ -62,7 +62,7 @@ type Store interface {
 	Add(ctx context.Context, account string, n int64, periods Periods) (Verdict, Limit, error)
 	// SetLimits stores each entry whose version is newer than the stored one.
 	SetLimits(ctx context.Context, limits map[string]Limit) error
-	// ClearLimits sets the accounts to no limit, keeping their versions.
+	// ClearLimits forgets the accounts' limits and versions, so a later pull can set any again.
 	ClearLimits(ctx context.Context, accounts []string) error
 	// Accounts lists the accounts that have a stored limit.
 	Accounts(ctx context.Context) ([]string, error)
