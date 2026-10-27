@@ -1,4 +1,5 @@
 import frappe
+from frappe.database.utils import drop_index_if_exists
 
 # The first Suite Cloud release shipped a Docker-based single-server deployment. It was replaced
 # wholesale (clusters, nodes, plans, tenancy) and nothing in it is migrated: the app had no
@@ -32,8 +33,8 @@ def execute() -> None:
             ignore_permissions=True,
             delete_permanently=True,
         )
-        frappe.db.sql_ddl(f"DROP TABLE IF EXISTS `tab{doctype}`")
+        frappe.db.sql_ddl(frappe.qb.drop_table(f"tab{doctype}").if_exists().get_sql())
 
     # DNS Record used to be unique on (host, type); round-robin A records need several rows.
     for index in ("host_type", "unique_host_type"):
-        frappe.db.sql_ddl(f"ALTER TABLE `tabDNS Record` DROP INDEX IF EXISTS `{index}`")
+        drop_index_if_exists("tabDNS Record", index)
