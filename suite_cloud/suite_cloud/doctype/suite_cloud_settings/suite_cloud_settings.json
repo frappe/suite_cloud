@@ -266,7 +266,7 @@
    "label": "Telemetry"
   },
   {
-   "default": "0",
+   "default": "1",
    "description": "Runs the Suite Cloud Agent on every Stalwart node and egress gateway and opens the telemetry API to them. Each Agent signs in with its cluster's Agent Key and Agent Secret. Turning this on or off queues an Install Agent job on every server that runs an Agent: off, the job stops the Agent.",
    "fieldname": "enable_telemetry",
    "fieldtype": "Check",
@@ -654,7 +654,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-27 19:30:00.000000",
+ "modified": "2026-10-27 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
