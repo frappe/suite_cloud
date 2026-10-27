@@ -223,6 +223,21 @@ func TestAStartSendsYesterdaysCountsTheStoreKept(t *testing.T) {
 	}
 }
 
+func TestAStartPushesWhatTheStoreCountedWithoutATouch(t *testing.T) {
+	caller := &fakeCaller{answers: map[string][]string{}}
+	usage, store := newUsage(t, caller, 100) // a fresh Usage after a crash: nothing touched
+	now := time.Date(2026, 10, 27, 0, 5, 0, 0, time.UTC)
+	usage.Now = func() time.Time { return now }
+	add(t, store, "a@example.com", 4, PeriodsAt(now.Add(-24*time.Hour)))
+	usage.TouchCounted(context.Background())
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := sentBy(t, caller, 0); got["a@example.com d:20261026"] != 4 {
+		t.Fatalf("records %v", got)
+	}
+}
+
 func TestPushesThatFailPastTwoMidnightsStillSendYesterday(t *testing.T) {
 	caller := &fakeCaller{answers: map[string][]string{}}
 	usage, store := newUsage(t, caller, 100)

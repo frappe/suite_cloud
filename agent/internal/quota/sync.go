@@ -142,6 +142,7 @@ type usageRecord struct {
 
 // Run pushes on every tick, and once more on the way out.
 func (u *Usage) Run(ctx context.Context) error {
+	u.TouchCounted(ctx)
 	ticker := time.NewTicker(u.Interval)
 	defer ticker.Stop()
 	for {
@@ -159,6 +160,18 @@ func (u *Usage) Run(ctx context.Context) error {
 			}
 		}
 	}
+}
+
+// TouchCounted marks every account with a count today or yesterday, as on a start: what was
+// counted before a crash, or after the last push before one, is then pushed. Suite Cloud keeps
+// the higher count, so sending one again is harmless.
+func (u *Usage) TouchCounted(ctx context.Context) {
+	now := u.Now()
+	accounts, err := u.Store.CountedAccounts(ctx, PeriodsAt(now).Day, PeriodsAt(now.Add(-24*time.Hour)).Day)
+	if err != nil {
+		u.Logger.Warn("counted accounts not read; they are pushed when they send again", "error", err)
+	}
+	u.Touched.Add(accounts...)
 }
 
 // Push sends the touched accounts' records in requests of at most BatchSize records. Accounts

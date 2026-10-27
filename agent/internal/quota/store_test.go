@@ -3,6 +3,8 @@ package quota
 import (
 	"context"
 	"os"
+	"slices"
+	"sort"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -122,6 +124,31 @@ func TestStoreCountersRollOverWithThePeriod(t *testing.T) {
 			november := PeriodsAt(time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC))
 			if v := add(t, store, "a@example.com", 10, november); v != Accepted {
 				t.Fatalf("a new month: %v", v)
+			}
+		})
+	}
+}
+
+func TestStoreListsTheAccountsCountedOnGivenDays(t *testing.T) {
+	for name, open := range stores(t) {
+		t.Run(name, func(t *testing.T) {
+			store := open(t)
+			today := PeriodsAt(time.Date(2026, 10, 27, 0, 5, 0, 0, time.UTC))
+			yesterday := PeriodsAt(time.Date(2026, 10, 26, 23, 0, 0, 0, time.UTC))
+			add(t, store, "sent@example.com", 2, today)
+			setLimit(t, store, "refused@example.com", 1, 0, "1")
+			if v := add(t, store, "refused@example.com", 2, yesterday); v != OverDaily {
+				t.Fatalf("not refused: %v", v)
+			}
+			add(t, store, "old@example.com", 1, PeriodsAt(time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)))
+
+			accounts, err := store.CountedAccounts(context.Background(), today.Day, yesterday.Day)
+			if err != nil {
+				t.Fatal(err)
+			}
+			sort.Strings(accounts)
+			if want := []string{"refused@example.com", "sent@example.com"}; !slices.Equal(accounts, want) {
+				t.Fatalf("accounts %v, want %v", accounts, want)
 			}
 		})
 	}

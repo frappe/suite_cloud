@@ -67,6 +67,9 @@ type Store interface {
 	// Accounts lists the accounts that have a stored limit.
 	Accounts(ctx context.Context) ([]string, error)
 	Counts(ctx context.Context, accounts []string, periods Periods) (map[string]Count, error)
+	// CountedAccounts lists the accounts with a sent or refused count on any of the days, such as
+	// "d:20261026".
+	CountedAccounts(ctx context.Context, days ...string) ([]string, error)
 	// Run keeps the store until the context ends, then saves or closes it.
 	Run(ctx context.Context) error
 }
@@ -123,4 +126,12 @@ func (t *Touched) Take() []string {
 // Caller makes one request to a telemetry API method; the sender implements it.
 type Caller interface {
 	Call(ctx context.Context, method string, payload, out any) error
+}
+
+func setMembers(set map[string]bool) []string {
+	members := make([]string, 0, len(set))
+	for member := range set {
+		members = append(members, member)
+	}
+	return members
 }

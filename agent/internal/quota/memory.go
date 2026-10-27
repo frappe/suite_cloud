@@ -123,6 +123,22 @@ func (m *MemoryStore) Accounts(context.Context) ([]string, error) {
 	return accounts, nil
 }
 
+func (m *MemoryStore) CountedAccounts(_ context.Context, days ...string) ([]string, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	found := map[string]bool{}
+	for _, counters := range []map[string]map[string]int64{m.data.Usage, m.data.Refused} {
+		for account, byPeriod := range counters {
+			for _, day := range days {
+				if byPeriod[day] > 0 {
+					found[account] = true
+				}
+			}
+		}
+	}
+	return setMembers(found), nil
+}
+
 func (m *MemoryStore) Counts(_ context.Context, accounts []string, periods Periods) (map[string]Count, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()

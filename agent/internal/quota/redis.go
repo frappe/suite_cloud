@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -158,6 +159,36 @@ func (r *RedisStore) ClearLimits(ctx context.Context, accounts []string) error {
 
 func (r *RedisStore) Accounts(ctx context.Context) ([]string, error) {
 	return r.client.SMembers(ctx, accountsKey).Result()
+}
+
+// CountedAccounts scans the counter keys once, on every master of a Redis Cluster: it runs when
+// an Agent starts, not on the mail path.
+func (r *RedisStore) CountedAccounts(ctx context.Context, days ...string) ([]string, error) {
+	found := map[string]bool{}
+	scan := func(ctx context.Context, client redis.Cmdable) error {
+		for _, day := range days {
+			// Matches both sca:quota:{account}:<day> and sca:quota:{account}:refused:<day>.
+			iter := client.Scan(ctx, 0, "sca:quota:{*:"+day, 1000).Iterator()
+			for iter.Next(ctx) {
+				key := iter.Val()
+				start, end := strings.Index(key, "{"), strings.Index(key, "}")
+				if start >= 0 && end > start {
+					found[key[start+1:end]] = true
+				}
+			}
+			if err := iter.Err(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	var err error
+	if cluster, ok := r.client.(*redis.ClusterClient); ok {
+		err = cluster.ForEachMaster(ctx, func(ctx context.Context, client *redis.Client) error { return scan(ctx, client) })
+	} else {
+		err = scan(ctx, r.client)
+	}
+	return setMembers(found), err
 }
 
 func (r *RedisStore) Counts(ctx context.Context, accounts []string, periods Periods) (map[string]Count, error) {
