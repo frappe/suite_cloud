@@ -196,6 +196,54 @@ func TestTheFirstPushAfterMidnightSendsYesterdaysLastCounts(t *testing.T) {
 	}
 }
 
+// sentBy returns "account period" -> sent of every record in the given request.
+func sentBy(t *testing.T, caller *fakeCaller, request int) map[string]float64 {
+	t.Helper()
+	got := map[string]float64{}
+	for _, record := range caller.payloads[usageMethod][request]["records"].([]any) {
+		r := record.(map[string]any)
+		got[r["account"].(string)+" "+r["period"].(string)] = r["sent"].(float64)
+	}
+	return got
+}
+
+func TestAStartSendsYesterdaysCountsTheStoreKept(t *testing.T) {
+	caller := &fakeCaller{answers: map[string][]string{}}
+	usage, store := newUsage(t, caller, 100) // a fresh Usage, as after a restart
+	now := time.Date(2026, 10, 27, 0, 5, 0, 0, time.UTC)
+	usage.Now = func() time.Time { return now }
+	add(t, store, "a@example.com", 4, PeriodsAt(now.Add(-24*time.Hour))) // counted before the restart
+	add(t, store, "a@example.com", 1, PeriodsAt(now))
+	usage.Touched.Add("a@example.com")
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := sentBy(t, caller, 0); got["a@example.com d:20261026"] != 4 || got["a@example.com d:20261027"] != 1 {
+		t.Fatalf("records %v", got)
+	}
+}
+
+func TestPushesThatFailPastTwoMidnightsStillSendYesterday(t *testing.T) {
+	caller := &fakeCaller{answers: map[string][]string{}}
+	usage, store := newUsage(t, caller, 100)
+	now := time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)
+	usage.Now = func() time.Time { return now }
+	usage.pushed = PeriodsAt(now) // the last push that went through
+	now = time.Date(2026, 10, 27, 0, 5, 0, 0, time.UTC)
+	add(t, store, "a@example.com", 6, PeriodsAt(now.Add(-24*time.Hour)))
+	usage.Touched.Add("a@example.com")
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	got := sentBy(t, caller, 0)
+	if got["a@example.com d:20261026"] != 6 {
+		t.Fatalf("the day in between was not sent: %v", got)
+	}
+	if _, ok := got["a@example.com d:20261025"]; ok {
+		t.Fatalf("a day Suite Cloud would drop was sent: %v", got)
+	}
+}
+
 func TestNoRequestHoldsMoreRecordsThanTheCap(t *testing.T) {
 	for _, limit := range []int{1, 3} {
 		caller := &fakeCaller{answers: map[string][]string{}}

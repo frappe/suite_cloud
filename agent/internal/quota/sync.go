@@ -130,7 +130,7 @@ type Usage struct {
 	BatchSize int // records per request
 	Logger    *slog.Logger
 	Now       func() time.Time
-	pushed    Periods // the periods of the last push that went through
+	pushed    Periods // the periods of the last push that went through; zero until one does
 }
 
 type usageRecord struct {
@@ -142,7 +142,6 @@ type usageRecord struct {
 
 // Run pushes on every tick, and once more on the way out.
 func (u *Usage) Run(ctx context.Context) error {
-	u.pushed = PeriodsAt(u.Now())
 	ticker := time.NewTicker(u.Interval)
 	defer ticker.Stop()
 	for {
@@ -164,17 +163,19 @@ func (u *Usage) Run(ctx context.Context) error {
 
 // Push sends the touched accounts' records in requests of at most BatchSize records. Accounts
 // with a record in a request that was not taken stay touched.
-// The first push after midnight UTC also sends the counts of the day and month the last push
-// covered: what was counted between that push and midnight would otherwise never be reported.
+// Until a push of the current day has gone through (after midnight UTC, after a start, after
+// failures) each push also sends yesterday's day and month: what was counted after the last push
+// of yesterday would otherwise never be reported. Suite Cloud takes nothing older.
 func (u *Usage) Push(ctx context.Context) error {
 	accounts := u.Touched.Take()
 	if len(accounts) == 0 {
 		return nil
 	}
-	current := PeriodsAt(u.Now())
+	now := u.Now()
+	current := PeriodsAt(now)
 	sets := []Periods{current}
-	if u.pushed != (Periods{}) && u.pushed != current {
-		sets = append(sets, u.pushed)
+	if u.pushed != current {
+		sets = append(sets, PeriodsAt(now.Add(-24*time.Hour)))
 	}
 	counts := make([]map[string]Count, len(sets))
 	for i, periods := range sets {
