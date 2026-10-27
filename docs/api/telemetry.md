@@ -1,6 +1,6 @@
 # Telemetry
 
-Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each Stalwart node, egress gateway or SFU node pushes the node's logs, traces and metrics here as JSON. Suite Cloud stages every accepted batch as a parquet file, copies the files into Frappe Insights' DuckDB every five minutes and deletes rows older than the retention in **Suite Cloud Settings > Agent & Telemetry** daily. Operators read the data in the Insights dashboards Suite Cloud ships. The loader copies the event data keys the dashboards read (`remoteIp`, `listenerId`, `domain`, `hostname`, `details` or `reason`, `code`, `accountName` or `accountId`, `from`, `to`, `elapsed`) into columns of the `events` table, with the SMTP code and the sender and recipient domains, so a chart does not parse the JSON of every row. Each dashboard opens on yesterday and today; the DMARC and TLS dashboards, which read daily reports, open on the last week.
+Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each Stalwart node and egress gateway pushes the server's logs, traces and metrics here as JSON. Suite Cloud stages every accepted batch as a parquet file, copies the files into Frappe Insights' DuckDB every five minutes and deletes rows older than the retention in **Suite Cloud Settings > Agent & Telemetry** daily. Operators read the data in the Insights dashboards Suite Cloud ships. The loader copies the event data keys the dashboards read (`remoteIp`, `listenerId`, `domain`, `hostname`, `details` or `reason`, `code`, `accountName` or `accountId`, `from`, `to`, `elapsed`) into columns of the `events` table, with the SMTP code and the sender and recipient domains, so a chart does not parse the JSON of every row. Each dashboard opens on yesterday and today; the DMARC and TLS dashboards, which read daily reports, open on the last week.
 
 | Method | Verb | Purpose |
 | --- | --- | --- |
@@ -17,7 +17,7 @@ Every agent sends its cluster's **Agent Key** and **Agent Secret**, from the Sta
 Authorization: Bearer <agent key>:<agent secret>
 ```
 
-The token is accepted only on these methods and runs them as a user without any role, so it opens nothing else. It also holds the caller to its cluster: `host_ip` must be one of that cluster's nodes or gateways, and a batch for any other address is a 403. With **Enable Telemetry** off in **Suite Cloud Settings > Agent & Telemetry**, every request is refused with a 401. **Rotate Agent Secret** on the cluster replaces the secret at once and reinstalls the cluster's agents; an agent still sending the old secret gets a 401 and retries until its new config arrives, so nothing is lost.
+The token is accepted only on these methods and runs them as a user without any role, so it opens nothing else. It also holds the caller to its cluster: `host_ip` must be one of that cluster's nodes or gateways, and a batch for any other address is a 403. Another kind of server, such as an SFU node, can send telemetry only once Suite Cloud records it as a server of a cluster. With **Enable Telemetry** off in **Suite Cloud Settings > Agent & Telemetry**, every request is refused with a 401. **Rotate Agent Secret** on the cluster replaces the secret at once and reinstalls the cluster's agents; an agent still sending the old secret gets a 401 and retries until its new config arrives, so nothing is lost.
 
 ## Request
 
@@ -25,7 +25,7 @@ Both methods take the same envelope and a list of records. A batch is checked wh
 
 | Parameter | Type | Meaning |
 | --- | --- | --- |
-| `source` | string | Required. What produced the data, such as `stalwart` or `sfu`: 1 to 64 lowercase letters, digits, `-` or `_` |
+| `source` | string | Required. What produced the data, such as `stalwart`: 1 to 64 lowercase letters, digits, `-` or `_` |
 | `host_ip` | string | Required. The node's IPv4 or IPv6 address, stored in its normalized form |
 | `hostname` | string | Optional. The node's hostname, at most 253 characters |
 | `batch_id` | string | Optional. A UUID the agent gives the batch, see [retries](#retries). Suite Cloud generates a UUIDv7 when it is left out |
