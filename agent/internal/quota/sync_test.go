@@ -153,6 +153,49 @@ func TestPushSendsDayAndMonthOfTouchedAccounts(t *testing.T) {
 	}
 }
 
+func TestTheFirstPushAfterMidnightSendsYesterdaysLastCounts(t *testing.T) {
+	caller := &fakeCaller{answers: map[string][]string{}}
+	usage, store := newUsage(t, caller, 100)
+	now := time.Date(2026, 10, 26, 23, 59, 30, 0, time.UTC)
+	usage.Now = func() time.Time { return now }
+	yesterday, today := PeriodsAt(now), PeriodsAt(now.Add(time.Minute))
+
+	add(t, store, "a@example.com", 3, yesterday)
+	usage.Touched.Add("a@example.com")
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	add(t, store, "a@example.com", 2, yesterday) // after that push, before midnight
+	usage.Touched.Add("a@example.com")
+	now = now.Add(time.Minute)
+	add(t, store, "b@example.com", 1, today) // b sends only after midnight
+	usage.Touched.Add("b@example.com")
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	got := map[string]float64{}
+	for _, record := range caller.payloads[usageMethod][1]["records"].([]any) {
+		r := record.(map[string]any)
+		got[r["account"].(string)+" "+r["period"].(string)] = r["sent"].(float64)
+	}
+	want := map[string]float64{
+		"a@example.com d:20261027": 0, "a@example.com m:202610": 5, "a@example.com d:20261026": 5,
+		"b@example.com d:20261027": 1, "b@example.com m:202610": 1,
+	}
+	if len(got) != len(want) {
+		t.Fatalf("records %v", got)
+	}
+	for key, sent := range want {
+		if value, ok := got[key]; !ok || value != sent {
+			t.Fatalf("records %v, want %v", got, want)
+		}
+	}
+	if err := usage.Push(context.Background()); err != nil || len(caller.payloads[usageMethod]) != 2 {
+		t.Fatalf("a push with nothing touched sent %d requests: %v", len(caller.payloads[usageMethod]), err)
+	}
+}
+
 func TestFailedPushKeepsTheAccountsTouched(t *testing.T) {
 	usage, _ := newUsage(t, &fakeCaller{fail: true}, 100)
 	usage.Touched.Add("a@example.com")

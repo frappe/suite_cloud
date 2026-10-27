@@ -150,16 +150,19 @@ func (m *MemoryStore) Run(ctx context.Context) error {
 	}
 }
 
-// Save drops the counters of past periods and writes the file when anything changed.
+// Save drops the counters older than yesterday and its month, and writes the file when anything
+// changed. Yesterday stays until the usage push has sent its last count.
 func (m *MemoryStore) Save() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if !m.dirty {
 		return nil
 	}
-	periods := PeriodsAt(m.now())
-	prune(m.data.Usage, periods)
-	prune(m.data.Refused, periods)
+	now := m.now()
+	today, yesterday := PeriodsAt(now), PeriodsAt(now.Add(-24*time.Hour))
+	kept := map[string]bool{today.Day: true, today.Month: true, yesterday.Day: true, yesterday.Month: true}
+	prune(m.data.Usage, kept)
+	prune(m.data.Refused, kept)
 	if err := state.WriteFile(m.dir, memoryFileName, m.data); err != nil {
 		return err
 	}
@@ -167,10 +170,10 @@ func (m *MemoryStore) Save() error {
 	return nil
 }
 
-func prune(all map[string]map[string]int64, periods Periods) {
+func prune(all map[string]map[string]int64, kept map[string]bool) {
 	for account, byPeriod := range all {
 		for period := range byPeriod {
-			if period != periods.Day && period != periods.Month {
+			if !kept[period] {
 				delete(byPeriod, period)
 			}
 		}

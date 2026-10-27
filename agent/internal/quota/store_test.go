@@ -185,7 +185,8 @@ func TestMemoryStoreSurvivesARestart(t *testing.T) {
 	store.now = func() time.Time { return time.Date(2026, 10, 26, 23, 59, 0, 0, time.UTC) }
 	setLimit(t, store, "a@example.com", 10, 0, "1")
 	add(t, store, "a@example.com", 4, october)
-	add(t, store, "a@example.com", 1, PeriodsAt(time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)))
+	add(t, store, "a@example.com", 2, PeriodsAt(time.Date(2026, 10, 25, 12, 0, 0, 0, time.UTC)))
+	add(t, store, "a@example.com", 1, PeriodsAt(time.Date(2026, 10, 24, 12, 0, 0, 0, time.UTC)))
 	if err := store.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -196,8 +197,9 @@ func TestMemoryStoreSurvivesARestart(t *testing.T) {
 	if v := add(t, reopened, "a@example.com", 7, october); v != OverDaily {
 		t.Fatalf("limit or count lost: %v", v)
 	}
-	if usage := reopened.data.Usage["a@example.com"]; len(usage) != 2 || usage["d:20261025"] != 0 {
-		t.Fatalf("a past day was kept: %v", usage)
+	// Yesterday stays for the usage push; the day before goes.
+	if usage := reopened.data.Usage["a@example.com"]; len(usage) != 3 || usage["d:20261025"] != 2 || usage["d:20261024"] != 0 {
+		t.Fatalf("usage %v", usage)
 	}
 }
 

@@ -12,7 +12,7 @@ const (
 	finalPushTimeout  = 5 * time.Second
 	limitsMethod      = "quota.limits"
 	usageMethod       = "quota.usage"
-	recordsPerAccount = 2 // a day and a month
+	recordsPerAccount = 2 // a day and a month, per set of periods
 )
 
 // Limits copies the cluster's limits from Suite Cloud into the store: what changed since the last
@@ -131,6 +131,7 @@ type Usage struct {
 	BatchSize int // records per request
 	Logger    *slog.Logger
 	Now       func() time.Time
+	pushed    Periods // the periods of the last push that went through
 }
 
 type usageRecord struct {
@@ -142,6 +143,7 @@ type usageRecord struct {
 
 // Run pushes on every tick, and once more on the way out.
 func (u *Usage) Run(ctx context.Context) error {
+	u.pushed = PeriodsAt(u.Now())
 	ticker := time.NewTicker(u.Interval)
 	defer ticker.Stop()
 	for {
@@ -162,27 +164,41 @@ func (u *Usage) Run(ctx context.Context) error {
 }
 
 // Push sends the touched accounts in batches. Accounts whose batch was not taken stay touched.
+// The first push after midnight UTC also sends the counts of the day and month the last push
+// covered: what was counted between that push and midnight would otherwise never be reported.
 func (u *Usage) Push(ctx context.Context) error {
 	accounts := u.Touched.Take()
 	if len(accounts) == 0 {
 		return nil
 	}
-	periods := PeriodsAt(u.Now())
-	counts, err := u.Store.Counts(ctx, accounts, periods)
-	if err != nil {
-		u.Touched.Add(accounts...)
-		return err
+	current := PeriodsAt(u.Now())
+	sets := []Periods{current}
+	if u.pushed != (Periods{}) && u.pushed != current {
+		sets = append(sets, u.pushed)
 	}
-	step := max(u.BatchSize/recordsPerAccount, 1)
+	counts := make([]map[string]Count, len(sets))
+	for i, periods := range sets {
+		var err error
+		if counts[i], err = u.Store.Counts(ctx, accounts, periods); err != nil {
+			u.Touched.Add(accounts...)
+			return err
+		}
+	}
+	step := max(u.BatchSize/(recordsPerAccount*len(sets)), 1)
 	for start := 0; start < len(accounts); start += step {
 		batch := accounts[start:min(start+step, len(accounts))]
-		records := make([]usageRecord, 0, len(batch)*recordsPerAccount)
+		records := make([]usageRecord, 0, len(batch)*recordsPerAccount*len(sets))
 		for _, account := range batch {
-			count := counts[account]
-			records = append(records,
-				usageRecord{account, periods.Day, count.Day, count.RefusedDay},
-				usageRecord{account, periods.Month, count.Month, count.RefusedMonth},
-			)
+			for i, periods := range sets {
+				count := counts[i][account]
+				// Before midnight, only what was counted: an account first counted after it has nothing.
+				if i == 0 || count.Day > 0 || count.RefusedDay > 0 {
+					records = append(records, usageRecord{account, periods.Day, count.Day, count.RefusedDay})
+				}
+				if i == 0 || periods.Month != current.Month && (count.Month > 0 || count.RefusedMonth > 0) {
+					records = append(records, usageRecord{account, periods.Month, count.Month, count.RefusedMonth})
+				}
+			}
 		}
 		var answer struct{}
 		if err := u.Caller.Call(ctx, usageMethod, map[string]any{"host_ip": u.HostIP, "records": records}, &answer); err != nil {
@@ -190,5 +206,6 @@ func (u *Usage) Push(ctx context.Context) error {
 			return err
 		}
 	}
+	u.pushed = current
 	return nil
 }
