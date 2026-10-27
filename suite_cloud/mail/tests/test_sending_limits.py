@@ -162,6 +162,33 @@ class TestUsageApi(SendingLimitsTestCase):
         self.assertRaises(InvalidInputError, self.push, ("bob@acme.com", day, -1))
         self.assertRaises(InvalidInputError, self.push, ("bob@acme.com", day, 1, -1))
 
+    def test_yesterday_and_last_month_are_taken_after_midnight(self) -> None:
+        """The Agent's first push after midnight UTC sends the periods that just ended."""
+
+        moment = datetime(2026, 11, 1, 0, 0, 30, tzinfo=UTC)
+
+        class Frozen(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return moment.astimezone(tz)
+
+        with patch(f"{mail_send_usage.__name__}.datetime", Frozen):
+            answer = self.push(
+                ("alice@acme.com", "d:20261101", 1),
+                ("alice@acme.com", "m:202611", 1),
+                ("alice@acme.com", "d:20261031", 7, 2),
+                ("alice@acme.com", "m:202610", 40, 2),
+                ("alice@acme.com", "d:20261030", 5),
+            )
+        self.assertEqual(answer["accepted"], 4)
+        stored = frappe.get_all(
+            "Mail Send Usage", {"account": "alice@acme.com"}, ["period", "sent", "refused"]
+        )
+        self.assertEqual(
+            {row.period: (row.sent, row.refused) for row in stored},
+            {"d:20261101": (1, 0), "m:202611": (1, 0), "d:20261031": (7, 2), "m:202610": (40, 2)},
+        )
+
     def test_form_and_api_show_the_usage_and_delete_takes_it(self) -> None:
         day, month = current_periods()
         self.push(("alice@acme.com", day, 80, 3), ("alice@acme.com", month, 900, 5))
