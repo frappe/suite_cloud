@@ -22,23 +22,26 @@ HOOK_TIMEOUT_MS = 2000
 BACKSTOP_DESCRIPTION = "suite-cloud-quota-backstop"
 DAY_MS = 86_400_000
 SIGNED_IN = {"match": as_list([{"if": "!is_empty(authenticated_as)", "then": "true"}]), "else": "false"}
+NEVER = {"match": as_list([]), "else": "false"}
 REDIS_STORE_TYPES = {"Redis": "redis", "RedisCluster": "redis_cluster", "RedisSentinel": "redis_sentinel"}
 
 
 def cluster_operations(cluster: Document) -> list[dict]:
+    """The hook and the backstop, switched off while quota is: the plan only upserts, so leaving
+    them out would keep Stalwart calling an Agent that no longer answers."""
+
     from suite_cloud.telemetry.agent.deploy import is_quota_enabled  # deploy imports this module
 
-    if not is_quota_enabled():
-        return []
-    return [hook_operation(cluster), backstop_operation(cluster)]
+    enabled = is_quota_enabled()
+    return [hook_operation(cluster, enabled), backstop_operation(cluster, enabled)]
 
 
-def hook_operation(cluster: Document) -> dict:
+def hook_operation(cluster: Document, enabled: bool = True) -> dict:
     """At the data stage every recipient is known, and JMAP sends pass through it too. Stalwart
     accepts the message when the Agent fails or times out."""
 
     hook = {
-        "enable": SIGNED_IN,
+        "enable": SIGNED_IN if enabled else NEVER,
         "url": HOOK_URL,
         "stages": as_set(["data"]),
         "timeout": HOOK_TIMEOUT_MS,
@@ -52,14 +55,14 @@ def hook_operation(cluster: Document) -> dict:
     return {"@type": "upsert", "object": "MtaHook", "matchOn": ["url"], "value": {"quota": hook}}
 
 
-def backstop_operation(cluster: Document) -> dict:
+def backstop_operation(cluster: Document, enabled: bool = True) -> dict:
     """The cluster's cap per signed-in account and UTC day, checked at MAIL FROM; 0 disables it.
     Without ``match`` every unauthenticated session would share one bucket, since Stalwart
     hashes an empty login too."""
 
     per_day = cint(cluster.quota_backstop_per_day)
     throttle = {
-        "enable": per_day > 0,
+        "enable": enabled and per_day > 0,
         "description": BACKSTOP_DESCRIPTION,
         "key": as_set(["authenticatedAs"]),
         "match": SIGNED_IN,

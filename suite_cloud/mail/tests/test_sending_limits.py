@@ -266,8 +266,15 @@ class TestTenantSendLimits(SendingLimitsTestCase):
 class TestQuotaPlan(SendingLimitsTestCase):
     def test_the_plan_carries_the_hook_once_the_agents_answer_it(self) -> None:
         objects = lambda operations: {op["object"] for op in operations}  # noqa: E731
+
+        def quota_objects(operations: list[dict]) -> dict:
+            values = {op["object"]: op["value"] for op in operations}
+            return values["MtaHook"]["quota"], values["MtaInboundThrottle"]["quota-backstop"]
+
+        # Off: both stay in the plan, switched off, so a hook installed before is turned off too.
         with patch("suite_cloud.telemetry.agent.deploy.is_quota_enabled", return_value=False):
-            self.assertFalse({"MtaHook", "MtaInboundThrottle"} & objects(plan.cluster_plan(self.cluster)))
+            hook, backstop = quota_objects(plan.cluster_plan(self.cluster))
+        self.assertEqual((hook["enable"], backstop["enable"]), (quota.NEVER, False))
 
         with patch("suite_cloud.telemetry.agent.deploy.is_quota_enabled", return_value=True):
             operations = plan.cluster_plan(self.cluster)

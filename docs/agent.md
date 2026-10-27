@@ -86,7 +86,7 @@ The Agent pulls the limits changed since its last pull every 60 seconds and all 
 
 Nothing in the quota path stops mail. When the Agent fails or takes longer than 2 seconds, Stalwart accepts the message uncounted. A native throttle, `suite-cloud-quota-backstop`, caps every signed-in account meanwhile at the cluster's **Backstop Messages per Day**, 5,000 by default, and 0 turns it off. It counts messages, not recipients, so keep it above the highest daily limit. A change applies with the next Sync Config. A message the hook accepted stays counted when Stalwart refuses it later, for example over a queue quota.
 
-The hook and the backstop are part of the cluster plan, and both they and the `quota` section of `config.json` wait for **Enable Telemetry** and a build of 0.2.0 or newer. To turn the limits on for a cluster: run **Build Agent**, then **Upgrade Agents**, then **Sync Config**. In the other order nothing breaks, but every message logs a hook error until the Agents are up. A single-node cluster that later gets a Redis in-memory store needs Upgrade Agents again to move its counters there.
+The hook and the backstop are part of the cluster plan, and both they and the `quota` section of `config.json` wait for **Enable Telemetry** and a build of 0.2.0 or newer. Until then the plan keeps both switched off, so turning telemetry off and running Sync Config turns off a hook installed before. To turn the limits on for a cluster: run **Build Agent**, then **Upgrade Agents**, then **Sync Config**. In the other order nothing breaks, but every message logs a hook error until the Agents are up. A single-node cluster that later gets a Redis in-memory store needs Upgrade Agents again to move its counters there.
 
 ## Status
 
