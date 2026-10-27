@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -205,23 +206,44 @@ func TestLimiterSharesOneMinuteWindow(t *testing.T) {
 	}
 }
 
+// Goroutines that find the minute full each sleep, and the fake clock adds their sleeps up, so the
+// number of waits varies; what must hold is that no minute grants more than its share.
 func TestLimiterIsSafeAcrossGoroutines(t *testing.T) {
 	c := &clock{now: time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)}
 	l := NewLimiter(100)
-	l.now, l.sleep = c.Now, c.Sleep
+	granted := map[time.Time]int{}
+	l.now = func() time.Time {
+		granted[l.window] = l.used // take holds l.mu here, so every earlier grant is counted
+		return c.Now()
+	}
+	l.sleep = c.Sleep
 	var wg sync.WaitGroup
+	var failed atomic.Int32
 	for g := 0; g < 4; g++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 50; i++ {
-				l.Wait(context.Background())
+				if l.Wait(context.Background()) != nil {
+					failed.Add(1)
+				}
 			}
 		}()
 	}
 	wg.Wait()
-	if len(c.waits) != 1 {
-		t.Fatalf("200 requests at 100 a minute took %d waits", len(c.waits))
+	l.mu.Lock()
+	granted[l.window] = l.used
+	l.mu.Unlock()
+
+	total := 0
+	for window, n := range granted {
+		if n > 100 {
+			t.Fatalf("the minute from %s granted %d of 100", window.Format(time.TimeOnly), n)
+		}
+		total += n
+	}
+	if failed.Load() != 0 || total != 200 || len(c.waits) == 0 {
+		t.Fatalf("%d failed, %d granted, %d waits", failed.Load(), total, len(c.waits))
 	}
 }
 
