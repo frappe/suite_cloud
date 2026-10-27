@@ -213,6 +213,27 @@ class TestTenantSendLimits(SendingLimitsTestCase):
             frappe.ValidationError, accounts.update_account, "bob@acme.com", daily_send_limit=-1
         )
 
+    def test_tenants_read_an_account_s_daily_history(self) -> None:
+        now = datetime.now(UTC)
+        today, two_days_ago, long_ago = (now - timedelta(days=days) for days in (0, 2, 40))
+        periods = {*periods_at(today), *periods_at(two_days_ago), *periods_at(long_ago)}
+        upsert_usage(
+            [{"account": "alice@acme.com", "period": period, "sent": 9, "refused": 1} for period in periods]
+        )
+
+        history = accounts.get_send_usage("alice@acme.com", days=7)
+        self.assertEqual(
+            [day["date"] for day in history["days"]], [f"{today:%Y-%m-%d}", f"{two_days_ago:%Y-%m-%d}"]
+        )
+        self.assertEqual(
+            history["days"][0], {"date": f"{today:%Y-%m-%d}", "sent": 9, "refused": 1, "limit": 100}
+        )
+        months = {f"{moment:%Y-%m}" for moment in (today, now - timedelta(days=6))}
+        self.assertEqual({month["month"] for month in history["months"]}, months)
+
+        self.act_as(self.other)
+        self.assertRaises(frappe.DoesNotExistError, accounts.get_send_usage, "alice@acme.com")
+
 
 class TestQuotaPlan(SendingLimitsTestCase):
     def test_the_plan_carries_the_hook_once_the_agents_answer_it(self) -> None:

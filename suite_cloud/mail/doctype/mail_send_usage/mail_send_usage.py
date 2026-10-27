@@ -77,6 +77,34 @@ def sent_by_account(accounts: list[str]) -> dict[str, dict[str, int]]:
     return usage
 
 
+def usage_history(account: str, days: int) -> dict[str, list[dict]]:
+    """The account's totals of the last ``days`` UTC days and of their months, newest first, each
+    with the limit it was last reported with."""
+
+    day, month = periods_at(datetime.now(UTC) - timedelta(days=days - 1))
+    usage = frappe.qb.DocType("Mail Send Usage")
+    rows = (
+        frappe.qb.from_(usage)
+        .select(usage.period, usage.sent, usage.refused, usage.send_limit)
+        .where(usage.account == account)
+        .where(
+            (usage.period.like("d:%") & (usage.period >= day))
+            | (usage.period.like("m:%") & (usage.period >= month))
+        )
+        .orderby(usage.period, order=frappe.qb.desc)
+        .run(as_dict=True)
+    )
+    history = {"days": [], "months": []}
+    for row in rows:
+        stamp = row.period[2:]
+        if row.period.startswith("d:"):
+            entry, key = {"date": f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:]}"}, "days"
+        else:
+            entry, key = {"month": f"{stamp[:4]}-{stamp[4:]}"}, "months"
+        history[key].append({**entry, "sent": row.sent, "refused": row.refused, "limit": row.send_limit})
+    return history
+
+
 def upsert_usage(rows: list[dict]) -> None:
     """Stores ``{account, period, sent, refused}`` rows in one statement, each with the account's
     limit for its period as it is now. Agents on several nodes report the same counters, and a

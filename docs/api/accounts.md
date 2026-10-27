@@ -7,6 +7,7 @@ Module `suite_cloud.api.mail.accounts`, plus `mail.meta.get_account_options`. Th
 | `mail.accounts.list_accounts` | GET | A page of accounts |
 | `mail.accounts.get_account` | GET | One account with its disk usage |
 | `mail.accounts.get_quotas` | GET | Disk quota and usage for up to 500 addresses at once |
+| `mail.accounts.get_send_usage` | GET | Recipients and refused messages per day and month |
 | `mail.accounts.create_account` | POST | Creates a mailbox and returns its app password once |
 | `mail.accounts.update_account` | PATCH | Changes the name, description, quotas, send limits, locale, time zone or receiving |
 | `mail.accounts.set_account_enabled` | PUT | Enables or disables login and delivery |
@@ -93,6 +94,24 @@ Takes `email`. Returns the account object with its usage.
 | `emails` | array of strings, required | Up to 500 addresses, as a JSON body on a QUERY, or as the array's JSON text on a GET short enough for a request line |
 
 Answers `{"<email>": {"disk_quota_gb": 5, "used_disk_bytes": 734003200}, …}` for the tenant's accounts among them; a `disk_quota_gb` of 0 means no limit. Addresses that are not the tenant's accounts are left out. The quotas are one query and the usage one cluster call per batch, so a list page can show both for every row.
+
+## `get_send_usage`
+
+| Parameter | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `email` | string, required | | The account |
+| `days` | integer | 30 | UTC days back from today, at most 400 |
+
+Answers the account's history, newest first, as far back as Suite Cloud keeps it (the operator's Sending Usage Retention, 90 days by default):
+
+```json
+{
+  "days": [{ "date": "2026-10-27", "sent": 120, "refused": 0, "limit": 500 }],
+  "months": [{ "month": "2026-10", "sent": 2340, "refused": 3, "limit": 10000 }]
+}
+```
+
+`sent` counts recipients and `refused` the messages refused over a limit. `limit` is the daily or monthly limit the account had when the period was last reported; 0 means no limit. `months` holds the months the days fall in. A day with nothing sent is left out.
 
 ## `create_account`
 

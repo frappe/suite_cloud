@@ -20,6 +20,7 @@ from suite_cloud.mail.doctype.mail_account.mail_account import (
     account_payloads,
     validate_password,
 )
+from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import usage_history
 from suite_cloud.mail.tenancy import account_credentials, sync
 from suite_cloud.mail.tenancy import quotas as quota_rows
 from suite_cloud.mail.tenancy.account_credentials import API_KEYS, APP_PASSWORDS, Kind
@@ -45,6 +46,19 @@ def list_accounts(
 @mail_api
 def get_account(email: str) -> dict:
     return owned("Mail Account", email).to_api(with_usage=True)
+
+
+HISTORY_DAYS_CAP = 400
+
+
+@frappe.whitelist(methods=["GET"])
+@mail_api
+def get_send_usage(email: str, days: int = 30) -> dict:
+    """The account's recipients and refused messages per UTC day for the last ``days`` (at most
+    400) and per month, newest first, each with the limit it had then; only as far back as the
+    Sending Usage Retention keeps."""
+
+    return usage_history(owned("Mail Account", email).name, page_size(days, HISTORY_DAYS_CAP))
 
 
 QUOTA_LOOKUP_LIMIT = 500
