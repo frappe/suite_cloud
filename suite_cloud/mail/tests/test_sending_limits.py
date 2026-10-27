@@ -251,11 +251,16 @@ class TestTenantSendLimits(SendingLimitsTestCase):
         self.assertRaises(
             frappe.ValidationError, accounts.update_account, "bob@acme.com", daily_send_limit=-1
         )
-        # Both limits are non_negative fields, so Frappe refuses a negative one on create too.
+        # A negative limit means nothing, so create refuses it too, naming the field.
         for limits in ({"daily_send_limit": -1}, {"monthly_send_limit": -5}):
             with self.subTest(**limits):
-                self.assertRaises(
-                    frappe.ValidationError, accounts.create_account, "dave@acme.com", "secret-pw", **limits
+                self.assertRaisesRegex(
+                    frappe.ValidationError,
+                    "Send Limit must be 0",
+                    accounts.create_account,
+                    "dave@acme.com",
+                    "secret-pw",
+                    **limits,
                 )
         self.assertFalse(frappe.db.exists("Mail Account", "dave@acme.com"))
 

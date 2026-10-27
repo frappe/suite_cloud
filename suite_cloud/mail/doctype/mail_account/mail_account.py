@@ -81,6 +81,7 @@ class MailAccount(QuotaHolder, Document):
             assert_domain_live(domain)
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
+        self.validate_send_limits()
 
         tenant = frappe.get_cached_doc("Suite Tenant", self.tenant)
         if self.is_new() and not self.flags.adopting:
@@ -101,6 +102,16 @@ class MailAccount(QuotaHolder, Document):
             validate_password(self.new_password)
             self.flags.password = self.new_password
         self.new_password = None
+
+    def validate_send_limits(self) -> None:
+        """Recipients per UTC day and month; 0 means no limit, so a negative one means nothing."""
+
+        for field in ("daily_send_limit", "monthly_send_limit"):
+            if cint(self.get(field)) < 0:
+                frappe.throw(
+                    _("{0} must be 0 (no limit) or more.").format(_(self.meta.get_label(field))),
+                    frappe.ValidationError,
+                )
 
     def validate_groups(self) -> None:
         seen = set()
