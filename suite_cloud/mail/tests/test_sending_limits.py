@@ -145,9 +145,10 @@ class TestUsageApi(SendingLimitsTestCase):
         self.push(("alice@acme.com", day, 6))
         self.assertEqual(frappe.db.get_value("Mail Send Usage", f"alice@acme.com:{day}", "send_limit"), 150)
 
-        frappe.db.set_value("Mail Send Usage", f"alice@acme.com:{day}", "send_limit", 0)
+        frappe.db.set_value("Mail Send Usage", {"account": "alice@acme.com"}, "send_limit", 0)
         fill_send_usage_limits.execute()
-        self.assertEqual(frappe.db.get_value("Mail Send Usage", f"alice@acme.com:{day}", "send_limit"), 150)
+        stored = frappe.get_all("Mail Send Usage", {"account": "alice@acme.com"}, ["period", "send_limit"])
+        self.assertEqual({row.period: row.send_limit for row in stored}, {day: 150, month: 2000})
 
     def test_unknown_accounts_and_old_periods_are_dropped(self) -> None:
         day, _month = current_periods()
