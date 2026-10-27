@@ -98,7 +98,7 @@ class StalwartNode(Document):
 
     def after_insert(self) -> None:
         dns.sync_node_records(self)
-        self.get_cluster().save(ignore_permissions=True)  # re-validates stores for the new node count
+        self.revalidate_cluster()
 
     def on_update(self) -> None:
         before = self.get_doc_before_save()
@@ -110,6 +110,8 @@ class StalwartNode(Document):
 
         if before.enabled and not self.enabled and self.status in ("Active", "Provisioned"):
             bootstrap.drain_node(self)
+        if self.enabled and not before.enabled:
+            self.revalidate_cluster()
 
     def on_trash(self) -> None:
         if self.status not in REMOVABLE_STATUSES:
@@ -131,6 +133,11 @@ class StalwartNode(Document):
 
     def get_cluster(self) -> Document:
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+
+    def revalidate_cluster(self) -> None:
+        """Saves a fresh copy of the cluster, which checks its stores against the new node count."""
+
+        frappe.get_doc("Stalwart Cluster", self.cluster).save(ignore_permissions=True)
 
     def ssh_target(self) -> SSHTarget:
         cluster = self.get_cluster()

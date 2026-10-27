@@ -246,6 +246,18 @@ class TestStalwartCluster(IntegrationTestCase):
         cluster.save()
         self.assertEqual(cluster.coordinator, "Disabled")
 
+    def test_enabling_a_second_node_needs_a_redis_in_memory_store(self) -> None:
+        # Shared stores but no Redis: one node is fine, a second must not start counting on its own.
+        cluster = make_cluster(name="pair", hostname=f"mail.pair.{ROOT_DOMAIN}", in_memory_store=None)
+        make_node(cluster, "203.0.113.1")
+        frappe.db.savepoint("second_node")
+        self.assertRaisesRegex(frappe.ValidationError, "needs a Redis", make_node, cluster, "203.0.113.2")
+        frappe.db.rollback(save_point="second_node")  # as the refused request would
+
+        second = make_node(cluster, "203.0.113.2", enabled=0)
+        second.enabled = 1
+        self.assertRaisesRegex(frappe.ValidationError, "needs a Redis", second.save)
+
     def test_node_hostnames_are_handed_out_in_order(self) -> None:
         cluster = make_cluster()
         first = make_node(cluster, "203.0.113.1")
