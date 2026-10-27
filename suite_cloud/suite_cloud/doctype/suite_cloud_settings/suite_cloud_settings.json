@@ -18,6 +18,7 @@
   "tenant_email_accounts",
   "column_break_email",
   "use_tenant_title_as_sender_name",
+  "agent_telemetry_tab",
   "telemetry_section",
   "enable_telemetry",
   "column_break_telemetry",
@@ -176,6 +177,11 @@
    "fieldname": "use_tenant_title_as_sender_name",
    "fieldtype": "Check",
    "label": "Use Tenant Title as Sender Name"
+  },
+  {
+   "fieldname": "agent_telemetry_tab",
+   "fieldtype": "Tab Break",
+   "label": "Agent & Telemetry"
   },
   {
    "description": "The agents on Stalwart and SFU nodes push logs and metrics to the telemetry API; the loader copies them into Insights.",
@@ -648,7 +654,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-27 12:00:00.000000",
+ "modified": "2026-10-27 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

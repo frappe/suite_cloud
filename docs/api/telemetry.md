@@ -1,6 +1,6 @@
 # Telemetry
 
-Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each Stalwart node, egress gateway or SFU node pushes the node's logs, traces and metrics here as JSON. Suite Cloud stages every accepted batch as a parquet file, copies the files into Frappe Insights' DuckDB every five minutes and deletes rows older than the retention in **Suite Cloud Settings > Telemetry** daily. Operators read the data in the Insights dashboards Suite Cloud ships. The loader copies the event data keys the dashboards read (`remoteIp`, `listenerId`, `domain`, `hostname`, `details` or `reason`, `code`, `accountName` or `accountId`, `from`, `to`, `elapsed`) into columns of the `events` table, with the SMTP code and the sender and recipient domains, so a chart does not parse the JSON of every row. Each dashboard opens on yesterday and today; the DMARC and TLS dashboards, which read daily reports, open on the last week.
+Module `suite_cloud.api.telemetry`. The [Suite Cloud Agent](../agent.md) on each Stalwart node, egress gateway or SFU node pushes the node's logs, traces and metrics here as JSON. Suite Cloud stages every accepted batch as a parquet file, copies the files into Frappe Insights' DuckDB every five minutes and deletes rows older than the retention in **Suite Cloud Settings > Agent & Telemetry** daily. Operators read the data in the Insights dashboards Suite Cloud ships. The loader copies the event data keys the dashboards read (`remoteIp`, `listenerId`, `domain`, `hostname`, `details` or `reason`, `code`, `accountName` or `accountId`, `from`, `to`, `elapsed`) into columns of the `events` table, with the SMTP code and the sender and recipient domains, so a chart does not parse the JSON of every row. Each dashboard opens on yesterday and today; the DMARC and TLS dashboards, which read daily reports, open on the last week.
 
 | Method | Verb | Purpose |
 | --- | --- | --- |
@@ -17,7 +17,7 @@ Every agent sends its cluster's **Agent Key** and **Agent Secret**, from the Sta
 Authorization: Bearer <agent key>:<agent secret>
 ```
 
-The token is accepted only on these methods and runs them as a user without any role, so it opens nothing else. It also holds the caller to its cluster: `host_ip` must be one of that cluster's nodes or gateways, and a batch for any other address is a 403. With **Enable Telemetry** off in **Suite Cloud Settings > Telemetry**, every request is refused with a 401. **Rotate Agent Secret** on the cluster replaces the secret at once and reinstalls the cluster's agents; an agent still sending the old secret gets a 401 and retries until its new config arrives, so nothing is lost.
+The token is accepted only on these methods and runs them as a user without any role, so it opens nothing else. It also holds the caller to its cluster: `host_ip` must be one of that cluster's nodes or gateways, and a batch for any other address is a 403. With **Enable Telemetry** off in **Suite Cloud Settings > Agent & Telemetry**, every request is refused with a 401. **Rotate Agent Secret** on the cluster replaces the secret at once and reinstalls the cluster's agents; an agent still sending the old secret gets a 401 and retries until its new config arrives, so nothing is lost.
 
 ## Request
 
@@ -119,7 +119,7 @@ An agent retries on 429 and on any 5xx or network failure, with a backoff. It do
 
 Give every batch a `batch_id` and keep it across retries. A retry of a batch Suite Cloud already staged replaces the staged file, and a batch already loaded into Insights is not loaded twice, so a request whose answer was lost in transit is safe to send again.
 
-Each node may make **Telemetry Requests per Minute** requests (300 by default), counted per `host_ip` in fixed one-minute windows. Both limits are in **Suite Cloud Settings > Telemetry**; a larger batch costs one request, and a batch is validated whole, so a change needs no release.
+Each node may make **Telemetry Requests per Minute** requests (300 by default), counted per `host_ip` in fixed one-minute windows. Both limits are in **Suite Cloud Settings > Agent & Telemetry**; a larger batch costs one request, and a batch is validated whole, so a change needs no release.
 
 ## Sending limits
 
