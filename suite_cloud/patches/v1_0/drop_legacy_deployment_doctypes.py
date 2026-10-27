@@ -1,9 +1,5 @@
-import json
-from pathlib import Path
-
 import frappe
 from frappe.database.utils import drop_index_if_exists
-from frappe.model import no_value_fields
 
 # The first Suite Cloud release shipped a Docker-based single-server deployment. It was replaced
 # wholesale (clusters, nodes, plans, tenancy) and nothing in it is migrated: the app had no
@@ -27,12 +23,14 @@ LEGACY_DOCTYPES = (
 )
 
 
-SHIPPED = {"Server Job": ("suite_cloud", "doctype", "server_job", "server_job.json")}
+# A table only the current DocType of the name has: the legacy Server Job had Server Job Command
+# rows, today's has Server Job Task rows. Unlike its columns, it does not change in later releases.
+CURRENT_MARKERS = {"Server Job": "Server Job Task"}
 
 
 def execute() -> None:
     for doctype in LEGACY_DOCTYPES:
-        if has_shipped_schema(doctype):
+        if is_current(doctype):
             continue
         frappe.delete_doc(
             "DocType",
@@ -49,13 +47,9 @@ def execute() -> None:
         drop_index_if_exists("tabDNS Record", index)
 
 
-def has_shipped_schema(doctype: str) -> bool:
-    """The table already has every field the app ships for this name: the site is past this patch,
-    and deleting the DocType would delete today's records, and in developer mode its files."""
+def is_current(doctype: str) -> bool:
+    """The site already has today's DocType of this name: it is past this patch, and deleting it
+    would delete today's records, and in developer mode its files."""
 
-    if doctype not in SHIPPED or not frappe.db.table_exists(doctype, cached=False):
-        return False
-    path = Path(frappe.get_app_path("suite_cloud", *SHIPPED[doctype]))
-    fields = json.loads(path.read_text())["fields"]
-    columns = [field["fieldname"] for field in fields if field["fieldtype"] not in no_value_fields]
-    return all(frappe.db.has_column(doctype, column) for column in columns)
+    marker = CURRENT_MARKERS.get(doctype)
+    return bool(marker) and frappe.db.table_exists(marker, cached=False)

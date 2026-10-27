@@ -68,12 +68,16 @@ class TestDropLegacyDeploymentDoctypes(IntegrationTestCase):
         return [call.args[1] for call in delete_doc.call_args_list]
 
     def test_a_site_past_the_patch_keeps_server_job(self) -> None:
-        self.assertTrue(drop_legacy.has_shipped_schema("Server Job"))
-        deleted = self.run_patch()
+        self.assertTrue(drop_legacy.is_current("Server Job"))
+        # A column a later release adds, not synced yet, does not make today's Server Job legacy.
+        with patch.object(frappe.db, "has_column", return_value=False):
+            deleted = self.run_patch()
         self.assertNotIn("Server Job", deleted)
         self.assertIn("Mail Cluster", deleted)
 
     def test_an_old_server_job_schema_is_dropped(self) -> None:
-        with patch.object(frappe.db, "has_column", return_value=False):
-            self.assertFalse(drop_legacy.has_shipped_schema("Server Job"))
+        exists = frappe.db.table_exists
+        legacy = lambda doctype, cached=True: doctype != "Server Job Task" and exists(doctype, cached)  # noqa: E731
+        with patch.object(frappe.db, "table_exists", side_effect=legacy):
+            self.assertFalse(drop_legacy.is_current("Server Job"))
             self.assertIn("Server Job", self.run_patch())
