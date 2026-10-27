@@ -263,6 +263,36 @@ func TestYesterdayIsSentForAWhileAfterTodaysFirstPush(t *testing.T) {
 	}
 }
 
+func TestAYesterdayRecordAFailedRequestHeldIsSentUntilTaken(t *testing.T) {
+	caller := &fakeCaller{answers: map[string][]string{}}
+	usage, store := newUsage(t, caller, 100)
+	now := time.Date(2026, 10, 27, 0, 5, 0, 0, time.UTC)
+	usage.Now = func() time.Time { return now }
+	usage.pushed = PeriodsAt(now) // today's first push already went through
+	add(t, store, "a@example.com", 3, PeriodsAt(now.Add(-24*time.Hour)))
+	usage.Touched.Add("a@example.com")
+	caller.fail = true
+	if err := usage.Push(context.Background()); err == nil {
+		t.Fatal("pushed")
+	}
+
+	now = time.Date(2026, 10, 27, 0, 20, 0, 0, time.UTC) // past the grace
+	caller.fail = false
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := sentBy(t, caller, 1); got["a@example.com d:20261026"] != 3 {
+		t.Fatalf("records %v", got)
+	}
+	usage.Touched.Add("a@example.com")
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := sentBy(t, caller, 2); len(got) != 2 {
+		t.Fatalf("yesterday sent again once taken: %v", got)
+	}
+}
+
 // failingOnce fails its first CountedAccounts, as a store that is not reachable yet.
 type failingOnce struct {
 	Store

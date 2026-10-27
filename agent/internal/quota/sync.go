@@ -133,8 +133,9 @@ type Usage struct {
 	BatchSize int // records per request
 	Logger    *slog.Logger
 	Now       func() time.Time
-	pushed    Periods // the periods of the last push that went through; zero until one does
-	counted   bool    // the accounts counted before the start were touched
+	pushed    Periods           // the periods of the last push that went through; zero until one does
+	counted   bool              // the accounts counted before the start were touched
+	owed      map[string]string // account -> yesterday's day, whose record a failed request held
 }
 
 type usageRecord struct {
@@ -188,40 +189,60 @@ func (u *Usage) TouchCounted(ctx context.Context) {
 // with a record in a request that was not taken stay touched.
 // Until a push of the current day has gone through (after midnight UTC, after a start, after
 // failures), and in the first minutes of every UTC day, each push also sends yesterday's day and
-// month: what was counted after the last push of yesterday would otherwise never be reported.
-// Suite Cloud takes nothing older.
+// month: what was counted after the last push of yesterday would otherwise never be reported. An
+// account whose yesterday record a failed request held gets it again until it is taken. Suite
+// Cloud takes nothing older than yesterday.
 func (u *Usage) Push(ctx context.Context) error {
 	accounts := u.Touched.Take()
 	if len(accounts) == 0 {
 		return nil
 	}
 	now := u.Now()
-	current := PeriodsAt(now)
-	sets := []Periods{current}
-	if u.pushed != current || now.Sub(now.UTC().Truncate(24*time.Hour)) < yesterdayGrace {
-		sets = append(sets, PeriodsAt(now.Add(-24*time.Hour)))
-	}
-	counts := make([]map[string]Count, len(sets))
-	for i, periods := range sets {
-		var err error
-		if counts[i], err = u.Store.Counts(ctx, accounts, periods); err != nil {
-			u.Touched.Add(accounts...)
-			return err
+	current, yesterday := PeriodsAt(now), PeriodsAt(now.Add(-24*time.Hour))
+	everyone := u.pushed != current || now.Sub(now.UTC().Truncate(24*time.Hour)) < yesterdayGrace
+	var late []string
+	for _, account := range accounts {
+		if everyone || u.owed[account] == yesterday.Day {
+			late = append(late, account)
 		}
 	}
+	counts, err := u.Store.Counts(ctx, accounts, current)
+	var lateCounts map[string]Count
+	if err == nil && len(late) > 0 {
+		lateCounts, err = u.Store.Counts(ctx, late, yesterday)
+	}
+	if err != nil {
+		u.Touched.Add(accounts...)
+		return err
+	}
+
 	var records []usageRecord
 	for _, account := range accounts {
-		for i, periods := range sets {
-			count := counts[i][account]
-			// Before midnight, only what was counted: an account first counted after it has nothing.
-			if i == 0 || count.Day > 0 || count.RefusedDay > 0 {
-				records = append(records, usageRecord{account, periods.Day, count.Day, count.RefusedDay})
-			}
-			if i == 0 || periods.Month != current.Month && (count.Month > 0 || count.RefusedMonth > 0) {
-				records = append(records, usageRecord{account, periods.Month, count.Month, count.RefusedMonth})
-			}
+		count := counts[account]
+		records = append(records,
+			usageRecord{account, current.Day, count.Day, count.RefusedDay},
+			usageRecord{account, current.Month, count.Month, count.RefusedMonth},
+		)
+		before, ok := lateCounts[account]
+		// Before midnight, only what was counted: an account first counted after it has nothing.
+		if ok && (before.Day > 0 || before.RefusedDay > 0) {
+			records = append(records, usageRecord{account, yesterday.Day, before.Day, before.RefusedDay})
+		}
+		if ok && yesterday.Month != current.Month && (before.Month > 0 || before.RefusedMonth > 0) {
+			records = append(records, usageRecord{account, yesterday.Month, before.Month, before.RefusedMonth})
 		}
 	}
+	isLate := func(record usageRecord) bool {
+		return record.Period == yesterday.Day || record.Period == yesterday.Month && yesterday.Month != current.Month
+	}
+	owed := map[string]string{}
+	for account, day := range u.owed {
+		if day == yesterday.Day {
+			owed[account] = day
+		}
+	}
+	u.owed = owed
+
 	size := max(u.BatchSize, 1)
 	for start := 0; start < len(records); start += size {
 		batch := records[start:min(start+size, len(records))]
@@ -229,8 +250,16 @@ func (u *Usage) Push(ctx context.Context) error {
 		if err := u.Caller.Call(ctx, usageMethod, map[string]any{"host_ip": u.HostIP, "records": batch}, &answer); err != nil {
 			for _, record := range records[start:] {
 				u.Touched.Add(record.Account)
+				if isLate(record) {
+					u.owed[record.Account] = yesterday.Day
+				}
 			}
 			return err
+		}
+		for _, record := range batch {
+			if isLate(record) {
+				delete(u.owed, record.Account)
+			}
 		}
 	}
 	u.pushed = current
