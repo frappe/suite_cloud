@@ -156,11 +156,13 @@ func TestStoreListsTheAccountsCountedOnGivenDays(t *testing.T) {
 	}
 }
 
-func TestRedisClusterAndSentinelTakeTheLoginFromTheirURLsWhenTheFieldsAreEmpty(t *testing.T) {
+func TestRedisStoresTakeTheLoginsStalwartTakes(t *testing.T) {
 	urls := []string{"redis://quota:s3cret@10.0.0.21:6379", "redis://10.0.0.22:6379"}
 	options := func(cfg config.QuotaStore) *redis.UniversalOptions {
 		t.Helper()
-		cfg.URLs = urls
+		if cfg.URLs == nil {
+			cfg.URLs = urls
+		}
 		opts, err := redisOptions(cfg)
 		if err != nil {
 			t.Fatal(err)
@@ -175,9 +177,11 @@ func TestRedisClusterAndSentinelTakeTheLoginFromTheirURLsWhenTheFieldsAreEmpty(t
 		cfg  config.QuotaStore
 		want [4]string
 	}{
-		// A cluster's URLs name its nodes; Sentinel's name the sentinels, not the master.
+		// A cluster takes the first node URL's login, as redis-rs does for Stalwart; only the first.
 		{"cluster", config.QuotaStore{Type: "redis_cluster"}, [4]string{"quota", "s3cret", "", ""}},
-		{"sentinel", config.QuotaStore{Type: "redis_sentinel", ServiceName: "mymaster"}, [4]string{"", "", "quota", "s3cret"}},
+		{"cluster later url", config.QuotaStore{Type: "redis_cluster", URLs: []string{urls[1], urls[0]}}, [4]string{"", "", "", ""}},
+		// Stalwart keeps only a sentinel URL's address, so its login reaches neither the master nor the sentinels.
+		{"sentinel", config.QuotaStore{Type: "redis_sentinel", ServiceName: "mymaster"}, [4]string{"", "", "", ""}},
 		{"cluster fields win", config.QuotaStore{Type: "redis_cluster", Username: "stalwart", Password: "field"}, [4]string{"stalwart", "field", "", ""}},
 		{"sentinel fields win", config.QuotaStore{Type: "redis_sentinel", SentinelUsername: "watch", SentinelPassword: "field", Username: "stalwart", Password: "master"}, [4]string{"stalwart", "master", "watch", "field"}},
 	}

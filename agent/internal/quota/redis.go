@@ -84,23 +84,20 @@ func redisOptions(cfg config.QuotaStore) (*redis.UniversalOptions, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Credentials in the URLs, as Stalwart also accepts them, stand in for empty fields: a
-	// cluster's URLs name its nodes, Sentinel's URLs name the sentinels.
+	// The same logins Stalwart uses: a cluster takes the first node URL's login when the fields
+	// are empty (redis-rs's ClusterClientBuilder does), Sentinel only the fields (Stalwart keeps
+	// nothing but the address of a sentinel URL).
 	username, password := cfg.Username, cfg.Password
-	sentinelUsername, sentinelPassword := cfg.SentinelUsername, cfg.SentinelPassword
 	if cfg.Type == "redis_cluster" && username == "" && password == "" {
 		username, password = login.username, login.password
-	}
-	if cfg.Type == "redis_sentinel" && sentinelUsername == "" && sentinelPassword == "" {
-		sentinelUsername, sentinelPassword = login.username, login.password
 	}
 	return &redis.UniversalOptions{
 		Addrs:            addresses,
 		Username:         username,
 		Password:         password,
 		MasterName:       cfg.ServiceName,
-		SentinelUsername: sentinelUsername,
-		SentinelPassword: sentinelPassword,
+		SentinelUsername: cfg.SentinelUsername,
+		SentinelPassword: cfg.SentinelPassword,
 		TLSConfig:        tlsConfig,
 		DialTimeout:      redisTimeout,
 		ReadTimeout:      redisTimeout,
@@ -110,8 +107,8 @@ func redisOptions(cfg config.QuotaStore) (*redis.UniversalOptions, error) {
 
 type redisLogin struct{ username, password string }
 
-// redisAddresses turns Stalwart's node URLs into host:port, with the first login one of them
-// carries; rediss:// on any of them means TLS.
+// redisAddresses turns Stalwart's node URLs into host:port, with the first URL's login;
+// rediss:// on any of them means TLS.
 func redisAddresses(urls []string) ([]string, redisLogin, *tls.Config, error) {
 	var addresses []string
 	var login redisLogin
@@ -122,7 +119,7 @@ func redisAddresses(urls []string) ([]string, redisLogin, *tls.Config, error) {
 			return nil, login, nil, fmt.Errorf("quota.store.urls: %w", err)
 		}
 		addresses = append(addresses, parsed.Host)
-		if parsed.User != nil && login == (redisLogin{}) {
+		if parsed.User != nil && len(addresses) == 1 {
 			login.username = parsed.User.Username()
 			login.password, _ = parsed.User.Password()
 		}
