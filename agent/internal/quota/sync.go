@@ -10,8 +10,11 @@ import (
 const (
 	fullPullInterval = time.Hour // also catches a save committed after a newer one was pulled
 	finalPushTimeout = 5 * time.Second
-	limitsMethod     = "quota.limits"
-	usageMethod      = "quota.usage"
+	// A hook call can count into yesterday a moment before midnight and touch its account after
+	// the day's first push took the touched accounts, so yesterday is sent for a while longer.
+	yesterdayGrace = 10 * time.Minute
+	limitsMethod   = "quota.limits"
+	usageMethod    = "quota.usage"
 )
 
 // Limits copies the cluster's limits from Suite Cloud into the store: what changed since the last
@@ -131,6 +134,7 @@ type Usage struct {
 	Logger    *slog.Logger
 	Now       func() time.Time
 	pushed    Periods // the periods of the last push that went through; zero until one does
+	counted   bool    // the accounts counted before the start were touched
 }
 
 type usageRecord struct {
@@ -140,7 +144,8 @@ type usageRecord struct {
 	Refused int64  `json:"refused"`
 }
 
-// Run pushes on every tick, and once more on the way out.
+// Run pushes on every tick, and once more on the way out. Until the store lists the accounts it
+// counted before the start, every tick asks again.
 func (u *Usage) Run(ctx context.Context) error {
 	u.TouchCounted(ctx)
 	ticker := time.NewTicker(u.Interval)
@@ -155,6 +160,9 @@ func (u *Usage) Run(ctx context.Context) error {
 			}
 			return ctx.Err()
 		case <-ticker.C:
+			if !u.counted {
+				u.TouchCounted(ctx)
+			}
 			if err := u.Push(ctx); err != nil && !errors.Is(err, context.Canceled) {
 				u.Logger.Warn("usage not pushed; it is sent with the next push", "error", err)
 			}
@@ -169,16 +177,19 @@ func (u *Usage) TouchCounted(ctx context.Context) {
 	now := u.Now()
 	accounts, err := u.Store.CountedAccounts(ctx, PeriodsAt(now).Day, PeriodsAt(now.Add(-24*time.Hour)).Day)
 	if err != nil {
-		u.Logger.Warn("counted accounts not read; they are pushed when they send again", "error", err)
+		u.Logger.Warn("counted accounts not read; asking again at the next push", "error", err)
+		return
 	}
 	u.Touched.Add(accounts...)
+	u.counted = true
 }
 
 // Push sends the touched accounts' records in requests of at most BatchSize records. Accounts
 // with a record in a request that was not taken stay touched.
 // Until a push of the current day has gone through (after midnight UTC, after a start, after
-// failures) each push also sends yesterday's day and month: what was counted after the last push
-// of yesterday would otherwise never be reported. Suite Cloud takes nothing older.
+// failures), and in the first minutes of every UTC day, each push also sends yesterday's day and
+// month: what was counted after the last push of yesterday would otherwise never be reported.
+// Suite Cloud takes nothing older.
 func (u *Usage) Push(ctx context.Context) error {
 	accounts := u.Touched.Take()
 	if len(accounts) == 0 {
@@ -187,7 +198,7 @@ func (u *Usage) Push(ctx context.Context) error {
 	now := u.Now()
 	current := PeriodsAt(now)
 	sets := []Periods{current}
-	if u.pushed != current {
+	if u.pushed != current || now.Sub(now.UTC().Truncate(24*time.Hour)) < yesterdayGrace {
 		sets = append(sets, PeriodsAt(now.Add(-24*time.Hour)))
 	}
 	counts := make([]map[string]Count, len(sets))

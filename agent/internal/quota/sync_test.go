@@ -238,6 +238,59 @@ func TestAStartPushesWhatTheStoreCountedWithoutATouch(t *testing.T) {
 	}
 }
 
+func TestYesterdayIsSentForAWhileAfterTodaysFirstPush(t *testing.T) {
+	caller := &fakeCaller{answers: map[string][]string{}}
+	usage, store := newUsage(t, caller, 100)
+	now := time.Date(2026, 10, 27, 0, 2, 0, 0, time.UTC)
+	usage.Now = func() time.Time { return now }
+	usage.pushed = PeriodsAt(now)                                        // today's first push already went through
+	add(t, store, "a@example.com", 3, PeriodsAt(now.Add(-24*time.Hour))) // a late hook call
+	usage.Touched.Add("a@example.com")
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := sentBy(t, caller, 0); got["a@example.com d:20261026"] != 3 {
+		t.Fatalf("records at 00:02 %v", got)
+	}
+
+	now = time.Date(2026, 10, 27, 0, 15, 0, 0, time.UTC)
+	usage.Touched.Add("a@example.com")
+	if err := usage.Push(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := sentBy(t, caller, 1); len(got) != 2 {
+		t.Fatalf("records at 00:15 %v, want today's day and month only", got)
+	}
+}
+
+// failingOnce fails its first CountedAccounts, as a store that is not reachable yet.
+type failingOnce struct {
+	Store
+	failed bool
+}
+
+func (f *failingOnce) CountedAccounts(ctx context.Context, days ...string) ([]string, error) {
+	if !f.failed {
+		f.failed = true
+		return nil, errors.New("redis not up yet")
+	}
+	return f.Store.CountedAccounts(ctx, days...)
+}
+
+func TestStartupDiscoveryIsRetriedAfterAStoreFailure(t *testing.T) {
+	usage, store := newUsage(t, &fakeCaller{answers: map[string][]string{}}, 100)
+	add(t, store, "a@example.com", 1, PeriodsAt(usage.Now()))
+	usage.Store = &failingOnce{Store: store}
+	usage.TouchCounted(context.Background())
+	if usage.counted || len(usage.Touched.Take()) != 0 {
+		t.Fatal("a failed discovery counted as done")
+	}
+	usage.TouchCounted(context.Background())
+	if touched := usage.Touched.Take(); !usage.counted || len(touched) != 1 {
+		t.Fatalf("touched %v after the store came back", touched)
+	}
+}
+
 func TestPushesThatFailPastTwoMidnightsStillSendYesterday(t *testing.T) {
 	caller := &fakeCaller{answers: map[string][]string{}}
 	usage, store := newUsage(t, caller, 100)
