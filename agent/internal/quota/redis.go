@@ -68,17 +68,27 @@ func redisClient(cfg config.QuotaStore) (redis.UniversalClient, error) {
 		options.DialTimeout, options.ReadTimeout, options.WriteTimeout = redisTimeout, redisTimeout, redisTimeout
 		return redis.NewClient(options), nil
 	}
-	addresses, tlsConfig, err := redisAddresses(cfg.URLs)
+	addresses, login, tlsConfig, err := redisAddresses(cfg.URLs)
 	if err != nil {
 		return nil, err
 	}
+	// Credentials in the URLs, as Stalwart also accepts them, stand in for empty fields: a
+	// cluster's URLs name its nodes, Sentinel's URLs name the sentinels.
+	username, password := cfg.Username, cfg.Password
+	sentinelUsername, sentinelPassword := cfg.SentinelUsername, cfg.SentinelPassword
+	if cfg.Type == "redis_cluster" && username == "" && password == "" {
+		username, password = login.username, login.password
+	}
+	if cfg.Type == "redis_sentinel" && sentinelUsername == "" && sentinelPassword == "" {
+		sentinelUsername, sentinelPassword = login.username, login.password
+	}
 	options := &redis.UniversalOptions{
 		Addrs:            addresses,
-		Username:         cfg.Username,
-		Password:         cfg.Password,
+		Username:         username,
+		Password:         password,
 		MasterName:       cfg.ServiceName,
-		SentinelUsername: cfg.SentinelUsername,
-		SentinelPassword: cfg.SentinelPassword,
+		SentinelUsername: sentinelUsername,
+		SentinelPassword: sentinelPassword,
 		TLSConfig:        tlsConfig,
 		DialTimeout:      redisTimeout,
 		ReadTimeout:      redisTimeout,
@@ -90,21 +100,29 @@ func redisClient(cfg config.QuotaStore) (redis.UniversalClient, error) {
 	return redis.NewFailoverClient(options.Failover()), nil
 }
 
-// redisAddresses turns Stalwart's node URLs into host:port; rediss:// on any of them means TLS.
-func redisAddresses(urls []string) ([]string, *tls.Config, error) {
+type redisLogin struct{ username, password string }
+
+// redisAddresses turns Stalwart's node URLs into host:port, with the first login one of them
+// carries; rediss:// on any of them means TLS.
+func redisAddresses(urls []string) ([]string, redisLogin, *tls.Config, error) {
 	var addresses []string
+	var login redisLogin
 	var tlsConfig *tls.Config
 	for _, raw := range urls {
 		parsed, err := url.Parse(raw)
 		if err != nil {
-			return nil, nil, fmt.Errorf("quota.store.urls: %w", err)
+			return nil, login, nil, fmt.Errorf("quota.store.urls: %w", err)
 		}
 		addresses = append(addresses, parsed.Host)
+		if parsed.User != nil && login == (redisLogin{}) {
+			login.username = parsed.User.Username()
+			login.password, _ = parsed.User.Password()
+		}
 		if parsed.Scheme == "rediss" {
 			tlsConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 		}
 	}
-	return addresses, tlsConfig, nil
+	return addresses, login, tlsConfig, nil
 }
 
 func limitKey(account string) string { return "sca:quota:limit:{" + account + "}" }

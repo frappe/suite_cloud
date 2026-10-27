@@ -10,6 +10,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/redis/go-redis/v9"
+
 	"github.com/frappe/suite_cloud/agent/internal/config"
 )
 
@@ -151,6 +153,26 @@ func TestStoreListsTheAccountsCountedOnGivenDays(t *testing.T) {
 				t.Fatalf("accounts %v, want %v", accounts, want)
 			}
 		})
+	}
+}
+
+func TestRedisClusterTakesTheLoginFromItsURLsWhenTheFieldsAreEmpty(t *testing.T) {
+	login := func(cfg config.QuotaStore) (string, string) {
+		client, err := redisClient(cfg)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer client.Close()
+		options := client.(*redis.ClusterClient).Options()
+		return options.Username, options.Password
+	}
+	urls := []string{"redis://quota:s3cret@10.0.0.21:6379", "redis://10.0.0.22:6379"}
+	if user, password := login(config.QuotaStore{Type: "redis_cluster", URLs: urls}); user != "quota" || password != "s3cret" {
+		t.Fatalf("login %q %q", user, password)
+	}
+	fields := config.QuotaStore{Type: "redis_cluster", URLs: urls, Username: "stalwart", Password: "field"}
+	if user, password := login(fields); user != "stalwart" || password != "field" {
+		t.Fatalf("the fields lost to the URL: %q %q", user, password)
 	}
 }
 
