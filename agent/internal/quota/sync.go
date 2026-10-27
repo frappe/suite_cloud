@@ -26,6 +26,7 @@ type Limits struct {
 	Now      func() time.Time
 	since    string
 	lastFull time.Time
+	missing  map[string]bool // accounts the last full pull did not return
 }
 
 type limitsPage struct {
@@ -56,8 +57,10 @@ func (l *Limits) Run(ctx context.Context) error {
 	}
 }
 
-// Pull reads every page. A full pull also clears the limits of accounts Suite Cloud no longer
-// returns, which is how a deleted account loses them.
+// Pull reads every page. A full pull also clears the limits of accounts that this and the previous
+// full pull did not return, which is how a deleted account loses them. One miss is not enough: a
+// save younger than the settle window is left out of a pull, and the account would send without
+// a limit until the next one.
 func (l *Limits) Pull(ctx context.Context, full bool) error {
 	since := l.since
 	if full {
@@ -100,13 +103,22 @@ func (l *Limits) clearMissing(ctx context.Context, seen map[string]bool) error {
 	if err != nil {
 		return err
 	}
-	var missing []string
+	missing := map[string]bool{}
+	var gone []string
 	for _, account := range stored {
-		if !seen[account] {
-			missing = append(missing, account)
+		if seen[account] {
+			continue
+		}
+		missing[account] = true
+		if l.missing[account] {
+			gone = append(gone, account)
 		}
 	}
-	return l.Store.ClearLimits(ctx, missing)
+	if err := l.Store.ClearLimits(ctx, gone); err != nil {
+		return err
+	}
+	l.missing = missing
+	return nil
 }
 
 // Usage pushes the day and month totals of the accounts counted since the last push.

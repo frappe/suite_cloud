@@ -66,16 +66,36 @@ func TestPullReadsEveryPageAndRemembersTheVersion(t *testing.T) {
 	}
 }
 
-func TestFullPullClearsAccountsNoLongerReturned(t *testing.T) {
-	caller := &fakeCaller{answers: map[string][]string{limitsMethod: {
-		`{"limits": [{"account": "kept@example.com", "daily": 5, "monthly": 0, "version": "v1"}], "next_version": "v1", "has_more": false}`,
-	}}}
+func TestFullPullClearsAccountsMissedTwiceInARow(t *testing.T) {
+	kept := `{"limits": [{"account": "kept@example.com", "daily": 5, "monthly": 0, "version": "v1"}], "next_version": "v1", "has_more": false}`
+	settled := `{"limits": [{"account": "kept@example.com", "daily": 5, "monthly": 0, "version": "v1"}, {"account": "saved@example.com", "daily": 4, "monthly": 0, "version": "v2"}], "next_version": "v2", "has_more": false}`
+	caller := &fakeCaller{answers: map[string][]string{limitsMethod: {kept, settled, kept, kept}}}
 	limits, store := newLimits(t, caller)
 	setLimit(t, store, "deleted@example.com", 3, 3, "v0")
-	if err := limits.Pull(context.Background(), true); err != nil {
-		t.Fatal(err)
+	setLimit(t, store, "saved@example.com", 2, 0, "v0")
+	pull := func() {
+		t.Helper()
+		if err := limits.Pull(context.Background(), true); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if store.data.Limits["deleted@example.com"] != (Limit{Version: "v0"}) || store.data.Limits["kept@example.com"].Daily != 5 {
+
+	// The first miss keeps the limits: saved@ was just saved and is still inside the settle window.
+	pull()
+	if store.data.Limits["deleted@example.com"].Daily != 3 || store.data.Limits["saved@example.com"].Daily != 2 {
+		t.Fatalf("limits after one miss %+v", store.data.Limits)
+	}
+	pull()
+	if store.data.Limits["deleted@example.com"] != (Limit{Version: "v0"}) || store.data.Limits["saved@example.com"].Daily != 4 {
+		t.Fatalf("limits after two misses %+v", store.data.Limits)
+	}
+	// saved@ came back in between, so its next miss starts the count again.
+	pull()
+	if store.data.Limits["saved@example.com"].Daily != 4 {
+		t.Fatalf("one miss after a return cleared the limit: %+v", store.data.Limits)
+	}
+	pull()
+	if store.data.Limits["saved@example.com"] != (Limit{Version: "v2"}) || store.data.Limits["kept@example.com"].Daily != 5 {
 		t.Fatalf("limits %+v", store.data.Limits)
 	}
 }
