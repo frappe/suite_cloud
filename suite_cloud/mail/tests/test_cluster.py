@@ -139,7 +139,8 @@ class TestStalwartCluster(IntegrationTestCase):
         older = make_cluster("older", hostname=f"mail.older.{ROOT_DOMAIN}")
         newer = make_cluster("newer", hostname=f"mail.newer.{ROOT_DOMAIN}")
         # A site from before the rule: no default, and only these two enabled (rolled back).
-        frappe.db.sql("update `tabStalwart Cluster` set is_default = 0, enabled = 0")
+        cluster = frappe.qb.DocType("Stalwart Cluster")
+        frappe.qb.update(cluster).set(cluster.is_default, 0).set(cluster.enabled, 0).run()
         frappe.db.set_value("Stalwart Cluster", {"name": ["in", [older.name, newer.name]]}, "enabled", 1)
 
         mark_default_cluster.execute()
@@ -152,7 +153,8 @@ class TestStalwartCluster(IntegrationTestCase):
         disabled = make_cluster("disabled", hostname=f"mail.disabled.{ROOT_DOMAIN}")
         enabled = make_cluster("enabled", hostname=f"mail.enabled.{ROOT_DOMAIN}")
         # Allowed before the rule: a disabled default (rolled back).
-        frappe.db.sql("update `tabStalwart Cluster` set is_default = 0, enabled = 0")
+        cluster = frappe.qb.DocType("Stalwart Cluster")
+        frappe.qb.update(cluster).set(cluster.is_default, 0).set(cluster.enabled, 0).run()
         frappe.db.set_value("Stalwart Cluster", disabled.name, "is_default", 1)
         frappe.db.set_value("Stalwart Cluster", enabled.name, "enabled", 1)
 
