@@ -305,6 +305,30 @@ class TestAgentDeploy(AgentBuildFixture):
             {"redis://s1:26379", "redis://s2:26379", "redis-pw", "sentinel-pw"},
         )
 
+    def test_the_node_shows_its_agent_config_with_every_secret_masked(self) -> None:
+        (self.source / "VERSION").write_text("0.2.0\n")
+        self.build().run()
+        secrets = deploy.agent_secrets(deploy.agent_config(self.node))
+        self.assertEqual(len(secrets), 4)  # token, metrics password, hook token, Redis URL
+
+        shown = self.node.show_agent_config()
+        text = json.dumps(shown["config"])
+        for secret in secrets:
+            self.assertNotIn(secret, text)
+        config = shown["config"]
+        self.assertEqual(config["suite_cloud"]["secret"], "***")
+        self.assertEqual(config["quota"]["hook_token"], "***")
+        self.assertEqual(config["node"]["host_ip"], self.node.ipv4_address)
+        self.assertEqual(config["quota"]["hook_port"], 8095)
+        self.assertTrue(shown["telemetry_enabled"])
+
+        self.assertEqual(
+            deploy.mask_secrets({"url": "redis://:pw@host"}, ["pw"]), {"url": "redis://:***@host"}
+        )
+        frappe.set_user("Guest")
+        self.addCleanup(frappe.set_user, "Administrator")
+        self.assertRaises(frappe.PermissionError, self.node.show_agent_config)
+
     def test_node_and_gateway_jobs_carry_the_agent_variables_as_secrets(self) -> None:
         self.build().run()
         for variables in (

@@ -163,11 +163,6 @@ def agent_variables(server: Document, restart: bool = False) -> dict:
         return disabled
 
     config = agent_config(server)
-    secrets = [config["suite_cloud"]["secret"]]
-    if "stalwart" in config["metrics"]:
-        secrets.append(config["metrics"]["stalwart"]["password"])
-    if "quota" in config:
-        secrets += [config["quota"]["hook_token"], *quota.store_secrets(config["quota"]["store"])]
     return {
         "agent_enabled": True,
         "agent_version": build.version,
@@ -175,8 +170,39 @@ def agent_variables(server: Document, restart: bool = False) -> dict:
         "agent_config_json": frappe.as_json(config),
         "agent_systemd_unit": systemd_unit(),
         "agent_restart": restart,
-        "__secret_values__": secrets,
+        "__secret_values__": agent_secrets(config),
     }
+
+
+def agent_secrets(config: dict) -> list[str]:
+    """Every secret in an agent's config.json, so job output and previews can mask them."""
+
+    secrets = [config["suite_cloud"]["secret"]]
+    if "stalwart" in config["metrics"]:
+        secrets.append(config["metrics"]["stalwart"]["password"])
+    if "quota" in config:
+        secrets += [config["quota"]["hook_token"], *quota.store_secrets(config["quota"]["store"])]
+    return [secret for secret in secrets if secret]
+
+
+def masked_agent_config(server: Document) -> dict:
+    """config.json as the next Install Agent writes it to the server, every secret masked."""
+
+    config = agent_config(server)
+    return mask_secrets(config, sorted(agent_secrets(config), key=len, reverse=True))
+
+
+def mask_secrets(value, secrets: list[str]):
+    """Masks every secret wherever it appears, a Redis URL holding a password included."""
+
+    if isinstance(value, dict):
+        return {key: mask_secrets(item, secrets) for key, item in value.items()}
+    if isinstance(value, list):
+        return [mask_secrets(item, secrets) for item in value]
+    if isinstance(value, str):
+        for secret in secrets:
+            value = value.replace(secret, plan.SECRET_MARKER)
+    return value
 
 
 def install_agent(server: Document) -> Document:
