@@ -256,6 +256,15 @@ class EgressGateway(Document):
         return install_agent(self).name
 
     @frappe.whitelist()
+    def show_agent_config(self) -> dict:
+        """The agent's config.json as the next Install Agent writes it, secrets masked."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.deploy import is_telemetry_enabled, masked_agent_config
+
+        return {"config": masked_agent_config(self), "telemetry_enabled": is_telemetry_enabled()}
+
+    @frappe.whitelist()
     def replace_dkim_keys(self) -> None:
         """Emergency replacement of the gateway domain's keys after a leak, same selectors."""
 

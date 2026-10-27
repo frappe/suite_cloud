@@ -305,7 +305,7 @@ class TestAgentDeploy(AgentBuildFixture):
             {"redis://s1:26379", "redis://s2:26379", "redis-pw", "sentinel-pw"},
         )
 
-    def test_the_node_shows_its_agent_config_with_every_secret_masked(self) -> None:
+    def test_nodes_and_gateways_show_their_agent_config_with_every_secret_masked(self) -> None:
         (self.source / "VERSION").write_text("0.2.0\n")
         self.build().run()
         secrets = deploy.agent_secrets(deploy.agent_config(self.node))
@@ -322,12 +322,21 @@ class TestAgentDeploy(AgentBuildFixture):
         self.assertEqual(config["quota"]["hook_port"], 8095)
         self.assertTrue(shown["telemetry_enabled"])
 
+        # A gateway's config has no quota section, so its secrets are the token and its metrics password.
+        gateway = self.gateway.show_agent_config()["config"]
+        self.assertNotIn("quota", gateway)
+        self.assertEqual(
+            (gateway["suite_cloud"]["secret"], gateway["metrics"]["stalwart"]["password"]), ("***", "***")
+        )
+        self.assertNotIn(self.gateway.get_password("metrics_password"), json.dumps(gateway))
+
         self.assertEqual(
             deploy.mask_secrets({"url": "redis://:pw@host"}, ["pw"]), {"url": "redis://:***@host"}
         )
         frappe.set_user("Guest")
         self.addCleanup(frappe.set_user, "Administrator")
         self.assertRaises(frappe.PermissionError, self.node.show_agent_config)
+        self.assertRaises(frappe.PermissionError, self.gateway.show_agent_config)
 
     def test_node_and_gateway_jobs_carry_the_agent_variables_as_secrets(self) -> None:
         self.build().run()
