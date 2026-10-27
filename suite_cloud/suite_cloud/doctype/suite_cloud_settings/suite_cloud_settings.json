@@ -19,15 +19,6 @@
   "column_break_email",
   "use_tenant_title_as_sender_name",
   "agent_telemetry_tab",
-  "telemetry_section",
-  "enable_telemetry",
-  "column_break_telemetry",
-  "telemetry_retention_days",
-  "telemetry_alerts_section",
-  "telemetry_alert_recipients",
-  "column_break_telemetry_alerts",
-  "telemetry_silence_minutes",
-  "telemetry_error_rate_percent",
   "agent_section",
   "agent_requests_per_minute",
   "agent_records_per_request",
@@ -39,6 +30,15 @@
   "agent_built_version",
   "agent_built_at",
   "agent_build_error",
+  "telemetry_section",
+  "enable_telemetry",
+  "column_break_telemetry",
+  "telemetry_retention_days",
+  "telemetry_alerts_section",
+  "telemetry_alert_recipients",
+  "column_break_telemetry_alerts",
+  "telemetry_silence_minutes",
+  "telemetry_error_rate_percent",
   "stalwart_tab",
   "versions_section",
   "stalwart_version",
@@ -184,63 +184,6 @@
    "label": "Agent & Telemetry"
   },
   {
-   "description": "The agents on Stalwart and SFU nodes push logs and metrics to the telemetry API; the loader copies them into Insights.",
-   "fieldname": "telemetry_section",
-   "fieldtype": "Section Break",
-   "label": "Telemetry"
-  },
-  {
-   "default": "0",
-   "description": "Runs the Suite Cloud Agent on every Stalwart node and egress gateway and opens the telemetry API to them. Each Agent signs in with its cluster's Agent Key and Agent Secret. Turning this on or off queues an Install Agent job on every server that runs an Agent: off, the job stops the Agent.",
-   "fieldname": "enable_telemetry",
-   "fieldtype": "Check",
-   "label": "Enable Telemetry"
-  },
-  {
-   "fieldname": "column_break_telemetry",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "90",
-   "description": "How long events and metrics are kept in Insights. Older rows are deleted daily.",
-   "fieldname": "telemetry_retention_days",
-   "fieldtype": "Int",
-   "label": "Telemetry Retention (Days)",
-   "reqd": 1
-  },
-  {
-   "description": "Every five minutes, a Telemetry Alert is opened for a node that stopped reporting or logs too many errors, and resolved when the condition clears.",
-   "fieldname": "telemetry_alerts_section",
-   "fieldtype": "Section Break",
-   "label": "Telemetry Alerts"
-  },
-  {
-   "description": "Email addresses to notify when an alert opens or resolves, separated by commas or lines. Empty: alerts are recorded but nobody is mailed.",
-   "fieldname": "telemetry_alert_recipients",
-   "fieldtype": "Small Text",
-   "label": "Telemetry Alert Recipients"
-  },
-  {
-   "fieldname": "column_break_telemetry_alerts",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "30",
-   "description": "A node that reported in the last day but sent nothing for this long is a Silent Host.",
-   "fieldname": "telemetry_silence_minutes",
-   "fieldtype": "Int",
-   "label": "Silent Host After (Minutes)",
-   "reqd": 1
-  },
-  {
-   "default": "5",
-   "description": "A node whose error-level events exceed this share of its events in the last hour (at least 100 events) has an Error Rate alert.",
-   "fieldname": "telemetry_error_rate_percent",
-   "fieldtype": "Int",
-   "label": "Error Rate Alert (%)",
-   "reqd": 1
-  },
-  {
    "description": "The Suite Cloud Agent runs on every Stalwart node and egress gateway and ships the Stalwart log and host metrics to the telemetry API. Provisioning installs it when Enable Telemetry is on and a build exists.",
    "fieldname": "agent_section",
    "fieldtype": "Section Break",
@@ -315,6 +258,63 @@
    "fieldtype": "Small Text",
    "label": "Last Build Error",
    "read_only": 1
+  },
+  {
+   "description": "The agents on Stalwart and SFU nodes push logs and metrics to the telemetry API; the loader copies them into Insights.",
+   "fieldname": "telemetry_section",
+   "fieldtype": "Section Break",
+   "label": "Telemetry"
+  },
+  {
+   "default": "0",
+   "description": "Runs the Suite Cloud Agent on every Stalwart node and egress gateway and opens the telemetry API to them. Each Agent signs in with its cluster's Agent Key and Agent Secret. Turning this on or off queues an Install Agent job on every server that runs an Agent: off, the job stops the Agent.",
+   "fieldname": "enable_telemetry",
+   "fieldtype": "Check",
+   "label": "Enable Telemetry"
+  },
+  {
+   "fieldname": "column_break_telemetry",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "90",
+   "description": "How long events and metrics are kept in Insights. Older rows are deleted daily.",
+   "fieldname": "telemetry_retention_days",
+   "fieldtype": "Int",
+   "label": "Telemetry Retention (Days)",
+   "reqd": 1
+  },
+  {
+   "description": "Every five minutes, a Telemetry Alert is opened for a node that stopped reporting or logs too many errors, and resolved when the condition clears.",
+   "fieldname": "telemetry_alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Telemetry Alerts"
+  },
+  {
+   "description": "Email addresses to notify when an alert opens or resolves, separated by commas or lines. Empty: alerts are recorded but nobody is mailed.",
+   "fieldname": "telemetry_alert_recipients",
+   "fieldtype": "Small Text",
+   "label": "Telemetry Alert Recipients"
+  },
+  {
+   "fieldname": "column_break_telemetry_alerts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "30",
+   "description": "A node that reported in the last day but sent nothing for this long is a Silent Host.",
+   "fieldname": "telemetry_silence_minutes",
+   "fieldtype": "Int",
+   "label": "Silent Host After (Minutes)",
+   "reqd": 1
+  },
+  {
+   "default": "5",
+   "description": "A node whose error-level events exceed this share of its events in the last hour (at least 100 events) has an Error Rate alert.",
+   "fieldname": "telemetry_error_rate_percent",
+   "fieldtype": "Int",
+   "label": "Error Rate Alert (%)",
+   "reqd": 1
   },
   {
    "fieldname": "stalwart_tab",
@@ -654,7 +654,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-27 19:00:00.000000",
+ "modified": "2026-10-27 19:30:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
