@@ -179,10 +179,10 @@ class TestValidation(TelemetryApiTestCase):
 
     def test_the_batch_and_request_limits_come_from_the_settings(self) -> None:
         frappe.set_user("Administrator")
-        configure_settings(telemetry_records_per_request=2, telemetry_requests_per_minute=2)
+        configure_settings(agent_records_per_request=2, agent_requests_per_minute=2)
         self.request(self.token)
         host = {**HOST, "host_ip": "198.51.100.77"}  # a window of its own; the counter outlives the test
-        frappe.cache.delete_keys("suite_cloud:ratelimit:telemetry:198.51.100.77")
+        frappe.cache.delete_keys("suite_cloud:ratelimit:agent:198.51.100.77")
 
         with self.assertRaisesRegex(InvalidInputError, "at most 2"):
             events(**host, records=[EVENT] * 3)  # refused, but counted

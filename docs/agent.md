@@ -21,7 +21,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 | --- | --- | --- |
 | `suite_cloud.url` | **Public URL**, else the site's own URL | Where the batches go |
 | `suite_cloud.secret` | **Agent Key** and **Agent Secret** of the cluster (a gateway uses its cluster's) | Sent as the bearer token, `<agent key>:<agent secret>` |
-| `suite_cloud.requests_per_minute`, `records_per_request` | **Telemetry Requests per Minute**, **Telemetry Records per Request** | The agent keeps to the limits the site enforces |
+| `suite_cloud.requests_per_minute`, `records_per_request` | **Agent Requests per Minute**, **Agent Records per Request** | The agent keeps to the limits the site enforces, for every request it makes |
 | `suite_cloud.max_attempts` | **Agent Max Attempts** | Sends of one batch after server or network failures before it is skipped |
 | `suite_cloud.request_timeout_seconds` | 60 | Time allowed for one request |
 | `node.source`, `node.host_ip`, `node.hostname` | The node record | `host_ip` is the node's IPv4 address, which the dashboards join on |
@@ -61,7 +61,7 @@ The agent never ships a line twice and loses none to a restart. For every file i
 | 400, 417 | Skips the batch at once and logs the server's message: the same request would fail again |
 | 401, 403 | Keeps retrying with a wait of up to five minutes and never skips; a rotated secret is fixed by an Install Agent job, and the Silent Host alert shows the gap |
 
-Logs and metrics share one request budget of **Telemetry Requests per Minute**, because Suite Cloud counts both per node. Metrics are points in time: a batch that cannot be sent within an hour is dropped, and nothing is kept across a restart.
+Logs, metrics and the sending-limit calls share one request budget of **Agent Requests per Minute**, because Suite Cloud counts them all per node. Metrics are points in time: a batch that cannot be sent within an hour is dropped, and nothing is kept across a restart.
 
 A new log file is read from the start; the file before it is finished once it stops growing. With **Delete Shipped Logs After (Days)** set, a rotated file is deleted that many days after it was shipped whole; the newest file and a file with a batch in flight are never deleted. The node's own tmpfiles rule removes log files after 14 days in any case. To ship a node's existing logs after the agent already ran there, stop the agent, delete `/var/lib/suite-cloud-agent/state.json`, turn **Ship Existing Logs** on and install the agent again.
 

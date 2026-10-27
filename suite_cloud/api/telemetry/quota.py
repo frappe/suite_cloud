@@ -99,7 +99,7 @@ def get_cluster_for_host(host_ip: str) -> str:
         address = str(ipaddress.ip_address(host_ip))
     except ValueError:
         frappe.throw(_("host_ip must be an IPv4 or IPv6 address."), InvalidInputError)
-    throttle(f"telemetry:{address}", get_limit("telemetry_requests_per_minute", DEFAULT_REQUESTS_PER_MINUTE))
+    throttle(f"agent:{address}", get_limit("agent_requests_per_minute", DEFAULT_REQUESTS_PER_MINUTE))
     cluster = frappe.local.agent_cluster
     node = {"cluster": cluster, "ipv4_address": address, "status": ("in", NODE_STATUSES)}
     if not frappe.db.exists("Stalwart Node", node):

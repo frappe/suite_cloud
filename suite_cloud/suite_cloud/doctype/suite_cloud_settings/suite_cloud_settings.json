@@ -23,14 +23,14 @@
   "enable_telemetry",
   "column_break_telemetry",
   "telemetry_retention_days",
-  "telemetry_requests_per_minute",
-  "telemetry_records_per_request",
   "telemetry_alerts_section",
   "telemetry_alert_recipients",
   "column_break_telemetry_alerts",
   "telemetry_silence_minutes",
   "telemetry_error_rate_percent",
   "agent_section",
+  "agent_requests_per_minute",
+  "agent_records_per_request",
   "agent_max_attempts",
   "agent_metrics_interval_seconds",
   "agent_ship_existing_logs",
@@ -209,22 +209,6 @@
    "reqd": 1
   },
   {
-   "default": "300",
-   "description": "How many requests one node may send per minute, counted by its address.",
-   "fieldname": "telemetry_requests_per_minute",
-   "fieldtype": "Int",
-   "label": "Telemetry Requests per Minute",
-   "reqd": 1
-  },
-  {
-   "default": "5000",
-   "description": "How many records one request may hold. Larger batches mean fewer requests; each is validated whole.",
-   "fieldname": "telemetry_records_per_request",
-   "fieldtype": "Int",
-   "label": "Telemetry Records per Request",
-   "reqd": 1
-  },
-  {
    "description": "Every five minutes, a Telemetry Alert is opened for a node that stopped reporting or logs too many errors, and resolved when the condition clears.",
    "fieldname": "telemetry_alerts_section",
    "fieldtype": "Section Break",
@@ -261,6 +245,22 @@
    "fieldname": "agent_section",
    "fieldtype": "Section Break",
    "label": "Agent"
+  },
+  {
+   "default": "300",
+   "description": "How many requests one node's Agent may send per minute, counted by its address: log and metric batches and the sending-limit calls together.",
+   "fieldname": "agent_requests_per_minute",
+   "fieldtype": "Int",
+   "label": "Agent Requests per Minute",
+   "reqd": 1
+  },
+  {
+   "default": "5000",
+   "description": "How many records one request may hold: log events, metric samples or sending-limit usage. Larger batches mean fewer requests; each is validated whole.",
+   "fieldname": "agent_records_per_request",
+   "fieldtype": "Int",
+   "label": "Agent Records per Request",
+   "reqd": 1
   },
   {
    "default": "8",
@@ -654,7 +654,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-27 18:00:00.000000",
+ "modified": "2026-10-27 19:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

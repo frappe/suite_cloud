@@ -147,7 +147,7 @@ def get_envelope(source: str, host_ip: str, hostname: str | None, batch_id: str 
         except ValueError:
             frappe.throw(_("batch_id must be a UUID."), InvalidInputError)
 
-    throttle(f"telemetry:{address}", get_limit("telemetry_requests_per_minute", DEFAULT_REQUESTS_PER_MINUTE))
+    throttle(f"agent:{address}", get_limit("agent_requests_per_minute", DEFAULT_REQUESTS_PER_MINUTE))
     assert_cluster_server(str(address))
     return {
         "batch_id": batch_id or str(uuid7()),
@@ -174,7 +174,7 @@ def assert_cluster_server(address: str) -> None:
 def get_records(records: list) -> list[Record]:
     if not records:
         frappe.throw(_("records must hold at least one record."), InvalidInputError)
-    limit = get_limit("telemetry_records_per_request", DEFAULT_RECORDS_PER_REQUEST)
+    limit = get_limit("agent_records_per_request", DEFAULT_RECORDS_PER_REQUEST)
     if len(records) > limit:
         frappe.throw(
             _("records holds {0} records; send at most {1} in one request.").format(len(records), limit),

@@ -33,8 +33,8 @@ def agent_config(server: Document) -> dict:
         "suite_cloud": {
             "url": get_config("public_url") or get_url(),
             "secret": server.get_cluster().agent_token,
-            "requests_per_minute": cint(get_config("telemetry_requests_per_minute")),
-            "records_per_request": cint(get_config("telemetry_records_per_request")),
+            "requests_per_minute": cint(get_config("agent_requests_per_minute")),
+            "records_per_request": cint(get_config("agent_records_per_request")),
             "max_attempts": cint(get_config("agent_max_attempts")),
         },
         "node": {"source": SOURCE, "host_ip": server.ipv4_address, "hostname": server.hostname},
