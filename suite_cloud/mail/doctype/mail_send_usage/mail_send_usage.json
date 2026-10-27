@@ -9,6 +9,7 @@
   "period",
   "sent",
   "refused",
+  "send_limit",
   "reported_at"
  ],
  "fields": [
@@ -30,7 +31,8 @@
    "in_list_view": 1,
    "label": "Period",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "search_index": 1
   },
   {
    "description": "Recipients counted in the period. A message to 50 recipients counts as 50.",
@@ -51,6 +53,15 @@
    "read_only": 1
   },
   {
+   "description": "The account's daily or monthly limit when the period was last reported. 0 means no limit.",
+   "fieldname": "send_limit",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Limit",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
    "fieldname": "reported_at",
    "fieldtype": "Datetime",
    "label": "Reported At",
@@ -60,7 +71,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-26 18:00:00.000000",
+ "modified": "2026-10-27 13:30:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Send Usage",

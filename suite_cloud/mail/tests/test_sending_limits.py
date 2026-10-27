@@ -20,7 +20,7 @@ from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
 )
 from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
-from suite_cloud.patches.v1_0 import fill_quota_hook_tokens
+from suite_cloud.patches.v1_0 import fill_quota_hook_tokens, fill_send_usage_limits
 from suite_cloud.telemetry import TELEMETRY_USER
 from suite_cloud.tests.fixtures import ROOT_DOMAIN
 
@@ -133,6 +133,21 @@ class TestUsageApi(SendingLimitsTestCase):
         self.push(("alice@acme.com", day, 7, 2))
         self.push(("alice@acme.com", day, 7, 1), ("alice@acme.com", day, 7))
         self.assertEqual(frappe.db.get_value("Mail Send Usage", f"alice@acme.com:{day}", "refused"), 2)
+
+    def test_each_period_keeps_the_limit_it_was_last_reported_with(self) -> None:
+        day, month = current_periods()
+        frappe.db.set_value("Mail Account", "alice@acme.com", "monthly_send_limit", 2000)
+        self.push(("alice@acme.com", day, 5), ("alice@acme.com", month, 40))
+        stored = frappe.get_all("Mail Send Usage", {"account": "alice@acme.com"}, ["period", "send_limit"])
+        self.assertEqual({row.period: row.send_limit for row in stored}, {day: 100, month: 2000})
+
+        frappe.db.set_value("Mail Account", "alice@acme.com", "daily_send_limit", 150)
+        self.push(("alice@acme.com", day, 6))
+        self.assertEqual(frappe.db.get_value("Mail Send Usage", f"alice@acme.com:{day}", "send_limit"), 150)
+
+        frappe.db.set_value("Mail Send Usage", f"alice@acme.com:{day}", "send_limit", 0)
+        fill_send_usage_limits.execute()
+        self.assertEqual(frappe.db.get_value("Mail Send Usage", f"alice@acme.com:{day}", "send_limit"), 150)
 
     def test_unknown_accounts_and_old_periods_are_dropped(self) -> None:
         day, _month = current_periods()

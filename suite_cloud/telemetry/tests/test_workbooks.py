@@ -60,7 +60,7 @@ class TestShippedWorkbooks(unittest.TestCase):
         source, account_join = operations[0], operations[1]
         self.assertEqual(source["table"]["table_name"], "tabMail Send Usage")
         self.assertEqual(account_join["table"]["table_name"], "tabMail Account")
-        usage_fields = {"account", "period", "sent", "refused", "reported_at"}
+        usage_fields = {"account", "period", "sent", "refused", "send_limit", "reported_at"}
         self.assertLessEqual(usage_fields, fields("mail_send_usage"))
         joined = {column["column_name"] for column in account_join["select_columns"]}
         self.assertLessEqual(joined, fields("mail_account"))

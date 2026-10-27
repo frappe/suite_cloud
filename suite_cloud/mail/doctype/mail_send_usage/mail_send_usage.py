@@ -32,6 +32,7 @@ class MailSendUsage(Document):
         period: DF.Data
         refused: DF.Int
         reported_at: DF.Datetime | None
+        send_limit: DF.Int
         sent: DF.Int
     # end: auto-generated types
 
@@ -77,12 +78,13 @@ def sent_by_account(accounts: list[str]) -> dict[str, dict[str, int]]:
 
 
 def upsert_usage(rows: list[dict]) -> None:
-    """Stores ``{account, period, sent, refused}`` rows in one statement. Agents on several nodes
-    report the same counters, and a counter only grows within its period, so the higher count is
-    kept."""
+    """Stores ``{account, period, sent, refused}`` rows in one statement, each with the account's
+    limit for its period as it is now. Agents on several nodes report the same counters, and a
+    counter only grows within its period, so the higher count is kept."""
 
     if not rows:
         return
+    limits = limits_by_account(list({row["account"] for row in rows}))
     now = frappe.utils.now()
     user = frappe.session.user
     usage = frappe.qb.DocType("Mail Send Usage")
@@ -92,6 +94,7 @@ def upsert_usage(rows: list[dict]) -> None:
         usage.period,
         usage.sent,
         usage.refused,
+        usage.send_limit,
         usage.reported_at,
         usage.creation,
         usage.modified,
@@ -100,16 +103,29 @@ def upsert_usage(rows: list[dict]) -> None:
     )
     for row in rows:
         name = f"{row['account']}:{row['period']}"
+        limit = limits[row["account"]][row["period"][0]]
         query = query.insert(
-            name, row["account"], row["period"], row["sent"], row["refused"], now, now, now, user, user
+            name, row["account"], row["period"], row["sent"], row["refused"], limit, now, now, now, user, user
         )
     query = (
         query.on_duplicate_key_update(usage.sent, Greatest(usage.sent, Values(usage.sent)))
         .on_duplicate_key_update(usage.refused, Greatest(usage.refused, Values(usage.refused)))
+        .on_duplicate_key_update(usage.send_limit, Values(usage.send_limit))
         .on_duplicate_key_update(usage.reported_at, Values(usage.reported_at))
         .on_duplicate_key_update(usage.modified, Values(usage.modified))
     )
     query.run()
+
+
+def limits_by_account(accounts: list[str]) -> dict[str, dict[str, int]]:
+    """``{account: {"d": daily, "m": monthly}}``, keyed like the first letter of a period."""
+
+    rows = frappe.get_all(
+        "Mail Account",
+        filters={"name": ("in", accounts)},
+        fields=["name", "daily_send_limit", "monthly_send_limit"],
+    )
+    return {row.name: {"d": row.daily_send_limit, "m": row.monthly_send_limit} for row in rows}
 
 
 def delete_usage(account: str) -> None:

@@ -89,7 +89,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Each account's recipients and refused messages per UTC day, newest first. Limit and Used (%) compare with the account's current daily limit. Filter by account to see one account's history.",
+   "info": "Each account's recipients and refused messages per UTC day, newest first, with the daily limit the account had when the day was last reported. Filter by account to see one account's history.",
    "name": "stalwart-account-sending-history",
    "query": "stalwart-sending-usage",
    "sort_order": 94,
@@ -7731,7 +7731,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-10-27 13:05:00.000000",
+ "modified": "2026-10-27 13:30:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -8317,14 +8317,6 @@
       {
        "column_name": "cluster",
        "type": "column"
-      },
-      {
-       "column_name": "daily_send_limit",
-       "type": "column"
-      },
-      {
-       "column_name": "monthly_send_limit",
-       "type": "column"
       }
      ],
      "table": {
@@ -8384,15 +8376,6 @@
       "type": "expression"
      },
      "new_name": "period_start",
-     "type": "mutate"
-    },
-    {
-     "data_type": "Integer",
-     "expression": {
-      "expression": "if_else(period_type == 'Day', daily_send_limit, monthly_send_limit)",
-      "type": "expression"
-     },
-     "new_name": "send_limit",
      "type": "mutate"
     },
     {
