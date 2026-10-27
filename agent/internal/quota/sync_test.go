@@ -196,6 +196,36 @@ func TestTheFirstPushAfterMidnightSendsYesterdaysLastCounts(t *testing.T) {
 	}
 }
 
+func TestNoRequestHoldsMoreRecordsThanTheCap(t *testing.T) {
+	for _, limit := range []int{1, 3} {
+		caller := &fakeCaller{answers: map[string][]string{}}
+		usage, store := newUsage(t, caller, limit)
+		before := time.Date(2026, 10, 31, 23, 59, 30, 0, time.UTC) // the month ends too: 4 records an account
+		now := before
+		usage.Now = func() time.Time { return now }
+		usage.pushed = PeriodsAt(before)
+		for _, account := range []string{"a@example.com", "b@example.com"} {
+			add(t, store, account, 2, PeriodsAt(before))
+			usage.Touched.Add(account)
+		}
+		now = before.Add(time.Minute)
+		if err := usage.Push(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		total := 0
+		for _, payload := range caller.payloads[usageMethod] {
+			records := len(payload["records"].([]any))
+			if records > limit {
+				t.Fatalf("limit %d: a request held %d records", limit, records)
+			}
+			total += records
+		}
+		if total != 8 || usage.pushed != PeriodsAt(now) {
+			t.Fatalf("limit %d: %d records sent, pushed %v", limit, total, usage.pushed)
+		}
+	}
+}
+
 func TestFailedPushKeepsTheAccountsTouched(t *testing.T) {
 	usage, _ := newUsage(t, &fakeCaller{fail: true}, 100)
 	usage.Touched.Add("a@example.com")

@@ -8,11 +8,10 @@ import (
 )
 
 const (
-	fullPullInterval  = time.Hour // also catches a save committed after a newer one was pulled
-	finalPushTimeout  = 5 * time.Second
-	limitsMethod      = "quota.limits"
-	usageMethod       = "quota.usage"
-	recordsPerAccount = 2 // a day and a month, per set of periods
+	fullPullInterval = time.Hour // also catches a save committed after a newer one was pulled
+	finalPushTimeout = 5 * time.Second
+	limitsMethod     = "quota.limits"
+	usageMethod      = "quota.usage"
 )
 
 // Limits copies the cluster's limits from Suite Cloud into the store: what changed since the last
@@ -163,7 +162,8 @@ func (u *Usage) Run(ctx context.Context) error {
 	}
 }
 
-// Push sends the touched accounts in batches. Accounts whose batch was not taken stay touched.
+// Push sends the touched accounts' records in requests of at most BatchSize records. Accounts
+// with a record in a request that was not taken stay touched.
 // The first push after midnight UTC also sends the counts of the day and month the last push
 // covered: what was counted between that push and midnight would otherwise never be reported.
 func (u *Usage) Push(ctx context.Context) error {
@@ -184,25 +184,27 @@ func (u *Usage) Push(ctx context.Context) error {
 			return err
 		}
 	}
-	step := max(u.BatchSize/(recordsPerAccount*len(sets)), 1)
-	for start := 0; start < len(accounts); start += step {
-		batch := accounts[start:min(start+step, len(accounts))]
-		records := make([]usageRecord, 0, len(batch)*recordsPerAccount*len(sets))
-		for _, account := range batch {
-			for i, periods := range sets {
-				count := counts[i][account]
-				// Before midnight, only what was counted: an account first counted after it has nothing.
-				if i == 0 || count.Day > 0 || count.RefusedDay > 0 {
-					records = append(records, usageRecord{account, periods.Day, count.Day, count.RefusedDay})
-				}
-				if i == 0 || periods.Month != current.Month && (count.Month > 0 || count.RefusedMonth > 0) {
-					records = append(records, usageRecord{account, periods.Month, count.Month, count.RefusedMonth})
-				}
+	var records []usageRecord
+	for _, account := range accounts {
+		for i, periods := range sets {
+			count := counts[i][account]
+			// Before midnight, only what was counted: an account first counted after it has nothing.
+			if i == 0 || count.Day > 0 || count.RefusedDay > 0 {
+				records = append(records, usageRecord{account, periods.Day, count.Day, count.RefusedDay})
+			}
+			if i == 0 || periods.Month != current.Month && (count.Month > 0 || count.RefusedMonth > 0) {
+				records = append(records, usageRecord{account, periods.Month, count.Month, count.RefusedMonth})
 			}
 		}
+	}
+	size := max(u.BatchSize, 1)
+	for start := 0; start < len(records); start += size {
+		batch := records[start:min(start+size, len(records))]
 		var answer struct{}
-		if err := u.Caller.Call(ctx, usageMethod, map[string]any{"host_ip": u.HostIP, "records": records}, &answer); err != nil {
-			u.Touched.Add(accounts[start:]...)
+		if err := u.Caller.Call(ctx, usageMethod, map[string]any{"host_ip": u.HostIP, "records": batch}, &answer); err != nil {
+			for _, record := range records[start:] {
+				u.Touched.Add(record.Account)
+			}
 			return err
 		}
 	}
