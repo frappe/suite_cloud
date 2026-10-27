@@ -78,18 +78,19 @@ def sent_by_account(accounts: list[str]) -> dict[str, dict[str, int]]:
 
 
 def usage_history(account: str, days: int) -> dict[str, list[dict]]:
-    """The account's totals of the last ``days`` UTC days and of their months, newest first, each
-    with the limit it was last reported with."""
+    """The account's totals of the last ``days`` UTC days, today included, and of their months,
+    newest first, each with the limit it was last reported with."""
 
-    day, month = periods_at(datetime.now(UTC) - timedelta(days=days - 1))
+    first_day, first_month = periods_at(datetime.now(UTC) - timedelta(days=days - 1))
+    today, this_month = current_periods()
     usage = frappe.qb.DocType("Mail Send Usage")
     rows = (
         frappe.qb.from_(usage)
         .select(usage.period, usage.sent, usage.refused, usage.send_limit)
         .where(usage.account == account)
         .where(
-            (usage.period.like("d:%") & (usage.period >= day))
-            | (usage.period.like("m:%") & (usage.period >= month))
+            (usage.period.like("d:%") & usage.period[first_day:today])
+            | (usage.period.like("m:%") & usage.period[first_month:this_month])
         )
         .orderby(usage.period, order=frappe.qb.desc)
         .run(as_dict=True)

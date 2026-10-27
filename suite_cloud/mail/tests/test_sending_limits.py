@@ -244,7 +244,9 @@ class TestTenantSendLimits(SendingLimitsTestCase):
     def test_tenants_read_an_account_s_daily_history(self) -> None:
         now = datetime.now(UTC)
         today, two_days_ago, long_ago = (now - timedelta(days=days) for days in (0, 2, 40))
-        periods = {*periods_at(today), *periods_at(two_days_ago), *periods_at(long_ago)}
+        # A future row, which the usage API never stores, stays out of the answer too.
+        future = now + timedelta(days=40)
+        periods = {*periods_at(today), *periods_at(two_days_ago), *periods_at(long_ago), *periods_at(future)}
         upsert_usage(
             [{"account": "alice@acme.com", "period": period, "sent": 9, "refused": 1} for period in periods]
         )
