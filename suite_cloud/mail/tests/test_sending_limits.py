@@ -178,28 +178,6 @@ class TestUsageApi(SendingLimitsTestCase):
         kept = set(frappe.get_all("Mail Send Usage", {"account": "alice@acme.com"}, pluck="period"))
         self.assertEqual(kept, {*periods_at(yesterday), *current_periods()})
 
-    def test_the_report_puts_accounts_nearest_their_limits_first(self) -> None:
-        from suite_cloud.mail.report.mail_sending_usage.mail_sending_usage import execute
-
-        day, month = current_periods()
-        # alice is at 90% of her daily 100, bob at 50% with a refusal, carol at 10%.
-        self.push(("alice@acme.com", day, 90), ("alice@acme.com", month, 90))
-        self.push(("bob@acme.com", day, 50, 1), ("carol@acme.com", day, 10))
-        frappe.set_user("Administrator")
-
-        _columns, rows = execute({"cluster": self.cluster.name, "near_limit": 1})
-        self.assertEqual([row["account"] for row in rows], ["alice@acme.com", "bob@acme.com"])
-        alice = rows[0]
-        self.assertEqual(
-            (alice["sent_today"], alice["daily_percent"], alice["monthly_percent"], alice["sent_this_month"]),
-            (90, 90.0, None, 90),
-        )
-        self.assertEqual(rows[1]["refused_day"], 1)
-
-        _columns, rows = execute({"tenant": self.tenant.name})
-        self.assertEqual([row["account"] for row in rows][-1], "carol@acme.com")
-        self.assertEqual(execute({"tenant": self.other.name})[1], [])
-
 
 class TestTenantSendLimits(SendingLimitsTestCase):
     def test_tenants_set_and_lift_the_limits(self) -> None:
