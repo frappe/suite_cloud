@@ -138,7 +138,8 @@ class TestAgentBuild(AgentBuildFixture):
         versions = {
             "0.1.9+abcdef12": False,
             "0.2.0+abcdef12": True,
-            "0.2.0-rc1+abcdef12": True,
+            "0.2.0-rc1+abcdef12": False,
+            "0.2.1-rc1+abcdef12": True,
             "0.10.0": True,
             "1.0.0": True,
             "dev": False,

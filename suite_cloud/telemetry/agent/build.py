@@ -21,7 +21,7 @@ GO_FALLBACK = "/usr/local/go/bin/go"
 ARCHITECTURES = {"x86_64": "amd64", "aarch64": "arm64"}  # ansible_architecture -> GOARCH
 SOURCE_GLOBS = ("VERSION", "go.mod", "go.sum", "**/*.go")
 QUOTA_RELEASE = (0, 2, 0)  # the first release that answers the sending-limit hook
-RELEASE = re.compile(r"(\d+)\.(\d+)\.(\d+)")  # 0.2.0, 0.2.0-rc1, 0.2.0+547d6a38
+RELEASE = re.compile(r"(\d+)\.(\d+)\.(\d+)(-[^+]+)?")  # 0.2.0, 0.2.0-rc1, 0.2.0+547d6a38
 
 
 class AgentBuildError(Exception):
@@ -69,12 +69,16 @@ class AgentBuild:
 
     @property
     def has_quota(self) -> bool:
-        """Older builds refuse a config.json with a quota section, so it waits for this one. A
-        version without a leading ``major.minor.patch`` counts as older: this sits on the cluster
-        plan's path, which must not fail over it."""
+        """Older builds refuse a config.json with a quota section, so it waits for this one. As in
+        semver, a prerelease such as 0.2.0-rc1 comes before its release. A version without a
+        leading ``major.minor.patch`` counts as older: this sits on the cluster plan's path, which
+        must not fail over it."""
 
         release = RELEASE.match(self.version)
-        return bool(release) and tuple(int(part) for part in release.groups()) >= QUOTA_RELEASE
+        if not release:
+            return False
+        parts = tuple(int(part) for part in release.groups()[:3])
+        return parts > QUOTA_RELEASE if release.group(4) else parts >= QUOTA_RELEASE
 
     @property
     def source_digest(self) -> str:
