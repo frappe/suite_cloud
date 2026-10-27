@@ -12,7 +12,7 @@ import pyarrow.parquet as parquet
 from frappe.tests import IntegrationTestCase
 from frappe.utils import get_test_client
 
-from suite_cloud.api.telemetry import DEFAULT_RECORDS_PER_REQUEST, authenticate, events, metrics
+from suite_cloud.api.telemetry import DEFAULT_RECORDS_PER_REQUEST, authenticate, events, get_envelope, metrics
 from suite_cloud.api.tenant import InvalidInputError
 from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.telemetry import EVENTS, METRICS, TELEMETRY_USER
@@ -242,6 +242,16 @@ class TestStaging(TelemetryApiTestCase):
         )
         self.assertEqual((rows[1]["count"], rows[1]["sum"], rows[1]["labels"]), (3, 9.5, '{"q":"a"}'))
         self.assertEqual(response["accepted"], 2)
+
+    def test_an_ipv6_host_ip_is_checked_and_stored_in_its_canonical_form(self) -> None:
+        with (
+            patch("suite_cloud.api.telemetry.throttle") as throttle,
+            patch("suite_cloud.api.telemetry.assert_cluster_server") as assert_cluster_server,
+        ):
+            envelope = get_envelope("stalwart", "2001:DB8:0::1", None, None)
+        self.assertEqual(envelope["host_ip"], "2001:db8::1")
+        assert_cluster_server.assert_called_once_with("2001:db8::1")
+        self.assertEqual(throttle.call_args.args[0], "agent:2001:db8::1")
 
     def test_a_retried_batch_id_replaces_the_file(self) -> None:
         batch_id = "0199F7E0-0000-7000-8000-000000000001"
