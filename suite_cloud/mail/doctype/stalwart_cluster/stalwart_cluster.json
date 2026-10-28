@@ -380,7 +380,9 @@
    "description": "Generated on save, unique per cluster. Stalwart's sending-limit hook sends it to the Agent on each node, which checks it.",
    "fieldname": "quota_hook_token",
    "fieldtype": "Password",
-   "label": "Quota Hook Token"
+   "label": "Quota Hook Token",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "fieldname": "ssh_section",
@@ -547,7 +549,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-27 12:00:00.000000",
+ "modified": "2026-10-28 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

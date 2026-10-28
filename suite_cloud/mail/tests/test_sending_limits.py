@@ -17,10 +17,11 @@ from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
     periods_at,
     prune_usage,
     upsert_usage,
+    usage_name,
 )
 from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
-from suite_cloud.patches.v1_0 import fill_quota_hook_tokens, fill_send_usage_limits
+from suite_cloud.patches.v1_0 import fill_quota_hook_tokens
 from suite_cloud.telemetry import TELEMETRY_USER
 from suite_cloud.tests.fixtures import ROOT_DOMAIN
 
@@ -118,21 +119,21 @@ class TestUsageApi(SendingLimitsTestCase):
         keys = ("account", "period", "sent", "refused")
         return quota_api.usage(NODE_IP, [dict(zip(keys, record, strict=False)) for record in records])
 
-    def sent(self, account: str, period: str) -> int | None:
-        return frappe.db.get_value("Mail Send Usage", f"{account}:{period}", "sent")
+    def stored(self, account: str, period: str, field: str = "sent") -> int | None:
+        return frappe.db.get_value("Mail Send Usage", {"account": account, "period": period}, field)
 
     def test_the_higher_count_of_two_agents_is_kept(self) -> None:
         day, month = current_periods()
         self.assertEqual(self.push(("alice@acme.com", day, 5), ("alice@acme.com", month, 40))["accepted"], 2)
         self.push(("alice@acme.com", day, 3))  # another node read the counter earlier
-        self.assertEqual(self.sent("alice@acme.com", day), 5)
+        self.assertEqual(self.stored("alice@acme.com", day), 5)
         self.push(("alice@acme.com", day, 7))
-        self.assertEqual((self.sent("alice@acme.com", day), self.sent("alice@acme.com", month)), (7, 40))
+        self.assertEqual((self.stored("alice@acme.com", day), self.stored("alice@acme.com", month)), (7, 40))
 
         # Refusals are kept the same way, and an Agent that sends none leaves them as they are.
         self.push(("alice@acme.com", day, 7, 2))
         self.push(("alice@acme.com", day, 7, 1), ("alice@acme.com", day, 7))
-        self.assertEqual(frappe.db.get_value("Mail Send Usage", f"alice@acme.com:{day}", "refused"), 2)
+        self.assertEqual(self.stored("alice@acme.com", day, "refused"), 2)
 
     def test_each_period_keeps_the_limit_it_was_last_reported_with(self) -> None:
         day, month = current_periods()
@@ -143,12 +144,22 @@ class TestUsageApi(SendingLimitsTestCase):
 
         frappe.db.set_value("Mail Account", "alice@acme.com", "daily_send_limit", 150)
         self.push(("alice@acme.com", day, 6))
-        self.assertEqual(frappe.db.get_value("Mail Send Usage", f"alice@acme.com:{day}", "send_limit"), 150)
+        self.assertEqual(self.stored("alice@acme.com", day, "send_limit"), 150)
 
-        frappe.db.set_value("Mail Send Usage", {"account": "alice@acme.com"}, "send_limit", 0)
-        fill_send_usage_limits.execute()
-        stored = frappe.get_all("Mail Send Usage", {"account": "alice@acme.com"}, ["period", "send_limit"])
-        self.assertEqual({row.period: row.send_limit for row in stored}, {day: 150, month: 2000})
+    def test_a_late_report_keeps_the_limit_of_its_day(self) -> None:
+        yesterday, _month = periods_at(datetime.now(UTC) - timedelta(days=1))
+        self.push(("alice@acme.com", yesterday, 90))
+        frappe.db.set_value("Mail Account", "alice@acme.com", "daily_send_limit", 10)  # after midnight
+        self.push(("alice@acme.com", yesterday, 95))
+        self.assertEqual(self.stored("alice@acme.com", yesterday), 95)
+        self.assertEqual(self.stored("alice@acme.com", yesterday, "send_limit"), 100)
+
+    def test_the_row_name_fits_any_account(self) -> None:
+        long_account = f"{'a' * 64}@{'b' * 75}.com"  # 140 characters, the longest name
+        self.assertEqual(len(usage_name(long_account, "d:20261028")), 40)
+        self.assertNotEqual(
+            usage_name("alice@acme.com", "d:20261028"), usage_name("alice@acme.com", "m:202610")
+        )
 
     def test_an_account_deleted_meanwhile_does_not_fail_the_batch(self) -> None:
         day, _month = current_periods()
@@ -158,8 +169,8 @@ class TestUsageApi(SendingLimitsTestCase):
                 {"account": "alice@acme.com", "period": day, "sent": 2, "refused": 0},
             ]
         )
-        self.assertEqual(self.sent("alice@acme.com", day), 2)
-        self.assertIsNone(self.sent("gone@acme.com", day))
+        self.assertEqual(self.stored("alice@acme.com", day), 2)
+        self.assertIsNone(self.stored("gone@acme.com", day))
 
     def test_unknown_accounts_and_old_periods_are_dropped(self) -> None:
         day, _month = current_periods()
@@ -168,8 +179,8 @@ class TestUsageApi(SendingLimitsTestCase):
             ("ALICE@acme.com", day, 1), ("ghost@acme.com", day, 1), ("bob@acme.com", old_day, 1)
         )
         self.assertEqual(answer["accepted"], 1)
-        self.assertEqual(self.sent("alice@acme.com", day), 1)
-        self.assertIsNone(self.sent("bob@acme.com", old_day))
+        self.assertEqual(self.stored("alice@acme.com", day), 1)
+        self.assertIsNone(self.stored("bob@acme.com", old_day))
         self.assertRaises(InvalidInputError, self.push, ("bob@acme.com", day, -1))
         self.assertRaises(InvalidInputError, self.push, ("bob@acme.com", day, 1, -1))
 

@@ -111,7 +111,7 @@ Answers the account's history, newest first, as far back as Suite Cloud keeps it
 }
 ```
 
-`sent` counts recipients and `refused` the messages refused over a limit. `limit` is the daily or monthly limit the account had when the period was last reported; 0 means no limit. `months` holds the months the days fall in. A day with nothing sent is left out.
+`sent` counts recipients and `refused` the messages refused over a limit. `limit` is the daily or monthly limit the account had while the period was current; 0 means no limit. `months` holds the months the days fall in. A day with nothing sent is left out.
 
 ## `create_account`
 

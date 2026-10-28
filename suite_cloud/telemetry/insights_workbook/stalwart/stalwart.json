@@ -89,7 +89,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Each account's recipients and refused messages per UTC day, newest first, with the daily limit the account had when the day was last reported. Filter by account to see one account's history.",
+   "info": "Each account's recipients and refused messages per UTC day, newest first, with the daily limit the account had on that day. Filter by account to see one account's history.",
    "name": "stalwart-account-sending-history",
    "query": "stalwart-sending-usage",
    "sort_order": 94,

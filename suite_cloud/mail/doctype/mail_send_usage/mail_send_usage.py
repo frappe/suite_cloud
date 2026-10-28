@@ -1,15 +1,16 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-"""What the Agents report an account sent: one row per account and UTC period, named
-``{account}:{period}``. The Agents count; Suite Cloud keeps their last report of each period, for
-the retention in Suite Cloud Settings, so the Mail Account form never waits on a node."""
+"""What the Agents report an account sent: one row per account and UTC period, unique on the two.
+The Agents count; Suite Cloud keeps their last report of each period, for the retention in Suite
+Cloud Settings, so the Mail Account form never waits on a node."""
 
+import hashlib
 from datetime import UTC, datetime, timedelta
 
 import frappe
 from frappe.model.document import Document
-from frappe.query_builder import CustomFunction
+from frappe.query_builder import Case, CustomFunction
 from frappe.utils import cint
 from pypika.terms import Values
 
@@ -37,6 +38,18 @@ class MailSendUsage(Document):
     # end: auto-generated types
 
     pass
+
+
+def on_doctype_update() -> None:
+    """The upsert finds a period's row by this key."""
+
+    frappe.db.add_unique("Mail Send Usage", ["account", "period"], constraint_name="account_period")
+
+
+def usage_name(account: str, period: str) -> str:
+    """A fixed-length name, since an account's name and a period together can pass the name column."""
+
+    return hashlib.sha1(f"{account}:{period}".encode()).hexdigest()
 
 
 def periods_at(moment: datetime) -> tuple[str, str]:
@@ -79,7 +92,7 @@ def sent_by_account(accounts: list[str]) -> dict[str, dict[str, int]]:
 
 def usage_history(account: str, days: int) -> dict[str, list[dict]]:
     """The account's totals of the last ``days`` UTC days, today included, and of their months,
-    newest first, each with the limit it was last reported with."""
+    newest first, each with the limit the account had while the period was current."""
 
     first_day, first_month = periods_at(datetime.now(UTC) - timedelta(days=days - 1))
     today, this_month = current_periods()
@@ -107,9 +120,10 @@ def usage_history(account: str, days: int) -> dict[str, list[dict]]:
 
 
 def upsert_usage(rows: list[dict]) -> None:
-    """Stores ``{account, period, sent, refused}`` rows in one statement, each with the account's
-    limit for its period as it is now. Agents on several nodes report the same counters, and a
-    counter only grows within its period, so the higher count is kept."""
+    """Stores ``{account, period, sent, refused}`` rows in one statement. Agents on several nodes
+    report the same counters, and a counter only grows within its period, so the higher count is
+    kept. A current period takes the account's limit as it is now; a past one keeps the limit it
+    was stored with, so a late report after a limit change does not rewrite it."""
 
     if not rows:
         return
@@ -120,6 +134,9 @@ def upsert_usage(rows: list[dict]) -> None:
     now = frappe.utils.now()
     user = frappe.session.user
     usage = frappe.qb.DocType("Mail Send Usage")
+    limit_while_current = (
+        Case().when(usage.period.isin(current_periods()), Values(usage.send_limit)).else_(usage.send_limit)
+    )
     query = frappe.qb.into(usage).columns(
         usage.name,
         usage.account,
@@ -134,15 +151,24 @@ def upsert_usage(rows: list[dict]) -> None:
         usage.modified_by,
     )
     for row in rows:
-        name = f"{row['account']}:{row['period']}"
         limit = limits[row["account"]][row["period"][0]]
         query = query.insert(
-            name, row["account"], row["period"], row["sent"], row["refused"], limit, now, now, now, user, user
+            usage_name(row["account"], row["period"]),
+            row["account"],
+            row["period"],
+            row["sent"],
+            row["refused"],
+            limit,
+            now,
+            now,
+            now,
+            user,
+            user,
         )
     query = (
         query.on_duplicate_key_update(usage.sent, Greatest(usage.sent, Values(usage.sent)))
         .on_duplicate_key_update(usage.refused, Greatest(usage.refused, Values(usage.refused)))
-        .on_duplicate_key_update(usage.send_limit, Values(usage.send_limit))
+        .on_duplicate_key_update(usage.send_limit, limit_while_current)
         .on_duplicate_key_update(usage.reported_at, Values(usage.reported_at))
         .on_duplicate_key_update(usage.modified, Values(usage.modified))
     )
