@@ -293,6 +293,12 @@ class EgressGateway(Document):
         self.set_status("Failed", job.error_log)
 
 
+def on_doctype_update() -> None:
+    """Every telemetry batch looks its gateway up by cluster and address."""
+
+    frappe.db.add_index("Egress Gateway", ["cluster", "ipv4_address"])
+
+
 def poll_pending_gateways() -> None:
     for name in frappe.get_all("Egress Gateway", {"status": "Provisioned"}, pluck="name"):
         gateway = frappe.get_doc("Egress Gateway", name)

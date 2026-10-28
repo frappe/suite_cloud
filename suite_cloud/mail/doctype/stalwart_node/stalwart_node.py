@@ -264,6 +264,12 @@ class StalwartNode(Document):
         self.set_status("Failed", job.error_log)
 
 
+def on_doctype_update() -> None:
+    """Every telemetry batch and sending-limit call looks its node up by cluster and address."""
+
+    frappe.db.add_index("Stalwart Node", ["cluster", "ipv4_address"])
+
+
 def validate_ip(value: str | None, version: int) -> str:
     try:
         address = ipaddress.ip_address((value or "").strip())

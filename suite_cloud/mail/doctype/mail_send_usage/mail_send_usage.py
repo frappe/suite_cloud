@@ -132,6 +132,8 @@ def upsert_usage(rows: list[dict], cluster: str) -> int:
     rows = [row for row in rows if row["account"] in limits]  # another cluster's, or deleted
     if not rows:
         return 0
+    # One lock order for every request, so two nodes reporting the same accounts do not deadlock.
+    rows.sort(key=lambda row: (row["account"], row["period"]))
     now = frappe.utils.now()
     user = frappe.session.user
     usage = frappe.qb.DocType("Mail Send Usage")
@@ -194,13 +196,18 @@ def delete_usage(account: str) -> None:
 
 
 def prune_usage() -> None:
-    """Daily: drops the days older than the retention and the months that ended before it."""
+    """Daily: drops the days older than the retention and the months that ended before it, one
+    period per transaction, so a shortened retention never deletes months of rows at once."""
 
     day, month = periods_at(datetime.now(UTC) - timedelta(days=retention_days()))
     usage = frappe.qb.DocType("Mail Send Usage")
     old_days = usage.period.like("d:%") & (usage.period < day)
     old_months = usage.period.like("m:%") & (usage.period < month)
-    frappe.qb.from_(usage).delete().where(old_days | old_months).run()
+    old = frappe.qb.from_(usage).select(usage.period).distinct().where(old_days | old_months).run(pluck=True)
+    for period in sorted(old):
+        frappe.db.delete("Mail Send Usage", {"period": period})
+        if not frappe.in_test:
+            frappe.db.commit()
 
 
 def retention_days() -> int:

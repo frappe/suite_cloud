@@ -107,9 +107,11 @@ class MailAccount(QuotaHolder, Document):
         """Recipients per UTC day and month; 0 means no limit, so a negative one means nothing."""
 
         for field in ("daily_send_limit", "monthly_send_limit"):
-            if cint(self.get(field)) < 0:
+            if (value := cint(self.get(field))) < 0:
                 frappe.throw(
-                    _("{0} must be 0 (no limit) or more.").format(_(self.meta.get_label(field))),
+                    _("{0} must be 0 (no limit) or more, not {1}.").format(
+                        _(self.meta.get_label(field)), value
+                    ),
                     frappe.ValidationError,
                 )
 

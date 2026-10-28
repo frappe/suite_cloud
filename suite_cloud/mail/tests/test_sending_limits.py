@@ -23,7 +23,7 @@ from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
 from suite_cloud.patches.v1_0 import fill_quota_hook_tokens
 from suite_cloud.telemetry import TELEMETRY_USER
-from suite_cloud.telemetry.agent.status import CACHE_KEY, forget_contacts
+from suite_cloud.telemetry.agent.status import CACHE_KEY
 from suite_cloud.tests.fixtures import ROOT_DOMAIN
 
 NODE_IP = "203.0.113.10"
@@ -123,13 +123,15 @@ class TestLimitsApi(SendingLimitsTestCase):
         self.assertRaises(frappe.PermissionError, self.pull)
 
     def test_quota_calls_leave_the_agent_status_to_batches(self) -> None:
-        forget_contacts()
-        self.addCleanup(forget_contacts)
+        frappe.cache.hdel(CACHE_KEY, NODE_IP)  # only this test's node: the site may run real agents
         self.pull()
         self.assertIsNone(frappe.cache.hget(CACHE_KEY, NODE_IP))
 
     def test_the_pull_reads_an_index_on_cluster_and_modified(self) -> None:
         self.assertTrue(frappe.db.has_index("tabMail Account", "cluster_modified_index"))
+        # Each Agent call finds its server by cluster and address.
+        for doctype in ("Stalwart Node", "Egress Gateway"):
+            self.assertTrue(frappe.db.has_index(f"tab{doctype}", "cluster_ipv4_address_index"))
 
     def test_only_agents_may_call(self) -> None:
         frappe.set_user("Administrator")
@@ -147,6 +149,15 @@ class TestUsageApi(SendingLimitsTestCase):
 
     def stored(self, account: str, period: str, field: str = "sent") -> int | None:
         return frappe.db.get_value("Mail Send Usage", {"account": account, "period": period}, field)
+
+    def test_rows_are_written_in_one_lock_order(self) -> None:
+        day, month = current_periods()
+        with patch.object(frappe.db, "sql", wraps=frappe.db.sql) as sql:
+            self.push(("bob@acme.com", day, 1), ("alice@acme.com", month, 1), ("alice@acme.com", day, 1))
+        insert = next(call for call in sql.call_args_list if "Mail Send Usage" in str(call.args[0]))
+        values = [str(value) for value in insert.args[1].values()]  # in the order of the statement
+        written = [(value, values[i + 1]) for i, value in enumerate(values) if value.endswith("@acme.com")]
+        self.assertEqual(written, [("alice@acme.com", day), ("alice@acme.com", month), ("bob@acme.com", day)])
 
     def test_the_higher_count_of_two_agents_is_kept(self) -> None:
         day, month = current_periods()
@@ -274,8 +285,14 @@ class TestUsageApi(SendingLimitsTestCase):
             ],
             self.cluster.name,
         )
-        with patch(f"{mail_send_usage.__name__}.get_config", return_value=30):
+        with (
+            patch(f"{mail_send_usage.__name__}.get_config", return_value=30),
+            patch.object(frappe.db, "delete", wraps=frappe.db.delete) as delete,
+        ):
             prune_usage()
+        # One period per statement, so a shortened retention never deletes months of rows at once.
+        self.assertTrue(delete.call_args_list)
+        self.assertTrue(all(set(call.args[1]) == {"period"} for call in delete.call_args_list))
         kept = set(frappe.get_all("Mail Send Usage", {"account": "alice@acme.com"}, pluck="period"))
         # The month of the 31st day back is kept while the retention still reaches into it.
         month_at_cutoff = periods_at(now - timedelta(days=30))[1]
@@ -296,12 +313,12 @@ class TestTenantSendLimits(SendingLimitsTestCase):
         self.assertRaises(
             frappe.ValidationError, accounts.update_account, "bob@acme.com", daily_send_limit=-1
         )
-        # A negative limit means nothing, so create refuses it too, naming the field.
+        # A negative limit means nothing, so create refuses it too, naming the field and the value.
         for limits in ({"daily_send_limit": -1}, {"monthly_send_limit": -5}):
             with self.subTest(**limits):
                 self.assertRaisesRegex(
                     frappe.ValidationError,
-                    "Send Limit must be 0",
+                    f"Send Limit must be 0 \\(no limit\\) or more, not {next(iter(limits.values()))}\\.",
                     accounts.create_account,
                     "dave@acme.com",
                     "secret-pw",
