@@ -983,6 +983,30 @@ class TestMailAccount(TenancyTestCase):
         self.assertNotIn(old_id, stored)
         self.assertEqual(sorted(c["description"] for c in stored.values()), ["Phone", "Suite Cloud"])
 
+    def test_a_disabled_account_keeps_its_mirrored_credentials(self) -> None:
+        # The disabled role leaves the account no session, so its credentials cannot be reached.
+        account = self.make_account("ivan@acme.com")
+        account.set_enabled(False)
+        account = frappe.get_doc("Mail Account", account.name)
+        with patch("frappe.log_error") as log_error:
+            account.run_method("onload")
+        log_error.assert_not_called()
+        self.assertEqual([r.description for r in account.app_passwords], ["Suite Cloud"])
+
+        account.append("app_passwords", {"description": "Phone"})
+        self.assertRaisesRegex(frappe.ValidationError, "Enable the account", account.save)
+        account.reload()
+        self.assertRaisesRegex(frappe.ValidationError, "Enable the account", account.rotate_api_key)
+        account.reload()
+
+        account.display_name = "Ivan"
+        account.save()
+        account.set_enabled(True)
+        self.assertEqual(self.fake.get("Account", account.stalwart_id)["roles"], {"@type": "User"})
+        account.append("app_passwords", {"description": "Phone"})
+        account.save()
+        self.assertEqual(len(self.fake.objects[f"AppPassword:{account.stalwart_id}"]), 2)
+
     def test_credentials_created_before_a_failed_save_are_revoked_with_it(self) -> None:
         account = self.make_account("heidi@acme.com")
         frappe.db.after_rollback.reset()  # the insert's own callback goes with its commit outside tests

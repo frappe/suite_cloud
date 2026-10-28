@@ -144,6 +144,8 @@ class FakeStalwart:
         account = self._authenticate(request.headers.get("Authorization"))
         if account is None:
             return json_response(401, {"type": "about:blank", "title": "Unauthorized", "status": 401})
+        if self._is_receive_only(account):
+            return json_response(403, {"type": "about:blank", "title": "Forbidden", "status": 403})
 
         if path == "/.well-known/jmap":
             return json_response(200, self._session(account))
@@ -178,6 +180,19 @@ class FakeStalwart:
             account = next((a for a in self.all("Account") if a.get("emailAddress") == email), None)
             return account["id"] if account else None
         return None
+
+    def _is_receive_only(self, account_id: str) -> bool:
+        """Custom roles that grant nothing beyond receiving refuse the session, as a disabled account's do."""
+
+        roles = self.objects["Account"][account_id].get("roles") or {}
+        if roles.get("@type") != "Custom":
+            return False
+        granted = {
+            permission
+            for role_id in roles.get("roleIds", {})
+            for permission in (self.get("Role", role_id) or {}).get("enabledPermissions", {})
+        }
+        return granted <= {"emailReceive"}
 
     def _session(self, account_id: str) -> dict:
         return {
