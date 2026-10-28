@@ -285,6 +285,33 @@ func TestMemoryStoreSurvivesARestart(t *testing.T) {
 	}
 }
 
+func TestMemoryStoreShedsOldDaysWithoutNewCounts(t *testing.T) {
+	dir := t.TempDir()
+	store, _ := OpenMemory(dir)
+	store.now = func() time.Time { return time.Date(2026, 10, 26, 23, 59, 0, 0, time.UTC) }
+	add(t, store, "a@example.com", 4, october)
+	store.data.Refused = map[string]map[string]int64{"b@example.com": {october.Day: 1, october.Month: 1}}
+	if err := store.Save(); err != nil {
+		t.Fatal(err)
+	}
+	// Two days later, with nothing sent since.
+	store.now = func() time.Time { return time.Date(2026, 10, 28, 9, 0, 0, 0, time.UTC) }
+	if err := store.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, _ := OpenMemory(dir)
+	for _, counters := range []map[string]map[string]int64{reopened.data.Usage, reopened.data.Refused} {
+		for account, byPeriod := range counters {
+			if _, ok := byPeriod[october.Day]; ok {
+				t.Fatalf("%s kept %s: %v", account, october.Day, byPeriod)
+			}
+		}
+	}
+	if reopened.data.Usage["a@example.com"][october.Month] != 4 {
+		t.Fatalf("this month's count lost: %v", reopened.data.Usage)
+	}
+}
+
 func TestMemoryStoreRefusesAnUnreadableFile(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(dir+"/quota.json", []byte("{"), 0o600)
