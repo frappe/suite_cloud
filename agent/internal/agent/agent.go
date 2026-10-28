@@ -77,16 +77,22 @@ func Run(ctx context.Context, cfg *config.Config, version string, logger *slog.L
 	return failure
 }
 
-// startQuota runs the hook, the limit pull, the usage push and the store, each on its own.
+// startQuota runs the hook, the limit pull, the usage push and the store, each on its own. A part
+// that fails is started again rather than stopping the logs and metrics: Stalwart accepts mail
+// while the hook is down.
 func startQuota(cfg *config.Config, store quota.Store, send *sender.Sender, logger *slog.Logger, start func(string, func(context.Context) error)) {
 	touched := &quota.Touched{}
 	hook := &quota.Hook{Port: cfg.Quota.HookPort, Token: cfg.Quota.HookToken, Store: store, Touched: touched, Logger: logger, Now: time.Now}
 	limits := &quota.Limits{Store: store, Caller: send, HostIP: cfg.Node.HostIP, Interval: cfg.Quota.LimitsPollInterval(), Logger: logger, Now: time.Now}
 	usage := &quota.Usage{Store: store, Caller: send, HostIP: cfg.Node.HostIP, Touched: touched, Interval: cfg.Quota.UsagePushInterval(), BatchSize: cfg.SuiteCloud.RecordsPerRequest, Logger: logger, Now: time.Now}
-	start("quota hook", hook.Run)
-	start("quota limits", limits.Run)
-	start("quota usage", usage.Run)
-	start("quota store", store.Run)
+	parts := map[string]func(context.Context) error{
+		"quota hook": hook.Run, "quota limits": limits.Run, "quota usage": usage.Run, "quota store": store.Run,
+	}
+	for name, run := range parts {
+		start(name, func(ctx context.Context) error {
+			return quota.KeepRunning(ctx, logger.With("part", name), quota.RestartDelay, run)
+		})
+	}
 }
 
 // Check reports what would stop the agent from running: the state directory, the log globs or a

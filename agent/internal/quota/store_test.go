@@ -3,6 +3,7 @@ package quota
 import (
 	"context"
 	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"sync"
@@ -317,5 +318,24 @@ func TestMemoryStoreRefusesAnUnreadableFile(t *testing.T) {
 	os.WriteFile(dir+"/quota.json", []byte("{"), 0o600)
 	if _, err := OpenMemory(dir); err == nil {
 		t.Fatal("opened")
+	}
+}
+
+func TestMemoryStoreWritesAgainAfterAFailedSave(t *testing.T) {
+	dir := t.TempDir()
+	store, _ := OpenMemory(dir)
+	store.now = func() time.Time { return time.Date(2026, 10, 26, 12, 0, 0, 0, time.UTC) }
+	add(t, store, "a@example.com", 4, october)
+	store.dir = filepath.Join(dir, "missing")
+	if err := store.Save(); err == nil {
+		t.Fatal("saved into a missing directory")
+	}
+	store.dir = dir
+	if err := store.Save(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, _ := OpenMemory(dir)
+	if reopened.data.Usage["a@example.com"][october.Day] != 4 {
+		t.Fatalf("count not written after the failure: %v", reopened.data.Usage)
 	}
 }

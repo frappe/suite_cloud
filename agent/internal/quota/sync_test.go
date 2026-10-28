@@ -382,3 +382,19 @@ func TestFailedPushKeepsTheAccountsTouched(t *testing.T) {
 		t.Fatalf("touched %v", touched)
 	}
 }
+
+func TestKeepRunningStartsAFailedPartAgainUntilTheEnd(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	runs := 0
+	err := KeepRunning(ctx, quiet, time.Millisecond, func(context.Context) error {
+		runs++
+		if runs == 3 {
+			cancel()
+			return errors.New("final save failed")
+		}
+		return errors.New("port taken")
+	})
+	if runs != 3 || err == nil || err.Error() != "final save failed" {
+		t.Fatalf("runs %d, err %v", runs, err)
+	}
+}

@@ -39,11 +39,12 @@ func counters(all *map[string]map[string]int64, account string) map[string]int64
 // MemoryStore is the store of a single-node cluster: one Agent, so one lock makes each check
 // atomic. It is saved to quota.json every few seconds, so a crash loses at most those counts.
 type MemoryStore struct {
-	mu    sync.Mutex
-	dir   string
-	data  memoryData
-	dirty bool
-	now   func() time.Time
+	mu     sync.Mutex
+	saving sync.Mutex // one write at a time, so an older snapshot never replaces a newer one
+	dir    string
+	data   memoryData
+	dirty  bool
+	now    func() time.Time
 }
 
 // OpenMemory loads quota.json from dir, or starts empty when there is none.
@@ -166,10 +167,28 @@ func (m *MemoryStore) Run(ctx context.Context) error {
 	}
 }
 
-// Save drops the counters older than yesterday and its month, and writes the file when anything
-// changed, a drop included, so a quiet store sheds old days too. Yesterday stays until the usage
-// push has sent its last count.
+// Save writes the file when anything changed. The hook's lock is held only while the data is
+// encoded, not while the file is written.
 func (m *MemoryStore) Save() error {
+	m.saving.Lock()
+	defer m.saving.Unlock()
+	raw, err := m.snapshot()
+	if raw == nil || err != nil {
+		return err
+	}
+	if err := state.WriteFile(m.dir, memoryFileName, raw); err != nil {
+		m.mu.Lock()
+		m.dirty = true
+		m.mu.Unlock()
+		return err
+	}
+	return nil
+}
+
+// snapshot drops the counters older than yesterday and its month, and encodes the data when
+// anything changed, a drop included, so a quiet store sheds old days too; nil when nothing did.
+// Yesterday stays until the usage push has sent its last count.
+func (m *MemoryStore) snapshot() (json.RawMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	now := m.now()
@@ -178,13 +197,14 @@ func (m *MemoryStore) Save() error {
 	droppedUsage, droppedRefused := prune(m.data.Usage, kept), prune(m.data.Refused, kept)
 	m.dirty = m.dirty || droppedUsage || droppedRefused
 	if !m.dirty {
-		return nil
+		return nil, nil
 	}
-	if err := state.WriteFile(m.dir, memoryFileName, m.data); err != nil {
-		return err
+	raw, err := json.Marshal(m.data)
+	if err != nil {
+		return nil, err
 	}
 	m.dirty = false
-	return nil
+	return raw, nil
 }
 
 // prune reports whether it dropped anything.

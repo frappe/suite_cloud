@@ -198,70 +198,116 @@ func (u *Usage) Push(ctx context.Context) error {
 		return nil
 	}
 	now := u.Now()
-	current, yesterday := PeriodsAt(now), PeriodsAt(now.Add(-24*time.Hour))
-	everyone := u.pushed != current || now.Sub(now.UTC().Truncate(24*time.Hour)) < yesterdayGrace
+	periods := pushPeriods{current: PeriodsAt(now), yesterday: PeriodsAt(now.Add(-24 * time.Hour))}
+	everyone := u.pushed != periods.current || now.Sub(now.UTC().Truncate(24*time.Hour)) < yesterdayGrace
+	records, err := u.getRecords(ctx, accounts, periods, everyone)
+	if err != nil {
+		u.Touched.Add(accounts...)
+		return err
+	}
+	u.dropStaleOwed(periods.yesterday.Day)
+	if err := u.send(ctx, records, periods); err != nil {
+		return err
+	}
+	u.pushed = periods.current
+	return nil
+}
+
+// pushPeriods are the periods of one push: the current day and month, and yesterday's.
+type pushPeriods struct{ current, yesterday Periods }
+
+// isLate reports whether a record is one of yesterday's.
+func (p pushPeriods) isLate(record usageRecord) bool {
+	return record.Period == p.yesterday.Day || record.Period == p.yesterday.Month && p.yesterday.Month != p.current.Month
+}
+
+// lateRecords are an account's records of yesterday. Before midnight, only what was counted: an
+// account first counted after it has nothing.
+func (p pushPeriods) lateRecords(account string, before Count) []usageRecord {
+	var records []usageRecord
+	if before.Day > 0 || before.RefusedDay > 0 {
+		records = append(records, usageRecord{account, p.yesterday.Day, before.Day, before.RefusedDay})
+	}
+	if p.yesterday.Month != p.current.Month && (before.Month > 0 || before.RefusedMonth > 0) {
+		records = append(records, usageRecord{account, p.yesterday.Month, before.Month, before.RefusedMonth})
+	}
+	return records
+}
+
+// getRecords reads the accounts' current records, and yesterday's of everyone or of the accounts
+// that are owed them.
+func (u *Usage) getRecords(ctx context.Context, accounts []string, periods pushPeriods, everyone bool) ([]usageRecord, error) {
+	counts, err := u.Store.Counts(ctx, accounts, periods.current)
+	if err != nil {
+		return nil, err
+	}
+	lateCounts, err := u.getLateCounts(ctx, accounts, periods.yesterday, everyone)
+	if err != nil {
+		return nil, err
+	}
+	var records []usageRecord
+	for _, account := range accounts {
+		count := counts[account]
+		records = append(records,
+			usageRecord{account, periods.current.Day, count.Day, count.RefusedDay},
+			usageRecord{account, periods.current.Month, count.Month, count.RefusedMonth},
+		)
+		if before, ok := lateCounts[account]; ok {
+			records = append(records, periods.lateRecords(account, before)...)
+		}
+	}
+	return records, nil
+}
+
+func (u *Usage) getLateCounts(ctx context.Context, accounts []string, yesterday Periods, everyone bool) (map[string]Count, error) {
 	var late []string
 	for _, account := range accounts {
 		if everyone || u.owed[account] == yesterday.Day {
 			late = append(late, account)
 		}
 	}
-	counts, err := u.Store.Counts(ctx, accounts, current)
-	var lateCounts map[string]Count
-	if err == nil && len(late) > 0 {
-		lateCounts, err = u.Store.Counts(ctx, late, yesterday)
+	if len(late) == 0 {
+		return nil, nil
 	}
-	if err != nil {
-		u.Touched.Add(accounts...)
-		return err
-	}
+	return u.Store.Counts(ctx, late, yesterday)
+}
 
-	var records []usageRecord
-	for _, account := range accounts {
-		count := counts[account]
-		records = append(records,
-			usageRecord{account, current.Day, count.Day, count.RefusedDay},
-			usageRecord{account, current.Month, count.Month, count.RefusedMonth},
-		)
-		before, ok := lateCounts[account]
-		// Before midnight, only what was counted: an account first counted after it has nothing.
-		if ok && (before.Day > 0 || before.RefusedDay > 0) {
-			records = append(records, usageRecord{account, yesterday.Day, before.Day, before.RefusedDay})
-		}
-		if ok && yesterday.Month != current.Month && (before.Month > 0 || before.RefusedMonth > 0) {
-			records = append(records, usageRecord{account, yesterday.Month, before.Month, before.RefusedMonth})
-		}
-	}
-	isLate := func(record usageRecord) bool {
-		return record.Period == yesterday.Day || record.Period == yesterday.Month && yesterday.Month != current.Month
-	}
+// dropStaleOwed forgets what is owed of days before yesterday: Suite Cloud would not take it.
+func (u *Usage) dropStaleOwed(yesterday string) {
 	owed := map[string]string{}
 	for account, day := range u.owed {
-		if day == yesterday.Day {
+		if day == yesterday {
 			owed[account] = day
 		}
 	}
 	u.owed = owed
+}
 
+// send posts the records in requests of at most BatchSize records. When one fails, the accounts
+// of the records not taken stay touched, and their yesterday records owed.
+func (u *Usage) send(ctx context.Context, records []usageRecord, periods pushPeriods) error {
 	size := max(u.BatchSize, 1)
 	for start := 0; start < len(records); start += size {
 		batch := records[start:min(start+size, len(records))]
 		var answer struct{}
 		if err := u.Caller.Call(ctx, usageMethod, map[string]any{"host_ip": u.HostIP, "records": batch}, &answer); err != nil {
-			for _, record := range records[start:] {
-				u.Touched.Add(record.Account)
-				if isLate(record) {
-					u.owed[record.Account] = yesterday.Day
-				}
-			}
+			u.keepForNextPush(records[start:], periods)
 			return err
 		}
 		for _, record := range batch {
-			if isLate(record) {
+			if periods.isLate(record) {
 				delete(u.owed, record.Account)
 			}
 		}
 	}
-	u.pushed = current
 	return nil
+}
+
+func (u *Usage) keepForNextPush(records []usageRecord, periods pushPeriods) {
+	for _, record := range records {
+		u.Touched.Add(record.Account)
+		if periods.isLate(record) {
+			u.owed[record.Account] = periods.yesterday.Day
+		}
+	}
 }

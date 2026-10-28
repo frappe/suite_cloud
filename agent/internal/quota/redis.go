@@ -157,10 +157,14 @@ func (r *RedisStore) SetLimits(ctx context.Context, limits map[string]Limit) err
 	if len(limits) == 0 {
 		return nil
 	}
+	// Loaded once per page, on every master of a cluster, so each account sends only the hash.
+	if err := setLimitScript.Load(ctx, r.client).Err(); err != nil {
+		return err
+	}
 	pipe := r.client.Pipeline()
 	members := make([]any, 0, len(limits))
 	for account, limit := range limits {
-		setLimitScript.Eval(ctx, pipe, []string{limitKey(account)}, limit.Daily, limit.Monthly, limit.Version)
+		setLimitScript.EvalSha(ctx, pipe, []string{limitKey(account)}, limit.Daily, limit.Monthly, limit.Version)
 		members = append(members, account)
 	}
 	pipe.SAdd(ctx, accountsKey, members...)

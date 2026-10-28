@@ -6,6 +6,7 @@ package quota
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"strings"
 	"sync"
 	"time"
@@ -126,6 +127,26 @@ func (t *Touched) Take() []string {
 // Caller makes one request to a telemetry API method; the sender implements it.
 type Caller interface {
 	Call(ctx context.Context, method string, payload, out any) error
+}
+
+// RestartDelay is how long a failed part of the quota waits before it starts again.
+const RestartDelay = 10 * time.Second
+
+// KeepRunning runs run until the context ends, starting it again after delay whenever it fails.
+// On the way out it returns what the last run returned, such as a final save's error.
+func KeepRunning(ctx context.Context, logger *slog.Logger, delay time.Duration, run func(context.Context) error) error {
+	for {
+		err := run(ctx)
+		if ctx.Err() != nil {
+			return err
+		}
+		logger.Error("stopped; starting it again", "error", err, "retry_in", delay)
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-time.After(delay):
+		}
+	}
 }
 
 func setMembers(set map[string]bool) []string {
