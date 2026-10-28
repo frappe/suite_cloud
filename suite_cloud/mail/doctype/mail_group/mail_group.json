@@ -75,7 +75,9 @@
   {
    "fieldname": "aliases_section",
    "fieldtype": "Section Break",
-   "label": "Aliases"
+   "label": "Aliases",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.aliases && doc.aliases.length"
   },
   {
    "fieldname": "aliases",
@@ -87,7 +89,9 @@
   {
    "fieldname": "quotas_section",
    "fieldtype": "Section Break",
-   "label": "Quotas"
+   "label": "Quotas",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.quotas && doc.quotas.length"
   },
   {
    "description": "Stalwart limits for the group. Leave a quota out for no limit.",
@@ -134,7 +138,7 @@
    "table_fieldname": "groups"
   }
  ],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Group",

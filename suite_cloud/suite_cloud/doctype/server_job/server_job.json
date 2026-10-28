@@ -169,7 +169,8 @@
    "collapsible": 1,
    "fieldname": "stats_section",
    "fieldtype": "Section Break",
-   "label": "Ansible Stats"
+   "label": "Ansible Stats",
+   "collapsible_depends_on": "eval:doc.failures || doc.unreachable"
   },
   {
    "description": "Tasks that ran without error.",
@@ -258,7 +259,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Server Job",

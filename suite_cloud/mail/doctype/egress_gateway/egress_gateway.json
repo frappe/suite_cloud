@@ -151,7 +151,9 @@
   {
    "fieldname": "ssh_section",
    "fieldtype": "Section Break",
-   "label": "SSH"
+   "label": "SSH",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!doc.ssh_verified"
   },
   {
    "description": "Blank uses the cluster SSH user.",
@@ -187,7 +189,9 @@
   {
    "fieldname": "stalwart_section",
    "fieldtype": "Section Break",
-   "label": "Stalwart"
+   "label": "Stalwart",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.__islocal"
   },
   {
    "description": "Store for the gateway's queue and settings. Blank creates a local RocksDB store.",
@@ -230,7 +234,8 @@
   {
    "fieldname": "state_section",
    "fieldtype": "Section Break",
-   "label": "Configuration"
+   "label": "Configuration",
+   "collapsible": 1
   },
   {
    "description": "When the last provisioning or upgrade job succeeded.",
@@ -286,7 +291,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress Gateway",

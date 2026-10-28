@@ -119,7 +119,9 @@
   {
    "fieldname": "progress_section",
    "fieldtype": "Section Break",
-   "label": "Setup"
+   "label": "Setup",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:![\"Active\", \"Dropped\"].includes(doc.status)"
   },
   {
    "default": "0",
@@ -235,7 +237,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

@@ -87,7 +87,9 @@
   {
    "fieldname": "dns_section",
    "fieldtype": "Section Break",
-   "label": "DNS Records"
+   "label": "DNS Records",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!doc.managed && doc.status != \"Active\""
   },
   {
    "description": "Fetched again after 23 hours because the verification token expires after 24.",
@@ -107,7 +109,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site Domain",

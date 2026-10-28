@@ -154,7 +154,9 @@
    "depends_on": "eval:doc.steps && doc.steps.length",
    "fieldname": "progress_section",
    "fieldtype": "Section Break",
-   "label": "Progress"
+   "label": "Progress",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.status != \"Completed\""
   },
   {
    "description": "Each step from request to owner invite, with its duration.",
@@ -167,7 +169,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request",

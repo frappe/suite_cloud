@@ -91,7 +91,9 @@
   {
    "fieldname": "settings_section",
    "fieldtype": "Section Break",
-   "label": "Settings"
+   "label": "Settings",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.catch_all_address || !doc.sub_addressing || doc.allow_relaying || doc.egress_pool"
   },
   {
    "description": "Gets mail for addresses that do not exist. Blank rejects that mail.",
@@ -303,7 +305,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Domain",

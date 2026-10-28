@@ -133,7 +133,9 @@
   {
    "fieldname": "setup_section",
    "fieldtype": "Section Break",
-   "label": "Setup"
+   "label": "Setup",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!doc.ready_since"
   },
   {
    "description": "Zone that Pilot registers new sites under.",
@@ -370,7 +372,7 @@
    "link_fieldname": "virtual_machine"
   }
  ],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Virtual Machine",

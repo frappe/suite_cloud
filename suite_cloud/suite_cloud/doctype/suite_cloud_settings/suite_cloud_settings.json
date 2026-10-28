@@ -180,7 +180,8 @@
   {
    "fieldname": "retention_section",
    "fieldtype": "Section Break",
-   "label": "Retention"
+   "label": "Retention",
+   "collapsible": 1
   },
   {
    "default": "90",
@@ -308,7 +309,8 @@
    "description": "Sites per server = (memory - reserved) / memory per site, or the same for disk, whichever is lower.",
    "fieldname": "sizing_section",
    "fieldtype": "Section Break",
-   "label": "Server Sizing"
+   "label": "Server Sizing",
+   "collapsible": 1
   },
   {
    "default": "1024",
@@ -528,7 +530,9 @@
    "description": "The agent runs on each Stalwart node and egress gateway. It sends logs and metrics to Suite Cloud.",
    "fieldname": "agent_section",
    "fieldtype": "Section Break",
-   "label": "Agent"
+   "label": "Agent",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.enable_telemetry || doc.agent_build_error"
   },
   {
    "default": "300",
@@ -629,7 +633,9 @@
    "description": "Checked every five minutes. An alert opens for a node that stops reporting or logs too many errors.",
    "fieldname": "telemetry_alerts_section",
    "fieldtype": "Section Break",
-   "label": "Telemetry Alerts"
+   "label": "Telemetry Alerts",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.enable_telemetry"
   },
   {
    "description": "Emails to notify, separated by commas or lines. Blank records alerts without email.",
@@ -661,7 +667,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

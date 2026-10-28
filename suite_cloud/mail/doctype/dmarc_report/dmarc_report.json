@@ -172,7 +172,9 @@
    "fieldname": "policy_section",
    "fieldtype": "Section Break",
    "label": "Published Policy",
-   "description": "DMARC record as the reporter read it."
+   "description": "DMARC record as the reporter read it.",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.failed_messages"
   },
   {
    "fieldname": "policy",
@@ -340,7 +342,7 @@
  ],
  "in_create": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "DMARC Report",

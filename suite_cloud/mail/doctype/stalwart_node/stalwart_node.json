@@ -169,7 +169,9 @@
   {
    "fieldname": "ssh_section",
    "fieldtype": "Section Break",
-   "label": "SSH"
+   "label": "SSH",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!doc.ssh_verified"
   },
   {
    "description": "Blank uses the cluster SSH user.",
@@ -246,7 +248,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Node",

@@ -155,7 +155,9 @@
    "description": "Limits on outgoing mail. Applied about one minute after save.",
    "fieldname": "sending_limits_section",
    "fieldtype": "Section Break",
-   "label": "Sending Limits"
+   "label": "Sending Limits",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.daily_send_limit || doc.monthly_send_limit"
   },
   {
    "default": "0",
@@ -180,7 +182,9 @@
   {
    "fieldname": "quotas_section",
    "fieldtype": "Section Break",
-   "label": "Quotas"
+   "label": "Quotas",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.quotas && doc.quotas.length"
   },
   {
    "description": "Read from the cluster when the form opens.",
@@ -200,7 +204,9 @@
   {
    "fieldname": "aliases_section",
    "fieldtype": "Section Break",
-   "label": "Aliases"
+   "label": "Aliases",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.aliases && doc.aliases.length"
   },
   {
    "description": "Other addresses delivered to this mailbox.",
@@ -212,7 +218,9 @@
   {
    "fieldname": "groups_section",
    "fieldtype": "Section Break",
-   "label": "Groups"
+   "label": "Groups",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.groups && doc.groups.length"
   },
   {
    "fieldname": "groups",
@@ -251,7 +259,7 @@
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",
