@@ -51,12 +51,13 @@ func (h *Hook) Run(ctx context.Context) error {
 	mux := http.NewServeMux()
 	mux.Handle(HookPath, h)
 	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
-	go func() {
-		<-ctx.Done()
+	// Unregistered when Serve fails, so a run started again leaves nothing behind.
+	stop := context.AfterFunc(ctx, func() {
 		shutdown, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 		defer cancel()
 		server.Shutdown(shutdown)
-	}()
+	})
+	defer stop()
 	if err := server.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
 		return err
 	}
@@ -129,32 +130,50 @@ func readRequest(body io.Reader) (login string, recipients int64, err error) {
 	if token, err := decoder.Token(); err != nil || token != json.Delim('{') {
 		return "", 0, fmt.Errorf("not a JSON object: %v", err)
 	}
-	var hookCtx hookContext
-	var envelope *hookEnvelope
-	haveContext := false
-	for decoder.More() && !(haveContext && envelope != nil) {
-		key, err := decoder.Token()
-		if err != nil {
+	var request hookFields
+	for decoder.More() && !request.isComplete() {
+		if err := request.decodeField(decoder); err != nil {
 			return "", 0, err
 		}
-		switch key {
-		case "context":
-			err, haveContext = decoder.Decode(&hookCtx), true
-		case "envelope":
-			envelope = &hookEnvelope{}
-			err = decoder.Decode(envelope)
-		default:
-			err = decoder.Decode(&json.RawMessage{})
-		}
-		if err != nil {
-			return "", 0, fmt.Errorf("%v: %w", key, err)
-		}
 	}
-	if envelope == nil {
+	if request.envelope == nil {
 		return "", 0, errors.New("no envelope")
 	}
-	if hookCtx.SASL != nil {
-		login = hookCtx.SASL.Login
+	return request.login(), int64(len(request.envelope.To)), nil
+}
+
+// hookFields holds the parts of Stalwart's request the hook reads.
+type hookFields struct {
+	context  *hookContext
+	envelope *hookEnvelope
+}
+
+func (r *hookFields) isComplete() bool { return r.context != nil && r.envelope != nil }
+
+// decodeField decodes the next key and its value; a key the hook does not read is skipped.
+func (r *hookFields) decodeField(decoder *json.Decoder) error {
+	key, err := decoder.Token()
+	if err != nil {
+		return err
 	}
-	return login, int64(len(envelope.To)), nil
+	var value any = &json.RawMessage{}
+	switch key {
+	case "context":
+		r.context = &hookContext{}
+		value = r.context
+	case "envelope":
+		r.envelope = &hookEnvelope{}
+		value = r.envelope
+	}
+	if err := decoder.Decode(value); err != nil {
+		return fmt.Errorf("%v: %w", key, err)
+	}
+	return nil
+}
+
+func (r *hookFields) login() string {
+	if r.context == nil || r.context.SASL == nil {
+		return ""
+	}
+	return r.context.SASL.Login
 }
