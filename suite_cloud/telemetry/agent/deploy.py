@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, get_url
 
-from suite_cloud.mail.cluster import plan, quota
+from suite_cloud.mail.cluster import egress, plan, quota
 from suite_cloud.mail.stalwart import verify_tls
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 from suite_cloud.telemetry.agent.build import (
@@ -16,7 +16,7 @@ from suite_cloud.telemetry.agent.build import (
     is_quota_enabled,
     is_telemetry_enabled,
 )
-from suite_cloud.utils import get_config, log_error
+from suite_cloud.utils import get_config, log_error, mask_secrets, secret_spellings
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -64,12 +64,12 @@ def agent_config(server: Document) -> dict:
             "tls_server_name": server.hostname,
             "verify_tls": verify_tls(),
         }
-    if answers_quota_hook(server):
+    if is_quota_hook_server(server):
         config["quota"] = quota_config(server.get_cluster())
     return config
 
 
-def answers_quota_hook(server: Document) -> bool:
+def is_quota_hook_server(server: Document) -> bool:
     """Stalwart calls the hook on the node that took the message: a node with listeners. Gateways
     and outbound-only nodes only relay."""
 
@@ -183,19 +183,18 @@ def masked_agent_config(server: Document) -> dict:
     """config.json as the next Install Agent writes it to the server, every secret masked."""
 
     config = agent_config(server)
-    return mask_secrets(config, sorted(agent_secrets(config), key=len, reverse=True))
+    return mask_config(config, secret_spellings(agent_secrets(config)))
 
 
-def mask_secrets(value, secrets: list[str]):
+def mask_config(value, spellings: list[str]):
     """Masks every secret wherever it appears, a Redis URL holding a password included."""
 
     if isinstance(value, dict):
-        return {key: mask_secrets(item, secrets) for key, item in value.items()}
+        return {key: mask_config(item, spellings) for key, item in value.items()}
     if isinstance(value, list):
-        return [mask_secrets(item, secrets) for item in value]
+        return [mask_config(item, spellings) for item in value]
     if isinstance(value, str):
-        for secret in secrets:
-            value = value.replace(secret, plan.SECRET_MARKER)
+        return mask_secrets(value, spellings)
     return value
 
 
@@ -252,11 +251,21 @@ def filters_for(cluster: Document | None, statuses: tuple[str, ...]) -> dict:
     return filters
 
 
+def switch_off_quota_hooks() -> None:
+    """With telemetry off the Agents stop, so each active cluster's config is pushed again: its
+    plan then holds the hook switched off, and Stalwart stops calling Agents that are gone."""
+
+    for name in frappe.get_all("Stalwart Cluster", {"status": "Active"}, pluck="name"):
+        egress.resync_cluster_after_commit(name)
+
+
 def roll_out_agents(enabled: bool) -> list[str]:
     """After Enable Telemetry changed: every server that runs an agent gets it installed, or
     stopped when telemetry was turned off. Runs inside the settings save, so a missing build is an
     Error Log, not an exception."""
 
+    if not enabled:
+        switch_off_quota_hooks()
     servers = agent_servers()
     if not servers:
         return []

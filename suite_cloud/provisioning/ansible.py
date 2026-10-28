@@ -23,7 +23,7 @@ from suite_cloud.provisioning.ssh import (
     private_key_file,
     scratch_dir,
 )
-from suite_cloud.utils import reconnect_on_failure
+from suite_cloud.utils import mask_secrets, reconnect_on_failure, secret_spellings
 
 if TYPE_CHECKING:
     from suite_cloud.suite_cloud.doctype.server_job.server_job import ServerJob
@@ -112,27 +112,14 @@ def ping(target: SSHTarget) -> tuple[bool, str]:
     return ok, detail
 
 
-def _spellings(secrets) -> set[str]:
-    """A secret as it is, and as JSON and shell output would quote it (``\"``, ``\\``, ``\u00e9``)."""
-
-    out = set()
-    for secret in secrets:
-        if not secret:
-            continue
-        out.add(secret)
-        out.add(json.dumps(secret)[1:-1])
-        out.add(json.dumps(secret, ensure_ascii=False)[1:-1])
-    return out
-
-
 class PlaybookRun:
     """One execution of a Server Job's playbook; events update the job's task rows."""
 
     def __init__(self, job: ServerJob, variables: dict[str, Any]) -> None:
         self.job = job
         # Literal secrets the playbook may echo (a CLI error quoting the plan, say); masked
-        # before anything is stored. Longest first so a secret containing another is caught whole.
-        self.secrets = sorted(_spellings(variables.pop("__secret_values__", [])), key=len, reverse=True)
+        # before anything is stored.
+        self.secrets = secret_spellings(variables.pop("__secret_values__", []))
         self.variables = variables
         self.tasks = {row.task: row.name for row in job.tasks}
         self.total = len(job.tasks)
@@ -168,11 +155,7 @@ class PlaybookRun:
         return RunOutcome(status="Success" if succeeded else "Failed", stats=stats, error_log=detail)
 
     def mask(self, text: str | None) -> str | None:
-        if not text:
-            return text
-        for secret in self.secrets:
-            text = text.replace(secret, "***")
-        return text
+        return mask_secrets(text, self.secrets) if text else text
 
     # --- events -----------------------------------------------------------------
 

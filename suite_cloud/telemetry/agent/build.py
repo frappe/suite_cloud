@@ -132,8 +132,9 @@ class AgentBuild:
             "GOARCH": goarch,
             "GOCACHE": str(self.root / ".gocache"),
             # Modules are downloaded once and checked against go.sum; the sources are never edited.
+            # Go makes the cache read-only, which would leave the site's files undeletable.
             "GOMODCACHE": str(self.root / ".gomodcache"),
-            "GOFLAGS": "-mod=readonly",
+            "GOFLAGS": "-mod=readonly -modcacherw",
             "GOTOOLCHAIN": "local",
         }
         command = [

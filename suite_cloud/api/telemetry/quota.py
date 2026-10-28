@@ -20,7 +20,6 @@ from suite_cloud.api.telemetry import (
 )
 from suite_cloud.api.tenant import InvalidInputError, throttle
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import reportable_periods, upsert_usage
-from suite_cloud.telemetry.agent.status import record_contact
 
 PAGE_SIZE = 500
 VERSION_FORMAT = "%Y-%m-%d %H:%M:%S.%f"
@@ -84,7 +83,8 @@ def usage(host_ip: str, records: list) -> dict:
 
 def get_cluster_for_host(host_ip: str) -> str:
     """The caller's cluster, once ``host_ip`` proves to be one of its Active or Draining nodes; the
-    host is throttled like any telemetry sender and noted as in contact."""
+    host is throttled like any telemetry sender. The call is not noted as contact: the Agent status
+    reports the last batch of logs or metrics, which a working limit pull must not stand in for."""
 
     try:
         address = str(ipaddress.ip_address(host_ip))
@@ -98,7 +98,6 @@ def get_cluster_for_host(host_ip: str) -> str:
             _("host_ip {0} is not an active Stalwart Node of the Agent's cluster.").format(address),
             frappe.PermissionError,
         )
-    record_contact(address, frappe.get_request_header("User-Agent"))
     return cluster
 
 

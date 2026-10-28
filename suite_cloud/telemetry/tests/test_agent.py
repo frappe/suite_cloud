@@ -21,7 +21,7 @@ if [ -n "$FAKE_GO_FAIL" ]; then echo "boom: $GOARCH" >&2; exit 1; fi
 args="$*"
 out=""
 while [ $# -gt 0 ]; do [ "$1" = "-o" ] && out="$2"; shift; done
-echo "GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED $args" > "$out"
+echo "GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED GOFLAGS=$GOFLAGS $args" > "$out"
 """
 
 
@@ -63,6 +63,8 @@ class TestAgentBuild(AgentBuildFixture):
             content = build.binary_path(architecture).read_text()
             self.assertIn(f"GOOS=linux GOARCH={goarch} CGO_ENABLED=0", content)
             self.assertIn(f"-X main.version={version}", content)
+            # A writable module cache, so the site's files can always be deleted.
+            self.assertIn("GOFLAGS=-mod=readonly -modcacherw", content)
         self.assertEqual(frappe.db.get_single_value("Suite Cloud Settings", "agent_built_version"), version)
         self.assertFalse(frappe.db.get_single_value("Suite Cloud Settings", "agent_build_error"))
         self.assertEqual([p.name for p in self.root.iterdir() if not p.name.startswith(".")], [version])
@@ -257,12 +259,18 @@ class TestAgentDeploy(AgentBuildFixture):
         with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
             self.assertIn(version, deploy.install_agent(self.node).title)
 
+        # Off: the Agents stop, and each active cluster's config is pushed with the hook switched off.
+        self.cluster.db_set("status", "Active")
         settings = frappe.get_single("Suite Cloud Settings")
         settings.enable_telemetry = 0
-        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+        with (
+            patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
+            patch.object(deploy.egress, "resync_cluster_after_commit") as resync,
+        ):
             settings.save()
         clear_config_cache()
         self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])
+        resync.assert_any_call(self.cluster.name)
 
     def test_the_quota_section_waits_for_a_build_that_answers_the_hook(self) -> None:
         self.build().run()  # 0.1.0 refuses a config with a quota section
@@ -346,7 +354,7 @@ class TestAgentDeploy(AgentBuildFixture):
         self.assertNotIn(self.gateway.get_password("metrics_password"), json.dumps(gateway))
 
         self.assertEqual(
-            deploy.mask_secrets({"url": "redis://:pw@host"}, ["pw"]), {"url": "redis://:***@host"}
+            deploy.mask_config({"url": "redis://:pw@host"}, ["pw"]), {"url": "redis://:***@host"}
         )
         frappe.set_user("Guest")
         self.addCleanup(frappe.set_user, "Administrator")
@@ -409,7 +417,10 @@ class TestAgentDeploy(AgentBuildFixture):
             before = frappe.get_all("Server Job", pluck="name")
             settings.reload()
             settings.enable_telemetry = int(enabled)
-            with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+            with (
+                patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
+                patch.object(deploy.egress, "resync_cluster_after_commit"),  # the site's own clusters
+            ):
                 settings.save()
             filters = {"name": ["not in", before], "server": ["in", ours]}
             return frappe.get_all("Server Job", filters, ["server", "title"])

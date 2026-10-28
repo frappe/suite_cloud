@@ -1,6 +1,7 @@
 import functools
+import json
 import re
-from collections.abc import Callable, Generator
+from collections.abc import Callable, Generator, Iterable
 from contextlib import contextmanager
 from typing import Any
 
@@ -277,3 +278,22 @@ def validate_version(value: str | None, label: str) -> str | None:
     if not VERSION.match(value):
         frappe.throw(_("{0} must be a version such as v0.16.20.").format(label))
     return value
+
+
+def secret_spellings(secrets: Iterable[str | None]) -> list[str]:
+    """Each secret as it is, and as JSON and shell output would quote it (``\"``, ``\\``, ``é``),
+    longest first so a secret containing another is masked whole."""
+
+    spellings = set()
+    for secret in secrets:
+        if secret:
+            spellings |= {secret, json.dumps(secret)[1:-1], json.dumps(secret, ensure_ascii=False)[1:-1]}
+    return sorted(spellings, key=len, reverse=True)
+
+
+def mask_secrets(text: str, spellings: list[str]) -> str:
+    """``text`` with every spelling from ``secret_spellings`` replaced by ``***``."""
+
+    for spelling in spellings:
+        text = text.replace(spelling, "***")
+    return text

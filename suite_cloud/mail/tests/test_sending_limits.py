@@ -23,6 +23,7 @@ from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
 from suite_cloud.patches.v1_0 import fill_quota_hook_tokens
 from suite_cloud.telemetry import TELEMETRY_USER
+from suite_cloud.telemetry.agent.status import CACHE_KEY, forget_contacts
 from suite_cloud.tests.fixtures import ROOT_DOMAIN
 
 NODE_IP = "203.0.113.10"
@@ -121,6 +122,12 @@ class TestLimitsApi(SendingLimitsTestCase):
         self.node.db_set("status", "Provisioned")
         self.assertRaises(frappe.PermissionError, self.pull)
 
+    def test_quota_calls_leave_the_agent_status_to_batches(self) -> None:
+        forget_contacts()
+        self.addCleanup(forget_contacts)
+        self.pull()
+        self.assertIsNone(frappe.cache.hget(CACHE_KEY, NODE_IP))
+
     def test_the_pull_reads_an_index_on_cluster_and_modified(self) -> None:
         self.assertTrue(frappe.db.has_index("tabMail Account", "cluster_modified_index"))
 
@@ -191,6 +198,15 @@ class TestUsageApi(SendingLimitsTestCase):
         )
         self.assertEqual(self.stored("alice@acme.com", day), 2)
         self.assertIsNone(self.stored("gone@acme.com", day))
+
+    def test_another_cluster_s_accounts_are_dropped(self) -> None:
+        day, _month = current_periods()
+        frappe.set_user("Administrator")
+        other = make_cluster("c2", hostname=f"mail.c2.{ROOT_DOMAIN}")
+        frappe.db.set_value("Mail Account", "bob@acme.com", "cluster", other.name)
+        answer = self.push(("alice@acme.com", day, 1), ("bob@acme.com", day, 1))
+        self.assertEqual(answer["accepted"], 1)
+        self.assertIsNone(self.stored("bob@acme.com", day))
 
     def test_unknown_accounts_and_old_periods_are_dropped(self) -> None:
         day, _month = current_periods()
