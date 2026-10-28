@@ -5,6 +5,8 @@ from pathlib import Path
 from suite_cloud.telemetry import EVENT_DATA_COLUMNS
 
 WORKBOOKS = Path(__file__).resolve().parents[1] / "insights_workbook"
+MAIL_DOCTYPES = Path(__file__).resolve().parents[2] / "mail" / "doctype"
+FRAME_COLUMNS = {"name", "creation", "modified", "owner", "modified_by"}
 
 
 def shipped_workbook(name: str) -> dict:
@@ -45,3 +47,30 @@ class TestShippedWorkbooks(unittest.TestCase):
         for mutate in mutates:
             self.assertNotIn("data", mutate["expression"]["expression"])
         self.assertLessEqual({column.name for column in EVENT_DATA_COLUMNS}, set(selected["column_names"]))
+
+    def test_the_sending_usage_query_reads_fields_the_doctypes_have(self) -> None:
+        """The query names Mail Send Usage and Mail Account columns; a renamed field fails here,
+        not on an operator's dashboard."""
+
+        def fields(doctype: str) -> set[str]:
+            path = MAIL_DOCTYPES / doctype / f"{doctype}.json"
+            return {field["fieldname"] for field in json.loads(path.read_text())["fields"]} | FRAME_COLUMNS
+
+        operations = shipped_workbook("stalwart")["queries"]["stalwart-sending-usage"]["operations"]
+        source, account_join = operations[0], operations[1]
+        self.assertEqual(source["table"]["table_name"], "tabMail Send Usage")
+        self.assertEqual(account_join["table"]["table_name"], "tabMail Account")
+        usage_fields = {"account", "period", "sent", "refused", "send_limit", "reported_at"}
+        self.assertLessEqual(usage_fields, fields("mail_send_usage"))
+        joined = {column["column_name"] for column in account_join["select_columns"]}
+        self.assertLessEqual(joined, fields("mail_account"))
+
+    def test_the_sending_usage_filters_reach_every_chart(self) -> None:
+        workbook = shipped_workbook("stalwart")
+        dashboard = workbook["dashboards"]["stalwart-sending-usage"]
+        charts = {item["chart"] for item in dashboard["items"] if item["type"] == "chart"}
+        self.assertTrue(charts <= set(workbook["charts"]))
+        for item in dashboard["items"]:
+            if item["type"] == "filter":
+                with self.subTest(filter=item["filter_name"]):
+                    self.assertEqual(set(item["links"]), charts)

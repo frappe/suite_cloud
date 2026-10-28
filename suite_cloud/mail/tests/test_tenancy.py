@@ -2,6 +2,7 @@ from unittest.mock import patch
 from uuid import UUID
 
 import frappe
+from frappe.query_builder import Table
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
@@ -45,6 +46,9 @@ class TenancyTestCase(IntegrationTestCase):
         self._install = self.fake.install()
         self._install.__enter__()
         self.addCleanup(self._install.__exit__, None, None, None)
+        # Credentials a test creates live in this fake; the class's final rollback would try to
+        # revoke them after it is gone, and log each failure.
+        self.addCleanup(frappe.db.after_rollback.reset)
         forget_sessions(self.cluster)
         clear_request_cache()
         self.tenant = make_tenant(self.cluster)
@@ -1230,7 +1234,11 @@ class TestMailingList(TenancyTestCase):
 
 
 def stored_credential_fields(account_name: str) -> list[str]:
-    rows = frappe.db.sql(
-        "select fieldname from `__Auth` where doctype = 'Mail Account' and name = %s", account_name
+    auth = Table("__Auth")
+    query = (
+        frappe.qb.from_(auth)
+        .select(auth.fieldname)
+        .where(auth.doctype == "Mail Account")
+        .where(auth.name == account_name)
     )
-    return sorted(row[0] for row in rows)
+    return sorted(query.run(pluck=True))

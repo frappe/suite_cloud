@@ -1,0 +1,92 @@
+{
+ "actions": [],
+ "creation": "2026-10-26 12:00:00.000000",
+ "description": "What the Agents last reported an account sent in a UTC day or month. Only the telemetry API writes it.",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "account",
+  "period",
+  "sent",
+  "refused",
+  "send_limit",
+  "reported_at"
+ ],
+ "fields": [
+  {
+   "fieldname": "account",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Account",
+   "options": "Mail Account",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "d:YYYYMMDD for a UTC day, m:YYYYMM for a UTC month.",
+   "fieldname": "period",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Period",
+   "read_only": 1,
+   "reqd": 1,
+   "search_index": 1
+  },
+  {
+   "description": "Recipients counted in the period. A message to 50 recipients counts as 50.",
+   "fieldname": "sent",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Sent",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "description": "Messages refused in the period for going over a limit. A refused message counts once, whatever its recipients.",
+   "fieldname": "refused",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Refused",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "description": "The account's daily or monthly limit while the period was current. 0 means no limit.",
+   "fieldname": "send_limit",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Limit",
+   "non_negative": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "reported_at",
+   "fieldtype": "Datetime",
+   "label": "Reported At",
+   "read_only": 1
+  }
+ ],
+ "in_create": 1,
+ "index_web_pages_for_search": 0,
+ "links": [],
+ "modified": "2026-10-28 15:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mail",
+ "name": "Mail Send Usage",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "delete": 1,
+   "export": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager"
+  }
+ ],
+ "row_format": "Dynamic",
+ "sort_field": "reported_at",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "account"
+}

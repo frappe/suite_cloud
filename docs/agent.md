@@ -1,6 +1,6 @@
 # Suite Cloud Agent
 
-The Suite Cloud Agent is one Go binary, `suite-cloud-agent`, that runs as a systemd service on every Stalwart node and egress gateway. It tails Stalwart's log files, samples the machine, scrapes Stalwart's Prometheus endpoint and pushes the records to the [telemetry API](api/telemetry.md). Its source is the `agent/` folder of this repository. Suite Cloud builds it on the bench host and installs it with the node's provisioning job.
+The Suite Cloud Agent is one Go binary, `suite-cloud-agent`, that runs as a systemd service on every Stalwart node and egress gateway. It tails Stalwart's log files, samples the machine, scrapes Stalwart's Prometheus endpoint and pushes the records to the [telemetry API](api/telemetry.md). On a Stalwart node it also enforces the [sending limits](#sending-limits) of Mail Accounts. Its source is the `agent/` folder of this repository. Suite Cloud builds it on the bench host and installs it with the node's provisioning job.
 
 ## Configuration
 
@@ -8,19 +8,20 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 
 ```json
 {
-  "suite_cloud": {"url": "https://cloud.example.com", "secret": "<telemetry secret>", "requests_per_minute": 300, "records_per_request": 5000, "max_attempts": 8},
+  "suite_cloud": {"url": "https://cloud.example.com", "secret": "<agent key>:<agent secret>", "requests_per_minute": 300, "records_per_request": 5000, "max_attempts": 8},
   "node": {"source": "stalwart", "host_ip": "203.0.113.5", "hostname": "n1.c1.example.com"},
   "state_dir": "/var/lib/suite-cloud-agent",
   "logs": [{"name": "stalwart", "path": "/var/log/stalwart/stalwart.*", "format": "stalwart", "ship_existing": false, "delete_after_days": 0}],
-  "metrics": {"interval_seconds": 60, "mounts": ["/"], "stalwart": {"url": "https://127.0.0.1:443/metrics/prometheus", "username": "telemetry", "password": "<metrics password>", "tls_server_name": "n1.c1.example.com", "verify_tls": true}}
+  "metrics": {"interval_seconds": 60, "mounts": ["/"], "stalwart": {"url": "https://127.0.0.1:443/metrics/prometheus", "username": "telemetry", "password": "<metrics password>", "tls_server_name": "n1.c1.example.com", "verify_tls": true}},
+  "quota": {"hook_port": 8095, "hook_token": "<quota hook token>", "store": {"type": "memory"}}
 }
 ```
 
 | Key | Source | Meaning |
 | --- | --- | --- |
 | `suite_cloud.url` | **Public URL**, else the site's own URL | Where the batches go |
-| `suite_cloud.secret` | **Telemetry Secret** | Sent as the bearer token |
-| `suite_cloud.requests_per_minute`, `records_per_request` | **Telemetry Requests per Minute**, **Telemetry Records per Request** | The agent keeps to the limits the site enforces |
+| `suite_cloud.secret` | **Agent Key** and **Agent Secret** of the cluster (a gateway uses its cluster's) | Sent as the bearer token, `<agent key>:<agent secret>` |
+| `suite_cloud.requests_per_minute`, `records_per_request` | **Agent Requests per Minute**, **Agent Records per Request** | The agent keeps to the limits the site enforces, for every request it makes |
 | `suite_cloud.max_attempts` | **Agent Max Attempts** | Sends of one batch after server or network failures before it is skipped |
 | `suite_cloud.request_timeout_seconds` | 60 | Time allowed for one request |
 | `node.source`, `node.host_ip`, `node.hostname` | The node record | `host_ip` is the node's IPv4 address, which the dashboards join on |
@@ -36,6 +37,9 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 | `metrics.interval_seconds` | **Metrics Interval (Seconds)** | One metrics batch per interval |
 | `metrics.mounts` | `["/"]` | Mounts reported as `host.disk.*` |
 | `metrics.stalwart` | **Enable Prometheus Metrics** and **Metrics Password** of the cluster or gateway | Absent when the cluster has the switch off, and on an outbound-only node, which has no listener |
+| `quota.hook_port`, `quota.hook_token` | 8095, **Quota Hook Token** of the cluster | The loopback port and bearer token of the sending-limit hook. The whole section is absent on gateways and outbound-only nodes, which take no client mail, and until the last build is 0.2.0 or newer |
+| `quota.store` | The cluster's in-memory store | `{"type": "memory"}`, or `redis`, `redis_cluster` or `redis_sentinel` with the store's `urls` and credentials |
+| `quota.limits_poll_seconds`, `usage_push_seconds` | Not written; the agent uses 60, 60 | How often limits are pulled and counts pushed |
 
 `suite-cloud-agent --config <path> --check` validates the file, the state directory and the log paths without a request. `--version` prints the version.
 
@@ -57,7 +61,7 @@ The agent never ships a line twice and loses none to a restart. For every file i
 | 400, 417 | Skips the batch at once and logs the server's message: the same request would fail again |
 | 401, 403 | Keeps retrying with a wait of up to five minutes and never skips; a rotated secret is fixed by an Install Agent job, and the Silent Host alert shows the gap |
 
-Logs and metrics share one request budget of **Telemetry Requests per Minute**, because Suite Cloud counts both per node. Metrics are points in time: a batch that cannot be sent within an hour is dropped, and nothing is kept across a restart.
+Logs, metrics and the sending-limit calls share one request budget of **Agent Requests per Minute**, because Suite Cloud counts them all per node. Metrics are points in time: a batch that cannot be sent within an hour is dropped, and nothing is kept across a restart.
 
 A new log file is read from the start; the file before it is finished once it stops growing. With **Delete Shipped Logs After (Days)** set, a rotated file is deleted that many days after it was shipped whole; the newest file and a file with a batch in flight are never deleted. The node's own tmpfiles rule removes log files after 14 days in any case. To ship a node's existing logs after the agent already ran there, stop the agent, delete `/var/lib/suite-cloud-agent/state.json`, turn **Ship Existing Logs** on and install the agent again.
 
@@ -65,9 +69,24 @@ A new log file is read from the start; the file before it is finished once it st
 
 The service runs as the `stalwart` user, since the log directory belongs to it, and is sandboxed away from Stalwart's configuration and data. `journalctl -u suite-cloud-agent` shows what it does; at `info` it logs the start with the files it found, every file it finishes or deletes and every batch it skips.
 
-Provisioning installs the agent as part of every Provision, Upgrade and Re-provision job of a node or gateway, after Stalwart. The job copies the binary of the node's architecture from the bench host, writes `config.json` and the unit, and restarts the agent when any of them changed. When the **Telemetry Secret** is empty or no agent build exists, the job stops and disables the agent on the node instead, and an Error Log names the missing build. **Install Agent** on a Stalwart Node or Egress Gateway runs that step on its own, without draining or restarting Stalwart: it rewrites the binary, `config.json` and the unit where they differ from the current build and settings, whatever version the node runs, and restarts the agent in any case. **Upgrade Agents** on a Stalwart Cluster runs it on every Active or Draining node and every Active gateway: a draining node still ships its log. Saving Suite Cloud Settings with a changed **Telemetry Secret** queues that job for the same servers of every cluster by itself, within the day the previous secret stays accepted; a cleared secret stops the agents the same way. Without a build at that moment an Error Log asks for Build Agent and Upgrade Agents instead.
+Provisioning installs the agent as part of every Provision, Upgrade and Re-provision job of a node or gateway, after Stalwart. The job copies the binary of the node's architecture from the bench host, writes `config.json` and the unit, and restarts the agent when any of them changed. When **Enable Telemetry** is off or no agent build exists, the job stops and disables the agent on the node instead, and an Error Log names the missing build. **Install Agent** on a Stalwart Node or Egress Gateway runs that step on its own, without draining or restarting Stalwart: it rewrites the binary, `config.json` and the unit where they differ from the current build and settings, whatever version the node runs, and restarts the agent in any case. **Show Agent Config** on a Stalwart Node or Egress Gateway shows the `config.json` that job would write, built from the current settings, with every secret masked; it reads nothing from the node. **Upgrade Agents** on a Stalwart Cluster runs it on every Active or Draining node and every Active gateway: a draining node still ships its log. **Enable Telemetry** in Suite Cloud Settings is on by default on a new site. Turning it on queues that job for the same servers of every cluster by itself, in a background job, and turning it off stops the agents the same way. Without a build at that moment an Error Log asks for Build Agent and Upgrade Agents instead. **Rotate Agent Secret** on a Stalwart Cluster replaces its Agent Secret and runs Upgrade Agents for it; an agent not yet reinstalled is refused and retries, and loses nothing.
 
 Stalwart's Prometheus endpoint is part of the cluster plan. **Enable Prometheus Metrics** on the Stalwart Cluster, on by default, turns it on with the user `telemetry` and the **Metrics Password** generated per cluster and per gateway; off, the exporter is disabled on every node and gateway of the cluster and the agents report host metrics only. A change reaches Stalwart with the next Sync Config, and the agents with the next Install Agent or Upgrade Agents job.
+
+## Sending limits
+
+A Mail Account's **Daily Send Limit** and **Monthly Send Limit** count recipients per UTC day and month; 0 means no limit. Stalwart enforces them through an MTA Hook at the data stage, for signed-in senders only, which covers SMTP submission and JMAP sends. The hook calls the Agent on the same node at `http://127.0.0.1:8095/hooks/quota` with the cluster's **Quota Hook Token**. The Agent reads only the context and the envelope of the request, never the message, and in one atomic step either adds the recipients to the account's day and month counters or, when that would pass a limit, counts the message as refused instead and answers `550 5.4.5` with the limit and when it resets.
+
+| Cluster | Counters and limits |
+| --- | --- |
+| Single node, no Redis | The Agent's memory, saved to `quota.json` in the state directory every 5 seconds and on shutdown |
+| With a Redis in-memory store (every multi-node cluster) | That Redis under `sca:quota:`. A Lua script checks and counts, and every key of an account shares the hash tag `{account}`, so it also works on Redis Cluster |
+
+The Agent pulls the limits changed since its last pull every 60 seconds and all of them on start and every hour; an account that two full pulls in a row do not return, such as a deleted one, loses its limits. One miss is not enough, because a pull leaves out saves younger than five seconds. It pushes the day and month totals of the accounts it counted, sent and refused, every 60 seconds and on shutdown, and keeps them for the next push when one fails. Until a push of the current UTC day goes through, after midnight, after a start or after failed pushes, and in the first ten minutes of every UTC day, each push also sends yesterday's totals (and an account whose yesterday total a failed request held gets it again until it is taken), and the previous month's when a month ended, so what was counted after yesterday's last push is not lost. Suite Cloud takes nothing older than yesterday. On a start the Agent also pushes every account its store counted today or yesterday, asking the store again at each push until it answers, so counts left by a crash are not lost. Both calls are in the [telemetry API](api/telemetry.md#sending-limits). The Mail Account form shows the last pushed totals: orange from 80% of a limit, red at 100%, with the refused messages beside them. Suite Cloud keeps each account's day and month totals for **Sending Usage Retention (Days)** in Suite Cloud Settings (90 by default) and deletes older days, and months that ended before them, daily. In Insights, the **Sending Usage** dashboard of the Stalwart Mail workbook shows recipients and refusals for the latest UTC day, the accounts at or near a limit, the top senders, recipients and refusals per day, and each account's daily history, filtered by tenant, cluster or account. Its "today" is the latest day and month the Agents reported rather than the database's date, so it stays right whatever the database's time zone. Each day and month keeps the limit the account had while it was current, so the history shows how close a past day came to the limit of that day.
+
+Nothing in the quota path stops mail. When the Agent fails or takes longer than 2 seconds, Stalwart accepts the message uncounted. A part of the quota that fails, such as a hook whose port is taken or a `quota.json` that cannot be written, is logged and started again after 10 seconds; it never stops the logs and metrics. A native throttle, `suite-cloud-quota-backstop`, caps every signed-in account meanwhile at the cluster's **Backstop Messages per Day**, 5,000 by default, and 0 turns it off. It counts messages, not recipients, so keep it above the highest daily limit. A change applies with the next Sync Config. A message the hook accepted stays counted when Stalwart refuses it later, for example over a queue quota.
+
+The hook and the backstop are part of the cluster plan, and both they and the `quota` section of `config.json` wait for **Enable Telemetry** and a build of 0.2.0 or newer. Until then the plan keeps both switched off. Turning **Enable Telemetry** off queues a push of every active cluster's config, so the hook installed before is switched off with the Agents. A cluster takes one config push at a time. A desk change that alters the plan, such as an egress pool or a tenant's pool, queues its push after the save, so a push already running never fails the save; a cluster has at most one push waiting, which takes in every change made before it starts. A pool change pushes the cluster first and its gateways after. A queued push that fails shows its error on the cluster's form until a push goes through. **Sync Config** waits up to 20 seconds and then asks you to try again. To turn the limits on for a cluster: run **Build Agent**, then **Upgrade Agents**, then **Sync Config**. In the other order nothing breaks, but every message logs a hook error until the Agents are up. A single-node cluster that later gets a Redis in-memory store needs Upgrade Agents again to move its counters there.
 
 ## Status
 
@@ -75,7 +94,7 @@ The telemetry API notes the last batch each host sent and the agent version in i
 
 ## Building
 
-Suite Cloud builds the agent on the bench host with the Go toolchain found on `PATH` or at `/usr/local/go/bin/go`. The build needs Go 1.22 or newer and nothing else: the module has no dependencies, so it compiles offline. Ubuntu 24.04 ships a recent enough `golang-go` package; on older releases, or to pick the version, install the release from [go.dev/dl](https://go.dev/dl/) under `/usr/local`, where Suite Cloud finds it without a `PATH` change:
+Suite Cloud builds the agent on the bench host with the Go toolchain found on `PATH` or at `/usr/local/go/bin/go`. The build needs Go 1.22 or newer and access to the Go module proxy, `proxy.golang.org` by default: it downloads the one dependency, `go-redis`, checks it against `agent/go.sum` and keeps it under `private/files/agent/.gomodcache`, so later builds need no network. A host behind a proxy sets `GOPROXY` for the bench's workers. Ubuntu 24.04 ships a recent enough `golang-go` package; on older releases, or to pick the version, install the release from [go.dev/dl](https://go.dev/dl/) under `/usr/local`, where Suite Cloud finds it without a `PATH` change:
 
 ```sh
 sudo apt install golang-go                          # Ubuntu 24.04 or newer
@@ -83,7 +102,7 @@ curl -fsSL https://go.dev/dl/go1.22.12.linux-amd64.tar.gz | sudo tar -C /usr/loc
 /usr/local/go/bin/go version
 ```
 
-The bench's workers run the build, so the toolchain must be readable by the bench user. **Build Agent** in Suite Cloud Settings queues a build; a migrate queues one when the agent's sources changed since the last build. The build compiles `linux/amd64` and `linux/arm64` into `private/files/agent/<version>/` under the site, records the version in **Built Agent Version**, and keeps the previous build so a job in progress can finish. Provisioning installs the build recorded there, so a source change that is not built yet never stops a running agent. A failure is shown in **Last Build Error** and in an Error Log. The version is the `agent/VERSION` file plus a digest of the sources, so a source change makes a new build without a bump; the install job compares the binary's checksum with the node's and copies it only when it differs.
+The bench's workers run the build, so the toolchain must be readable by the bench user. **Build Agent** in Suite Cloud Settings queues a build; a migrate queues one when the agent's sources changed since the last build. The build compiles `linux/amd64` and `linux/arm64` into `private/files/agent/<version>/` under the site, records the version in **Built Agent Version**, and keeps the previous build so a job in progress can finish. Provisioning installs the build recorded there, so a source change that is not built yet never stops a running agent. A failure is shown in **Last Build Error** and in an Error Log. The version is the `agent/VERSION` file plus a digest of the sources and `go.sum`, so a source change makes a new build without a bump; the install job compares the binary's checksum with the node's and copies it only when it differs.
 
 ## Installing by hand
 

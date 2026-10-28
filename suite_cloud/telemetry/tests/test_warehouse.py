@@ -276,11 +276,15 @@ class TestWarehouse(IntegrationTestCase):
 
         self.warehouse.load_pending()
 
+        # Only what this test made: the site may hold clusters and tenants of its own.
         with self.warehouse.write_connection() as db:
             nodes = db.con.execute(
-                'SELECT host_ip, hostname, cluster, role FROM "nodes" ORDER BY host_ip'
+                'SELECT host_ip, hostname, cluster, role FROM "nodes" WHERE cluster = ? ORDER BY host_ip',
+                [cluster.name],
             ).fetchall()
-            domains = db.con.execute('SELECT domain, tenant, tenant_title FROM "mail_domains"').fetchall()
+            domains = db.con.execute(
+                'SELECT domain, tenant, tenant_title FROM "mail_domains" WHERE tenant = ?', [tenant.name]
+            ).fetchall()
         self.assertEqual(
             nodes,
             [

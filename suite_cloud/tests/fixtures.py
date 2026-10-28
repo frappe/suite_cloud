@@ -46,3 +46,16 @@ def no_dns_provider():
     """DNS Record pushes go nowhere: the provider is unset, so records stay unverified."""
 
     return patch("suite_cloud.suite_cloud.doctype.dns_record.dns_record.get_dns_provider", return_value=None)
+
+
+def production_logging():
+    """Requests log failures as in production, only 5xx. With developer_mode on, Frappe logs every
+    failed request, so a test's deliberate 4xx answers would fill the site's Error Log."""
+
+    from frappe.config import get_site_config  # where frappe.init reads it from, per request
+
+    site_config = get_site_config
+    return patch(
+        "frappe.config.get_site_config",
+        side_effect=lambda *args, **kwargs: frappe._dict(site_config(*args, **kwargs), developer_mode=0),
+    )

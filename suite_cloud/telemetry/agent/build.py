@@ -2,13 +2,14 @@
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
 
 import frappe
 from frappe import _
-from frappe.utils import now
+from frappe.utils import cint, now
 from frappe.utils.background_jobs import is_job_enqueued
 
 from suite_cloud.utils import clear_config_cache, get_config, log_error, log_exception
@@ -18,7 +19,9 @@ JOB_ID = "agent-build"
 BUILD_TIMEOUT = 600  # seconds, per architecture
 GO_FALLBACK = "/usr/local/go/bin/go"
 ARCHITECTURES = {"x86_64": "amd64", "aarch64": "arm64"}  # ansible_architecture -> GOARCH
-SOURCE_GLOBS = ("VERSION", "go.mod", "**/*.go")
+SOURCE_GLOBS = ("VERSION", "go.mod", "go.sum", "**/*.go")
+QUOTA_RELEASE = (0, 2, 0)  # the first release that answers the sending-limit hook
+RELEASE = re.compile(r"(\d+)\.(\d+)\.(\d+)(-[^+]+)?")  # 0.2.0, 0.2.0-rc1, 0.2.0+547d6a38
 
 
 class AgentBuildError(Exception):
@@ -63,6 +66,19 @@ class AgentBuild:
         if self.pinned_version:
             return self.pinned_version
         return f"{(self.source / 'VERSION').read_text().strip()}+{self.source_digest[:8]}"
+
+    @property
+    def has_quota(self) -> bool:
+        """Older builds refuse a config.json with a quota section, so it waits for this one. As in
+        semver, a prerelease such as 0.2.0-rc1 comes before its release. A version without a
+        leading ``major.minor.patch`` counts as older: this sits on the cluster plan's path, which
+        must not fail over it."""
+
+        release = RELEASE.match(self.version)
+        if not release:
+            return False
+        parts = tuple(int(part) for part in release.groups()[:3])
+        return parts > QUOTA_RELEASE if release.group(4) else parts >= QUOTA_RELEASE
 
     @property
     def source_digest(self) -> str:
@@ -115,7 +131,10 @@ class AgentBuild:
             "GOOS": "linux",
             "GOARCH": goarch,
             "GOCACHE": str(self.root / ".gocache"),
-            "GOFLAGS": "-mod=mod",
+            # Modules are downloaded once and checked against go.sum; the sources are never edited.
+            # Go makes the cache read-only, which would leave the site's files undeletable.
+            "GOMODCACHE": str(self.root / ".gomodcache"),
+            "GOFLAGS": "-mod=readonly -modcacherw",
             "GOTOOLCHAIN": "local",
         }
         command = [
@@ -189,6 +208,17 @@ def build_agent() -> str:
         return str(e)
 
 
+def is_telemetry_enabled() -> bool:
+    return bool(cint(get_config("enable_telemetry")))
+
+
+def is_quota_enabled() -> bool:
+    """The hook and the Agents' quota section wait for telemetry to be on and a build with quota."""
+
+    build = AgentBuild.last_built()
+    return is_telemetry_enabled() and bool(build) and build.has_quota
+
+
 def build_if_outdated() -> None:
     """After a migrate: queue a build when the sources changed. Never fails the migrate."""
 
@@ -199,7 +229,7 @@ def build_if_outdated() -> None:
         if build.version == get_config("agent_built_version") and build.is_built:
             return
         if not find_go():
-            if frappe.get_single(SETTINGS).get_password("telemetry_secret", raise_exception=False):
+            if is_telemetry_enabled():
                 log_error("Agent not built", _("Telemetry is on but this bench host has no Go toolchain."))
             return
         enqueue_build()

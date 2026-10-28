@@ -14,6 +14,7 @@ from frappe import _
 from frappe.utils import add_to_date, get_datetime, now
 
 from suite_cloud.mail.cluster import dns, plan
+from suite_cloud.mail.cluster.push import recorded_failure, resync_cluster
 from suite_cloud.mail.stalwart import has_credentials
 from suite_cloud.mail.stalwart.directory import dkim_management_payload
 from suite_cloud.mail.stalwart.errors import StalwartError
@@ -208,19 +209,48 @@ def current_route_expression(cluster: Document) -> dict:
 
 
 def apply_pool_changes(pool: Document) -> None:
-    """A pool changed: the cluster's routes and every hosting gateway's listeners follow."""
+    """A pool changed: in a job after commit, so a remote failure never fails the save. The
+    gateways that newly host its relay port are worked out now, while the pool before the save is
+    known."""
 
-    resync_cluster(pool.get_cluster())
     before = pool.get_doc_before_save()
     port_is_new = before is None or before.relay_port != pool.relay_port
     hosted_before = set(before.gateway_names()) if before else set()
-    for gateway_name in pool.gateway_names():
+    new_port_on = [
+        name
+        for name in pool.gateway_names()
+        if pool.relay_port and (port_is_new or name not in hosted_before)
+    ]
+    if frappe.flags.do_not_enqueue:
+        apply_pool_changes_job(pool.name, new_port_on)
+        return
+    frappe.msgprint(_("The pool's configuration is pushed in the background."), alert=True)
+    frappe.enqueue(
+        apply_pool_changes_job,
+        pool=pool.name,
+        new_port_on=new_port_on,
+        queue="long",
+        enqueue_after_commit=True,
+    )
+
+
+def apply_pool_changes_job(pool: str, new_port_on: list[str]) -> None:
+    """The cluster's routes first, then every hosting gateway's listeners: a pool the cluster stops
+    routing to is closed on the gateways only after. A cluster that refuses the push stops the job
+    before any gateway changes."""
+
+    if not frappe.db.exists("Egress IP Pool", pool):
+        return  # deleted meanwhile; its delete resyncs the cluster
+    doc = frappe.get_doc("Egress IP Pool", pool)
+    with recorded_failure(doc.cluster):
+        resync_cluster(doc.get_cluster())
+    for gateway_name in doc.gateway_names():
         gateway = frappe.get_doc("Egress Gateway", gateway_name)
         if gateway.status != "Active":
             continue  # provisioning opens every port of every pool it hosts
         gateway.push_config()
-        if pool.relay_port and (port_is_new or gateway_name not in hosted_before):
-            open_relay_port(gateway, pool.relay_port)
+        if gateway_name in new_port_on:
+            open_relay_port(gateway, doc.relay_port)
 
 
 def open_relay_port(gateway: Document, port: int) -> None:
@@ -236,31 +266,6 @@ def open_relay_port(gateway: Document, port: int) -> None:
         context={"commands": [f"ufw allow {int(port)}/tcp"]},
         variables_builder="suite_cloud.mail.cluster.bootstrap.build_command_variables",
     )
-
-
-def resync_cluster_after_commit(cluster_name: str) -> None:
-    """Deferred variant for deletes: a remote failure must not roll the delete back."""
-
-    if frappe.flags.do_not_enqueue:
-        resync_cluster(frappe.get_doc("Stalwart Cluster", cluster_name))
-        return
-    frappe.enqueue(
-        resync_cluster_job,
-        cluster=cluster_name,
-        queue="short",
-        job_id=f"resync-cluster:{cluster_name}",
-        deduplicate=True,
-        enqueue_after_commit=True,
-    )
-
-
-def resync_cluster_job(cluster: str) -> None:
-    resync_cluster(frappe.get_doc("Stalwart Cluster", cluster))
-
-
-def resync_cluster(cluster: Document) -> None:
-    if cluster.status == "Active" and has_credentials(cluster):
-        cluster.push_config()
 
 
 # --- gateway side --------------------------------------------------------------------------------

@@ -2,20 +2,25 @@
 # For license information, please see license.txt
 
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import now
+from redis.exceptions import LockNotOwnedError
 
-from suite_cloud.mail.cluster import bootstrap, dns, egress, naming, plan, reconcile
+from suite_cloud.mail.cluster import bootstrap, dns, egress, naming, plan, push, reconcile
 from suite_cloud.mail.stalwart import forget_sessions, get_admin_client, get_client
 from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
-from suite_cloud.utils import dkim_algorithms, get_config, log_exception, validate_version
+from suite_cloud.utils import dkim_algorithms, get_config, log_error, log_exception, validate_version
 
 LABEL = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+PUSH_TIMEOUT = 300  # seconds a config push may hold its cluster's lock, and wait for it by default
+SYNC_CONFIG_WAIT = 20  # seconds Sync Config waits for the lock, well inside a web worker's timeout
 STORE_KINDS = {
     "data_store": "Data",
     "blob_store": "Blob",
@@ -39,6 +44,8 @@ class StalwartCluster(Document):
 
         acme_contact_email: DF.Data | None
         acme_directory_url: DF.Data | None
+        agent_key: DF.Data | None
+        agent_secret: DF.Password | None
         admin_password: DF.Password | None
         admin_username: DF.Data | None
         api_key: DF.Password | None
@@ -60,7 +67,10 @@ class StalwartCluster(Document):
         is_default: DF.Check
         label: DF.Data | None
         last_config_sync_at: DF.Datetime | None
+        last_config_sync_error: DF.SmallText | None
         metrics_password: DF.Password | None
+        quota_backstop_per_day: DF.Int
+        quota_hook_token: DF.Password | None
         regions: DF.Table[StalwartClusterRegion]
         relay_password: DF.Password | None
         relay_username: DF.Data | None
@@ -84,6 +94,11 @@ class StalwartCluster(Document):
             self.admin_password = frappe.generate_hash(length=32)
         if not self.metrics_password:
             self.metrics_password = frappe.generate_hash(length=32)
+        if not self.quota_hook_token:
+            self.quota_hook_token = frappe.generate_hash(length=32)
+        self.agent_key = self.agent_key or frappe.generate_hash(length=20)
+        if not self.agent_secret:
+            self.agent_secret = frappe.generate_hash(length=40)
         self.relay_username = self.relay_username or "relay"
         if not self.relay_password:
             self.relay_password = frappe.generate_hash(length=32)
@@ -119,7 +134,7 @@ class StalwartCluster(Document):
         elif not before.enabled and self.enabled and self.status == "Disabled":
             self.db_set("status", "Active")
         if before.default_egress_pool != self.default_egress_pool:
-            egress.resync_cluster(self)
+            push.resync_cluster_after_commit(self.name)
 
     def on_trash(self) -> None:
         if self.is_default and frappe.db.exists("Stalwart Cluster", {"name": ["!=", self.name]}):
@@ -208,7 +223,12 @@ class StalwartCluster(Document):
         in_memory = self.get_store("in_memory_store")
         has_redis = bool(in_memory and in_memory.type.startswith("Redis"))
         self.coordinator = "Default" if has_redis and not self.single_node else "Disabled"
-        if self.node_count() > 1 and self.coordinator == "Disabled":
+        self.validate_node_count(self.node_count())
+
+    def validate_node_count(self, count: int) -> None:
+        """Nodes share coordination and sending counters through Redis, so only one may run without."""
+
+        if count > 1 and self.coordinator == "Disabled":
             frappe.throw(_("A multi-node cluster needs a Redis in-memory store to coordinate nodes."))
 
     def validate_default(self) -> None:
@@ -250,6 +270,12 @@ class StalwartCluster(Document):
     def get_client(self):
         return get_client(self)
 
+    @property
+    def agent_token(self) -> str:
+        """The bearer token the cluster's Agents send to Suite Cloud: ``<agent key>:<agent secret>``."""
+
+        return f"{self.agent_key}:{self.get_password('agent_secret')}"
+
     def get_admin_client(self):
         return get_admin_client(self)
 
@@ -276,16 +302,26 @@ class StalwartCluster(Document):
         frappe.only_for("System Manager")
         if self.status != "Active":
             frappe.throw(_("Only an active cluster can be synced; provision the first node instead."))
-        return self.push_config()
+        return self.push_config(wait=SYNC_CONFIG_WAIT)
 
-    def push_config(self) -> dict:
-        """The sync itself; also run on behalf of documents whose change alters the plan."""
+    def push_config(self, wait: float = PUSH_TIMEOUT) -> dict:
+        """The sync itself, under the cluster's push lock; a desk change reaches it through
+        ``push.resync_cluster_after_commit``."""
+
+        with push_lock(self.name, wait):
+            return self.apply_config()
+
+    def apply_config(self) -> dict:
+        """Pushes the plan; the caller holds the push lock."""
 
         rendered = plan.cluster_plan(self)
         result = self.get_client().apply(rendered)
         self.get_client().reload_settings()
         self.bump_config_version(rendered)
-        self.db_set({"last_config_sync_at": now(), "drift_report": None}, update_modified=False)
+        self.db_set(
+            {"last_config_sync_at": now(), "last_config_sync_error": None, "drift_report": None},
+            update_modified=False,
+        )
         return {"created": result.created, "updated": result.updated, "unchanged": result.unchanged}
 
     @frappe.whitelist()
@@ -312,6 +348,7 @@ class StalwartCluster(Document):
         """Mints a fresh management key with the admin credentials and forgets the old one."""
 
         frappe.only_for("System Manager")
+        self.reload()  # the form sends its unsaved edits too; only the key is saved
         client = self.get_admin_client()
         old = client.api_keys.find_local(description=plan.API_KEY_DESCRIPTION)
         _, secret = client.api_keys.create_secret(
@@ -360,6 +397,46 @@ class StalwartCluster(Document):
         from suite_cloud.telemetry.agent.deploy import upgrade_agents
 
         return upgrade_agents(self)
+
+    @frappe.whitelist()
+    def rotate_agent_secret(self) -> list[str]:
+        """Replaces the Agent Secret and reinstalls the cluster's Agents with it. An Agent not yet
+        reinstalled is refused and retries, so it loses nothing."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.build import is_telemetry_enabled
+        from suite_cloud.telemetry.agent.deploy import upgrade_agents
+
+        self.reload()  # the form sends its unsaved edits too; only the secret is saved
+        self.agent_secret = frappe.generate_hash(length=40)
+        self.save(ignore_permissions=True)
+        return upgrade_agents(self) if is_telemetry_enabled() else []
+
+
+@contextmanager
+def push_lock(cluster: str, wait: float = PUSH_TIMEOUT) -> Iterator[None]:
+    """One config push per cluster at a time, so a push that started later never loses to an older
+    plan finishing after it. Refuses after ``wait`` seconds."""
+
+    lock = frappe.cache.lock(f"{frappe.local.site}:suite_cloud:push-config:{cluster}", timeout=PUSH_TIMEOUT)
+    if not lock.acquire(blocking_timeout=wait):
+        frappe.throw(
+            _("Another configuration push to {0} is running; try again in a minute.").format(cluster)
+        )
+    try:
+        yield
+    finally:
+        release_push_lock(lock, cluster)
+
+
+def release_push_lock(lock, cluster: str) -> None:
+    """A push that outlived the lock lost its turn; that is logged, and an error the push raised
+    is left to surface instead."""
+
+    try:
+        lock.release()
+    except LockNotOwnedError:
+        log_error("Config push outlived its lock", f"The push to {cluster} took over {PUSH_TIMEOUT} seconds.")
 
 
 def check_all_clusters() -> None:

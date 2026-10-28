@@ -7,6 +7,7 @@ from frappe.utils import get_test_client
 
 from suite_cloud.api.mail import domains
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
+from suite_cloud.tests.fixtures import production_logging
 
 API = "/api/v2/method/suite_cloud.api."
 
@@ -30,6 +31,7 @@ class TestHttpContract(TenantApiTestCase):
             patch.object(db, "commit"),
             patch.object(db, "rollback"),
             patch("frappe.destroy"),
+            production_logging(),
         ):
             response = get_test_client().open(
                 f"{API}{method}", method=verb, headers=headers, base_url="http://localhost/", **payload

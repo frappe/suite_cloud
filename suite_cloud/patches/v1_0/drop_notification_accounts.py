@@ -11,7 +11,10 @@ def execute() -> None:
     rename_field("Suite Site", "email_account_created", "mail_domain_verified")
     if not frappe.db.has_column("Mail Account", "is_system_account"):
         return
-    names = frappe.db.sql_list("select name from `tabMail Account` where is_system_account = 1")
+    account = frappe.qb.DocType("Mail Account")
+    names = (
+        frappe.qb.from_(account).select(account.name).where(account.is_system_account == 1).run(pluck=True)
+    )
     if names:
         frappe.enqueue(
             "suite_cloud.patches.v1_0.drop_notification_accounts.delete_accounts",

@@ -3,8 +3,9 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.mail.cluster import dns, egress
+from suite_cloud.mail.cluster import dns, egress, push
 from suite_cloud.mail.stalwart import forget_sessions
+from suite_cloud.mail.stalwart.errors import StalwartError
 from suite_cloud.mail.tests.fake_stalwart import FakeStalwart
 from suite_cloud.mail.tests.fixtures import (
     ROOT_DOMAIN,
@@ -177,6 +178,32 @@ class TestEgress(IntegrationTestCase):
         # A typed pool name is ignored: names are handed out in order.
         self.assertEqual(self.make_pool(("203.0.113.54",), pool_name="custom").pool_name, "p3")
 
+    def test_a_pool_change_pushes_the_cluster_before_its_gateways(self) -> None:
+        pool = self.make_pool()
+        self.gateway.db_set("status", "Active")
+        steps = []
+        with (
+            patch.object(egress, "resync_cluster", side_effect=lambda cluster: steps.append("cluster")),
+            patch.object(type(self.gateway), "push_config", side_effect=lambda: steps.append("gateway")),
+            patch.object(egress, "open_relay_port") as open_port,
+        ):
+            egress.apply_pool_changes_job(pool.name, [self.gateway.name])
+        self.assertEqual(steps, ["cluster", "gateway"])
+        open_port.assert_called_once()
+
+        # A cluster that refuses the push leaves the gateways as they were, and says so on its form.
+        steps.clear()
+        with (
+            patch.object(egress, "resync_cluster", side_effect=StalwartError("cluster down")),
+            patch.object(type(self.gateway), "push_config", side_effect=lambda: steps.append("gateway")),
+        ):
+            self.assertRaises(StalwartError, egress.apply_pool_changes_job, pool.name, [])
+        self.assertEqual(steps, [])
+        self.assertIn(
+            "cluster down",
+            frappe.db.get_value("Stalwart Cluster", self.cluster.name, "last_config_sync_error"),
+        )
+
     def test_cluster_routes_follow_pool_assignment(self) -> None:
         pool = self.make_pool()
         domain = frappe.get_doc(
@@ -219,7 +246,7 @@ class TestEgress(IntegrationTestCase):
 
         # Re-applying is idempotent: our rules are replaced, not stacked. The default pool is the
         # fallback of the expression, so domains on it need no rule of their own.
-        egress.resync_cluster(frappe.get_doc("Stalwart Cluster", self.cluster.name))
+        push.resync_cluster(frappe.get_doc("Stalwart Cluster", self.cluster.name))
         live = self.fake.singletons["MtaOutboundStrategy"]["route"]
         self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'"])
         self.assertEqual(live["else"], "'egress-p1'")
@@ -240,7 +267,7 @@ class TestEgress(IntegrationTestCase):
         # before any domain exists.
         pool = self.make_pool()
         cluster.db_set("default_egress_pool", pool.name)
-        egress.resync_cluster(cluster)
+        push.resync_cluster(cluster)
         self.assertEqual(self.fake.find("MtaRoute", name="egress-p2")["address"], pool.hostname)
         live = self.fake.singletons["MtaOutboundStrategy"]["route"]
         self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'"])
@@ -269,7 +296,7 @@ class TestEgress(IntegrationTestCase):
 
         # Clearing the default hands the fallback back to direct delivery; a foreign else is kept.
         cluster.db_set("default_egress_pool", None)
-        egress.resync_cluster(cluster)
+        push.resync_cluster(cluster)
         live = self.fake.singletons["MtaOutboundStrategy"]["route"]
         self.assertEqual(live["else"], "'mx'")
         self.assertEqual([r["then"] for r in egress.expression_rules(live)], ["'local'", "'egress-p3'"])

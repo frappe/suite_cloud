@@ -41,6 +41,7 @@ frappe.ui.form.on('Stalwart Node', {
 		}
 		if (['Provisioned', 'Active', 'Draining'].includes(frm.doc.status)) {
 			frm.add_custom_button(__('Install Agent'), () => frm.events.call(frm, 'install_agent', __('Queueing the agent install...')), __('Actions'))
+			frm.add_custom_button(__('Show Agent Config'), () => frm.events.show_agent_config(frm), __('Actions'))
 		}
 		if (frm.doc.status === 'Draining') {
 			frm.add_custom_button(__('Restore'), () => frm.events.call(frm, 'restore', __('Adding to ingress DNS...')), __('Actions'))
@@ -61,6 +62,16 @@ frappe.ui.form.on('Stalwart Node', {
 		frappe.xcall('suite_cloud.telemetry.agent.status.get_agent_status', { doctype: frm.doctype, name: frm.doc.name }).then((status) => {
 			const colors = { ok: 'green', outdated: 'orange', silent: 'red', unknown: 'blue' }
 			frm.dashboard.add_comment(frappe.utils.escape_html(status.message), colors[status.state], true)
+		})
+	},
+
+	show_agent_config(frm) {
+		frm.call({ doc: frm.doc, method: 'show_agent_config' }).then(({ message }) => {
+			const note = message.telemetry_enabled
+				? __('What the next Install Agent writes to {0}. Secrets are masked.', ['<code>/etc/suite-cloud-agent/config.json</code>'])
+				: __('Enable Telemetry is off: Install Agent would stop the agent instead of writing this file.')
+			const config = frappe.utils.escape_html(JSON.stringify(message.config, null, 2))
+			frappe.msgprint({ title: __('Agent Config'), wide: true, message: `<p class="text-muted">${note}</p><pre>${config}</pre>` })
 		})
 	},
 

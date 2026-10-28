@@ -1,5 +1,6 @@
 import frappe
 from frappe.model.rename_doc import get_link_fields, update_link_field_values
+from pypika.functions import Replace
 
 # The module was renamed from "Cloud Mail" to "Mail". A standard Module Def cannot be renamed, and
 # the migrate registers the new row before the patches run, so the old row's links are repointed
@@ -10,10 +11,15 @@ NEW = "Mail"
 
 
 def execute() -> None:
-    frappe.db.sql(
-        """update `tabServer Job`
-        set variables_builder = replace(variables_builder, 'suite_cloud.cloud_mail.', 'suite_cloud.mail.')
-        where variables_builder like 'suite_cloud.cloud_mail.%%'"""
+    job = frappe.qb.DocType("Server Job")
+    (
+        frappe.qb.update(job)
+        .set(
+            job.variables_builder,
+            Replace(job.variables_builder, "suite_cloud.cloud_mail.", "suite_cloud.mail."),
+        )
+        .where(job.variables_builder.like("suite_cloud.cloud_mail.%"))
+        .run()
     )
 
     update_link_field_values(get_link_fields("Module Def"), OLD, NEW, "Module Def")

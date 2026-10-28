@@ -66,6 +66,8 @@ class StalwartNode(Document):
             frappe.throw(_("Hostname must be a single label under {0}.").format(cluster.default_domain))
 
         self.validate_single_node(cluster)
+        if self.enabled and (self.is_new() or self.has_value_changed("enabled")):
+            cluster.validate_node_count(cluster.node_count() + 1)  # this node joins the count
         self.ipv4_address = validate_ip(self.ipv4_address, 4)
         self.ipv6_address = validate_ip(self.ipv6_address, 6) if self.ipv6_address else None
         self.ssh_user = self.ssh_user or cluster.ssh_user
@@ -98,7 +100,7 @@ class StalwartNode(Document):
 
     def after_insert(self) -> None:
         dns.sync_node_records(self)
-        self.get_cluster().save(ignore_permissions=True)  # re-validates stores for the new node count
+        self.revalidate_cluster()
 
     def on_update(self) -> None:
         before = self.get_doc_before_save()
@@ -131,6 +133,11 @@ class StalwartNode(Document):
 
     def get_cluster(self) -> Document:
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+
+    def revalidate_cluster(self) -> None:
+        """Saves a fresh copy of the cluster, which checks its stores against the new node count."""
+
+        frappe.get_doc("Stalwart Cluster", self.cluster).save(ignore_permissions=True)
 
     def ssh_target(self) -> SSHTarget:
         cluster = self.get_cluster()
@@ -205,6 +212,16 @@ class StalwartNode(Document):
         return install_agent(self).name
 
     @frappe.whitelist()
+    def show_agent_config(self) -> dict:
+        """The agent's config.json as the next Install Agent writes it, secrets masked."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.build import is_telemetry_enabled
+        from suite_cloud.telemetry.agent.deploy import masked_agent_config
+
+        return {"config": masked_agent_config(self), "telemetry_enabled": is_telemetry_enabled()}
+
+    @frappe.whitelist()
     def drain(self) -> None:
         frappe.only_for("System Manager")
         bootstrap.drain_node(self)
@@ -245,6 +262,12 @@ class StalwartNode(Document):
 
     def after_upgrade_failed(self, job: Document) -> None:
         self.set_status("Failed", job.error_log)
+
+
+def on_doctype_update() -> None:
+    """Every telemetry batch and sending-limit call looks its node up by cluster and address."""
+
+    frappe.db.add_index("Stalwart Node", ["cluster", "ipv4_address"])
 
 
 def validate_ip(value: str | None, version: int) -> str:

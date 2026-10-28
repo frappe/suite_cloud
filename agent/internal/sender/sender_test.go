@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -205,23 +206,44 @@ func TestLimiterSharesOneMinuteWindow(t *testing.T) {
 	}
 }
 
+// Goroutines that find the minute full each sleep, and the fake clock adds their sleeps up, so the
+// number of waits varies; what must hold is that no minute grants more than its share.
 func TestLimiterIsSafeAcrossGoroutines(t *testing.T) {
 	c := &clock{now: time.Date(2026, 10, 20, 12, 0, 0, 0, time.UTC)}
 	l := NewLimiter(100)
-	l.now, l.sleep = c.Now, c.Sleep
+	granted := map[time.Time]int{}
+	l.now = func() time.Time {
+		granted[l.window] = l.used // take holds l.mu here, so every earlier grant is counted
+		return c.Now()
+	}
+	l.sleep = c.Sleep
 	var wg sync.WaitGroup
+	var failed atomic.Int32
 	for g := 0; g < 4; g++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			for i := 0; i < 50; i++ {
-				l.Wait(context.Background())
+				if l.Wait(context.Background()) != nil {
+					failed.Add(1)
+				}
 			}
 		}()
 	}
 	wg.Wait()
-	if len(c.waits) != 1 {
-		t.Fatalf("200 requests at 100 a minute took %d waits", len(c.waits))
+	l.mu.Lock()
+	granted[l.window] = l.used
+	l.mu.Unlock()
+
+	total := 0
+	for window, n := range granted {
+		if n > 100 {
+			t.Fatalf("the minute from %s granted %d of 100", window.Format(time.TimeOnly), n)
+		}
+		total += n
+	}
+	if failed.Load() != 0 || total != 200 || len(c.waits) == 0 {
+		t.Fatalf("%d failed, %d granted, %d waits", failed.Load(), total, len(c.waits))
 	}
 }
 
@@ -231,5 +253,34 @@ func TestErrorMessage(t *testing.T) {
 	}
 	if got := errorMessage("<html>gateway"); got != "<html>gateway" {
 		t.Fatal(got)
+	}
+}
+
+func TestCallDecodesTheAnswerData(t *testing.T) {
+	server, requests := newServer(t, 200)
+	s, _ := newSender(t, server.URL, 300, 8)
+	var answer struct {
+		Accepted int `json:"accepted"`
+	}
+	payload := map[string]any{"batch_id": "b", "records": []int{1, 2}}
+	if err := s.Call(context.Background(), "quota.usage", payload, &answer); err != nil {
+		t.Fatal(err)
+	}
+	r := (*requests)[0]
+	if r.path != "/api/v2/method/suite_cloud.api.telemetry.quota.usage" || r.auth != "Bearer s3cret" || answer.Accepted != 2 {
+		t.Fatalf("request %+v answer %+v", r, answer)
+	}
+}
+
+func TestCallMakesOneAttempt(t *testing.T) {
+	for _, status := range []int{400, 429, 500} {
+		server, requests := newServer(t, status, 200)
+		s, _ := newSender(t, server.URL, 300, 8)
+		if err := s.Call(context.Background(), "quota.limits", map[string]any{}, &struct{}{}); err == nil {
+			t.Fatalf("status %d accepted", status)
+		}
+		if len(*requests) != 1 {
+			t.Fatalf("status %d: %d requests", status, len(*requests))
+		}
 	}
 }

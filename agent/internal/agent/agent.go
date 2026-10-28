@@ -1,4 +1,5 @@
-// Package agent wires the config, the state, the tailers and the metrics pipeline together.
+// Package agent wires the config, the state, the tailers, the metrics pipeline and the sending
+// quota together.
 package agent
 
 import (
@@ -9,12 +10,14 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/frappe/suite_cloud/agent/internal/config"
 	"github.com/frappe/suite_cloud/agent/internal/format"
 	"github.com/frappe/suite_cloud/agent/internal/hostmetrics"
 	"github.com/frappe/suite_cloud/agent/internal/metrics"
 	"github.com/frappe/suite_cloud/agent/internal/prometheus"
+	"github.com/frappe/suite_cloud/agent/internal/quota"
 	"github.com/frappe/suite_cloud/agent/internal/sender"
 	"github.com/frappe/suite_cloud/agent/internal/state"
 	"github.com/frappe/suite_cloud/agent/internal/tail"
@@ -30,6 +33,12 @@ func Run(ctx context.Context, cfg *config.Config, version string, logger *slog.L
 	logger.Info("suite-cloud-agent starting", "version", version, "config", cfg.Summary())
 	logCursors(store, logger)
 	send := sender.New(cfg.SuiteCloud, version, logger)
+	var quotaStore quota.Store
+	if cfg.Quota != nil {
+		if quotaStore, err = quota.Open(cfg.Quota.Store, cfg.StateDir); err != nil {
+			return fmt.Errorf("quota store: %w", err)
+		}
+	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -59,13 +68,45 @@ func Run(ctx context.Context, cfg *config.Config, version string, logger *slog.L
 		}
 		start("metrics", pipeline.Run)
 	}
+	if cfg.Quota != nil {
+		startQuota(cfg, quotaStore, send, logger.With("component", "quota"), start)
+	}
 
 	wg.Wait()
 	logger.Info("suite-cloud-agent stopped", "state_saved", true)
 	return failure
 }
 
-// Check reports what would stop the agent from running: the state directory or the log globs.
+// startQuota runs the hook, the limit pull, the usage push and the store, each on its own. A part
+// that fails is started again rather than stopping the logs and metrics: Stalwart accepts mail
+// while the hook is down. The store stops last, so its final save holds every count.
+func startQuota(cfg *config.Config, store quota.Store, send *sender.Sender, logger *slog.Logger, start func(string, func(context.Context) error)) {
+	touched := &quota.Touched{}
+	hook := &quota.Hook{Port: cfg.Quota.HookPort, Token: cfg.Quota.HookToken, Store: store, Touched: touched, Logger: logger, Now: time.Now}
+	limits := &quota.Limits{Store: store, Caller: send, HostIP: cfg.Node.HostIP, Interval: cfg.Quota.LimitsPollInterval(), Logger: logger, Now: time.Now}
+	usage := &quota.Usage{Store: store, Caller: send, HostIP: cfg.Node.HostIP, Touched: touched, Interval: cfg.Quota.UsagePushInterval(), BatchSize: cfg.SuiteCloud.RecordsPerRequest, Logger: logger, Now: time.Now}
+	parts := map[string]func(context.Context) error{"quota hook": hook.Run, "quota limits": limits.Run, "quota usage": usage.Run}
+	var users sync.WaitGroup
+	users.Add(len(parts))
+	for name, run := range parts {
+		start(name, func(ctx context.Context) error {
+			defer users.Done()
+			return quota.KeepRunning(ctx, logger.With("part", name), quota.RestartDelay, run)
+		})
+	}
+	start("quota store", func(ctx context.Context) error {
+		storeCtx, stop := context.WithCancel(context.WithoutCancel(ctx))
+		defer stop()
+		go func() {
+			users.Wait()
+			stop()
+		}()
+		return quota.KeepRunning(storeCtx, logger.With("part", "quota store"), quota.RestartDelay, store.Run)
+	})
+}
+
+// Check reports what would stop the agent from running: the state directory, the log globs or a
+// quota.json that cannot be read.
 // It makes no request.
 func Check(cfg *config.Config) error {
 	var problems []error
@@ -80,6 +121,11 @@ func Check(cfg *config.Config) error {
 	for _, def := range cfg.Logs {
 		if _, err := os.Stat(filepath.Dir(def.Path)); err != nil {
 			problems = append(problems, fmt.Errorf("logs[%s]: %w", def.Name, err))
+		}
+	}
+	if cfg.Quota != nil && cfg.Quota.Store.Type == "memory" {
+		if _, err := quota.OpenMemory(cfg.StateDir); err != nil {
+			problems = append(problems, fmt.Errorf("quota store: %w", err))
 		}
 	}
 	return errors.Join(problems...)

@@ -53,13 +53,18 @@ func (s *Store) View(fn func(*State)) {
 	fn(s.state)
 }
 
-// save writes through a temp file and a rename, so a crash leaves the old file or the new one.
 func (s *Store) save() error {
-	raw, err := json.MarshalIndent(s.state, "", "  ")
+	return WriteFile(s.dir, fileName, s.state)
+}
+
+// WriteFile writes value as JSON through a temp file and a rename, so a crash leaves the old file
+// or the new one.
+func WriteFile(dir, name string, value any) error {
+	raw, err := json.MarshalIndent(value, "", "  ")
 	if err != nil {
 		return err
 	}
-	temp, err := os.CreateTemp(s.dir, "state.*.tmp")
+	temp, err := os.CreateTemp(dir, name+".*.tmp")
 	if err != nil {
 		return err
 	}
@@ -75,5 +80,5 @@ func (s *Store) save() error {
 	if err := temp.Close(); err != nil {
 		return err
 	}
-	return os.Rename(temp.Name(), filepath.Join(s.dir, fileName))
+	return os.Rename(temp.Name(), filepath.Join(dir, name))
 }

@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import frappe
+from frappe.core.doctype.error_log.error_log import ErrorLog
 
 from suite_cloud.tests.fixtures import (
     ROOT_DOMAIN,
@@ -133,9 +134,10 @@ def make_tenant(cluster, title: str = "acme.frappe.test", **fields):
 
 
 def error_log_count() -> int:
-    """Error Log lives on Frappe's log database as a virtual DocType, so raw SQL cannot see it."""
+    """Error Log lives on Frappe's log database as a virtual DocType, so raw SQL cannot see it,
+    and its list stops at one page of 20 rows; the controller counts them all."""
 
-    return len(frappe.get_all("Error Log", pluck="name", limit_page_length=0))
+    return ErrorLog.get_count("Error Log")
 
 
 def latest_error_log_method() -> str | None:

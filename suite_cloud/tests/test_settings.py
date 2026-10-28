@@ -78,9 +78,23 @@ class TestSuiteCloudSettings(IntegrationTestCase):
         patch.execute()
         self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 30)
 
+    def test_send_usage_retention_is_backfilled_for_existing_sites(self) -> None:
+        from suite_cloud.patches.v1_0 import fill_send_usage_retention_default as patch
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, 0)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 90)
+
+        frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, 30)
+        patch.execute()
+        self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 30)
+
     def test_a_retention_under_a_day_is_refused(self) -> None:
-        self.settings.telemetry_retention_days = 0
-        self.assertRaises(frappe.ValidationError, self.settings.save)
+        for field in ("telemetry_retention_days", "send_usage_retention_days"):
+            with self.subTest(field=field):
+                settings = frappe.get_doc("Suite Cloud Settings")
+                settings.set(field, 0)
+                self.assertRaises(frappe.ValidationError, settings.save)
 
     def test_telemetry_limits_are_backfilled_and_must_be_positive(self) -> None:
         from suite_cloud.patches.v1_0 import fill_telemetry_limit_defaults as patch
@@ -128,40 +142,6 @@ class TestSuiteCloudSettings(IntegrationTestCase):
         self.settings.agent_metrics_interval_seconds = 5
         self.settings.save()
         self.assertEqual(get_config("agent_log_delete_after_days"), 0)
-
-    def test_a_new_telemetry_secret_keeps_the_old_one_for_a_day(self) -> None:
-        from frappe.utils.password import get_decrypted_password
-
-        self.settings.telemetry_secret = ""  # the site may hold one already
-        self.settings.save()
-        self.settings.telemetry_secret = "first"
-        self.settings.save()
-        self.settings.reload()
-        self.settings.save()  # the form sends the masked secret back: nothing rotates
-        self.assertIsNone(self.settings.telemetry_previous_secret_until)
-
-        self.settings.telemetry_secret = "second"
-        self.settings.save()
-        previous = get_decrypted_password(
-            "Suite Cloud Settings", "Suite Cloud Settings", "telemetry_previous_secret"
-        )
-        self.assertEqual(previous, "first")
-        hours = (
-            self.settings.telemetry_previous_secret_until - frappe.utils.now_datetime()
-        ).total_seconds() / 3600
-        self.assertAlmostEqual(hours, 24, delta=0.1)
-
-        self.settings.telemetry_secret = ""
-        self.settings.save()
-        self.assertIsNone(self.settings.telemetry_previous_secret_until)
-        self.assertIsNone(
-            get_decrypted_password(
-                "Suite Cloud Settings",
-                "Suite Cloud Settings",
-                "telemetry_previous_secret",
-                raise_exception=False,
-            )
-        )
 
     def test_the_telemetry_user_is_created_without_roles(self) -> None:
         from suite_cloud.install import TELEMETRY_USER, ensure_user

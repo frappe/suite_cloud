@@ -46,7 +46,12 @@ def create_zone(root: str) -> None:
 def old_value(field: str) -> str | None:
     """The fields are gone from the DocType, so their values are read straight from tabSingles."""
 
-    rows = frappe.db.sql(
-        "select value from tabSingles where doctype = %s and field = %s", (SETTINGS, field), pluck=True
+    singles = frappe.qb.DocType("Singles")
+    rows = (
+        frappe.qb.from_(singles)
+        .select(singles.value)
+        .where(singles.doctype == SETTINGS)
+        .where(singles.field == field)
+        .run(pluck=True)
     )
     return rows[0] if rows else None

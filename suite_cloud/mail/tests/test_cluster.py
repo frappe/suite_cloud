@@ -1,10 +1,12 @@
 import json
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
 
 from suite_cloud.mail.cluster import dns, plan
+from suite_cloud.mail.stalwart.errors import StalwartUnavailableError
 from suite_cloud.mail.tests.fixtures import (
     ROOT_DOMAIN,
     configure_settings,
@@ -26,6 +28,104 @@ class TestStalwartCluster(IntegrationTestCase):
 
     def tearDown(self) -> None:
         frappe.flags.do_not_enqueue = False
+
+    def test_a_config_push_waits_for_the_one_running(self) -> None:
+        from suite_cloud.mail.doctype.stalwart_cluster import stalwart_cluster
+
+        cluster = make_cluster()
+        held = frappe.cache.lock(f"{frappe.local.site}:suite_cloud:push-config:{cluster.name}", timeout=30)
+        self.assertTrue(held.acquire(blocking=False))
+        self.addCleanup(held.release)
+        # A push gives up after its wait, before planning anything; Sync Config waits briefly.
+        with patch.object(plan, "cluster_plan") as planned:
+            self.assertRaisesRegex(
+                frappe.ValidationError, "Another configuration push", cluster.push_config, wait=0.1
+            )
+        planned.assert_not_called()
+        self.assertLess(stalwart_cluster.SYNC_CONFIG_WAIT, stalwart_cluster.PUSH_TIMEOUT)
+
+    def test_a_queued_push_locks_before_it_reads_and_keeps_its_failure(self) -> None:
+        from suite_cloud.mail.cluster import push
+        from suite_cloud.mail.doctype.stalwart_cluster import stalwart_cluster
+
+        cluster = make_cluster()
+        cluster.db_set("status", "Active")
+        steps = []
+
+        @contextmanager
+        def recording_lock(name, wait=stalwart_cluster.PUSH_TIMEOUT):
+            steps.append("lock")
+            yield
+
+        load = frappe.get_doc
+        with (
+            patch.object(stalwart_cluster, "push_lock", recording_lock),
+            patch("frappe.get_doc", side_effect=lambda *args: steps.append("read") or load(*args)),
+            patch.object(plan, "cluster_plan", side_effect=StalwartUnavailableError("cluster down")),
+        ):
+            self.assertRaises(StalwartUnavailableError, push.resync_cluster_job, cluster.name)
+        self.assertEqual(steps[:2], ["lock", "read"])
+        self.assertIn(
+            "cluster down", frappe.db.get_value("Stalwart Cluster", cluster.name, "last_config_sync_error")
+        )
+
+        # The next push that goes through clears it.
+        with patch.object(plan, "cluster_plan", return_value=[]), patch.object(type(cluster), "get_client"):
+            frappe.get_doc("Stalwart Cluster", cluster.name).push_config()
+        self.assertIsNone(frappe.db.get_value("Stalwart Cluster", cluster.name, "last_config_sync_error"))
+
+    def test_a_push_that_outlived_its_lock_is_logged_not_raised(self) -> None:
+        from suite_cloud.mail.doctype.stalwart_cluster import stalwart_cluster
+
+        lock = frappe.cache.lock(f"{frappe.local.site}:suite_cloud:test-expired-lock", timeout=30)
+        self.assertTrue(lock.acquire(blocking=False))
+        lock.redis.delete(lock.name)  # as if the push outlived the lock's timeout
+        with patch.object(stalwart_cluster, "log_error") as log_error:
+            stalwart_cluster.release_push_lock(lock, "c1")
+        log_error.assert_called_once()
+
+    def test_desk_changes_queue_one_waiting_push_per_cluster(self) -> None:
+        from suite_cloud.mail.cluster import push
+
+        frappe.flags.do_not_enqueue = False
+        self.addCleanup(frappe.cache.delete, push.pending_push_key("c1"))
+        frappe.cache.delete(push.pending_push_key("c1"))
+        queued = len(frappe.db.after_commit)
+        push.resync_cluster_after_commit("c1")
+        self.assertEqual(len(frappe.db.after_commit), queued + 1)  # only once the save commits
+        frappe.db.after_commit.cut(queued)
+
+        with patch("frappe.enqueue") as enqueue:
+            push.queue_cluster_push("c1")
+            push.queue_cluster_push("c1")  # a push still waiting covers this change too
+        enqueue.assert_called_once_with(push.resync_cluster_job, cluster="c1", queue="long")
+
+        frappe.cache.delete(push.pending_push_key("c1"))  # what the job does when it starts
+        with patch("frappe.enqueue") as enqueue:
+            push.queue_cluster_push("c1")
+        enqueue.assert_called_once()
+
+    def test_tests_reach_only_test_hosts(self) -> None:
+        from suite_cloud.mail.stalwart import get_client
+        from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
+
+        cluster = make_cluster()
+        self.assertIn(".test", cluster.base_url)
+        cluster.base_url = "https://mail.c1.frappe.email"
+        self.assertRaisesRegex(frappe.ValidationError, "only reach .test hosts", get_client, cluster)
+
+        node = make_node(cluster)
+        node.db_set("hostname", "n9.c9.frappe.email")
+        with patch("suite_cloud.provisioning.ansible.PlaybookRun.run") as run:
+            self.assertRaisesRegex(
+                frappe.ValidationError,
+                "only reach .test hosts",
+                create_server_job,
+                node,
+                "install-agent.yml",
+                title="Install agent",
+            )
+        run.assert_not_called()
 
     def test_connections_pin_the_host_key_recorded_at_first_contact(self) -> None:
         from suite_cloud.provisioning.ssh import SSHTarget, UnknownHostError, inventory_line, known_hosts_file
@@ -139,7 +239,8 @@ class TestStalwartCluster(IntegrationTestCase):
         older = make_cluster("older", hostname=f"mail.older.{ROOT_DOMAIN}")
         newer = make_cluster("newer", hostname=f"mail.newer.{ROOT_DOMAIN}")
         # A site from before the rule: no default, and only these two enabled (rolled back).
-        frappe.db.sql("update `tabStalwart Cluster` set is_default = 0, enabled = 0")
+        cluster = frappe.qb.DocType("Stalwart Cluster")
+        frappe.qb.update(cluster).set(cluster.is_default, 0).set(cluster.enabled, 0).run()
         frappe.db.set_value("Stalwart Cluster", {"name": ["in", [older.name, newer.name]]}, "enabled", 1)
 
         mark_default_cluster.execute()
@@ -152,7 +253,8 @@ class TestStalwartCluster(IntegrationTestCase):
         disabled = make_cluster("disabled", hostname=f"mail.disabled.{ROOT_DOMAIN}")
         enabled = make_cluster("enabled", hostname=f"mail.enabled.{ROOT_DOMAIN}")
         # Allowed before the rule: a disabled default (rolled back).
-        frappe.db.sql("update `tabStalwart Cluster` set is_default = 0, enabled = 0")
+        cluster = frappe.qb.DocType("Stalwart Cluster")
+        frappe.qb.update(cluster).set(cluster.is_default, 0).set(cluster.enabled, 0).run()
         frappe.db.set_value("Stalwart Cluster", disabled.name, "is_default", 1)
         frappe.db.set_value("Stalwart Cluster", enabled.name, "enabled", 1)
 
@@ -243,6 +345,18 @@ class TestStalwartCluster(IntegrationTestCase):
         cluster.in_memory_store = redis.name
         cluster.save()
         self.assertEqual(cluster.coordinator, "Disabled")
+
+    def test_enabling_a_second_node_needs_a_redis_in_memory_store(self) -> None:
+        # Shared stores but no Redis: one node is fine, a second must not start counting on its own.
+        cluster = make_cluster(name="pair", hostname=f"mail.pair.{ROOT_DOMAIN}", in_memory_store=None)
+        make_node(cluster, "203.0.113.1")
+        frappe.db.savepoint("second_node")
+        self.assertRaisesRegex(frappe.ValidationError, "needs a Redis", make_node, cluster, "203.0.113.2")
+        frappe.db.rollback(save_point="second_node")  # as the refused request would
+
+        second = make_node(cluster, "203.0.113.2", enabled=0)
+        second.enabled = 1
+        self.assertRaisesRegex(frappe.ValidationError, "needs a Redis", second.save)
 
     def test_node_hostnames_are_handed_out_in_order(self) -> None:
         cluster = make_cluster()
@@ -452,8 +566,12 @@ class TestStalwartCluster(IntegrationTestCase):
             old_key = cluster.get_password("api_key")
             clear_request_cache()
             self.assertEqual(cluster.get_client().cluster_nodes.find_by_hostname(node.hostname)["nodeId"], 7)
+            cluster.label = "Unsaved edit"  # the form sends its unsaved edits with the call
             cluster.rotate_api_key()
             self.assertNotEqual(cluster.get_password("api_key"), old_key)
+            self.assertNotEqual(
+                frappe.db.get_value("Stalwart Cluster", cluster.name, "label"), "Unsaved edit"
+            )
             self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
 
     def test_client_falls_back_to_the_admin_password_without_an_api_key(self) -> None:

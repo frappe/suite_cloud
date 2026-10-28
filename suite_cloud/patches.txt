@@ -22,7 +22,11 @@ suite_cloud.patches.v1_0.grant_owner_role
 suite_cloud.patches.v1_0.mark_default_cluster
 suite_cloud.patches.v1_0.drop_notification_accounts
 suite_cloud.patches.v1_0.fill_telemetry_retention_default
+suite_cloud.patches.v1_0.rename_telemetry_limits_to_agent
 suite_cloud.patches.v1_0.fill_telemetry_limit_defaults
 suite_cloud.patches.v1_0.fill_agent_defaults
 suite_cloud.patches.v1_0.fill_metrics_passwords
 suite_cloud.patches.v1_0.name_records_with_uuid7
+suite_cloud.patches.v1_0.fill_quota_hook_tokens
+suite_cloud.patches.v1_0.move_agent_auth_to_clusters
+suite_cloud.patches.v1_0.fill_send_usage_retention_default

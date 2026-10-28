@@ -241,6 +241,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
     )
 
     plan.extend(egress_operations(cluster))
+    plan.extend(quota_operations(cluster))
     return plan
 
 
@@ -322,15 +323,21 @@ def admin_account_operation(server: Document) -> dict:
     }
 
 
+# Stalwart inserts its defaults of these only on a normal start that finds none, so the recovery
+# plan must not create any; they are pushed once the cluster is active.
+DEFAULTS_PROVISIONED_BY_STALWART = ("Role", "MtaInboundThrottle")
+
+
 def recovery_plan(cluster: Document) -> list[dict]:
     """The cluster plan as the first node applies it in recovery mode.
 
-    Stalwart provisions its built-in roles only on a normal start that finds no Role objects,
-    so the plan must not create any: the disabled-accounts role is pushed once the cluster is
-    active. The admin password is pinned here and only here (see the helper).
+    Stalwart provisions its built-in roles and inbound throttles only on a normal start that
+    finds none, so the plan must not create any: the disabled-accounts role and the quota
+    backstop are pushed once the cluster is active. The admin password is pinned here and only
+    here (see the helper).
     """
 
-    operations = [op for op in cluster_plan(cluster) if op["object"] != "Role"]
+    operations = [op for op in cluster_plan(cluster) if op["object"] not in DEFAULTS_PROVISIONED_BY_STALWART]
     operations.append(admin_account_operation(cluster))
     return operations
 
@@ -378,6 +385,14 @@ def egress_operations(cluster: Document) -> list[dict]:
         from suite_cloud.mail.cluster.egress import cluster_operations
     except ImportError:
         return []
+    return cluster_operations(cluster)
+
+
+def quota_operations(cluster: Document) -> list[dict]:
+    """The sending-limit hook and its backstop; filled in by suite_cloud.mail.cluster.quota."""
+
+    from suite_cloud.mail.cluster.quota import cluster_operations  # it builds on this module
+
     return cluster_operations(cluster)
 
 

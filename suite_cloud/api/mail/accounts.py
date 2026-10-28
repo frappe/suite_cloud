@@ -20,6 +20,7 @@ from suite_cloud.mail.doctype.mail_account.mail_account import (
     account_payloads,
     validate_password,
 )
+from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import usage_history
 from suite_cloud.mail.tenancy import account_credentials, sync
 from suite_cloud.mail.tenancy import quotas as quota_rows
 from suite_cloud.mail.tenancy.account_credentials import API_KEYS, APP_PASSWORDS, Kind
@@ -45,6 +46,19 @@ def list_accounts(
 @mail_api
 def get_account(email: str) -> dict:
     return owned("Mail Account", email).to_api(with_usage=True)
+
+
+HISTORY_DAYS_CAP = 400
+
+
+@frappe.whitelist(methods=["GET"])
+@mail_api
+def get_send_usage(email: str, days: int = 30) -> dict:
+    """The account's recipients and refused messages per UTC day for the last ``days`` (at most
+    400) and per month, newest first, each with the limit it had then; only as far back as the
+    Sending Usage Retention keeps."""
+
+    return usage_history(owned("Mail Account", email).name, page_size(days, HISTORY_DAYS_CAP))
 
 
 QUOTA_LOOKUP_LIMIT = 500
@@ -90,8 +104,11 @@ def create_account(
     locale: str | None = None,
     time_zone: str | None = None,
     disable_receiving: bool = False,
+    daily_send_limit: int = 0,
+    monthly_send_limit: int = 0,
 ) -> dict:
-    """``disable_receiving`` makes the account send-only: mail addressed to it bounces."""
+    """``disable_receiving`` makes the account send-only: mail addressed to it bounces. The send
+    limits count recipients per UTC day and month; 0 means no limit."""
 
     validate_password(password)
 
@@ -109,6 +126,8 @@ def create_account(
             "locale": locale or "en-US",
             "time_zone": time_zone,
             "disable_receiving": int(sbool(disable_receiving)),
+            "daily_send_limit": daily_send_limit,
+            "monthly_send_limit": monthly_send_limit,
             "aliases": as_alias_rows(aliases),
             "groups": [{"group": owned("Mail Group", g).name} for g in as_list(groups, MEMBERSHIP_CAP)],
         }
@@ -149,10 +168,13 @@ def update_account(
     locale: str | None = None,
     time_zone: str | None = None,
     disable_receiving: bool | None = None,
+    daily_send_limit: int | None = None,
+    monthly_send_limit: int | None = None,
 ) -> dict:
     """``quotas`` replaces the other limits (``{}`` lifts them all); the disk quota stays unless
     ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it, and 0 lifts it. ``disable_receiving``
-    makes the account send-only or lets it receive again; left out, it stays as it is."""
+    makes the account send-only or lets it receive again; left out, it stays as it is. So do the
+    send limits, where 0 lifts one."""
 
     doc = owned("Mail Account", email)
     for field, value in {
@@ -160,6 +182,8 @@ def update_account(
         "description": description,
         "locale": locale,
         "time_zone": time_zone,
+        "daily_send_limit": daily_send_limit,
+        "monthly_send_limit": monthly_send_limit,
     }.items():
         if value is not None:
             doc.set(field, value)

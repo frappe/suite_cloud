@@ -90,3 +90,38 @@ func TestValidationNamesEveryKey(t *testing.T) {
 		}
 	}
 }
+
+const quota = `"quota": {"hook_port": 8091, "hook_token": "t0ken", "store": {"type": "memory"}},
+  "logs":`
+
+func TestLoadQuotaAppliesDefaults(t *testing.T) {
+	cfg, err := load(t, strings.Replace(example, `"logs":`, quota, 1))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Quota.LimitsPollSeconds != 60 || cfg.Quota.UsagePushSeconds != 60 {
+		t.Fatalf("quota %+v", cfg.Quota)
+	}
+	if strings.Contains(cfg.Summary(), "t0ken") || !strings.Contains(cfg.Summary(), "quota_token=set") {
+		t.Fatalf("summary leaks: %s", cfg.Summary())
+	}
+}
+
+func TestLoadRejectsBadQuota(t *testing.T) {
+	cases := map[string]string{
+		"low port":            strings.Replace(quota, "8091", "80", 1),
+		"no token":            strings.Replace(quota, "t0ken", " ", 1),
+		"unknown store":       strings.Replace(quota, `"memory"`, `"memcached"`, 1),
+		"redis no url":        strings.Replace(quota, `"memory"`, `"redis"`, 1),
+		"redis two urls":      strings.Replace(quota, `"type": "memory"`, `"type": "redis", "urls": ["redis://a:6379", "redis://b:6379"]`, 1),
+		"redis bad url":       strings.Replace(quota, `"type": "memory"`, `"type": "redis_cluster", "urls": ["http://a:6379"]`, 1),
+		"sentinel no service": strings.Replace(quota, `"type": "memory"`, `"type": "redis_sentinel", "urls": ["redis://a:26379"]`, 1),
+	}
+	for name, section := range cases {
+		t.Run(name, func(t *testing.T) {
+			if _, err := load(t, strings.Replace(example, `"logs":`, section, 1)); err == nil {
+				t.Fatal("accepted")
+			}
+		})
+	}
+}

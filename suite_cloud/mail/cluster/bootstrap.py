@@ -240,7 +240,8 @@ def activate_node(node: Document) -> None:
 
 
 def _push_initial_config(cluster: Document) -> None:
-    """Objects the recovery stage cannot create (the disabled-accounts role) land here."""
+    """Objects the recovery stage cannot create (the disabled-accounts role, the quota backstop)
+    land here."""
 
     try:
         cluster.push_config()

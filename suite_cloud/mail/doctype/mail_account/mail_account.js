@@ -7,6 +7,30 @@ frappe.ui.form.on('Mail Account', {
 		frm.add_custom_button(__('Reset Password'), () => frm.trigger('reset_password'), __('Credentials'))
 		frm.add_custom_button(__('Rotate App Password'), () => frm.trigger('rotate_app_password'), __('Credentials'))
 		frm.add_custom_button(__('Rotate API Key'), () => frm.trigger('rotate_api_key'), __('Credentials'))
+		frm.trigger('show_send_usage')
+	},
+
+	show_send_usage(frm) {
+		const usage = frm.doc.__onload?.send_usage
+		if (!usage) return
+		const part = (label, sent, limit) => {
+			const text = limit ? `${format_number(sent, null, 0)} / ${format_number(limit, null, 0)}` : format_number(sent, null, 0)
+			return { text: `${label}: ${text}`, ratio: limit ? sent / limit : 0 }
+		}
+		const parts = [
+			part(__('Sent today'), usage.day, frm.doc.daily_send_limit),
+			part(__('This month'), usage.month, frm.doc.monthly_send_limit),
+		]
+		const worst = Math.max(...parts.map((p) => p.ratio))
+		const color = worst >= 1 ? 'red' : worst >= 0.8 ? 'orange' : 'blue'
+		frm.dashboard.add_indicator(parts.map((p) => p.text).join(' · '), color)
+		if (usage.refused_day || usage.refused_month) {
+			const refused = __('Refused over a limit: {0} today · {1} this month', [
+				format_number(usage.refused_day, null, 0),
+				format_number(usage.refused_month, null, 0),
+			])
+			frm.dashboard.add_indicator(refused, 'red')
+		}
 	},
 
 	reset_password(frm) {

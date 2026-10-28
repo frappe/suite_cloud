@@ -256,6 +256,16 @@ class EgressGateway(Document):
         return install_agent(self).name
 
     @frappe.whitelist()
+    def show_agent_config(self) -> dict:
+        """The agent's config.json as the next Install Agent writes it, secrets masked."""
+
+        frappe.only_for("System Manager")
+        from suite_cloud.telemetry.agent.build import is_telemetry_enabled
+        from suite_cloud.telemetry.agent.deploy import masked_agent_config
+
+        return {"config": masked_agent_config(self), "telemetry_enabled": is_telemetry_enabled()}
+
+    @frappe.whitelist()
     def replace_dkim_keys(self) -> None:
         """Emergency replacement of the gateway domain's keys after a leak, same selectors."""
 
@@ -281,6 +291,12 @@ class EgressGateway(Document):
 
     def after_upgrade_failed(self, job: Document) -> None:
         self.set_status("Failed", job.error_log)
+
+
+def on_doctype_update() -> None:
+    """Every telemetry batch looks its gateway up by cluster and address."""
+
+    frappe.db.add_index("Egress Gateway", ["cluster", "ipv4_address"])
 
 
 def poll_pending_gateways() -> None:
