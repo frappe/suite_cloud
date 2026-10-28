@@ -253,12 +253,10 @@ def filters_for(cluster: Document | None, statuses: tuple[str, ...]) -> dict:
 
 def switch_off_quota_hooks() -> None:
     """With telemetry off the Agents stop, so each active cluster's config is pushed again: its
-    plan then holds the hook switched off, and Stalwart stops calling Agents that are gone. One job
-    per cluster, never deduplicated: a resync already running may have planned with the hook on,
-    and the cluster's push lock makes this one plan after it."""
+    plan then holds the hook switched off, and Stalwart stops calling Agents that are gone."""
 
     for name in frappe.get_all("Stalwart Cluster", {"status": "Active"}, pluck="name"):
-        frappe.enqueue(egress.resync_cluster_job, cluster=name, queue="short", enqueue_after_commit=True)
+        egress.resync_cluster_after_commit(name)
 
 
 def enqueue_roll_out_agents() -> None:

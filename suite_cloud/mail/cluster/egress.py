@@ -210,7 +210,7 @@ def current_route_expression(cluster: Document) -> dict:
 def apply_pool_changes(pool: Document) -> None:
     """A pool changed: the cluster's routes and every hosting gateway's listeners follow."""
 
-    resync_cluster(pool.get_cluster())
+    resync_cluster_after_commit(pool.cluster)
     before = pool.get_doc_before_save()
     port_is_new = before is None or before.relay_port != pool.relay_port
     hosted_before = set(before.gateway_names()) if before else set()
@@ -239,19 +239,15 @@ def open_relay_port(gateway: Document, port: int) -> None:
 
 
 def resync_cluster_after_commit(cluster_name: str) -> None:
-    """Deferred variant for deletes: a remote failure must not roll the delete back."""
+    """How a desk change reaches the cluster: in a job after commit, so a remote failure or a push
+    already running never fails the save. Not deduplicated: a push already running may have
+    planned before this change, and the cluster's push lock runs this one after it. The long
+    queue, since a push may wait for the lock as long as it may hold it."""
 
     if frappe.flags.do_not_enqueue:
         resync_cluster(frappe.get_doc("Stalwart Cluster", cluster_name))
         return
-    frappe.enqueue(
-        resync_cluster_job,
-        cluster=cluster_name,
-        queue="short",
-        job_id=f"resync-cluster:{cluster_name}",
-        deduplicate=True,
-        enqueue_after_commit=True,
-    )
+    frappe.enqueue(resync_cluster_job, cluster=cluster_name, queue="long", enqueue_after_commit=True)
 
 
 def resync_cluster_job(cluster: str) -> None:

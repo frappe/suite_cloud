@@ -110,7 +110,7 @@ class EgressIPPool(Document):
     def after_delete(self) -> None:
         cluster = self.get_cluster()
         dns.sync_spf_record(cluster)
-        egress.resync_cluster(cluster)
+        egress.resync_cluster_after_commit(cluster.name)
 
     # --- actions ----------------------------------------------------------------
 

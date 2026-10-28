@@ -297,3 +297,11 @@ def mask_secrets(text: str, spellings: list[str]) -> str:
     for spelling in spellings:
         text = text.replace(spelling, "***")
     return text
+
+
+def assert_test_host(host: str | None) -> None:
+    """While tests run, only a host under the reserved ``.test`` domain may be reached: the test
+    site is often a working site whose real clusters a test must never touch."""
+
+    if frappe.in_test and not (host or "").rstrip(".").endswith(".test"):
+        frappe.throw(_("Tests may only reach .test hosts, not {0}.").format(host))

@@ -128,15 +128,10 @@ class TestAgentDeploy(AgentBuildFixture):
         self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])
         with (
             patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
-            patch("frappe.enqueue") as enqueue,
+            patch.object(deploy.egress, "resync_cluster_after_commit") as resync,
         ):
             deploy.roll_out_agents()
-        pushed = [
-            call.kwargs["cluster"]
-            for call in enqueue.call_args_list
-            if call.args[0] is egress.resync_cluster_job
-        ]
-        self.assertIn(self.cluster.name, pushed)
+        resync.assert_any_call(self.cluster.name)
 
     def test_the_quota_section_waits_for_a_build_that_answers_the_hook(self) -> None:
         self.build().run()  # 0.1.0 refuses a config with a quota section
@@ -269,7 +264,7 @@ class TestAgentDeploy(AgentBuildFixture):
         settings.save()
         with (
             patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
-            patch("frappe.enqueue"),
+            patch.object(deploy.egress, "resync_cluster_after_commit"),
         ):
             self.assertTrue(deploy.roll_out_agents())
             # A second job queued for the same change, say by a quick second turn, finds it done.
@@ -309,7 +304,10 @@ class TestAgentDeploy(AgentBuildFixture):
                 settings.save()
                 # The save only queues the roll-out; it runs here as a worker would, without playbooks.
                 if any(call.args[:1] == (deploy.roll_out_agents,) for call in enqueue.call_args_list):
-                    with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+                    with (
+                        patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
+                        patch.object(deploy.egress, "resync_cluster_after_commit"),
+                    ):
                         deploy.roll_out_agents()
             filters = {"name": ["not in", before], "server": ["in", ours]}
             return frappe.get_all("Server Job", filters, ["server", "title"])

@@ -3,6 +3,7 @@ from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
+from frappe.utils import CallbackManager
 
 from suite_cloud.mail.cluster import dns, plan
 from suite_cloud.mail.tests.fixtures import (
@@ -34,14 +35,84 @@ class TestStalwartCluster(IntegrationTestCase):
         held = frappe.cache.lock(f"{frappe.local.site}:suite_cloud:push-config:{cluster.name}", timeout=30)
         self.assertTrue(held.acquire(blocking=False))
         self.addCleanup(held.release)
-        # A web request gives up after its short wait, before planning anything.
-        with (
-            patch.object(stalwart_cluster, "REQUEST_PUSH_WAIT", 0.1),
-            patch.object(frappe.local, "request", object(), create=True),
-            patch.object(plan, "cluster_plan") as planned,
-        ):
-            self.assertRaisesRegex(frappe.ValidationError, "Another configuration push", cluster.push_config)
+        # A push gives up after its wait, before planning anything; Sync Config waits briefly.
+        with patch.object(plan, "cluster_plan") as planned:
+            self.assertRaisesRegex(
+                frappe.ValidationError, "Another configuration push", cluster.push_config, wait=0.1
+            )
         planned.assert_not_called()
+        self.assertLess(stalwart_cluster.SYNC_CONFIG_WAIT, stalwart_cluster.PUSH_TIMEOUT)
+
+    def test_a_push_plans_from_a_fresh_snapshot_only_when_it_loses_nothing(self) -> None:
+        cluster = make_cluster()
+        cluster.db_set("status", "Active")
+        db = frappe.db
+        cases = {
+            "nothing pending": (0, False, True),
+            "writes": (3, False, False),
+            "queued job": (0, True, False),
+        }
+        for name, (writes, queued, refreshed) in cases.items():
+            after_commit = CallbackManager()
+            if queued:
+                after_commit.add(lambda: None)
+            with (
+                self.subTest(name),
+                patch.object(db, "transaction_writes", writes),
+                patch.object(db, "before_commit", CallbackManager()),
+                patch.object(db, "after_commit", after_commit),
+            ):
+                with (
+                    patch.object(db, "rollback") as rollback,
+                    patch.object(cluster, "reload") as reload,
+                    patch.object(plan, "cluster_plan", return_value=[]),
+                    patch.object(cluster, "get_client"),
+                    patch.object(cluster, "bump_config_version"),
+                ):
+                    cluster.push_config()
+                self.assertEqual((rollback.called, reload.called), (refreshed, refreshed))
+
+    def test_a_push_that_outlived_its_lock_is_logged_not_raised(self) -> None:
+        from suite_cloud.mail.doctype.stalwart_cluster import stalwart_cluster
+
+        lock = frappe.cache.lock(f"{frappe.local.site}:suite_cloud:test-expired-lock", timeout=30)
+        self.assertTrue(lock.acquire(blocking=False))
+        lock.redis.delete(lock.name)  # as if the push outlived the lock's timeout
+        with patch.object(stalwart_cluster, "log_error") as log_error:
+            stalwart_cluster.release_push_lock(lock, "c1")
+        log_error.assert_called_once()
+
+    def test_desk_changes_queue_their_push_on_the_long_queue(self) -> None:
+        from suite_cloud.mail.cluster import egress
+
+        frappe.flags.do_not_enqueue = False
+        with patch("frappe.enqueue") as enqueue:
+            egress.resync_cluster_after_commit("c1")
+        enqueue.assert_called_once_with(
+            egress.resync_cluster_job, cluster="c1", queue="long", enqueue_after_commit=True
+        )
+
+    def test_tests_reach_only_test_hosts(self) -> None:
+        from suite_cloud.mail.stalwart import get_client
+        from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
+
+        cluster = make_cluster()
+        self.assertIn(".test", cluster.base_url)
+        cluster.base_url = "https://mail.c1.frappe.email"
+        self.assertRaisesRegex(frappe.ValidationError, "only reach .test hosts", get_client, cluster)
+
+        node = make_node(cluster)
+        node.db_set("hostname", "n9.c9.frappe.email")
+        with patch("suite_cloud.provisioning.ansible.PlaybookRun.run") as run:
+            self.assertRaisesRegex(
+                frappe.ValidationError,
+                "only reach .test hosts",
+                create_server_job,
+                node,
+                "install-agent.yml",
+                title="Install agent",
+            )
+        run.assert_not_called()
 
     def test_connections_pin_the_host_key_recorded_at_first_contact(self) -> None:
         from suite_cloud.provisioning.ssh import SSHTarget, UnknownHostError, inventory_line, known_hosts_file

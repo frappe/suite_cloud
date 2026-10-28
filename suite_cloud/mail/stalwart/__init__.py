@@ -8,13 +8,14 @@ Bearer token cannot do: minting API keys and creating app passwords inside a mem
 
 import hashlib
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 import frappe
 from frappe.utils import cint
 
 from suite_cloud.mail.stalwart.client import StalwartClient
 from suite_cloud.mail.stalwart.connection import ConnectionInfo, JMAPConnection, SessionStore
-from suite_cloud.utils import get_config
+from suite_cloud.utils import assert_test_host, get_config
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -33,10 +34,10 @@ def get_client(target: Document, timeout: tuple[float, float] = DEFAULT_TIMEOUT)
     token = target.get_password("api_key", raise_exception=False)
     password = target.get_password("admin_password", raise_exception=False)
     if token:
-        info = ConnectionInfo(target.base_url, token=token, timeout=timeout, verify_ssl=verify_tls())
+        info = ConnectionInfo(get_base_url(target), token=token, timeout=timeout, verify_ssl=verify_tls())
     elif password:
         info = ConnectionInfo(
-            target.base_url,
+            get_base_url(target),
             username=target.admin_username,
             password=password,
             timeout=timeout,
@@ -55,6 +56,13 @@ def get_client(target: Document, timeout: tuple[float, float] = DEFAULT_TIMEOUT)
     return StalwartClient(JMAPConnection(info, session_store=store))
 
 
+def get_base_url(target: Document) -> str:
+    """The target's management URL; while tests run, only a ``.test`` host's."""
+
+    assert_test_host(urlparse(target.base_url).hostname)
+    return target.base_url
+
+
 def has_credentials(target: Document) -> bool:
     """Whether ``get_client`` can authenticate against the target at all."""
 
@@ -68,7 +76,7 @@ def get_admin_client(target: Document, timeout: tuple[float, float] = DEFAULT_TI
     """Authenticates with the admin account's password; sessions are never cached."""
 
     info = ConnectionInfo(
-        target.base_url,
+        get_base_url(target),
         username=target.admin_username,
         password=target.get_password("admin_password"),
         timeout=timeout,
@@ -87,7 +95,7 @@ def get_account_client(
     """
 
     info = ConnectionInfo(
-        target.base_url,
+        get_base_url(target),
         username=f"{email}%{target.admin_username}",
         password=target.get_password("admin_password"),
         timeout=timeout,

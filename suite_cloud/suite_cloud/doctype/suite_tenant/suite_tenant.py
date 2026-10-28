@@ -114,7 +114,7 @@ class SuiteTenant(Document):
             from suite_cloud.mail.cluster import egress
 
             for name in {before.stalwart_cluster, self.stalwart_cluster} - {None}:
-                egress.resync_cluster(frappe.get_cached_doc("Stalwart Cluster", name))
+                egress.resync_cluster_after_commit(name)
 
     def on_trash(self) -> None:
         self.assert_no_live_site()

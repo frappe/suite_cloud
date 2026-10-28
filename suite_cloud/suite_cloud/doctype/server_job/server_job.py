@@ -11,7 +11,7 @@ from frappe.utils import cint, now, time_diff_in_seconds
 from frappe.utils.background_jobs import is_job_enqueued
 
 from suite_cloud.provisioning.ansible import PlaybookRun, playbook_path, playbook_task_names
-from suite_cloud.utils import get_config, log_exception
+from suite_cloud.utils import assert_test_host, get_config, log_exception
 
 # Every function a job may run to build its variables, and every method it may call back on its
 # server. A System Manager can create Server Job rows; a free choice here would be a way to
@@ -103,6 +103,7 @@ class ServerJob(Document):
 
         if self.status == "Running" and not self.is_stale():
             return
+        assert_test_host(frappe.db.get_value(self.server_doctype, self.server, "hostname"))
 
         self.mark_running()
         run = None
