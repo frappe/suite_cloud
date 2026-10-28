@@ -5,6 +5,7 @@
 
 from uuid import uuid7
 
+import frappe
 from frappe.model.document import Document
 from frappe.utils import now_datetime
 
@@ -43,3 +44,9 @@ class TelemetryAlert(Document):
         elif not self.resolved_at:
             self.resolved_at = now_datetime()
             self.dismissed = 0 if self.flags.resolved_by_check else 1
+
+
+def on_doctype_update() -> None:
+    """A dismissed alert is looked up by host and type."""
+
+    frappe.db.add_index("Telemetry Alert", ["host_ip", "alert_type"])

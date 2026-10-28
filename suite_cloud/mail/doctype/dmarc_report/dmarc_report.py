@@ -111,6 +111,8 @@ def on_doctype_update() -> None:
     # A report is one object on one cluster; the pair is what the fetch dedups on, and two runs
     # racing each other must not store it twice.
     frappe.db.add_unique("DMARC Report", ["cluster", "stalwart_id"])
+    # The tenant API lists and sums a tenant's reports by the end of their period.
+    frappe.db.add_index("DMARC Report", ["tenant", "date_range_end"])
 
 
 DMARC_REPORTS = ReceivedReports(

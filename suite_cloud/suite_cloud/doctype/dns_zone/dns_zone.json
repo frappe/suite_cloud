@@ -31,8 +31,7 @@
    "label": "Domain Name",
    "placeholder": "frappemail.com",
    "reqd": 1,
-   "set_only_once": 1,
-   "unique": 1
+   "set_only_once": 1
   },
   {
    "description": "Blank uses the Default DNS TTL in Suite Cloud Settings.",
@@ -155,7 +154,7 @@
    "link_fieldname": "dns_zone"
   }
  ],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "DNS Zone",

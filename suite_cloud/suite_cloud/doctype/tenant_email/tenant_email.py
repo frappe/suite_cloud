@@ -60,6 +60,12 @@ class TenantEmail(Document):
         frappe.db.delete(table, filters=(table.creation < (Now() - Interval(days=days))))
 
 
+def on_doctype_update() -> None:
+    """The monthly send limit counts a tenant's emails by ``sent_at``."""
+
+    frappe.db.add_index("Tenant Email", ["tenant", "sent_at"])
+
+
 def send(tenant, name: str, recipient: str, params: dict, request_key: str) -> TenantEmail:
     """Sends the tenant's site one of Suite Cloud's emails now, from its template and through the
     Email Account of the tenant's type.

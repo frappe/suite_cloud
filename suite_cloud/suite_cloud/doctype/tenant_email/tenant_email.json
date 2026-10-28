@@ -30,8 +30,7 @@
    "label": "Tenant",
    "options": "Suite Tenant",
    "read_only": 1,
-   "reqd": 1,
-   "search_index": 1
+   "reqd": 1
   },
   {
    "description": "e.g. password-reset or account-invite. other if the site did not say.",
@@ -56,8 +55,7 @@
    "fieldname": "sent_at",
    "fieldtype": "Datetime",
    "label": "Sent At",
-   "read_only": 1,
-   "search_index": 1
+   "read_only": 1
   },
   {
    "fieldname": "column_break_main",
@@ -134,7 +132,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Tenant Email",

@@ -413,6 +413,12 @@ class StalwartCluster(Document):
         return upgrade_agents(self) if is_telemetry_enabled() else []
 
 
+def on_doctype_update() -> None:
+    """A label names the cluster's hosts under its DNS zone."""
+
+    frappe.db.add_unique("Stalwart Cluster", ["dns_zone", "label"])
+
+
 @contextmanager
 def push_lock(cluster: str, wait: float = PUSH_TIMEOUT) -> Iterator[None]:
     """One config push per cluster at a time, so a push that started later never loses to an older

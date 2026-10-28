@@ -37,7 +37,6 @@
    "label": "DNS Zone",
    "options": "DNS Zone",
    "reqd": 1,
-   "search_index": 1,
    "set_only_once": 1
   },
   {
@@ -49,7 +48,6 @@
    "label": "Host",
    "length": 255,
    "reqd": 1,
-   "search_index": 1,
    "set_only_once": 1
   },
   {
@@ -170,7 +168,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "DNS Record",

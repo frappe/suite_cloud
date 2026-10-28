@@ -29,7 +29,6 @@
    "options": "Email",
    "reqd": 1,
    "set_only_once": 1,
-   "unique": 1,
    "description": "Group address, e.g. sales@acme.com. Mail sent to it reaches each member. Cannot be changed after save."
   },
   {
@@ -138,7 +137,7 @@
    "table_fieldname": "groups"
   }
  ],
- "modified": "2026-10-28 18:22:33.441427",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Group",

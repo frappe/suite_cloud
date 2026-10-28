@@ -156,8 +156,7 @@
    "in_list_view": 1,
    "label": "Hostname",
    "read_only": 1,
-   "set_only_once": 1,
-   "unique": 1
+   "set_only_once": 1
   },
   {
    "description": "Sub-zone for nodes, gateways and pools, e.g. blr.frappemail.com.",
@@ -562,7 +561,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",
