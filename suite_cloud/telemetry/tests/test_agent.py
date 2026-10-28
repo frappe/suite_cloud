@@ -397,6 +397,16 @@ class TestAgentDeploy(AgentBuildFixture):
             servers = {frappe.db.get_value("Server Job", name, "server") for name in jobs}
             self.assertEqual(servers, {self.node.name, self.gateway.name})
 
+    def test_the_settings_save_leaves_the_roll_out_to_a_background_job(self) -> None:
+        frappe.flags.do_not_enqueue = False
+        before = frappe.get_all("Server Job", pluck="name")
+        settings = frappe.get_single("Suite Cloud Settings")
+        settings.enable_telemetry = 0
+        with patch("frappe.enqueue") as enqueue:
+            settings.save()
+        enqueue.assert_called_once_with(deploy.roll_out_agents, queue="long", enqueue_after_commit=True)
+        self.assertEqual(frappe.get_all("Server Job", {"name": ["not in", before]}), [])
+
     def test_turning_telemetry_on_or_off_rolls_the_agents_out(self) -> None:
         self.node.db_set("status", "Active")
         self.gateway.db_set("status", "Active")

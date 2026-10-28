@@ -259,11 +259,22 @@ def switch_off_quota_hooks() -> None:
         egress.resync_cluster_after_commit(name)
 
 
-def roll_out_agents(enabled: bool) -> list[str]:
-    """After Enable Telemetry changed: every server that runs an agent gets it installed, or
-    stopped when telemetry was turned off. Runs inside the settings save, so a missing build is an
-    Error Log, not an exception."""
+def enqueue_roll_out_agents() -> None:
+    """Enable Telemetry changed. In the background, since the roll-out loads every server of every
+    cluster and creates a job for each; one job per turn of the setting, each reading the setting
+    when it runs, so quick turns end in the last one."""
 
+    if frappe.flags.do_not_enqueue:
+        roll_out_agents()
+        return
+    frappe.enqueue(roll_out_agents, queue="long", enqueue_after_commit=True)
+
+
+def roll_out_agents() -> list[str]:
+    """Every server that runs an agent gets it installed, or stopped while telemetry is off. A
+    missing build is an Error Log, not an exception: the setting is already saved."""
+
+    enabled = is_telemetry_enabled()
     if not enabled:
         switch_off_quota_hooks()
     servers = agent_servers()

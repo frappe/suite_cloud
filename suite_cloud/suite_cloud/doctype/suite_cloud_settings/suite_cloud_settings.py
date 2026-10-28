@@ -111,9 +111,9 @@ class SuiteCloudSettings(Document):
 
             enqueue_recheck_of_vouched_domains()
         if before and cint(before.enable_telemetry) != cint(self.enable_telemetry):
-            from suite_cloud.telemetry.agent.deploy import roll_out_agents
+            from suite_cloud.telemetry.agent.deploy import enqueue_roll_out_agents
 
-            roll_out_agents(enabled=bool(self.enable_telemetry))
+            enqueue_roll_out_agents()
 
     def validate_report_retention(self) -> None:
         for field in (
