@@ -266,12 +266,12 @@ class TestAgentDeploy(AgentBuildFixture):
 
     def test_the_quota_section_waits_for_a_build_that_answers_the_hook(self) -> None:
         self.build().run()  # 0.1.0 refuses a config with a quota section
-        self.assertFalse(deploy.is_quota_enabled())
+        self.assertFalse(build.is_quota_enabled())
         self.assertNotIn("quota", deploy.agent_config(self.node))
 
         (self.source / "VERSION").write_text("0.2.0\n")
         self.build().run()
-        self.assertTrue(deploy.is_quota_enabled())
+        self.assertTrue(build.is_quota_enabled())
         section = deploy.agent_config(self.node)["quota"]
         self.assertEqual(
             (section["hook_port"], section["limits_poll_seconds"], section["usage_push_seconds"]),

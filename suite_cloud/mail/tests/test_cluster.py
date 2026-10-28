@@ -466,8 +466,12 @@ class TestStalwartCluster(IntegrationTestCase):
             old_key = cluster.get_password("api_key")
             clear_request_cache()
             self.assertEqual(cluster.get_client().cluster_nodes.find_by_hostname(node.hostname)["nodeId"], 7)
+            cluster.label = "Unsaved edit"  # the form sends its unsaved edits with the call
             cluster.rotate_api_key()
             self.assertNotEqual(cluster.get_password("api_key"), old_key)
+            self.assertNotEqual(
+                frappe.db.get_value("Stalwart Cluster", cluster.name, "label"), "Unsaved edit"
+            )
             self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
 
     def test_client_falls_back_to_the_admin_password_without_an_api_key(self) -> None:

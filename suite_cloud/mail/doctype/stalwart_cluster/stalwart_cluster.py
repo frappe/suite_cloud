@@ -332,6 +332,7 @@ class StalwartCluster(Document):
         """Mints a fresh management key with the admin credentials and forgets the old one."""
 
         frappe.only_for("System Manager")
+        self.reload()  # the form sends its unsaved edits too; only the key is saved
         client = self.get_admin_client()
         old = client.api_keys.find_local(description=plan.API_KEY_DESCRIPTION)
         _, secret = client.api_keys.create_secret(
@@ -387,8 +388,10 @@ class StalwartCluster(Document):
         reinstalled is refused and retries, so it loses nothing."""
 
         frappe.only_for("System Manager")
-        from suite_cloud.telemetry.agent.deploy import is_telemetry_enabled, upgrade_agents
+        from suite_cloud.telemetry.agent.build import is_telemetry_enabled
+        from suite_cloud.telemetry.agent.deploy import upgrade_agents
 
+        self.reload()  # the form sends its unsaved edits too; only the secret is saved
         self.agent_secret = frappe.generate_hash(length=40)
         self.save(ignore_permissions=True)
         return upgrade_agents(self) if is_telemetry_enabled() else []

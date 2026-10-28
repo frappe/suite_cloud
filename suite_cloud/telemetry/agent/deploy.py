@@ -10,7 +10,12 @@ from frappe.utils import cint, get_url
 from suite_cloud.mail.cluster import plan, quota
 from suite_cloud.mail.stalwart import verify_tls
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
-from suite_cloud.telemetry.agent.build import ARCHITECTURES, AgentBuild
+from suite_cloud.telemetry.agent.build import (
+    ARCHITECTURES,
+    AgentBuild,
+    is_quota_enabled,
+    is_telemetry_enabled,
+)
 from suite_cloud.utils import get_config, log_error
 
 if TYPE_CHECKING:
@@ -85,13 +90,6 @@ def quota_config(cluster: Document) -> dict:
     }
 
 
-def is_quota_enabled() -> bool:
-    """The hook and the Agents' quota section wait for telemetry to be on and a build with quota."""
-
-    build = AgentBuild.last_built()
-    return is_telemetry_enabled() and bool(build) and build.has_quota
-
-
 def scrapes_metrics(server: Document) -> bool:
     """The cluster's switch turns the exporter on. A gateway keeps every listener on; an
     outbound-only node runs none, so there is nothing to scrape."""
@@ -132,10 +130,6 @@ MemoryMax=256M
 [Install]
 WantedBy=multi-user.target
 """
-
-
-def is_telemetry_enabled() -> bool:
-    return bool(cint(get_config("enable_telemetry")))
 
 
 def agent_variables(server: Document, restart: bool = False) -> dict:

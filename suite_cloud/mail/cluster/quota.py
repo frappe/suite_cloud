@@ -3,7 +3,7 @@ signed-in sender's message is accepted, a native throttle that caps every accoun
 is down, and the counter store the Agents share.
 
 The hook and the Agents' ``quota`` config go out together, and only once the last agent build
-answers the hook (``deploy.is_quota_enabled``); until then the plan leaves both out.
+answers the hook (``build.is_quota_enabled``); until then the plan leaves both out.
 """
 
 from typing import TYPE_CHECKING
@@ -12,6 +12,7 @@ from frappe.utils import cint
 
 from suite_cloud.mail.cluster.plan import as_list, as_set, secret_value
 from suite_cloud.mail.doctype.stalwart_store.stalwart_store import lines
+from suite_cloud.telemetry.agent.build import is_quota_enabled
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -29,8 +30,6 @@ REDIS_STORE_TYPES = {"Redis": "redis", "RedisCluster": "redis_cluster", "RedisSe
 def cluster_operations(cluster: Document) -> list[dict]:
     """The hook and the backstop, switched off while quota is: the plan only upserts, so leaving
     them out would keep Stalwart calling an Agent that no longer answers."""
-
-    from suite_cloud.telemetry.agent.deploy import is_quota_enabled  # deploy imports this module
 
     enabled = is_quota_enabled()
     return [hook_operation(cluster, enabled), backstop_operation(cluster, enabled)]

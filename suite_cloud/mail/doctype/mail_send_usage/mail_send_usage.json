@@ -21,8 +21,7 @@
    "label": "Account",
    "options": "Mail Account",
    "read_only": 1,
-   "reqd": 1,
-   "search_index": 1
+   "reqd": 1
   },
   {
    "description": "d:YYYYMMDD for a UTC day, m:YYYYMM for a UTC month.",
@@ -71,7 +70,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-28 12:00:00.000000",
+ "modified": "2026-10-28 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Send Usage",

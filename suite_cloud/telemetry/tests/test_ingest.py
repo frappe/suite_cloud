@@ -108,9 +108,11 @@ class TestAuthentication(TelemetryApiTestCase):
     def test_a_rotated_secret_refuses_the_old_one_at_once(self) -> None:
         frappe.set_user("Administrator")
         cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
+        cluster.label = "Unsaved edit"  # the form sends its unsaved edits with the call
         with patch("suite_cloud.telemetry.agent.deploy.upgrade_agents", return_value=[]) as upgrade:
             cluster.rotate_agent_secret()
         upgrade.assert_called_once()
+        self.assertNotEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "label"), "Unsaved edit")
 
         with self.assertRaisesRegex(frappe.AuthenticationError, "failed"):
             self.request(self.token)

@@ -28,6 +28,17 @@ from suite_cloud.tests.fixtures import ROOT_DOMAIN
 NODE_IP = "203.0.113.10"
 
 
+def frozen_clock(moment: datetime) -> type[datetime]:
+    """``datetime`` with ``now()`` fixed at ``moment``, for the usage module."""
+
+    class Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return moment.astimezone(tz)
+
+    return Frozen
+
+
 class SendingLimitsTestCase(TenantApiTestCase):
     def setUp(self) -> None:
         super().setUp()
@@ -42,6 +53,11 @@ class SendingLimitsTestCase(TenantApiTestCase):
         settle = patch.object(quota_api, "SETTLE_SECONDS", 0)
         settle.start()
         self.addCleanup(settle.stop)
+        # One moment for the test and the code, so a run across midnight UTC sees one day.
+        self.now = datetime.now(UTC)
+        clock = patch.object(mail_send_usage, "datetime", frozen_clock(self.now))
+        clock.start()
+        self.addCleanup(clock.stop)
 
     def tearDown(self) -> None:
         frappe.local.agent_cluster = None
@@ -105,6 +121,9 @@ class TestLimitsApi(SendingLimitsTestCase):
         self.node.db_set("status", "Provisioned")
         self.assertRaises(frappe.PermissionError, self.pull)
 
+    def test_the_pull_reads_an_index_on_cluster_and_modified(self) -> None:
+        self.assertTrue(frappe.db.has_index("tabMail Account", "cluster_modified_index"))
+
     def test_only_agents_may_call(self) -> None:
         frappe.set_user("Administrator")
         self.assertRaises(frappe.PermissionError, quota_api.limits, NODE_IP)
@@ -147,7 +166,7 @@ class TestUsageApi(SendingLimitsTestCase):
         self.assertEqual(self.stored("alice@acme.com", day, "send_limit"), 150)
 
     def test_a_late_report_keeps_the_limit_of_its_day(self) -> None:
-        yesterday, _month = periods_at(datetime.now(UTC) - timedelta(days=1))
+        yesterday, _month = periods_at(self.now - timedelta(days=1))
         self.push(("alice@acme.com", yesterday, 90))
         frappe.db.set_value("Mail Account", "alice@acme.com", "daily_send_limit", 10)  # after midnight
         self.push(("alice@acme.com", yesterday, 95))
@@ -167,14 +186,15 @@ class TestUsageApi(SendingLimitsTestCase):
             [
                 {"account": "gone@acme.com", "period": day, "sent": 3, "refused": 0},
                 {"account": "alice@acme.com", "period": day, "sent": 2, "refused": 0},
-            ]
+            ],
+            self.cluster.name,
         )
         self.assertEqual(self.stored("alice@acme.com", day), 2)
         self.assertIsNone(self.stored("gone@acme.com", day))
 
     def test_unknown_accounts_and_old_periods_are_dropped(self) -> None:
         day, _month = current_periods()
-        old_day, _old_month = periods_at(datetime.now(UTC) - timedelta(days=3))
+        old_day, _old_month = periods_at(self.now - timedelta(days=3))
         answer = self.push(
             ("ALICE@acme.com", day, 1), ("ghost@acme.com", day, 1), ("bob@acme.com", old_day, 1)
         )
@@ -188,13 +208,7 @@ class TestUsageApi(SendingLimitsTestCase):
         """The Agent's first push after midnight UTC sends the periods that just ended."""
 
         moment = datetime(2026, 11, 1, 0, 0, 30, tzinfo=UTC)
-
-        class Frozen(datetime):
-            @classmethod
-            def now(cls, tz=None):
-                return moment.astimezone(tz)
-
-        with patch(f"{mail_send_usage.__name__}.datetime", Frozen):
+        with patch.object(mail_send_usage, "datetime", frozen_clock(moment)):
             answer = self.push(
                 ("alice@acme.com", "d:20261101", 1),
                 ("alice@acme.com", "m:202611", 1),
@@ -234,11 +248,15 @@ class TestUsageApi(SendingLimitsTestCase):
         self.assertFalse(frappe.db.exists("Mail Send Usage", {"account": "alice@acme.com"}))
 
     def test_prune_keeps_the_days_and_months_of_the_retention(self) -> None:
-        now = datetime.now(UTC)
+        now = self.now
         inside, outside, old = (now - timedelta(days=days) for days in (29, 31, 70))
         rows = [*current_periods(), *periods_at(inside), *periods_at(outside), *periods_at(old)]
         upsert_usage(
-            [{"account": "alice@acme.com", "period": period, "sent": 1, "refused": 0} for period in set(rows)]
+            [
+                {"account": "alice@acme.com", "period": period, "sent": 1, "refused": 0}
+                for period in set(rows)
+            ],
+            self.cluster.name,
         )
         with patch(f"{mail_send_usage.__name__}.get_config", return_value=30):
             prune_usage()
@@ -276,13 +294,14 @@ class TestTenantSendLimits(SendingLimitsTestCase):
         self.assertFalse(frappe.db.exists("Mail Account", "dave@acme.com"))
 
     def test_tenants_read_an_account_s_daily_history(self) -> None:
-        now = datetime.now(UTC)
+        now = self.now
         today, two_days_ago, long_ago = (now - timedelta(days=days) for days in (0, 2, 40))
         # A future row, which the usage API never stores, stays out of the answer too.
         future = now + timedelta(days=40)
         periods = {*periods_at(today), *periods_at(two_days_ago), *periods_at(long_ago), *periods_at(future)}
         upsert_usage(
-            [{"account": "alice@acme.com", "period": period, "sent": 9, "refused": 1} for period in periods]
+            [{"account": "alice@acme.com", "period": period, "sent": 9, "refused": 1} for period in periods],
+            self.cluster.name,
         )
 
         history = accounts.get_send_usage("alice@acme.com", days=7)
@@ -308,11 +327,11 @@ class TestQuotaPlan(SendingLimitsTestCase):
             return values["MtaHook"]["quota"], values["MtaInboundThrottle"]["quota-backstop"]
 
         # Off: both stay in the plan, switched off, so a hook installed before is turned off too.
-        with patch("suite_cloud.telemetry.agent.deploy.is_quota_enabled", return_value=False):
+        with patch.object(quota, "is_quota_enabled", return_value=False):
             hook, backstop = quota_objects(plan.cluster_plan(self.cluster))
         self.assertEqual((hook["enable"], backstop["enable"]), (quota.NEVER, False))
 
-        with patch("suite_cloud.telemetry.agent.deploy.is_quota_enabled", return_value=True):
+        with patch.object(quota, "is_quota_enabled", return_value=True):
             operations = plan.cluster_plan(self.cluster)
             recovery = plan.recovery_plan(self.cluster)
         hook = next(op for op in operations if op["object"] == "MtaHook")["value"]["quota"]

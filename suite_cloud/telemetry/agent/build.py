@@ -207,6 +207,17 @@ def build_agent() -> str:
         return str(e)
 
 
+def is_telemetry_enabled() -> bool:
+    return bool(cint(get_config("enable_telemetry")))
+
+
+def is_quota_enabled() -> bool:
+    """The hook and the Agents' quota section wait for telemetry to be on and a build with quota."""
+
+    build = AgentBuild.last_built()
+    return is_telemetry_enabled() and bool(build) and build.has_quota
+
+
 def build_if_outdated() -> None:
     """After a migrate: queue a build when the sources changed. Never fails the migrate."""
 
@@ -217,7 +228,7 @@ def build_if_outdated() -> None:
         if build.version == get_config("agent_built_version") and build.is_built:
             return
         if not find_go():
-            if cint(get_config("enable_telemetry")):
+            if is_telemetry_enabled():
                 log_error("Agent not built", _("Telemetry is on but this bench host has no Go toolchain."))
             return
         enqueue_build()

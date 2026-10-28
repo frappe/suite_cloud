@@ -76,8 +76,7 @@
    "fieldtype": "Link",
    "label": "Cluster",
    "options": "Stalwart Cluster",
-   "read_only": 1,
-   "search_index": 1
+   "read_only": 1
   },
   {
    "fieldname": "column_break_main",
@@ -241,7 +240,7 @@
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-26 12:00:00.000000",
+ "modified": "2026-10-28 15:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",

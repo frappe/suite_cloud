@@ -119,18 +119,19 @@ def usage_history(account: str, days: int) -> dict[str, list[dict]]:
     return history
 
 
-def upsert_usage(rows: list[dict]) -> None:
-    """Stores ``{account, period, sent, refused}`` rows in one statement. Agents on several nodes
-    report the same counters, and a counter only grows within its period, so the higher count is
-    kept. A current period takes the account's limit as it is now; a past one keeps the limit it
-    was stored with, so a late report after a limit change does not rewrite it."""
+def upsert_usage(rows: list[dict], cluster: str) -> int:
+    """Stores the ``{account, period, sent, refused}`` rows of the cluster's accounts in one
+    statement and returns how many it stored. Agents on several nodes report the same counters,
+    and a counter only grows within its period, so the higher count is kept. A current period
+    takes the account's limit as it is now; a past one keeps the limit it was stored with, so a
+    late report after a limit change does not rewrite it."""
 
     if not rows:
-        return
-    limits = limits_by_account(list({row["account"] for row in rows}))
-    rows = [row for row in rows if row["account"] in limits]  # deleted since the caller looked
+        return 0
+    limits = limits_by_account(list({row["account"] for row in rows}), cluster)
+    rows = [row for row in rows if row["account"] in limits]  # another cluster's, or deleted
     if not rows:
-        return
+        return 0
     now = frappe.utils.now()
     user = frappe.session.user
     usage = frappe.qb.DocType("Mail Send Usage")
@@ -173,14 +174,16 @@ def upsert_usage(rows: list[dict]) -> None:
         .on_duplicate_key_update(usage.modified, Values(usage.modified))
     )
     query.run()
+    return len(rows)
 
 
-def limits_by_account(accounts: list[str]) -> dict[str, dict[str, int]]:
-    """``{account: {"d": daily, "m": monthly}}``, keyed like the first letter of a period."""
+def limits_by_account(accounts: list[str], cluster: str) -> dict[str, dict[str, int]]:
+    """``{account: {"d": daily, "m": monthly}}`` of the cluster's accounts, keyed like the first
+    letter of a period."""
 
     rows = frappe.get_all(
         "Mail Account",
-        filters={"name": ("in", accounts)},
+        filters={"cluster": cluster, "name": ("in", accounts)},
         fields=["name", "daily_send_limit", "monthly_send_limit"],
     )
     return {row.name: {"d": row.daily_send_limit, "m": row.monthly_send_limit} for row in rows}

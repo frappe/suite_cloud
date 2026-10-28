@@ -307,6 +307,12 @@ class MailAccount(QuotaHolder, Document):
         )
 
 
+def on_doctype_update() -> None:
+    """The Agents' limits pull reads a cluster's accounts in ``modified`` order after a cursor."""
+
+    frappe.db.add_index("Mail Account", ["cluster", "modified"])
+
+
 def validate_password(password: str | None) -> None:
     if not password or len(password) < MIN_PASSWORD_LENGTH:
         frappe.throw(_("Password must be at least {0} characters.").format(MIN_PASSWORD_LENGTH))

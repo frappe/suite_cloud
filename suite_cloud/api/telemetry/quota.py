@@ -79,16 +79,7 @@ def usage(host_ip: str, records: list) -> dict:
     cluster = get_cluster_for_host(host_ip)
     rows = [parse_usage(record) for record in get_records(records)]
     periods = reportable_periods()
-    accounts = set(
-        frappe.get_all(
-            "Mail Account",
-            filters={"cluster": cluster, "name": ("in", list({row["account"] for row in rows}))},
-            pluck="name",
-        )
-    )
-    kept = [row for row in rows if row["account"] in accounts and row["period"] in periods]
-    upsert_usage(kept)
-    return {"accepted": len(kept)}
+    return {"accepted": upsert_usage([row for row in rows if row["period"] in periods], cluster)}
 
 
 def get_cluster_for_host(host_ip: str) -> str:

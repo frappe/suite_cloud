@@ -216,7 +216,8 @@ class StalwartNode(Document):
         """The agent's config.json as the next Install Agent writes it, secrets masked."""
 
         frappe.only_for("System Manager")
-        from suite_cloud.telemetry.agent.deploy import is_telemetry_enabled, masked_agent_config
+        from suite_cloud.telemetry.agent.build import is_telemetry_enabled
+        from suite_cloud.telemetry.agent.deploy import masked_agent_config
 
         return {"config": masked_agent_config(self), "telemetry_enabled": is_telemetry_enabled()}
 
