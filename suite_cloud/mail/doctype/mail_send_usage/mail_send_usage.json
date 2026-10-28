@@ -34,7 +34,7 @@
    "search_index": 1
   },
   {
-   "description": "Recipients counted in the period. A message to 50 recipients counts as 50.",
+   "description": "Recipients in the period. A message to 50 recipients counts as 50.",
    "fieldname": "sent",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -43,7 +43,7 @@
    "read_only": 1
   },
   {
-   "description": "Messages refused in the period for going over a limit. A refused message counts once, whatever its recipients.",
+   "description": "Messages refused for going over the limit.",
    "fieldname": "refused",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -52,7 +52,7 @@
    "read_only": 1
   },
   {
-   "description": "The account's daily or monthly limit while the period was current. 0 means no limit.",
+   "description": "0 means no limit.",
    "fieldname": "send_limit",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -70,7 +70,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-10-28 15:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Send Usage",

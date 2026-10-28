@@ -17,7 +17,7 @@
  ],
  "fields": [
   {
-   "description": "The step's key in suite_cloud.hosting.progress, e.g. mail_records.",
+   "description": "Step key, e.g. mail_records.",
    "fieldname": "step",
    "fieldtype": "Data",
    "label": "Step Key",
@@ -26,7 +26,6 @@
   },
   {
    "columns": 4,
-   "description": "What the step does, e.g. Verifying the Mail Domain DNS records. Steps are listed in the order they run; the site domain runs alongside the mail steps.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -37,7 +36,7 @@
   {
    "columns": 2,
    "default": "Pending",
-   "description": "Pending: the steps it follows have not finished. Running: started, maybe waiting on a server or on DNS; Detail says what for. Completed: done. Skipped: not needed, e.g. no server or site was created for a site taken from the ready pool. Failed: the request failed here; Retry on the request goes on from this step.",
+   "description": "Pending: earlier steps are not done. Running: started, may wait on a server or DNS. Completed: done. Skipped: not needed. Failed: the request failed here. Retry starts again from this step.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -50,14 +49,13 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "When the step first started. A retry keeps it.",
+   "description": "A retry keeps the first start time.",
    "fieldname": "started_at",
    "fieldtype": "Datetime",
    "label": "Started At",
    "read_only": 1
   },
   {
-   "description": "When the step completed or failed.",
    "fieldname": "ended_at",
    "fieldtype": "Datetime",
    "label": "Ended At",
@@ -65,7 +63,7 @@
   },
   {
    "columns": 1,
-   "description": "From Started At to Ended At, waiting included: a step that waits on DNS takes as long as the provider does.",
+   "description": "Includes waiting time, e.g. for DNS.",
    "fieldname": "duration",
    "fieldtype": "Duration",
    "in_list_view": 1,
@@ -78,7 +76,7 @@
   },
   {
    "columns": 3,
-   "description": "What a running step waits for, why a step failed or was skipped, or what it chose, e.g. the server a site was placed on.",
+   "description": "What the step waits for, why it failed or was skipped, or what it chose.",
    "fieldname": "detail",
    "fieldtype": "Small Text",
    "in_list_view": 1,
@@ -89,7 +87,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-17 18:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request Step",

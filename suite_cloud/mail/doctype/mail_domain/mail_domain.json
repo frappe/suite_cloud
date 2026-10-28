@@ -38,7 +38,7 @@
  ],
  "fields": [
   {
-   "description": "The domain mail is sent from and received for, e.g. acme.com. Lowercased and IDNA-encoded on save; it names the record and cannot change.",
+   "description": "Domain to send and receive mail for, e.g. acme.com. Cannot be changed.",
    "fieldname": "domain_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -48,7 +48,7 @@
    "unique": 1
   },
   {
-   "description": "The Suite Tenant that owns the domain and administers it through the API. Fixed once the domain exists; it counts against the tenant's domain limit.",
+   "description": "Tenant that owns the domain. Cannot be changed.",
    "fieldname": "tenant",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -60,7 +60,7 @@
    "set_only_once": 1
   },
   {
-   "description": "The tenant's cluster, copied on every save. The domain is created on this cluster and its DNS records point at it.",
+   "description": "Set from the tenant.",
    "fetch_from": "tenant.stalwart_cluster",
    "fieldname": "cluster",
    "fieldtype": "Link",
@@ -76,19 +76,19 @@
   },
   {
    "default": "1",
-   "description": "Unchecked, the domain stops sending and receiving on the cluster and loses its verification, so it must be verified again after it is enabled. Its accounts and aliases stay in place.",
+   "description": "Clear to stop sending and receiving. The domain must be verified again after it is enabled.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
   },
   {
-   "description": "Free text shown on the cluster next to the domain. Blank falls back to the tenant's name.",
+   "description": "Shown on the cluster. Blank uses the tenant name.",
    "fieldname": "description",
    "fieldtype": "Data",
    "label": "Description"
   },
   {
-   "description": "The domain's id on the cluster, set when it is created there. Blank means the cluster never accepted it.",
+   "description": "ID of the domain on the cluster. Blank if not created there.",
    "fieldname": "stalwart_id",
    "fieldtype": "Data",
    "label": "Stalwart ID",
@@ -97,7 +97,7 @@
   },
   {
    "default": "0",
-   "description": "The tenant's mail domain under the tenant mail zone, created with its hosted site. Suite Cloud publishes its records; the tenant cannot change or delete it.",
+   "description": "Tenant mail domain created with its hosted site. Suite Cloud publishes its records.",
    "fieldname": "hosted",
    "fieldtype": "Check",
    "label": "Hosted",
@@ -110,7 +110,7 @@
    "label": "Settings"
   },
   {
-   "description": "Receives mail addressed to local parts that match no account or alias. Blank rejects such mail.",
+   "description": "Gets mail for addresses that do not exist. Blank rejects that mail.",
    "fieldname": "catch_all_address",
    "fieldtype": "Data",
    "label": "Catch-all Address",
@@ -118,14 +118,14 @@
   },
   {
    "default": "1",
-   "description": "user+tag@domain delivers to user@domain. Turn off if a local part legitimately contains a plus sign.",
+   "description": "Deliver user+tag@domain to user@domain.",
    "fieldname": "sub_addressing",
    "fieldtype": "Check",
    "label": "Sub-addressing"
   },
   {
    "default": "0",
-   "description": "Relay mail for addresses of this domain that have no account here to the domain's MX (split delivery, for domains that keep some mailboxes on another server). Off rejects such mail, or delivers it to the catch-all address.",
+   "description": "Send mail for addresses without an account here to the domain's MX. Use when some mailboxes are on another server.",
    "fieldname": "allow_relaying",
    "fieldtype": "Check",
    "label": "Allow Relaying"
@@ -136,7 +136,7 @@
   },
   {
    "default": "0",
-   "description": "Also list the MTA-STS, autoconfig and autodiscover records. Those hostnames are served over HTTPS and get no certificate from the cluster, so leave this off unless the tenant handles TLS for them.",
+   "description": "Show MTA-STS, autoconfig and autodiscover records. Turn on only if the tenant handles HTTPS for them.",
    "fieldname": "publish_client_discovery_records",
    "fieldtype": "Check",
    "label": "Publish Client Discovery Records"
@@ -148,7 +148,7 @@
   },
   {
    "default": "0",
-   "description": "Set by Verify DNS Records when SPF, DMARC and at least one DKIM record resolve to the expected values on public resolvers. Mail flows only while this is checked and the domain is enabled. A System Manager can set it by hand; the hourly check re-verifies domains that are unchecked, and checked ones with a mandatory record still unresolved, which unchecks a domain verified by hand unless Skip Scheduled Verification is on.",
+   "description": "SPF, DMARC and at least one DKIM record resolve. Mail flows only when the domain is verified and enabled. Checked hourly.",
    "fieldname": "is_verified",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -157,7 +157,7 @@
   },
   {
    "default": "0",
-   "description": "Checked, the hourly check leaves this domain alone, so Verified stays as it was last set, by hand or by the action. Verify DNS Records still resolves the records on demand.",
+   "description": "The hourly check does not change Verified for this domain.",
    "fieldname": "skip_scheduled_verification",
    "fieldtype": "Check",
    "label": "Skip Scheduled Verification",
@@ -165,7 +165,7 @@
   },
   {
    "default": "0",
-   "description": "Verified on the cloud's word while Skip Domain Verification (Suite Cloud Settings) was on, with the hourly check left out. Turning that setting off clears this and checks the records like any other domain's.",
+   "description": "Verified without a DNS check because Skip Domain Verification is on.",
    "fieldname": "verification_skipped",
    "fieldtype": "Check",
    "label": "Verification Skipped",
@@ -173,7 +173,7 @@
    "read_only": 1
   },
   {
-   "description": "When the records were last resolved, by the Verify DNS Records action or the hourly check of unverified domains.",
+   "description": "When the records were last checked.",
    "fieldname": "last_verified_at",
    "fieldtype": "Datetime",
    "label": "Last Verified At",
@@ -184,14 +184,14 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "When the record rows were last rebuilt from the cluster's zone file, by the Refresh DNS Records action or the hourly check for keys the cluster was still generating.",
+   "description": "When the records were last read from the cluster.",
    "fieldname": "last_refreshed_at",
    "fieldtype": "Datetime",
    "label": "Records Refreshed At",
    "read_only": 1
   },
   {
-   "description": "Mandatory. Records that stop others sending mail as this domain: SPF, DKIM and DMARC. Mail flows once SPF, DMARC and at least one DKIM selector resolve.",
+   "description": "Required. SPF, DKIM and DMARC records that stop others sending as this domain.",
    "fieldname": "authentication_records",
    "fieldtype": "Table",
    "label": "Email Authentication",
@@ -199,7 +199,7 @@
    "read_only": 1
   },
   {
-   "description": "Optional. Points mail sent to this domain at the cluster. Leave it out to keep receiving elsewhere and use the cluster for sending only.",
+   "description": "Optional. Sends incoming mail for this domain to the cluster.",
    "fieldname": "routing_records",
    "fieldtype": "Table",
    "label": "Inbound Mail Routing",
@@ -207,7 +207,7 @@
    "read_only": 1
   },
   {
-   "description": "Optional. Asks sending servers to insist on encrypted delivery (MTA-STS) and to report failed or insecure connections (TLS-RPT). MTA-STS rows appear only with Publish Client Discovery Records on.",
+   "description": "Optional. Asks senders to use encrypted delivery and report failures.",
    "fieldname": "transport_security_records",
    "fieldtype": "Table",
    "label": "Transport Security",
@@ -215,7 +215,7 @@
    "read_only": 1
   },
   {
-   "description": "Optional. Lets mail, calendar and contacts apps find the servers for this domain on their own.",
+   "description": "Optional. Lets mail, calendar and contacts apps find the servers.",
    "fieldname": "discovery_records",
    "fieldtype": "Table",
    "label": "Service Discovery",
@@ -224,7 +224,7 @@
   },
   {
    "depends_on": "eval:doc.publish_client_discovery_records",
-   "description": "Optional. Lets mail clients set themselves up from just an address. These hostnames are served over HTTPS by the cluster, which holds no certificate for them.",
+   "description": "Optional. Lets mail clients set up from an email address.",
    "fieldname": "autoconfig_records",
    "fieldtype": "Table",
    "label": "Client Auto-configuration",
@@ -238,14 +238,14 @@
    "label": "Zone File"
   },
   {
-   "description": "The zone file the cluster generated for the domain, as last refreshed. The tables above are parsed from it.",
+   "description": "Zone file from the cluster. The tables above come from it.",
    "fieldname": "dns_zone_file",
    "fieldtype": "Code",
    "label": "Zone File",
    "read_only": 1
   },
   {
-   "description": "Outbound mail of this domain leaves through this pool instead of the tenant's or the cluster's default. The pool must belong to the domain's cluster.",
+   "description": "Pool for outbound mail of this domain. Overrides the tenant and cluster default.",
    "fieldname": "egress_pool",
    "fieldtype": "Link",
    "label": "Egress Pool",
@@ -285,7 +285,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-10-16 12:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Domain",

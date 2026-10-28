@@ -27,7 +27,7 @@
    "in_list_view": 1,
    "columns": 2,
    "read_only": 1,
-   "description": "The address the messages were sent from, as the reporter saw it.",
+   "description": "Address the messages came from.",
    "search_index": 1
   },
   {
@@ -37,7 +37,7 @@
    "in_list_view": 1,
    "columns": 1,
    "read_only": 1,
-   "description": "How many messages from this source shared these results."
+   "description": "Messages with this source and these results."
   },
   {
    "fieldname": "disposition",
@@ -46,7 +46,7 @@
    "in_list_view": 1,
    "columns": 1,
    "read_only": 1,
-   "description": "What the receiver did with the messages: none, quarantine or reject."
+   "description": "What the receiver did: none, quarantine or reject."
   },
   {
    "fieldname": "dkim",
@@ -55,7 +55,7 @@
    "in_list_view": 1,
    "columns": 1,
    "read_only": 1,
-   "description": "The aligned DKIM result the receiver evaluated for the DMARC check."
+   "description": "Aligned DKIM result."
   },
   {
    "fieldname": "spf",
@@ -64,7 +64,7 @@
    "in_list_view": 1,
    "columns": 1,
    "read_only": 1,
-   "description": "The aligned SPF result the receiver evaluated for the DMARC check."
+   "description": "Aligned SPF result."
   },
   {
    "fieldname": "column_break_results",
@@ -77,28 +77,28 @@
    "in_list_view": 1,
    "columns": 2,
    "read_only": 1,
-   "description": "The domain in the From header, which is what DMARC aligns against."
+   "description": "Domain in the From header. DMARC aligns against it."
   },
   {
    "fieldname": "envelope_from",
    "fieldtype": "Data",
    "label": "Envelope From",
    "read_only": 1,
-   "description": "The domain of the SMTP MAIL FROM, which SPF checks."
+   "description": "Domain of the SMTP MAIL FROM. SPF checks it."
   },
   {
    "fieldname": "envelope_to",
    "fieldtype": "Data",
    "label": "Envelope To",
    "read_only": 1,
-   "description": "The domain the messages were addressed to, when the reporter includes it."
+   "description": "Domain the messages were sent to, if reported."
   },
   {
    "fieldname": "override_reasons",
    "fieldtype": "Small Text",
    "label": "Policy Override Reasons",
    "read_only": 1,
-   "description": "Why the receiver applied a different disposition than the policy asked for, one reason per line."
+   "description": "Why the receiver did not follow the policy, one reason per line."
   },
   {
    "fieldname": "details_section",
@@ -111,19 +111,19 @@
    "fieldtype": "JSON",
    "label": "DKIM Results",
    "read_only": 1,
-   "description": "Every DKIM signature the receiver checked, with its domain, selector and result."
+   "description": "Each DKIM signature checked, with domain, selector and result."
   },
   {
    "fieldname": "spf_results",
    "fieldtype": "JSON",
    "label": "SPF Results",
    "read_only": 1,
-   "description": "Every SPF check the receiver made, with its domain, scope and result."
+   "description": "Each SPF check, with domain, scope and result."
   }
  ],
  "istable": 1,
  "links": [],
- "modified": "2026-09-18 12:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "DMARC Report Record",

@@ -105,7 +105,7 @@
    "label": "Suite Cloud"
   },
   {
-   "description": "Address tenants use to reach this Suite Cloud, e.g. https://cloud.frappemail.com. Leave blank to use this site's own URL. Hosted sites are given it to call Suite Cloud, so it must be reachable from Frappe Cloud: on a development machine, set a tunnel's address.",
+   "description": "URL that tenants and hosted sites use to reach Suite Cloud. Blank uses this site's URL. On a development machine, use a tunnel URL.",
    "fieldname": "public_url",
    "fieldtype": "Data",
    "label": "Public URL",
@@ -117,7 +117,7 @@
   },
   {
    "default": "0",
-   "description": "Take a tenant's word for its domains: add them without the TXT record that proves control, and treat them as verified without checking their DNS records. For a development cloud, whose test domains exist in no public DNS. Never on a shared cluster: a wrongly claimed domain locks its owner out, and Stalwart accepts mail for every domain marked verified. Turning it off re-checks the domains it vouched for.",
+   "description": "Treat tenant domains as verified without a DNS check. For development only. Never use on a shared cluster.",
    "fieldname": "skip_domain_verification",
    "fieldtype": "Check",
    "label": "Skip Domain Verification"
@@ -129,7 +129,7 @@
   },
   {
    "default": "1800",
-   "description": "How long an install, bootstrap or upgrade job may run before it is marked failed. Bootstrapping the first node includes waiting for a certificate, so keep this generous. 1800 = 30 minutes.",
+   "description": "Time limit for install, bootstrap and upgrade jobs. 1800 = 30 minutes.",
    "fieldname": "server_job_timeout",
    "fieldtype": "Int",
    "label": "Server Job Timeout (Seconds)",
@@ -141,7 +141,7 @@
   },
   {
    "default": "90",
-   "description": "How long fetched DMARC reports are kept. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
+   "description": "Days to keep DMARC reports. Stalwart deletes its copy after 30 days.",
    "fieldname": "dmarc_report_retention_days",
    "fieldtype": "Int",
    "label": "DMARC Report Retention (Days)",
@@ -149,7 +149,7 @@
   },
   {
    "default": "90",
-   "description": "How long fetched TLS reports are kept. Stalwart drops its own copy after 30 days, so this is the only history a tenant sees.",
+   "description": "Days to keep TLS reports. Stalwart deletes its copy after 30 days.",
    "fieldname": "tls_report_retention_days",
    "fieldtype": "Int",
    "label": "TLS Report Retention (Days)",
@@ -157,7 +157,7 @@
   },
   {
    "default": "90",
-   "description": "How long each account's daily and monthly sent and refused counts are kept for the Sending Usage dashboard. Older rows are deleted daily.",
+   "description": "Days to keep sending counts for the Sending Usage dashboard.",
    "fieldname": "send_usage_retention_days",
    "fieldtype": "Int",
    "label": "Sending Usage Retention (Days)",
@@ -167,10 +167,10 @@
    "fieldname": "email_section",
    "fieldtype": "Section Break",
    "label": "Tenant Email",
-   "description": "Sites connected to Suite Cloud send their mail through it, e.g. invites and password resets."
+   "description": "Connected sites send mail such as invites and password resets through Suite Cloud."
   },
   {
-   "description": "The outgoing Email Account each tenant type's sites send through. A site whose type has none cannot send mail.",
+   "description": "Outgoing Email Account for each tenant type. Sites of a type with no account cannot send mail.",
    "fieldname": "tenant_email_accounts",
    "fieldtype": "Table",
    "label": "Email Accounts",
@@ -182,7 +182,7 @@
   },
   {
    "default": "0",
-   "description": "Send under the tenant's title, e.g. Acme <noreply@example.com>. Off: under the Email Account's name.",
+   "description": "e.g. Acme <noreply@example.com>. Off uses the Email Account name.",
    "fieldname": "use_tenant_title_as_sender_name",
    "fieldtype": "Check",
    "label": "Use Tenant Title as Sender Name"
@@ -193,14 +193,14 @@
    "label": "Agent & Telemetry"
   },
   {
-   "description": "The Suite Cloud Agent runs on every Stalwart node and egress gateway and ships the Stalwart log and host metrics to the telemetry API. Provisioning installs it when Enable Telemetry is on and a build exists.",
+   "description": "The agent runs on each Stalwart node and egress gateway. It sends logs and metrics to Suite Cloud.",
    "fieldname": "agent_section",
    "fieldtype": "Section Break",
    "label": "Agent"
   },
   {
    "default": "300",
-   "description": "How many requests one node's Agent may send per minute, counted by its address: log and metric batches and the sending-limit calls together.",
+   "description": "Per agent.",
    "fieldname": "agent_requests_per_minute",
    "fieldtype": "Int",
    "label": "Agent Requests per Minute",
@@ -208,7 +208,7 @@
   },
   {
    "default": "5000",
-   "description": "How many records one request may hold: log events, metric samples or sending-limit usage. Larger batches mean fewer requests; each is validated whole.",
+   "description": "Log events, metric samples or usage records in one request.",
    "fieldname": "agent_records_per_request",
    "fieldtype": "Int",
    "label": "Agent Records per Request",
@@ -216,7 +216,7 @@
   },
   {
    "default": "8",
-   "description": "How often the agent retries a batch after a server or network failure before it skips the batch. Rate limits never count.",
+   "description": "Retries for a batch after a server or network failure. Rate limits do not count.",
    "fieldname": "agent_max_attempts",
    "fieldtype": "Int",
    "label": "Agent Max Attempts",
@@ -224,7 +224,7 @@
   },
   {
    "default": "60",
-   "description": "How often the agent samples the machine and Stalwart's metrics.",
+   "description": "How often the agent collects metrics.",
    "fieldname": "agent_metrics_interval_seconds",
    "fieldtype": "Int",
    "label": "Metrics Interval (Seconds)",
@@ -232,14 +232,14 @@
   },
   {
    "default": "0",
-   "description": "On a node that already holds log files, ship them too the first time the agent starts there. Off: only new lines are shipped.",
+   "description": "Send old log files the first time the agent starts. Off sends only new lines.",
    "fieldname": "agent_ship_existing_logs",
    "fieldtype": "Check",
    "label": "Ship Existing Logs"
   },
   {
    "default": "0",
-   "description": "The agent deletes a rotated log file this many days after it was shipped whole. 0: never. The node's tmpfiles rule removes log files after 14 days in any case.",
+   "description": "Days to keep a sent log file. 0 keeps it. The node deletes logs after 14 days in any case.",
    "fieldname": "agent_log_delete_after_days",
    "fieldtype": "Int",
    "label": "Delete Shipped Logs After (Days)"
@@ -249,7 +249,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "The agent version Build Agent last built on this bench host; what provisioning installs.",
+   "description": "Version that provisioning installs.",
    "fieldname": "agent_built_version",
    "fieldtype": "Data",
    "label": "Built Agent Version",
@@ -269,14 +269,14 @@
    "read_only": 1
   },
   {
-   "description": "The agents on Stalwart and SFU nodes push logs and metrics to the telemetry API; the loader copies them into Insights.",
+   "description": "Agents send logs and metrics to the telemetry API. A loader copies them into Insights.",
    "fieldname": "telemetry_section",
    "fieldtype": "Section Break",
    "label": "Telemetry"
   },
   {
    "default": "1",
-   "description": "Runs the Suite Cloud Agent on every Stalwart node and egress gateway and opens the telemetry API to them. Each Agent signs in with its cluster's Agent Key and Agent Secret. Turning this on or off queues an Install Agent job on every server that runs an Agent: off, the job stops the Agent.",
+   "description": "Run the agent on each Stalwart node and egress gateway. Changing it queues an Install Agent job on each server.",
    "fieldname": "enable_telemetry",
    "fieldtype": "Check",
    "label": "Enable Telemetry"
@@ -287,20 +287,20 @@
   },
   {
    "default": "90",
-   "description": "How long events and metrics are kept in Insights. Older rows are deleted daily.",
+   "description": "Days to keep events and metrics in Insights.",
    "fieldname": "telemetry_retention_days",
    "fieldtype": "Int",
    "label": "Telemetry Retention (Days)",
    "reqd": 1
   },
   {
-   "description": "Every five minutes, a Telemetry Alert is opened for a node that stopped reporting or logs too many errors, and resolved when the condition clears.",
+   "description": "Checked every five minutes. An alert opens for a node that stops reporting or logs too many errors.",
    "fieldname": "telemetry_alerts_section",
    "fieldtype": "Section Break",
    "label": "Telemetry Alerts"
   },
   {
-   "description": "Email addresses to notify when an alert opens or resolves, separated by commas or lines. Empty: alerts are recorded but nobody is mailed.",
+   "description": "Emails to notify, separated by commas or lines. Blank records alerts without email.",
    "fieldname": "telemetry_alert_recipients",
    "fieldtype": "Small Text",
    "label": "Telemetry Alert Recipients"
@@ -311,7 +311,7 @@
   },
   {
    "default": "30",
-   "description": "A node that reported in the last day but sent nothing for this long is a Silent Host.",
+   "description": "A node with no data for this long gets a Silent Host alert.",
    "fieldname": "telemetry_silence_minutes",
    "fieldtype": "Int",
    "label": "Silent Host After (Minutes)",
@@ -319,7 +319,7 @@
   },
   {
    "default": "5",
-   "description": "A node whose error-level events exceed this share of its events in the last hour (at least 100 events) has an Error Rate alert.",
+   "description": "A node with more errors than this share of its events in the last hour gets an alert. Needs at least 100 events.",
    "fieldname": "telemetry_error_rate_percent",
    "fieldtype": "Int",
    "label": "Error Rate Alert (%)",
@@ -337,7 +337,7 @@
   },
   {
    "default": "v0.16.20",
-   "description": "Stalwart release that new clusters install, e.g. v0.16.20. Existing clusters keep their own version until you run Upgrade Nodes on them.",
+   "description": "Stalwart release for new clusters, e.g. v0.16.20.",
    "fieldname": "stalwart_version",
    "fieldtype": "Data",
    "label": "Stalwart Version",
@@ -345,7 +345,7 @@
   },
   {
    "default": "https://github.com/stalwartlabs/stalwart/releases/download/{version}/stalwart-{target}.tar.gz",
-   "description": "Where the node downloads the Stalwart archive from. {version} is replaced with the release and {target} with the platform, e.g. x86_64-unknown-linux-gnu.",
+   "description": "{version} is the release and {target} the platform, e.g. x86_64-unknown-linux-gnu.",
    "fieldname": "stalwart_download_url_template",
    "fieldtype": "Data",
    "label": "Stalwart Download URL Template",
@@ -354,7 +354,7 @@
   },
   {
    "default": "v3.0.1",
-   "description": "Release of Stalwart's spam filter rules a cluster imports on its first start, e.g. v3.0.1. Newer rules can use expression functions an older server lacks, so change it together with the Stalwart Version. Empty imports the latest release.",
+   "description": "Spam filter rules a new cluster imports, e.g. v3.0.1. Change it with the Stalwart Version. Blank imports the latest.",
    "fieldname": "spam_filter_rules_version",
    "fieldtype": "Data",
    "label": "Spam Filter Rules Version"
@@ -365,7 +365,7 @@
   },
   {
    "default": "v1.0.12",
-   "description": "Release of stalwart-cli installed next to the server, e.g. v1.0.12. Only used on a node while it bootstraps a cluster.",
+   "description": "stalwart-cli release used to bootstrap a cluster, e.g. v1.0.12.",
    "fieldname": "stalwart_cli_version",
    "fieldtype": "Data",
    "label": "Stalwart CLI Version",
@@ -373,7 +373,7 @@
   },
   {
    "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
-   "description": "Where the node downloads the stalwart-cli archive from. Same placeholders as the server URL, but {target} is the static build, e.g. x86_64-unknown-linux-musl.",
+   "description": "Same placeholders as the Stalwart URL. {target} is the static build, e.g. x86_64-unknown-linux-musl.",
    "fieldname": "stalwart_cli_download_url_template",
    "fieldtype": "Data",
    "label": "Stalwart CLI Download URL Template",
@@ -387,7 +387,7 @@
   },
   {
    "default": "1",
-   "description": "Verify the TLS certificate of clusters and egress gateways when talking to their management API. Turn off only on a development site whose cluster has a staging certificate.",
+   "description": "Turn off only on a development site whose cluster uses a staging certificate.",
    "fieldname": "verify_stalwart_tls",
    "fieldtype": "Check",
    "label": "Verify Stalwart TLS Certificates"
@@ -399,7 +399,7 @@
   },
   {
    "default": "0",
-   "description": "Every domain gets an RSA key (selector frappemail-rsa); check this to add an Ed25519 key as well (selector frappemail-ed25519). Off by default because many receivers still ignore Ed25519 signatures and treat the mail as unsigned. Keys are generated and held by the cluster and never rotate. Applies to domains registered on Stalwart after the change, the cluster default domain included; existing domains keep the keys they were created with.",
+   "description": "Add an Ed25519 DKIM key next to the RSA key. Applies to new domains only. Many receivers ignore Ed25519.",
    "fieldname": "sign_with_ed25519",
    "fieldtype": "Check",
    "label": "Sign with Ed25519 as well as RSA"
@@ -416,7 +416,7 @@
   },
   {
    "default": "https://acme-v02.api.letsencrypt.org/directory",
-   "description": "Certificate authority clusters request their TLS certificates from. While testing use https://acme-staging-v02.api.letsencrypt.org/directory to avoid rate limits; staging certificates are not trusted by mail clients.",
+   "description": "Certificate authority for clusters. For testing, use the Let's Encrypt staging URL.",
    "fieldname": "acme_directory_url",
    "fieldtype": "Data",
    "label": "ACME Directory URL",
@@ -429,7 +429,7 @@
   },
   {
    "default": "admin@example.com",
-   "description": "Address the certificate authority writes to about expiring certificates. Used by clusters that do not set their own contact.",
+   "description": "Gets notices about expiring certificates.",
    "fieldname": "acme_contact_email",
    "fieldtype": "Data",
    "label": "ACME Contact Email",
@@ -448,7 +448,7 @@
   },
   {
    "default": "300",
-   "description": "How long resolvers may cache the records Suite Cloud publishes, used when a DNS Zone sets no TTL of its own. Also suggested to tenants for their domain records. 300 keeps node changes quick to roll out.",
+   "description": "Used when a DNS Zone has no TTL. Also suggested to tenants.",
    "fieldname": "default_dns_ttl",
    "fieldtype": "Int",
    "label": "Default DNS TTL (Seconds)",
@@ -465,7 +465,7 @@
    "label": "Central"
   },
   {
-   "description": "Address of Frappe Cloud's control plane, e.g. https://central.frappe.cloud. Suite Cloud creates its servers there.",
+   "description": "Frappe Cloud control plane, e.g. https://central.frappe.cloud.",
    "fieldname": "central_url",
    "fieldtype": "Data",
    "label": "Central URL",
@@ -473,7 +473,7 @@
    "options": "URL"
   },
   {
-   "description": "The team that owns Suite Cloud's servers, picked from the teams the API key's user belongs to; enter the URL, key and secret first. The key's user needs a team-wide role with server:create, server:view, cluster:view and server:console in it.",
+   "description": "Team that owns the Suite Cloud servers. Enter the URL, key and secret first. The user needs server:create, server:view, cluster:view and server:console.",
    "fieldname": "central_team",
    "fieldtype": "Autocomplete",
    "label": "Central Team",
@@ -501,7 +501,7 @@
    "label": "Servers"
   },
   {
-   "description": "Where a tenant's site goes when its signup names no region. Only enabled regions are offered: run Sync Regions under Frappe Cloud, then enable a region and set its proxy zone.",
+   "description": "Region for signups that name no region. Run Sync Regions and enable a region first.",
    "fieldname": "default_region",
    "fieldtype": "Link",
    "label": "Default Region",
@@ -509,14 +509,14 @@
   },
   {
    "default": "pilot",
-   "description": "Central image offering new servers boot from; its newest image without a baked site is used.",
+   "description": "Image offering for new servers.",
    "fieldname": "central_image_offering",
    "fieldtype": "Data",
    "label": "Image Offering",
    "reqd": 1
   },
   {
-   "description": "Central plan of new servers. Blank takes the first plan Central offers in the region.",
+   "description": "Plan for new servers. Blank uses the first plan in the region.",
    "fieldname": "central_plan",
    "fieldtype": "Data",
    "label": "Plan"
@@ -527,7 +527,7 @@
   },
   {
    "default": "10",
-   "description": "The most sites any server takes, Suite sites and others together, whatever its size. Each server's Max Sites is worked out from its memory and disk below and never exceeds this.",
+   "description": "Most sites on one server, Suite sites and others together.",
    "fieldname": "max_sites_per_vm",
    "fieldtype": "Int",
    "label": "Max Sites per Server",
@@ -535,7 +535,7 @@
   },
   {
    "default": "2",
-   "description": "With Create Servers Automatically on, a region with fewer free slots than this gets one more server, at most one per hour.",
+   "description": "A region with fewer free slots gets a new server, at most one per hour.",
    "fieldname": "min_free_site_slots",
    "fieldtype": "Int",
    "label": "Minimum Free Site Slots",
@@ -543,20 +543,20 @@
   },
   {
    "default": "0",
-   "description": "Add a server to a region that runs short of free site slots. Each server is billed to the Central team.",
+   "description": "Add a server when a region runs low on free slots. Each server is billed.",
    "fieldname": "auto_create_vms",
    "fieldtype": "Check",
    "label": "Create Servers Automatically"
   },
   {
-   "description": "A server takes as many sites as both its memory and its disk allow, after what the server itself needs: (memory − reserved) ÷ memory per site, and the same for disk. Recalculated whenever Central reports the server's size, so a resize on the dashboard counts.",
+   "description": "Sites per server = (memory - reserved) / memory per site, or the same for disk, whichever is lower.",
    "fieldname": "sizing_section",
    "fieldtype": "Section Break",
    "label": "Server Sizing"
   },
   {
    "default": "1024",
-   "description": "Memory the bench needs before any site: Frappe, the Suite app, MariaDB, Redis and the workers.",
+   "description": "Memory for Frappe, MariaDB, Redis and workers before any site.",
    "fieldname": "reserved_memory_mb",
    "fieldtype": "Int",
    "label": "Memory Reserved for the Server (MB)",
@@ -575,7 +575,7 @@
   },
   {
    "default": "8",
-   "description": "Disk the system, the bench and its apps take before any site.",
+   "description": "Disk for the system, bench and apps before any site.",
    "fieldname": "reserved_disk_gb",
    "fieldtype": "Int",
    "label": "Disk Reserved for the Server (GB)",
@@ -595,7 +595,7 @@
   },
   {
    "default": "https://github.com/frappe/suite",
-   "description": "Git repository of the Suite app each server installs.",
+   "description": "Git repository of the Suite app.",
    "fieldname": "suite_app_repo",
    "fieldtype": "Data",
    "label": "Repository",
@@ -607,7 +607,7 @@
   },
   {
    "default": "develop",
-   "description": "What new servers install. Servers already set up keep the commit they installed.",
+   "description": "Used by new servers only.",
    "fieldname": "suite_app_ref",
    "fieldtype": "Data",
    "label": "Branch or Tag",
@@ -620,7 +620,7 @@
   },
   {
    "default": "2",
-   "description": "Sites with Suite installed kept waiting in each enabled region, so a signup gets one at once. 0 creates every site on demand.",
+   "description": "Sites kept ready in each region so a signup gets a site at once. 0 creates sites on demand.",
    "fieldname": "ready_sites_per_region",
    "fieldtype": "Int",
    "label": "Ready Sites per Region",
@@ -628,14 +628,14 @@
   },
   {
    "default": "0",
-   "description": "Accept signups through the public signup API. Each one creates a tenant and claims a site.",
+   "description": "Accept signups through the public signup API.",
    "fieldname": "allow_signup",
    "fieldtype": "Check",
    "label": "Allow Signup"
   },
   {
    "default": "0",
-   "description": "Accept a signup email with a +tag, e.g. john+test@example.com. Off, such an email is refused: every tag of one mailbox could sign up again. On, the owner's account on the site leaves the tag out, e.g. john@acme.example.com.",
+   "description": "Accept signup emails with a +tag, e.g. john+test@example.com. The owner account on the site does not get the tag.",
    "fieldname": "allow_subaddressed_signups",
    "fieldtype": "Check",
    "label": "Allow Sub-addressed Emails at Signup"
@@ -645,14 +645,14 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Zone under which each site gets its label as its primary domain, e.g. acme.example.app. It may be the tenant mail zone: site domains then go under sites, e.g. acme.sites.example.com beside the mail domain acme.example.com. It needs a DNS provider.",
+   "description": "Each site gets its label under this zone, e.g. acme.example.app. Needs a DNS provider.",
    "fieldname": "site_dns_zone",
    "fieldtype": "Link",
    "label": "Site DNS Zone",
    "options": "DNS Zone"
   },
   {
-   "description": "Zone under which each tenant gets its label as its mail domain, e.g. acme.example.com. Every hosted site gets one, so it is required once Central is set. It may be the site DNS zone. It needs a DNS provider and must not be the zone of a Stalwart cluster.",
+   "description": "Each tenant gets its label under this zone as its mail domain, e.g. acme.example.com. Needs a DNS provider. Must not be a Stalwart cluster zone.",
    "fieldname": "tenant_mail_zone",
    "fieldtype": "Link",
    "label": "Tenant Mail Zone",
@@ -663,7 +663,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-27 20:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

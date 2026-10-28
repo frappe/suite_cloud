@@ -16,7 +16,7 @@
  ],
  "fields": [
   {
-   "description": "Cluster whose mail this pool sends. Only gateways of the same cluster can host its addresses.",
+   "description": "Only gateways of this cluster can host the pool's addresses.",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -27,7 +27,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Assigned on first save: p1, p2 and so on. It names the relay listener and connection strategy on the gateways and cannot change afterwards.",
+   "description": "Set on first save, e.g. p1. Cannot be changed.",
    "fieldname": "pool_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -37,7 +37,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Display name shown in lists and links, e.g. Dedicated pool for Acme. Defaults to the hostname.",
+   "description": "Name shown in lists.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -48,7 +48,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Port the cluster relays to on every gateway hosting this pool. Assigned on save, starting at 2525, one per pool.",
+   "description": "Port the cluster relays to on each gateway. Set on save, from 2525.",
    "fieldname": "relay_port",
    "fieldtype": "Int",
    "in_standard_filter": 1,
@@ -56,7 +56,7 @@
    "read_only": 1
   },
   {
-   "description": "Pool name, then .out., then the cluster zone, e.g. p1.out.blr.frappemail.com. Resolves to every gateway hosting an address of the pool; the cluster relays to it. The out sub-zone is what the gateway certificates cover.",
+   "description": "Resolves to each gateway that hosts the pool, e.g. p1.out.blr.frappemail.com.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -70,7 +70,7 @@
    "label": "Addresses"
   },
   {
-   "description": "The IP addresses mail leaves from, each on a gateway of this cluster. An address can belong to one pool only. Adding or removing rows updates DNS, the SPF include and both servers' configuration on save.",
+   "description": "IP addresses that mail is sent from. An address can be in one pool only.",
    "fieldname": "addresses",
    "fieldtype": "Table",
    "label": "Addresses",
@@ -95,7 +95,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-10-15 21:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress IP Pool",

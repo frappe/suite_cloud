@@ -12,7 +12,7 @@
  ],
  "fields": [
   {
-   "description": "The list this address receives. Cannot change after saving.",
+   "description": "Cannot be changed after save.",
    "fieldname": "mailing_list",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -23,7 +23,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Internal or external address that receives every message sent to the list. Cannot change after saving; remove and add instead.",
+   "description": "Address that gets each message sent to the list. Cannot be changed after save.",
    "fieldname": "email",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -39,14 +39,14 @@
   },
   {
    "default": "1",
-   "description": "Untick to stop delivering to this address without removing it from the list.",
+   "description": "Clear to stop delivery to this address.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "Enabled"
   },
   {
-   "description": "Suite Tenant that owns the list. Derived from the list.",
+   "description": "Set from the list.",
    "fieldname": "tenant",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -57,7 +57,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-26 12:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mailing List Recipient",
