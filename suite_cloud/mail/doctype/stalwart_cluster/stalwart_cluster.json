@@ -19,6 +19,10 @@
   "hostname",
   "default_domain",
   "base_url",
+  "tls_section",
+  "acme_directory_url",
+  "column_break_tls",
+  "acme_contact_email",
   "placement_section",
   "is_default",
   "regions",
@@ -32,39 +36,36 @@
   "coordinator",
   "column_break_derived",
   "single_node",
-  "tls_tab",
-  "acme_directory_url",
-  "column_break_tls",
-  "acme_contact_email",
   "access_tab",
   "admin_section",
   "admin_username",
   "admin_password",
   "column_break_admin",
   "api_key",
-  "metrics_section",
-  "enable_metrics",
-  "column_break_metrics",
-  "metrics_password",
-  "agent_section",
-  "agent_key",
-  "column_break_agent",
-  "agent_secret",
-  "sending_limits_section",
-  "quota_backstop_per_day",
-  "column_break_sending_limits",
-  "quota_hook_token",
   "ssh_section",
   "ssh_user",
   "ssh_port",
   "column_break_ssh",
   "ssh_public_key",
   "ssh_private_key",
+  "agent_section",
+  "agent_key",
+  "column_break_agent",
+  "agent_secret",
+  "metrics_section",
+  "enable_metrics",
+  "column_break_metrics",
+  "metrics_password",
   "egress_tab",
+  "egress_section",
   "default_egress_pool",
   "column_break_egress",
   "relay_username",
   "relay_password",
+  "sending_limits_section",
+  "quota_backstop_per_day",
+  "column_break_sending_limits",
+  "quota_hook_token",
   "config_tab",
   "bootstrap_node",
   "config_version",
@@ -173,6 +174,29 @@
    "read_only": 1
   },
   {
+   "fieldname": "tls_section",
+   "fieldtype": "Section Break",
+   "label": "Certificates"
+  },
+  {
+   "description": "Certificate authority. Blank uses Suite Cloud Settings.",
+   "fieldname": "acme_directory_url",
+   "fieldtype": "Data",
+   "label": "ACME Directory URL",
+   "length": 255
+  },
+  {
+   "fieldname": "column_break_tls",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Gets notices about expiring certificates. Blank uses Suite Cloud Settings.",
+   "fieldname": "acme_contact_email",
+   "fieldtype": "Data",
+   "label": "ACME Contact Email",
+   "options": "Email"
+  },
+  {
    "fieldname": "placement_section",
    "fieldtype": "Section Break",
    "label": "Placement"
@@ -254,29 +278,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "tls_tab",
-   "fieldtype": "Tab Break",
-   "label": "TLS"
-  },
-  {
-   "description": "Certificate authority. Blank uses Suite Cloud Settings.",
-   "fieldname": "acme_directory_url",
-   "fieldtype": "Data",
-   "label": "ACME Directory URL",
-   "length": 255
-  },
-  {
-   "fieldname": "column_break_tls",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Gets notices about expiring certificates. Blank uses Suite Cloud Settings.",
-   "fieldname": "acme_contact_email",
-   "fieldtype": "Data",
-   "label": "ACME Contact Email",
-   "options": "Email"
-  },
-  {
    "fieldname": "access_tab",
    "fieldtype": "Tab Break",
    "label": "Access"
@@ -310,79 +311,6 @@
    "fieldtype": "Password",
    "hidden": 1,
    "label": "API Key"
-  },
-  {
-   "fieldname": "metrics_section",
-   "fieldtype": "Section Break",
-   "label": "Prometheus Metrics"
-  },
-  {
-   "default": "1",
-   "description": "Serve Stalwart metrics to the agent. Off, the agent sends host metrics only.",
-   "fieldname": "enable_metrics",
-   "fieldtype": "Check",
-   "label": "Enable Prometheus Metrics"
-  },
-  {
-   "fieldname": "column_break_metrics",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Generated on save.",
-   "fieldname": "metrics_password",
-   "fieldtype": "Password",
-   "label": "Metrics Password"
-  },
-  {
-   "fieldname": "agent_section",
-   "fieldtype": "Section Break",
-   "label": "Suite Cloud Agent"
-  },
-  {
-   "description": "Identifies the cluster to Suite Cloud. Generated on save.",
-   "fieldname": "agent_key",
-   "fieldtype": "Data",
-   "label": "Agent Key",
-   "no_copy": 1,
-   "read_only": 1,
-   "unique": 1
-  },
-  {
-   "fieldname": "column_break_agent",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Generated on save. Rotate Agent Secret replaces it and reinstalls the agents.",
-   "fieldname": "agent_secret",
-   "fieldtype": "Password",
-   "label": "Agent Secret",
-   "no_copy": 1,
-   "read_only": 1
-  },
-  {
-   "fieldname": "sending_limits_section",
-   "fieldtype": "Section Break",
-   "label": "Sending Limits"
-  },
-  {
-   "default": "5000",
-   "description": "Most messages any account can send per UTC day. Keep it above the highest Daily Send Limit. 0 turns it off.",
-   "fieldname": "quota_backstop_per_day",
-   "fieldtype": "Int",
-   "label": "Backstop Messages per Day",
-   "non_negative": 1
-  },
-  {
-   "fieldname": "column_break_sending_limits",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Generated on save.",
-   "fieldname": "quota_hook_token",
-   "fieldtype": "Password",
-   "label": "Quota Hook Token",
-   "no_copy": 1,
-   "read_only": 1
   },
   {
    "fieldname": "ssh_section",
@@ -424,8 +352,61 @@
    "label": "SSH Private Key"
   },
   {
+   "fieldname": "agent_section",
+   "fieldtype": "Section Break",
+   "label": "Suite Cloud Agent"
+  },
+  {
+   "description": "Identifies the cluster to Suite Cloud. Generated on save.",
+   "fieldname": "agent_key",
+   "fieldtype": "Data",
+   "label": "Agent Key",
+   "no_copy": 1,
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "fieldname": "column_break_agent",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Generated on save. Rotate Agent Secret replaces it and reinstalls the agents.",
+   "fieldname": "agent_secret",
+   "fieldtype": "Password",
+   "label": "Agent Secret",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "metrics_section",
+   "fieldtype": "Section Break",
+   "label": "Prometheus Metrics"
+  },
+  {
+   "default": "1",
+   "description": "Serve Stalwart metrics to the agent. Off, the agent sends host metrics only.",
+   "fieldname": "enable_metrics",
+   "fieldtype": "Check",
+   "label": "Enable Prometheus Metrics"
+  },
+  {
+   "fieldname": "column_break_metrics",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Generated on save.",
+   "fieldname": "metrics_password",
+   "fieldtype": "Password",
+   "label": "Metrics Password"
+  },
+  {
    "fieldname": "egress_tab",
    "fieldtype": "Tab Break",
+   "label": "Sending"
+  },
+  {
+   "fieldname": "egress_section",
+   "fieldtype": "Section Break",
    "label": "Egress"
   },
   {
@@ -453,6 +434,31 @@
    "fieldtype": "Password",
    "hidden": 1,
    "label": "Relay Password"
+  },
+  {
+   "fieldname": "sending_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Sending Limits"
+  },
+  {
+   "default": "5000",
+   "description": "Most messages any account can send per UTC day. Keep it above the highest Daily Send Limit. 0 turns it off.",
+   "fieldname": "quota_backstop_per_day",
+   "fieldtype": "Int",
+   "label": "Backstop Messages per Day",
+   "non_negative": 1
+  },
+  {
+   "fieldname": "column_break_sending_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Generated on save.",
+   "fieldname": "quota_hook_token",
+   "fieldtype": "Password",
+   "label": "Quota Hook Token",
+   "no_copy": 1,
+   "read_only": 1
   },
   {
    "fieldname": "config_tab",
@@ -556,7 +562,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

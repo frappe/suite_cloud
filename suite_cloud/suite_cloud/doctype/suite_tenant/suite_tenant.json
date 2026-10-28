@@ -9,15 +9,14 @@
   "user",
   "contact_email",
   "column_break_main",
-  "enabled",
   "status",
+  "enabled",
   "archived_at",
-  "plan_section",
-  "max_disk_gb",
   "access_section",
   "secret",
   "allowed_ips",
-  "column_break_access",
+  "plan_section",
+  "max_disk_gb",
   "mail_tab",
   "cluster_section",
   "stalwart_cluster",
@@ -76,14 +75,6 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "1",
-   "description": "Clear to stop the secret from working.",
-   "fieldname": "enabled",
-   "fieldtype": "Check",
-   "label": "Enabled",
-   "permlevel": 1
-  },
-  {
    "default": "Active",
    "description": "Active: the API works. Suspended: requests get a 403. Archived: final, required before deletion.",
    "fieldname": "status",
@@ -96,25 +87,20 @@
    "read_only": 1
   },
   {
+   "default": "1",
+   "description": "Clear to stop the secret from working.",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "label": "Enabled",
+   "permlevel": 1
+  },
+  {
    "description": "The tenant cannot be resumed after this.",
    "fieldname": "archived_at",
    "fieldtype": "Datetime",
    "label": "Archived At",
    "permlevel": 1,
    "read_only": 1
-  },
-  {
-   "fieldname": "plan_section",
-   "fieldtype": "Section Break",
-   "label": "Plan"
-  },
-  {
-   "default": "0",
-   "description": "Disk in the plan across all services. 0 means unlimited. Does not limit mail quotas.",
-   "fieldname": "max_disk_gb",
-   "fieldtype": "Float",
-   "label": "Total Disk Quota (GB)",
-   "permlevel": 1
   },
   {
    "fieldname": "access_section",
@@ -137,8 +123,17 @@
    "permlevel": 1
   },
   {
-   "fieldname": "column_break_access",
-   "fieldtype": "Column Break"
+   "fieldname": "plan_section",
+   "fieldtype": "Section Break",
+   "label": "Plan"
+  },
+  {
+   "default": "0",
+   "description": "Disk in the plan across all services. 0 means unlimited. Does not limit mail quotas.",
+   "fieldname": "max_disk_gb",
+   "fieldtype": "Float",
+   "label": "Total Disk Quota (GB)",
+   "permlevel": 1
   },
   {
    "fieldname": "mail_tab",
@@ -198,6 +193,10 @@
    "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
   {
+   "fieldname": "column_break_limits",
+   "fieldtype": "Column Break"
+  },
+  {
    "default": "50",
    "description": "0 means unlimited.",
    "fieldname": "max_groups",
@@ -214,10 +213,6 @@
    "label": "Max Mailing Lists",
    "permlevel": 1,
    "read_only_depends_on": "eval:!doc.stalwart_cluster"
-  },
-  {
-   "fieldname": "column_break_limits",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "usage_section",
@@ -273,7 +268,7 @@
    "link_fieldname": "tenant"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Tenant",

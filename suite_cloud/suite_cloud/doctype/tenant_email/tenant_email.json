@@ -7,16 +7,19 @@
   "tenant",
   "email_type",
   "status",
-  "recipient",
-  "column_break_main",
-  "email_account",
-  "sender",
-  "message_id",
   "sent_at",
-  "request_key",
+  "column_break_main",
+  "recipient",
+  "sender",
+  "email_account",
   "section_break_message",
   "subject",
-  "error"
+  "error_section",
+  "error",
+  "references_section",
+  "message_id",
+  "column_break_references",
+  "request_key"
  ],
  "fields": [
   {
@@ -50,22 +53,22 @@
    "default": "Sending"
   },
   {
-   "fieldname": "recipient",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Recipient",
-   "options": "Email",
-   "read_only": 1
+   "fieldname": "sent_at",
+   "fieldtype": "Datetime",
+   "label": "Sent At",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "email_account",
-   "fieldtype": "Link",
-   "label": "Email Account",
-   "options": "Email Account",
+   "fieldname": "recipient",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Recipient",
+   "options": "Email",
    "read_only": 1
   },
   {
@@ -76,23 +79,10 @@
    "read_only": 1
   },
   {
-   "fieldname": "message_id",
-   "fieldtype": "Data",
-   "label": "Message ID",
-   "read_only": 1
-  },
-  {
-   "fieldname": "sent_at",
-   "fieldtype": "Datetime",
-   "label": "Sent At",
-   "read_only": 1,
-   "search_index": 1
-  },
-  {
-   "description": "Site key for this email. A repeat request with the same key returns this result.",
-   "fieldname": "request_key",
-   "fieldtype": "Data",
-   "label": "Request Key",
+   "fieldname": "email_account",
+   "fieldtype": "Link",
+   "label": "Email Account",
+   "options": "Email Account",
    "read_only": 1
   },
   {
@@ -106,16 +96,45 @@
    "read_only": 1
   },
   {
+   "fieldname": "error_section",
+   "fieldtype": "Section Break",
+   "label": "Error",
+   "depends_on": "eval:doc.error"
+  },
+  {
    "fieldname": "error",
    "fieldtype": "Small Text",
    "label": "Error",
+   "read_only": 1
+  },
+  {
+   "fieldname": "references_section",
+   "fieldtype": "Section Break",
+   "label": "References",
+   "collapsible": 1
+  },
+  {
+   "fieldname": "message_id",
+   "fieldtype": "Data",
+   "label": "Message ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_references",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Site key for this email. A repeat request with the same key returns this result.",
+   "fieldname": "request_key",
+   "fieldtype": "Data",
+   "label": "Request Key",
    "read_only": 1
   }
  ],
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Tenant Email",

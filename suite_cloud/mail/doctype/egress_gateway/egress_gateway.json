@@ -5,17 +5,21 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "title",
   "cluster",
   "hostname",
-  "title",
   "location",
-  "base_url",
   "column_break_main",
   "enabled",
   "status",
   "stalwart_version",
+  "installed_version",
+  "error_section",
+  "last_error",
   "network_section",
   "ipv4_address",
+  "column_break_network",
+  "base_url",
   "ssh_section",
   "ssh_user",
   "ssh_port",
@@ -26,20 +30,25 @@
   "data_store",
   "admin_username",
   "admin_password",
-  "metrics_password",
   "column_break_stalwart",
+  "metrics_password",
   "api_key",
   "state_section",
-  "installed_version",
-  "config_version",
   "provisioned_at",
   "column_break_state",
+  "config_version",
   "last_config_sync_at",
-  "last_error",
   "config_plan_section",
   "config_plan"
  ],
  "fields": [
+  {
+   "description": "Name shown in lists. Defaults to the hostname.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
   {
    "description": "Cluster whose mail this gateway sends.",
    "fieldname": "cluster",
@@ -62,24 +71,10 @@
    "unique": 1
   },
   {
-   "description": "Name shown in lists. Defaults to the hostname.",
-   "fieldname": "title",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Title"
-  },
-  {
    "description": "Where the server runs, e.g. DigitalOcean BLR1. For information only.",
    "fieldname": "location",
    "fieldtype": "Data",
    "label": "Location"
-  },
-  {
-   "description": "Management URL of the gateway's Stalwart.",
-   "fieldname": "base_url",
-   "fieldtype": "Data",
-   "label": "Base URL",
-   "read_only": 1
   },
   {
    "fieldname": "column_break_main",
@@ -110,6 +105,26 @@
    "label": "Stalwart Version"
   },
   {
+   "description": "Stalwart release installed by the last job.",
+   "fieldname": "installed_version",
+   "fieldtype": "Data",
+   "label": "Installed Version",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error_section",
+   "fieldtype": "Section Break",
+   "label": "Last Error",
+   "depends_on": "eval:doc.last_error"
+  },
+  {
+   "description": "Why the last job, check or push failed.",
+   "fieldname": "last_error",
+   "fieldtype": "Small Text",
+   "label": "Last Error",
+   "read_only": 1
+  },
+  {
    "fieldname": "network_section",
    "fieldtype": "Section Break",
    "label": "Network"
@@ -123,9 +138,22 @@
    "reqd": 1
   },
   {
+   "fieldname": "column_break_network",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Management URL of the gateway's Stalwart.",
+   "fieldname": "base_url",
+   "fieldtype": "Data",
+   "label": "Base URL",
+   "read_only": 1
+  },
+  {
    "fieldname": "ssh_section",
    "fieldtype": "Section Break",
-   "label": "SSH"
+   "label": "SSH",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!doc.ssh_verified"
   },
   {
    "description": "Blank uses the cluster SSH user.",
@@ -161,7 +189,9 @@
   {
    "fieldname": "stalwart_section",
    "fieldtype": "Section Break",
-   "label": "Stalwart"
+   "label": "Stalwart",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.__islocal"
   },
   {
    "description": "Store for the gateway's queue and settings. Blank creates a local RocksDB store.",
@@ -185,14 +215,14 @@
    "label": "Admin Password"
   },
   {
+   "fieldname": "column_break_stalwart",
+   "fieldtype": "Column Break"
+  },
+  {
    "description": "Generated on save. The agent uses it to read Prometheus metrics.",
    "fieldname": "metrics_password",
    "fieldtype": "Password",
    "label": "Metrics Password"
-  },
-  {
-   "fieldname": "column_break_stalwart",
-   "fieldtype": "Column Break"
   },
   {
    "description": "Token Suite Cloud uses to push configuration. Created when provisioning finishes.",
@@ -204,22 +234,8 @@
   {
    "fieldname": "state_section",
    "fieldtype": "Section Break",
-   "label": "State"
-  },
-  {
-   "description": "Stalwart release installed by the last job.",
-   "fieldname": "installed_version",
-   "fieldtype": "Data",
-   "label": "Installed Version",
-   "read_only": 1
-  },
-  {
-   "default": "0",
-   "description": "Increases on each configuration push.",
-   "fieldname": "config_version",
-   "fieldtype": "Int",
-   "label": "Config Version",
-   "read_only": 1
+   "label": "Configuration",
+   "collapsible": 1
   },
   {
    "description": "When the last provisioning or upgrade job succeeded.",
@@ -233,16 +249,17 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "last_config_sync_at",
-   "fieldtype": "Datetime",
-   "label": "Last Config Sync At",
+   "default": "0",
+   "description": "Increases on each configuration push.",
+   "fieldname": "config_version",
+   "fieldtype": "Int",
+   "label": "Config Version",
    "read_only": 1
   },
   {
-   "description": "Why the last job, check or push failed.",
-   "fieldname": "last_error",
-   "fieldtype": "Small Text",
-   "label": "Last Error",
+   "fieldname": "last_config_sync_at",
+   "fieldtype": "Datetime",
+   "label": "Last Config Sync At",
    "read_only": 1
   },
   {
@@ -274,7 +291,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress Gateway",

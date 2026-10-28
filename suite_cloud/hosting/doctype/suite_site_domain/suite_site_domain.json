@@ -6,14 +6,16 @@
  "engine": "InnoDB",
  "field_order": [
   "domain",
-  "status",
+  "managed",
   "is_primary",
   "primary_skipped",
-  "managed",
-  "dns_records",
-  "records_fetched_at",
+  "column_break_main",
+  "status",
   "task",
-  "failure_reason"
+  "failure_reason",
+  "dns_section",
+  "records_fetched_at",
+  "dns_records"
  ],
  "fields": [
   {
@@ -26,13 +28,12 @@
   },
   {
    "columns": 1,
-   "default": "Pending",
-   "description": "Pending: DNS records not seen yet. Active: attached through the Frappe Cloud proxy. Failed: Pilot could not attach it.",
-   "fieldname": "status",
-   "fieldtype": "Select",
+   "default": "0",
+   "description": "Suite Cloud publishes the DNS records.",
+   "fieldname": "managed",
+   "fieldtype": "Check",
    "in_list_view": 1,
-   "label": "Status",
-   "options": "Pending\nActive\nFailed",
+   "label": "Managed",
    "read_only": 1
   },
   {
@@ -55,27 +56,18 @@
    "read_only": 1
   },
   {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
    "columns": 1,
-   "default": "0",
-   "description": "Suite Cloud publishes the DNS records.",
-   "fieldname": "managed",
-   "fieldtype": "Check",
+   "default": "Pending",
+   "description": "Pending: DNS records not seen yet. Active: attached through the Frappe Cloud proxy. Failed: Pilot could not attach it.",
+   "fieldname": "status",
+   "fieldtype": "Select",
    "in_list_view": 1,
-   "label": "Managed",
-   "read_only": 1
-  },
-  {
-   "description": "CNAME and TXT records that Pilot asks for.",
-   "fieldname": "dns_records",
-   "fieldtype": "JSON",
-   "label": "DNS Records",
-   "read_only": 1
-  },
-  {
-   "description": "Fetched again after 23 hours because the verification token expires after 24.",
-   "fieldname": "records_fetched_at",
-   "fieldtype": "Datetime",
-   "label": "Records Fetched At",
+   "label": "Status",
+   "options": "Pending\nActive\nFailed",
    "read_only": 1
   },
   {
@@ -91,12 +83,33 @@
    "fieldtype": "Small Text",
    "label": "Failure Reason",
    "read_only": 1
+  },
+  {
+   "fieldname": "dns_section",
+   "fieldtype": "Section Break",
+   "label": "DNS Records",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!doc.managed && doc.status != \"Active\""
+  },
+  {
+   "description": "Fetched again after 23 hours because the verification token expires after 24.",
+   "fieldname": "records_fetched_at",
+   "fieldtype": "Datetime",
+   "label": "Records Fetched At",
+   "read_only": 1
+  },
+  {
+   "description": "CNAME and TXT records that Pilot asks for.",
+   "fieldname": "dns_records",
+   "fieldtype": "JSON",
+   "label": "DNS Records",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site Domain",

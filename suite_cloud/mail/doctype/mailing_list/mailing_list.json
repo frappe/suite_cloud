@@ -8,12 +8,14 @@
   "email",
   "domain",
   "tenant",
-  "cluster",
   "column_break_main",
   "description",
-  "stalwart_id",
   "aliases_section",
-  "aliases"
+  "aliases",
+  "cluster_section",
+  "cluster",
+  "column_break_cluster",
+  "stalwart_id"
  ],
  "fields": [
   {
@@ -50,16 +52,6 @@
    "description": "Set from the domain."
   },
   {
-   "fetch_from": "domain.cluster",
-   "fieldname": "cluster",
-   "fieldtype": "Link",
-   "label": "Cluster",
-   "options": "Stalwart Cluster",
-   "read_only": 1,
-   "search_index": 1,
-   "description": "Set from the tenant."
-  },
-  {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
   },
@@ -71,17 +63,11 @@
    "description": "What the list is for, e.g. Product news. Shown on the cluster as the list name."
   },
   {
-   "fieldname": "stalwart_id",
-   "fieldtype": "Data",
-   "label": "Stalwart ID",
-   "no_copy": 1,
-   "read_only": 1,
-   "description": "ID of the list on the cluster."
-  },
-  {
    "fieldname": "aliases_section",
    "fieldtype": "Section Break",
-   "label": "Aliases"
+   "label": "Aliases",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.aliases && doc.aliases.length"
   },
   {
    "fieldname": "aliases",
@@ -89,6 +75,34 @@
    "label": "Aliases",
    "options": "Mail Address Alias",
    "description": "Other addresses that reach the list."
+  },
+  {
+   "fieldname": "cluster_section",
+   "fieldtype": "Section Break",
+   "label": "Cluster",
+   "collapsible": 1
+  },
+  {
+   "fetch_from": "domain.cluster",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "Set from the tenant."
+  },
+  {
+   "fieldname": "column_break_cluster",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "stalwart_id",
+   "fieldtype": "Data",
+   "label": "Stalwart ID",
+   "no_copy": 1,
+   "read_only": 1,
+   "description": "ID of the list on the cluster."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -99,7 +113,7 @@
    "link_fieldname": "mailing_list"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mailing List",

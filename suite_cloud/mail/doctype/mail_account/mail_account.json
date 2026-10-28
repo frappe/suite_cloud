@@ -8,32 +8,34 @@
   "email",
   "domain",
   "tenant",
-  "cluster",
   "column_break_main",
   "enabled",
   "disable_receiving",
+  "profile_section",
   "display_name",
   "description",
-  "stalwart_id",
+  "column_break_profile",
+  "locale",
+  "time_zone",
   "credentials_section",
   "new_password",
   "app_passwords",
   "api_keys",
-  "settings_section",
-  "locale",
-  "column_break_settings",
-  "time_zone",
-  "used_disk_bytes",
   "sending_limits_section",
   "daily_send_limit",
   "column_break_sending_limits",
   "monthly_send_limit",
   "quotas_section",
+  "used_disk_bytes",
   "quotas",
   "aliases_section",
   "aliases",
   "groups_section",
-  "groups"
+  "groups",
+  "cluster_section",
+  "cluster",
+  "column_break_cluster",
+  "stalwart_id"
  ],
  "fields": [
   {
@@ -70,15 +72,6 @@
    "search_index": 1
   },
   {
-   "description": "Set from the tenant.",
-   "fetch_from": "domain.cluster",
-   "fieldname": "cluster",
-   "fieldtype": "Link",
-   "label": "Cluster",
-   "options": "Stalwart Cluster",
-   "read_only": 1
-  },
-  {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
   },
@@ -98,6 +91,11 @@
    "label": "Disable Receiving"
   },
   {
+   "fieldname": "profile_section",
+   "fieldtype": "Section Break",
+   "label": "Profile"
+  },
+  {
    "description": "Name shown to other users, e.g. Alice Doe.",
    "fieldname": "display_name",
    "fieldtype": "Data",
@@ -110,12 +108,21 @@
    "label": "Description"
   },
   {
-   "description": "ID of the account on the cluster.",
-   "fieldname": "stalwart_id",
+   "fieldname": "column_break_profile",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "en-US",
+   "description": "For server messages and folder names, e.g. en-US.",
+   "fieldname": "locale",
    "fieldtype": "Data",
-   "label": "Stalwart ID",
-   "no_copy": 1,
-   "read_only": 1
+   "label": "Locale"
+  },
+  {
+   "description": "e.g. Asia/Kolkata. Blank uses the server time zone.",
+   "fieldname": "time_zone",
+   "fieldtype": "Data",
+   "label": "Time Zone"
   },
   {
    "collapsible": 1,
@@ -145,40 +152,12 @@
    "options": "Mail Credential"
   },
   {
-   "fieldname": "settings_section",
-   "fieldtype": "Section Break",
-   "label": "Settings"
-  },
-  {
-   "default": "en-US",
-   "description": "For server messages and folder names, e.g. en-US.",
-   "fieldname": "locale",
-   "fieldtype": "Data",
-   "label": "Locale"
-  },
-  {
-   "fieldname": "column_break_settings",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "e.g. Asia/Kolkata. Blank uses the server time zone.",
-   "fieldname": "time_zone",
-   "fieldtype": "Data",
-   "label": "Time Zone"
-  },
-  {
-   "description": "Read from the cluster when the form opens.",
-   "fieldname": "used_disk_bytes",
-   "fieldtype": "Int",
-   "is_virtual": 1,
-   "label": "Used Disk (bytes)",
-   "read_only": 1
-  },
-  {
    "description": "Limits on outgoing mail. Applied about one minute after save.",
    "fieldname": "sending_limits_section",
    "fieldtype": "Section Break",
-   "label": "Sending Limits"
+   "label": "Sending Limits",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.daily_send_limit || doc.monthly_send_limit"
   },
   {
    "default": "0",
@@ -203,7 +182,17 @@
   {
    "fieldname": "quotas_section",
    "fieldtype": "Section Break",
-   "label": "Quotas"
+   "label": "Quotas",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.quotas && doc.quotas.length"
+  },
+  {
+   "description": "Read from the cluster when the form opens.",
+   "fieldname": "used_disk_bytes",
+   "fieldtype": "Int",
+   "is_virtual": 1,
+   "label": "Used Disk (bytes)",
+   "read_only": 1
   },
   {
    "description": "Stalwart limits for the account. Leave a quota out for no limit.",
@@ -215,7 +204,9 @@
   {
    "fieldname": "aliases_section",
    "fieldtype": "Section Break",
-   "label": "Aliases"
+   "label": "Aliases",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.aliases && doc.aliases.length"
   },
   {
    "description": "Other addresses delivered to this mailbox.",
@@ -227,19 +218,48 @@
   {
    "fieldname": "groups_section",
    "fieldtype": "Section Break",
-   "label": "Groups"
+   "label": "Groups",
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:doc.groups && doc.groups.length"
   },
   {
    "fieldname": "groups",
    "fieldtype": "Table MultiSelect",
    "label": "Groups",
    "options": "Mail Group Member"
+  },
+  {
+   "fieldname": "cluster_section",
+   "fieldtype": "Section Break",
+   "label": "Cluster",
+   "collapsible": 1
+  },
+  {
+   "description": "Set from the tenant.",
+   "fetch_from": "domain.cluster",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_cluster",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "ID of the account on the cluster.",
+   "fieldname": "stalwart_id",
+   "fieldtype": "Data",
+   "label": "Stalwart ID",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",

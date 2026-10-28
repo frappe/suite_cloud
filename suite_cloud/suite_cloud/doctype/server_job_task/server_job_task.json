@@ -77,7 +77,8 @@
    "collapsible": 1,
    "fieldname": "output_section",
    "fieldtype": "Section Break",
-   "label": "Output"
+   "label": "Output",
+   "collapsible_depends_on": "eval:[\"Failed\", \"Unreachable\"].includes(doc.status)"
   },
   {
    "description": "Ansible message, usually why the task failed.",
@@ -109,7 +110,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:22:33.441427",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Server Job Task",
