@@ -59,7 +59,6 @@
    "in_standard_filter": 1,
    "reqd": 1,
    "read_only": 1,
-   "description": "The domain the report is about, as the reporter names it. It is the Mail Domain's name whenever a tenant holds the domain.",
    "search_index": 1
   },
   {
@@ -70,7 +69,7 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "read_only": 1,
-   "description": "The tenant that held the domain when the report was fetched, set only if the report was also addressed to one of its domains; the tenant API shows the report to this tenant only.",
+   "description": "Tenant that held the domain when the report was fetched. Only this tenant sees the report.",
    "search_index": 1
   },
   {
@@ -85,7 +84,7 @@
    "reqd": 1,
    "in_standard_filter": 1,
    "read_only": 1,
-   "description": "The cluster that intercepted the report. Stalwart parses reports mailed to postmaster@ and keeps them for a month."
+   "description": "Cluster that received the report."
   },
   {
    "fieldname": "stalwart_id",
@@ -93,7 +92,7 @@
    "label": "Stalwart ID",
    "reqd": 1,
    "read_only": 1,
-   "description": "The id of the DmarcExternalReport object on the cluster; with the cluster it says whether a report is stored already."
+   "description": "ID of the report on the cluster."
   },
   {
    "fieldname": "reporter_section",
@@ -107,7 +106,7 @@
    "in_list_view": 1,
    "reqd": 1,
    "read_only": 1,
-   "description": "The organisation that evaluated the mail and sent the report, such as google.com."
+   "description": "Organization that sent the report, e.g. google.com."
   },
   {
    "fieldname": "reporter_email",
@@ -115,14 +114,13 @@
    "label": "Reporter Email",
    "options": "Email",
    "read_only": 1,
-   "description": "Where the reporter takes questions about the report."
+   "description": "Contact address of the reporter."
   },
   {
    "fieldname": "extra_contact_info",
    "fieldtype": "Small Text",
    "label": "Reporter Contact",
-   "read_only": 1,
-   "description": "Any further contact detail the reporter added."
+   "read_only": 1
   },
   {
    "fieldname": "column_break_reporter",
@@ -133,27 +131,26 @@
    "fieldtype": "Data",
    "label": "Report ID",
    "read_only": 1,
-   "description": "The reporter's own id for the report; the same report resent carries the same id."
+   "description": "Reporter's ID for the report."
   },
   {
    "fieldname": "report_version",
    "fieldtype": "Float",
    "label": "Report Version",
-   "description": "The version of the aggregate report format the reporter used.",
+   "description": "Version of the report format.",
    "read_only": 1
   },
   {
    "fieldname": "subject",
    "fieldtype": "Small Text",
    "label": "Subject",
-   "description": "The subject line of the message that carried the report.",
    "read_only": 1
   },
   {
    "fieldname": "sent_to",
    "fieldtype": "Small Text",
    "label": "Sent To",
-   "description": "The addresses the reporter mailed the report to, one per line; postmaster@ of the domain, normally.",
+   "description": "Addresses the report was sent to, one per line.",
    "read_only": 1
   },
   {
@@ -166,8 +163,7 @@
    "fieldtype": "Datetime",
    "label": "Range Begins",
    "in_list_view": 1,
-   "read_only": 1,
-   "description": "The start of the period the report covers, usually one day."
+   "read_only": 1
   },
   {
    "fieldname": "date_range_end",
@@ -175,7 +171,6 @@
    "label": "Range Ends",
    "in_list_view": 1,
    "read_only": 1,
-   "description": "The end of the period the report covers.",
    "search_index": 1
   },
   {
@@ -186,15 +181,14 @@
    "fieldname": "received_at",
    "fieldtype": "Datetime",
    "label": "Received At",
-   "read_only": 1,
-   "description": "When the cluster received the report."
+   "read_only": 1
   },
   {
    "fieldname": "expires_at",
    "fieldtype": "Datetime",
    "label": "Expires On Cluster",
    "read_only": 1,
-   "description": "When Stalwart drops its copy; the report stays here until the retention in Suite Cloud Settings runs out."
+   "description": "When Stalwart deletes its copy. The report stays here for the retention set in Suite Cloud Settings."
   },
   {
    "fieldname": "totals_section",
@@ -207,7 +201,7 @@
    "label": "Messages",
    "in_list_view": 1,
    "read_only": 1,
-   "description": "Messages the reporter saw from this domain in the period, summed over the records."
+   "description": "Messages seen from this domain in the period."
   },
   {
    "fieldname": "passed_messages",
@@ -215,7 +209,7 @@
    "label": "Passed DMARC",
    "in_list_view": 1,
    "read_only": 1,
-   "description": "Messages that passed DMARC: aligned DKIM or aligned SPF verified."
+   "description": "Messages that passed aligned DKIM or aligned SPF."
   },
   {
    "fieldname": "failed_messages",
@@ -223,7 +217,7 @@
    "label": "Failed DMARC",
    "in_list_view": 1,
    "read_only": 1,
-   "description": "Messages that failed both aligned checks; the published policy decided their fate."
+   "description": "Messages that failed both aligned checks."
   },
   {
    "fieldname": "column_break_totals",
@@ -234,40 +228,40 @@
    "fieldtype": "Int",
    "label": "Passed DKIM",
    "read_only": 1,
-   "description": "Messages with a verified, aligned DKIM signature."
+   "description": "Messages with a valid, aligned DKIM signature."
   },
   {
    "fieldname": "spf_passed_messages",
    "fieldtype": "Int",
    "label": "Passed SPF",
    "read_only": 1,
-   "description": "Messages whose envelope sender passed an aligned SPF check."
+   "description": "Messages that passed an aligned SPF check."
   },
   {
    "fieldname": "policy_section",
    "fieldtype": "Section Break",
    "label": "Published Policy",
-   "description": "The DMARC record as the reporter read it when it evaluated the messages."
+   "description": "DMARC record as the reporter read it."
   },
   {
    "fieldname": "policy",
    "fieldtype": "Data",
    "label": "Policy (p)",
    "read_only": 1,
-   "description": "The p tag the reporter read: none, quarantine or reject."
+   "description": "none, quarantine or reject."
   },
   {
    "fieldname": "subdomain_policy",
    "fieldtype": "Data",
    "label": "Subdomain Policy (sp)",
    "read_only": 1,
-   "description": "The sp tag: the policy for subdomains, when it differs from p."
+   "description": "Policy for subdomains, if different from p."
   },
   {
    "fieldname": "testing_mode",
    "fieldtype": "Check",
    "label": "Testing Mode",
-   "description": "Whether the reporter found the policy in testing mode, that is applied to only part of the failing mail.",
+   "description": "The policy applied to only part of the failing mail.",
    "read_only": 1
   },
   {
@@ -279,21 +273,21 @@
    "fieldtype": "Data",
    "label": "DKIM Alignment (adkim)",
    "read_only": 1,
-   "description": "The adkim tag: whether DKIM alignment was relaxed or strict."
+   "description": "relaxed or strict."
   },
   {
    "fieldname": "aspf",
    "fieldtype": "Data",
    "label": "SPF Alignment (aspf)",
    "read_only": 1,
-   "description": "The aspf tag: whether SPF alignment was relaxed or strict."
+   "description": "relaxed or strict."
   },
   {
    "fieldname": "errors",
    "fieldtype": "Small Text",
    "label": "Reporter Errors",
    "read_only": 1,
-   "description": "Remarks the reporter added, such as a DNS lookup it could not complete."
+   "description": "Notes from the reporter, e.g. a failed DNS lookup."
   },
   {
    "fieldname": "records_section",
@@ -306,7 +300,7 @@
    "label": "Records",
    "options": "DMARC Report Record",
    "read_only": 1,
-   "description": "One row per source IP and result combination, as the reporter grouped the messages."
+   "description": "One row for each source IP and result."
   },
   {
    "fieldname": "stalwart_section",
@@ -319,12 +313,12 @@
    "fieldtype": "JSON",
    "label": "Stalwart Object",
    "read_only": 1,
-   "description": "The DmarcExternalReport object exactly as the cluster answered it, for anything the fields above leave out."
+   "description": "Raw report object from the cluster."
   }
  ],
  "in_create": 1,
  "links": [],
- "modified": "2026-10-16 03:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "DMARC Report",

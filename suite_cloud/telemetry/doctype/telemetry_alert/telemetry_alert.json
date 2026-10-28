@@ -20,7 +20,7 @@
  ],
  "fields": [
   {
-   "description": "Silent Host: the node reported in the last day but sent nothing for the configured minutes. Error Rate: more than the configured share of the node's events in the last hour are errors.",
+   "description": "Silent Host: the node stopped reporting. Error Rate: too many error events in the last hour.",
    "fieldname": "alert_type",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -32,7 +32,7 @@
   },
   {
    "default": "Open",
-   "description": "The checker resolves an alert when its condition clears. Resolve a Silent Host alert yourself when the node was taken out of service; it stays resolved until the node reports again.",
+   "description": "Resolved when the condition clears. Resolve a Silent Host alert by hand if the node was removed.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -91,7 +91,7 @@
   },
   {
    "default": "0",
-   "description": "Resolved by hand. The checker opens no new Silent Host alert for the node until it reports again.",
+   "description": "Resolved by hand. No new Silent Host alert until the node reports again.",
    "fieldname": "dismissed",
    "fieldtype": "Check",
    "label": "Dismissed",
@@ -112,7 +112,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-26 12:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "Telemetry Alert",

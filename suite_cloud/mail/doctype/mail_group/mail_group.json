@@ -28,7 +28,7 @@
    "reqd": 1,
    "set_only_once": 1,
    "unique": 1,
-   "description": "The group's address, e.g. sales@acme.com. Mail sent to it reaches every member. Its domain must be a Mail Domain of the tenant. Cannot change after saving."
+   "description": "Group address, e.g. sales@acme.com. Mail sent to it reaches each member. Cannot be changed after save."
   },
   {
    "fieldname": "domain",
@@ -39,7 +39,7 @@
    "options": "Mail Domain",
    "read_only": 1,
    "search_index": 1,
-   "description": "Mail Domain the address belongs to. Derived from the email."
+   "description": "Set from the email."
   },
   {
    "fetch_from": "domain.tenant",
@@ -50,7 +50,7 @@
    "options": "Suite Tenant",
    "read_only": 1,
    "search_index": 1,
-   "description": "Suite Tenant that owns the group. Derived from the domain; the tenant's group limit applies."
+   "description": "Set from the domain."
   },
   {
    "fetch_from": "domain.cluster",
@@ -60,7 +60,7 @@
    "options": "Stalwart Cluster",
    "read_only": 1,
    "search_index": 1,
-   "description": "Cluster the group lives on. Derived from the tenant."
+   "description": "Set from the tenant."
   },
   {
    "fieldname": "column_break_main",
@@ -71,14 +71,14 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Description",
-   "description": "What the group is for, e.g. Sales team. Shown on the cluster as the group's name."
+   "description": "What the group is for, e.g. Sales team. Shown on the cluster as the group name."
   },
   {
    "default": "0",
    "fieldname": "disable_receiving",
    "fieldtype": "Check",
    "label": "Disable Receiving",
-   "description": "Tick to stop the group receiving mail: mail addressed to it bounces back to the sender, while its members' own mail is not affected. Untick to let it receive again."
+   "description": "Mail sent to the group bounces. Mail of the members is not affected."
   },
   {
    "fieldname": "quotas_section",
@@ -86,7 +86,7 @@
    "label": "Quotas"
   },
   {
-   "description": "Stalwart's per-account limits: maxDiskQuota in bytes, the others as counts. Every row is optional; leave one out for no limit.",
+   "description": "Stalwart limits for the group. Leave a quota out for no limit.",
    "fieldname": "quotas",
    "fieldtype": "Table",
    "label": "Quotas",
@@ -98,7 +98,7 @@
    "label": "Stalwart ID",
    "no_copy": 1,
    "read_only": 1,
-   "description": "Id of the group on the cluster. Set when it is created there."
+   "description": "ID of the group on the cluster."
   },
   {
    "fieldname": "aliases_section",
@@ -110,7 +110,7 @@
    "fieldtype": "Table",
    "label": "Aliases",
    "options": "Mail Address Alias",
-   "description": "Other addresses delivered to the group. Each must be unique across the cluster and under one of the tenant's domains."
+   "description": "Other addresses delivered to the group."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -122,7 +122,7 @@
    "table_fieldname": "groups"
   }
  ],
- "modified": "2026-10-16 03:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Group",

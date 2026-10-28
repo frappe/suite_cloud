@@ -10,7 +10,6 @@
  ],
  "fields": [
   {
-   "description": "One of Stalwart's per-account limits.",
    "fieldname": "quota",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -19,7 +18,7 @@
    "reqd": 1
   },
   {
-   "description": "The most the account may hold: bytes for maxDiskQuota, a count for the others. Remove a row for no limit.",
+   "description": "Bytes for maxDiskQuota, a count for the others.",
    "fieldname": "value",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -31,7 +30,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-09-11 10:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Quota",

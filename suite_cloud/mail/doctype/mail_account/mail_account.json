@@ -37,7 +37,7 @@
  ],
  "fields": [
   {
-   "description": "The mailbox address, e.g. alice@acme.com. Its domain must be a Mail Domain of the tenant. Cannot change after saving.",
+   "description": "Mailbox address, e.g. alice@acme.com. Cannot be changed after save.",
    "fieldname": "email",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -48,7 +48,7 @@
    "unique": 1
   },
   {
-   "description": "Mail Domain the address belongs to. Derived from the email.",
+   "description": "Set from the email.",
    "fieldname": "domain",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -59,7 +59,7 @@
    "search_index": 1
   },
   {
-   "description": "Suite Tenant that owns the account. Derived from the domain; the tenant's account limit applies.",
+   "description": "Set from the domain.",
    "fetch_from": "domain.tenant",
    "fieldname": "tenant",
    "fieldtype": "Link",
@@ -70,7 +70,7 @@
    "search_index": 1
   },
   {
-   "description": "Cluster the mailbox lives on. Derived from the tenant.",
+   "description": "Set from the tenant.",
    "fetch_from": "domain.cluster",
    "fieldname": "cluster",
    "fieldtype": "Link",
@@ -84,7 +84,7 @@
   },
   {
    "default": "1",
-   "description": "Untick to lock the account: it keeps receiving mail but can no longer log in, send or read. Tick again to restore it.",
+   "description": "Clear to lock the account. It still receives mail but cannot log in, send or read.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "in_list_view": 1,
@@ -92,25 +92,25 @@
   },
   {
    "default": "0",
-   "description": "Tick for a send-only account: it logs in, reads and sends as usual, but mail addressed to it bounces back to the sender. Untick to let it receive again.",
+   "description": "Mail sent to this account bounces. It can still log in and send.",
    "fieldname": "disable_receiving",
    "fieldtype": "Check",
    "label": "Disable Receiving"
   },
   {
-   "description": "Name shown to other users, e.g. Alice Doe. This is the only text sent to the cluster for the account.",
+   "description": "Name shown to other users, e.g. Alice Doe.",
    "fieldname": "display_name",
    "fieldtype": "Data",
    "label": "Display Name"
   },
   {
-   "description": "Internal note for operators, e.g. the team or purpose. Stays in Suite Cloud; the cluster never sees it.",
+   "description": "Internal note. Not sent to the cluster.",
    "fieldname": "description",
    "fieldtype": "Data",
    "label": "Description"
   },
   {
-   "description": "Id of the account on the cluster. Set when it is created there.",
+   "description": "ID of the account on the cluster.",
    "fieldname": "stalwart_id",
    "fieldtype": "Data",
    "label": "Stalwart ID",
@@ -124,21 +124,21 @@
    "label": "Credentials"
   },
   {
-   "description": "Login password. Leave blank when creating to have one generated. Type a new one and save to reset it. It is pushed to the cluster and never stored here.",
+   "description": "Leave blank to generate one. Enter a new one to reset it. Not stored here.",
    "fieldname": "new_password",
    "fieldtype": "Password",
    "label": "Password",
    "no_copy": 1
   },
   {
-   "description": "The account's app passwords on the cluster, refreshed when the form opens. A new row is created on save and its secret shown once; a removed row is revoked. Suite Cloud is the tenant's own login and stays first. The maxAppPasswords quota caps the rows.",
+   "description": "Save a new row to create it. The secret is shown once. Remove a row to revoke it.",
    "fieldname": "app_passwords",
    "fieldtype": "Table",
    "label": "App Passwords",
    "options": "Mail Credential"
   },
   {
-   "description": "Bearer tokens for the account's JMAP access, handled like the app passwords. Suite Cloud is reserved for Rotate API Key. The maxApiKeys quota caps the rows.",
+   "description": "JMAP tokens. They work like app passwords.",
    "fieldname": "api_keys",
    "fieldtype": "Table",
    "label": "API Keys",
@@ -151,7 +151,7 @@
   },
   {
    "default": "en-US",
-   "description": "Language tag for server-generated messages and folder names, e.g. en-US or de-DE.",
+   "description": "For server messages and folder names, e.g. en-US.",
    "fieldname": "locale",
    "fieldtype": "Data",
    "label": "Locale"
@@ -161,13 +161,13 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "IANA time zone, e.g. Asia/Kolkata. Blank uses the server's.",
+   "description": "e.g. Asia/Kolkata. Blank uses the server time zone.",
    "fieldname": "time_zone",
    "fieldtype": "Data",
    "label": "Time Zone"
   },
   {
-   "description": "Mailbox size read from the cluster when the account is opened; nothing is stored.",
+   "description": "Read from the cluster when the form opens.",
    "fieldname": "used_disk_bytes",
    "fieldtype": "Int",
    "is_virtual": 1,
@@ -175,14 +175,14 @@
    "read_only": 1
   },
   {
-   "description": "Suite Cloud's own limit on outgoing mail, which Stalwart's storage quotas below do not cover. Counted by the Agents on the cluster's nodes and applied within about a minute of saving.",
+   "description": "Limits on outgoing mail. Applied about one minute after save.",
    "fieldname": "sending_limits_section",
    "fieldtype": "Section Break",
    "label": "Sending Limits"
   },
   {
    "default": "0",
-   "description": "Recipients the account may send to per UTC day. A message to 50 recipients counts as 50. 0 means no limit.",
+   "description": "Recipients per UTC day. A message to 50 recipients counts as 50. 0 means no limit.",
    "fieldname": "daily_send_limit",
    "fieldtype": "Int",
    "label": "Daily Send Limit",
@@ -194,7 +194,7 @@
   },
   {
    "default": "0",
-   "description": "Recipients the account may send to per UTC month. 0 means no limit.",
+   "description": "Recipients per UTC month. 0 means no limit.",
    "fieldname": "monthly_send_limit",
    "fieldtype": "Int",
    "label": "Monthly Send Limit",
@@ -206,7 +206,7 @@
    "label": "Quotas"
   },
   {
-   "description": "Stalwart's per-account limits: maxDiskQuota in bytes, the others as counts. Every row is optional; leave one out for no limit.",
+   "description": "Stalwart limits for the account. Leave a quota out for no limit.",
    "fieldname": "quotas",
    "fieldtype": "Table",
    "label": "Quotas",
@@ -218,7 +218,7 @@
    "label": "Aliases"
   },
   {
-   "description": "Other addresses delivered to this mailbox. Each must be unique across the cluster and under one of the tenant's domains.",
+   "description": "Other addresses delivered to this mailbox.",
    "fieldname": "aliases",
    "fieldtype": "Table",
    "label": "Aliases",
@@ -230,7 +230,6 @@
    "label": "Groups"
   },
   {
-   "description": "Mail Groups this account is a member of. Mail sent to a group reaches every member.",
    "fieldname": "groups",
    "fieldtype": "Table MultiSelect",
    "label": "Groups",
@@ -240,7 +239,7 @@
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 15:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",

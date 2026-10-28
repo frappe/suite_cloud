@@ -86,7 +86,7 @@
    "fieldtype": "Section Break"
   },
   {
-   "description": "Display name shown in lists and links, e.g. Bangalore 1. Editable; the document is named by its hostname.",
+   "description": "Name shown in lists, e.g. Bangalore 1.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -95,7 +95,7 @@
   },
   {
    "default": "1",
-   "description": "Untick to stop placing new tenants here and mark the cluster Disabled. Existing tenants keep working. The default cluster cannot be disabled; mark another one as default first.",
+   "description": "Clear to stop placing new tenants here. Current tenants keep working. The default cluster cannot be disabled.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
@@ -106,7 +106,7 @@
   },
   {
    "default": "Pending",
-   "description": "Pending: no node yet. Bootstrapping: first node provisioned, waiting for the certificate. Active: ready for tenants. Failed: the first node did not come up; provision it again.",
+   "description": "Pending: no node yet. Bootstrapping: waits for the certificate. Active: ready for tenants. Failed: the first node did not start. Provision it again.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -116,7 +116,7 @@
    "read_only": 1
   },
   {
-   "description": "Stalwart release the nodes run, e.g. v0.16.20. Defaults to the version in Suite Cloud Settings. Change it and run Upgrade Nodes.",
+   "description": "Stalwart release the nodes run. Change it and run Upgrade Nodes.",
    "fieldname": "stalwart_version",
    "fieldtype": "Data",
    "label": "Stalwart Version"
@@ -127,7 +127,7 @@
    "label": "Naming"
   },
   {
-   "description": "Short set-once id that namespaces the cluster under its zone. With label blr and zone frappemail.com the cluster is mail.blr.frappemail.com, its nodes n1.blr.frappemail.com and so on, and one wildcard certificate covers them. Lowercase letters, digits and dashes; handed out as c1, c2, ... when left blank. Only a namespace, not a place.",
+   "description": "Short ID under the zone, e.g. blr gives mail.blr.frappemail.com. Blank gives c1, c2 and so on. Cannot be changed.",
    "fieldname": "label",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -135,7 +135,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Zone the cluster's hostnames are derived under and its records are published in. Defaults to the default zone. Cannot change after saving.",
+   "description": "Zone for the cluster's hostnames and records. Cannot be changed after save.",
    "fieldname": "dns_zone",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -149,7 +149,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Public address of the cluster and its document name, built from the label and the zone, e.g. mail.blr.frappemail.com. Mail clients, MX records and tenants all use it.",
+   "description": "Public address of the cluster, e.g. mail.blr.frappemail.com.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -159,14 +159,14 @@
    "unique": 1
   },
   {
-   "description": "Sub-zone the cluster owns, built from the label and the zone, e.g. blr.frappemail.com. Nodes, gateways and pools get single labels under it, and its wildcard certificate covers them.",
+   "description": "Sub-zone for nodes, gateways and pools, e.g. blr.frappemail.com.",
    "fieldname": "default_domain",
    "fieldtype": "Data",
    "label": "Default Domain",
    "read_only": 1
   },
   {
-   "description": "JMAP URL handed to tenants: https:// plus the hostname.",
+   "description": "JMAP URL given to tenants.",
    "fieldname": "base_url",
    "fieldtype": "Data",
    "label": "Base URL",
@@ -179,13 +179,13 @@
   },
   {
    "default": "0",
-   "description": "Cluster a tenant is placed on when no cluster lists its region. There is always exactly one: the first cluster becomes the default, and marking another cluster moves it there. The default cannot be disabled or deleted.",
+   "description": "Tenants go here when no cluster lists their region. There is always one default.",
    "fieldname": "is_default",
    "fieldtype": "Check",
    "label": "Is Default"
   },
   {
-   "description": "Region codes a tenant may be placed from, e.g. blr, sfo; a Region's Stalwart Region is matched against them. A tenant whose region no cluster lists goes to the default cluster. Placement policy only: the cluster's servers may sit anywhere.",
+   "description": "Region codes this cluster serves, e.g. blr.",
    "fieldname": "regions",
    "fieldtype": "Table",
    "label": "Regions Served",
@@ -197,7 +197,7 @@
    "label": "Stores"
   },
   {
-   "description": "Where settings, the directory and message metadata live. PostgreSQL or MySQL for a real cluster; RocksDB only for a single test node.",
+   "description": "Settings, directory and message metadata. Use PostgreSQL or MySQL. RocksDB is for a single test node.",
    "fieldname": "data_store",
    "fieldtype": "Link",
    "label": "Data Store",
@@ -205,7 +205,7 @@
    "reqd": 1
   },
   {
-   "description": "Where message bodies and attachments live. Leave blank to keep them in the data store; S3 is the usual choice for a cluster.",
+   "description": "Message bodies and attachments. Blank uses the data store.",
    "fieldname": "blob_store",
    "fieldtype": "Link",
    "label": "Blob Store",
@@ -216,14 +216,14 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Where the full-text index lives. Leave blank to keep it in the data store.",
+   "description": "Full-text index. Blank uses the data store.",
    "fieldname": "search_store",
    "fieldtype": "Link",
    "label": "Search Store",
    "options": "Stalwart Store"
   },
   {
-   "description": "Caches, rate limits and cluster coordination. Leave blank to keep them in the data store; Redis is required for more than one node.",
+   "description": "Caches, rate limits and coordination. Blank uses the data store. More than one node needs Redis.",
    "fieldname": "in_memory_store",
    "fieldtype": "Link",
    "label": "In-Memory Store",
@@ -234,7 +234,7 @@
    "fieldtype": "Section Break"
   },
   {
-   "description": "Derived. Default when a Redis in-memory store is set on a multi-node cluster, so nodes can coordinate through it; Disabled otherwise.",
+   "description": "Set automatically. Default when a multi-node cluster has a Redis store.",
    "fieldname": "coordinator",
    "fieldtype": "Select",
    "label": "Coordinator",
@@ -247,7 +247,7 @@
   },
   {
    "default": "0",
-   "description": "Derived. Set when a store is embedded (RocksDB or local files). Its data lives on one VPS and cannot be shared, so the cluster can only ever have one node.",
+   "description": "Set automatically when a store is local. The cluster can have only one node.",
    "fieldname": "single_node",
    "fieldtype": "Check",
    "label": "Single Node Only",
@@ -259,7 +259,7 @@
    "label": "TLS"
   },
   {
-   "description": "Certificate authority the cluster requests its certificates from. Defaults to Suite Cloud Settings. Use the Let's Encrypt staging directory while testing.",
+   "description": "Certificate authority. Blank uses Suite Cloud Settings.",
    "fieldname": "acme_directory_url",
    "fieldtype": "Data",
    "label": "ACME Directory URL",
@@ -270,7 +270,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Address the certificate authority writes to about expiring certificates. Defaults to Suite Cloud Settings.",
+   "description": "Gets notices about expiring certificates. Blank uses Suite Cloud Settings.",
    "fieldname": "acme_contact_email",
    "fieldtype": "Data",
    "label": "ACME Contact Email",
@@ -288,14 +288,13 @@
   },
   {
    "default": "admin",
-   "description": "Stalwart's built-in administrator account, created during bootstrap.",
    "fieldname": "admin_username",
    "fieldtype": "Data",
    "label": "Admin Username",
    "read_only": 1
   },
   {
-   "description": "Generated on save. Only used to mint the API key and for app-password creation; Show Admin Password reveals it to the Administrator.",
+   "description": "Generated on save.",
    "fieldname": "admin_password",
    "fieldtype": "Password",
    "hidden": 1,
@@ -306,7 +305,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Bearer token Suite Cloud uses for every management call. Minted when bootstrap finishes; Rotate API Key replaces it.",
+   "description": "Token Suite Cloud uses for management calls. Rotate API Key replaces it.",
    "fieldname": "api_key",
    "fieldtype": "Password",
    "hidden": 1,
@@ -319,7 +318,7 @@
   },
   {
    "default": "1",
-   "description": "Stalwart serves /metrics/prometheus on the HTTPS listener of every node and gateway, as the user telemetry with the password beside. The agent reads it and reports Stalwart's own metrics; off, the agent reports host metrics only. Applied by Sync Config and on the next Install Agent job.",
+   "description": "Serve Stalwart metrics to the agent. Off, the agent sends host metrics only.",
    "fieldname": "enable_metrics",
    "fieldtype": "Check",
    "label": "Enable Prometheus Metrics"
@@ -329,7 +328,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Generated on save, unique per cluster. The agent on each node signs in with it.",
+   "description": "Generated on save.",
    "fieldname": "metrics_password",
    "fieldtype": "Password",
    "label": "Metrics Password"
@@ -340,7 +339,7 @@
    "label": "Suite Cloud Agent"
   },
   {
-   "description": "Identifies the cluster to Suite Cloud. The Agents on its nodes and gateways send it with the Agent Secret, and Suite Cloud only lets them read and report this cluster's data. Generated on save.",
+   "description": "Identifies the cluster to Suite Cloud. Generated on save.",
    "fieldname": "agent_key",
    "fieldtype": "Data",
    "label": "Agent Key",
@@ -353,7 +352,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Generated on save, unique per cluster. Rotate Agent Secret replaces it and reinstalls the Agents; until each is reinstalled, its requests are refused and retried, and nothing is lost.",
+   "description": "Generated on save. Rotate Agent Secret replaces it and reinstalls the agents.",
    "fieldname": "agent_secret",
    "fieldtype": "Password",
    "label": "Agent Secret",
@@ -367,7 +366,7 @@
   },
   {
    "default": "5000",
-   "description": "Messages a signed-in account may send per UTC day, whatever its own limits. It keeps every account in check while an Agent is down, so keep it above the highest Daily Send Limit. It counts messages, not recipients. 0 turns it off. Applied by Sync Config.",
+   "description": "Most messages any account can send per UTC day. Keep it above the highest Daily Send Limit. 0 turns it off.",
    "fieldname": "quota_backstop_per_day",
    "fieldtype": "Int",
    "label": "Backstop Messages per Day",
@@ -378,7 +377,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Generated on save, unique per cluster. Stalwart's sending-limit hook sends it to the Agent on each node, which checks it.",
+   "description": "Generated on save.",
    "fieldname": "quota_hook_token",
    "fieldtype": "Password",
    "label": "Quota Hook Token",
@@ -392,7 +391,7 @@
   },
   {
    "default": "root",
-   "description": "User Ansible logs in as on the nodes. Needs root or passwordless sudo.",
+   "description": "User Ansible logs in as. Needs root or passwordless sudo.",
    "fieldname": "ssh_user",
    "fieldtype": "Data",
    "label": "SSH User",
@@ -400,7 +399,7 @@
   },
   {
    "default": "22",
-   "description": "SSH port on the nodes. Individual nodes can override user and port.",
+   "description": "Nodes can override it.",
    "fieldname": "ssh_port",
    "fieldtype": "Int",
    "label": "SSH Port",
@@ -411,14 +410,14 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Generated on save. Add it to the authorized keys of the SSH user on every node and gateway VPS before provisioning.",
+   "description": "Add it to the authorized keys on each node and gateway before provisioning.",
    "fieldname": "ssh_public_key",
    "fieldtype": "Code",
    "label": "SSH Public Key",
    "read_only": 1
   },
   {
-   "description": "Generated on save; written to a temporary file only while a job runs.",
+   "description": "Generated on save.",
    "fieldname": "ssh_private_key",
    "fieldtype": "Password",
    "hidden": 1,
@@ -430,7 +429,7 @@
    "label": "Egress"
   },
   {
-   "description": "Everything the cluster sends leaves through this pool, bounces and reports included, unless a tenant or domain names another pool. Leave blank for direct delivery from the nodes.",
+   "description": "Pool for all outbound mail. Blank sends mail directly from the nodes.",
    "fieldname": "default_egress_pool",
    "fieldtype": "Link",
    "label": "Default Egress Pool",
@@ -442,14 +441,14 @@
   },
   {
    "default": "relay",
-   "description": "SMTP AUTH user the cluster presents to its egress gateways.",
+   "description": "SMTP user the cluster uses with its egress gateways.",
    "fieldname": "relay_username",
    "fieldtype": "Data",
    "label": "Relay Username",
    "read_only": 1
   },
   {
-   "description": "Generated on save; pushed to the gateways with their configuration.",
+   "description": "Generated on save.",
    "fieldname": "relay_password",
    "fieldtype": "Password",
    "hidden": 1,
@@ -461,7 +460,7 @@
    "label": "Configuration"
   },
   {
-   "description": "The node that ran the first-time setup of the cluster. Set automatically.",
+   "description": "Node that ran the first setup.",
    "fieldname": "bootstrap_node",
    "fieldtype": "Link",
    "label": "Bootstrap Node",
@@ -470,21 +469,20 @@
   },
   {
    "default": "0",
-   "description": "Increases every time the generated configuration is pushed to the cluster.",
+   "description": "Increases on each configuration push.",
    "fieldname": "config_version",
    "fieldtype": "Int",
    "label": "Config Version",
    "read_only": 1
   },
   {
-   "description": "When the configuration was last pushed.",
    "fieldname": "last_config_sync_at",
    "fieldtype": "Datetime",
    "label": "Last Config Sync At",
    "read_only": 1
   },
   {
-   "description": "Why the last queued push failed, with its time. Cleared by the next push that goes through.",
+   "description": "Why the last push failed.",
    "fieldname": "last_config_sync_error",
    "fieldtype": "Small Text",
    "label": "Last Config Sync Error",
@@ -496,7 +494,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Result of the last Check Drift: settings on the cluster that differ from the generated plan. Cleared by Sync Config.",
+   "description": "Settings on the cluster that differ from the plan, from the last Check Drift.",
    "fieldname": "drift_report",
    "fieldtype": "JSON",
    "label": "Drift Report",
@@ -507,7 +505,7 @@
    "fieldtype": "Section Break"
   },
   {
-   "description": "Last generated plan, secrets redacted.",
+   "description": "Last generated configuration, secrets hidden.",
    "fieldname": "config_plan",
    "fieldtype": "Code",
    "label": "Config Plan",
@@ -558,7 +556,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-28 20:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

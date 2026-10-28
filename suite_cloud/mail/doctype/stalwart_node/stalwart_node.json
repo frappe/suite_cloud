@@ -36,7 +36,6 @@
  ],
  "fields": [
   {
-   "description": "Cluster this server belongs to. It provides the stores, the SSH key and the version the node runs.",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -47,7 +46,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Assigned on first save: n1, n2 and so on under the cluster's default domain, e.g. n1.blr.frappemail.com. It gets an A record in the zone and is what the reverse DNS of the IP must point to.",
+   "description": "Set on first save, e.g. n1.blr.frappemail.com. Reverse DNS of the IP must point to it.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -57,21 +56,21 @@
    "unique": 1
   },
   {
-   "description": "Display name shown in lists and links, e.g. Bangalore node 1. Defaults to the hostname.",
+   "description": "Name shown in lists. Defaults to the hostname.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title"
   },
   {
-   "description": "Where the server runs, e.g. DigitalOcean BLR1. Informational; placement follows the cluster's regions.",
+   "description": "Where the server runs, e.g. DigitalOcean BLR1. For information only.",
    "fieldname": "location",
    "fieldtype": "Data",
    "label": "Location"
   },
   {
    "default": "full",
-   "description": "What this node does. full: serves mail clients and sends outbound mail. frontend: serves clients only. outbound: only delivers the queue and takes no client traffic. Single-node clusters must use full.",
+   "description": "full: serves clients and sends mail. frontend: serves clients only. outbound: sends mail only. Single-node clusters use full.",
    "fieldname": "role",
    "fieldtype": "Select",
    "label": "Role",
@@ -83,14 +82,14 @@
   },
   {
    "default": "1",
-   "description": "Untick to take the node out of service: it leaves the cluster hostname's DNS and Stalwart is stopped. Tick again and Restore to bring it back.",
+   "description": "Clear to take the node out of service and stop Stalwart.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
   },
   {
    "default": "Pending",
-   "description": "Pending: created, not provisioned. Provisioning: a job is running. Provisioned: installed, waiting for Stalwart to report healthy. Active: serving. Draining: removed from DNS for maintenance. Failed: the job or health check failed, see Last Error. Disabled: stopped by an operator.",
+   "description": "Pending: not provisioned. Provisioning: a job runs. Provisioned: waits for Stalwart to be healthy. Active: serving. Draining: out of DNS for maintenance. Failed: see Last Error. Disabled: stopped by an operator.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -101,7 +100,7 @@
   },
   {
    "default": "0",
-   "description": "This node ran the first-time setup of the cluster. It cannot be deleted while the cluster is active.",
+   "description": "Ran the first setup. Cannot be deleted while the cluster is active.",
    "fieldname": "is_bootstrap_node",
    "fieldtype": "Check",
    "label": "Is Bootstrap Node",
@@ -113,7 +112,7 @@
    "label": "Network"
   },
   {
-   "description": "Public IPv4 of the VPS. Used for SSH, the node's A record and, while the node is active, the cluster hostname's A record.",
+   "description": "Public IPv4 of the server, used for SSH and DNS.",
    "fieldname": "ipv4_address",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -121,7 +120,7 @@
    "reqd": 1
   },
   {
-   "description": "Public IPv6 of the VPS, if it has one. Gets an AAAA record alongside the A record.",
+   "description": "Optional. Gets an AAAA record.",
    "fieldname": "ipv6_address",
    "fieldtype": "Data",
    "label": "IPv6 Address"
@@ -132,7 +131,7 @@
   },
   {
    "default": "0",
-   "description": "The cluster hostname currently resolves to this node, so mail clients and other servers reach it.",
+   "description": "The cluster hostname resolves to this node.",
    "fieldname": "in_ingress_dns",
    "fieldtype": "Check",
    "label": "In Ingress DNS",
@@ -140,7 +139,7 @@
   },
   {
    "default": "0",
-   "description": "Reverse DNS of the IPv4 address points back at the hostname. Set it at the VPS provider; receivers reject mail from servers without it. Checked daily and by Verify PTR.",
+   "description": "Reverse DNS of the IPv4 points to the hostname. Set it at the server provider.",
    "fieldname": "ptr_verified",
    "fieldtype": "Check",
    "label": "PTR Verified",
@@ -152,13 +151,13 @@
    "label": "SSH"
   },
   {
-   "description": "User Ansible logs in as. Leave blank to use the cluster's SSH user.",
+   "description": "Blank uses the cluster SSH user.",
    "fieldname": "ssh_user",
    "fieldtype": "Data",
    "label": "SSH User"
   },
   {
-   "description": "Leave blank to use the cluster's SSH port.",
+   "description": "Blank uses the cluster SSH port.",
    "fieldname": "ssh_port",
    "fieldtype": "Int",
    "label": "SSH Port"
@@ -169,14 +168,14 @@
   },
   {
    "default": "0",
-   "description": "Verify SSH reached the server with the cluster's key. Required before Provision; reset when the IP changes.",
+   "description": "Verify SSH reached the server. Required before Provision.",
    "fieldname": "ssh_verified",
    "fieldtype": "Check",
    "label": "SSH Verified",
    "read_only": 1
   },
   {
-   "description": "The server's SSH host keys, recorded by Verify SSH on first contact and required to match on every later connection. Cleared when the address or port changes. After reinstalling the server, use Reset SSH Host Keys and verify again.",
+   "description": "Recorded on first SSH contact and checked on each connection. After a reinstall, run Reset SSH Host Keys.",
    "fieldname": "ssh_host_keys",
    "fieldtype": "Small Text",
    "label": "SSH Host Keys",
@@ -188,14 +187,14 @@
    "label": "State"
   },
   {
-   "description": "Stalwart release the last job installed on this node.",
+   "description": "Stalwart release installed by the last job.",
    "fieldname": "installed_version",
    "fieldtype": "Data",
    "label": "Installed Version",
    "read_only": 1
   },
   {
-   "description": "Id Stalwart's cluster registry assigned to this node. Stays 0 on single-node clusters without a coordinator.",
+   "description": "ID in the Stalwart cluster registry. 0 on a single node without a coordinator.",
    "fieldname": "node_id",
    "fieldtype": "Int",
    "label": "Node ID",
@@ -206,21 +205,21 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "When the last provisioning or upgrade job finished successfully.",
+   "description": "When the last provisioning or upgrade job succeeded.",
    "fieldname": "provisioned_at",
    "fieldtype": "Datetime",
    "label": "Provisioned At",
    "read_only": 1
   },
   {
-   "description": "When Stalwart on this node last answered a health check.",
+   "description": "When Stalwart last passed a health check.",
    "fieldname": "last_health_at",
    "fieldtype": "Datetime",
    "label": "Last Health At",
    "read_only": 1
   },
   {
-   "description": "Why the last job, health check or SSH check failed. Cleared by the next success.",
+   "description": "Why the last job or check failed.",
    "fieldname": "last_error",
    "fieldtype": "Small Text",
    "label": "Last Error",
@@ -240,7 +239,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-10-28 18:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Node",

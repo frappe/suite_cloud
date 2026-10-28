@@ -34,7 +34,7 @@
  ],
  "fields": [
   {
-   "description": "The tenant's display name, e.g. Acme Corp. The Suite app sends its workspace name.",
+   "description": "Display name, e.g. Acme Corp.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -43,7 +43,6 @@
   },
   {
    "default": "Suite Site",
-   "description": "What the tenant is: a hosted Frappe Suite site, a team workspace, or a development setup.",
    "fieldname": "tenant_type",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -54,7 +53,7 @@
    "reqd": 1
   },
   {
-   "description": "The user who owns the tenant; it needs the Suite Tenant role and keeps it while it owns one. Requests authenticated with the tenant's secret run as this user. One user may own several tenants.",
+   "description": "Owner of the tenant. Requests with the tenant secret run as this user.",
    "fieldname": "user",
    "fieldtype": "Link",
    "label": "User",
@@ -64,7 +63,7 @@
    "search_index": 1
   },
   {
-   "description": "Where tenant-specific notices go, such as downtime or a domain losing verification. Set by the tenant through the API; the owner's email when left empty.",
+   "description": "Gets tenant notices. Blank uses the owner email.",
    "fetch_from": "user.email",
    "fetch_if_empty": 1,
    "fieldname": "contact_email",
@@ -78,7 +77,7 @@
   },
   {
    "default": "1",
-   "description": "Unchecked, the tenant's secret stops authenticating. Archive clears it and Resume sets it again; Suspend leaves it checked so the tenant gets a 403 naming the suspension instead of a bare 401.",
+   "description": "Clear to stop the secret from working.",
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled",
@@ -86,7 +85,7 @@
   },
   {
    "default": "Active",
-   "description": "Active serves the API. Suspended keeps the key valid but answers every request with a 403 naming the suspension. Archived is final and required before deletion.",
+   "description": "Active: the API works. Suspended: requests get a 403. Archived: final, required before deletion.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -97,7 +96,7 @@
    "read_only": 1
   },
   {
-   "description": "When the tenant was archived. Set by the Archive action; the tenant cannot be resumed after this.",
+   "description": "The tenant cannot be resumed after this.",
    "fieldname": "archived_at",
    "fieldtype": "Datetime",
    "label": "Archived At",
@@ -111,7 +110,7 @@
   },
   {
    "default": "0",
-   "description": "Disk the tenant's plan includes, in gigabytes, across every service the tenant uses; shown to the tenant next to its usage. 0 means unlimited. It does not cap the quotas of its mail accounts and groups.",
+   "description": "Disk in the plan across all services. 0 means unlimited. Does not limit mail quotas.",
    "fieldname": "max_disk_gb",
    "fieldtype": "Float",
    "label": "Total Disk Quota (GB)",
@@ -123,7 +122,7 @@
    "label": "API Access"
   },
   {
-   "description": "Sent by the tenant in the Authorization header as Tenant, its id, a colon and this secret. Stored encrypted and shown once, after Rotate Secret; rotating it invalidates the previous secret immediately.",
+   "description": "Shown once after Rotate Secret. Rotating it stops the old secret at once.",
    "fieldname": "secret",
    "fieldtype": "Password",
    "hidden": 1,
@@ -131,7 +130,7 @@
    "permlevel": 1
   },
   {
-   "description": "One per line: the IPv4 or IPv6 addresses, or CIDR ranges, the tenant's server sends from. Set, only requests from these addresses may use the tenant's secret; a leaked secret is useless elsewhere. Blank accepts any address.",
+   "description": "One IP or CIDR range per line. Only these addresses can use the secret. Blank allows any.",
    "fieldname": "allowed_ips",
    "fieldtype": "Small Text",
    "label": "Allowed IP Addresses",
@@ -152,7 +151,7 @@
    "label": "Cluster"
   },
   {
-   "description": "The Stalwart cluster hosting every mail domain and account of the tenant. Empty, the tenant is not set up for Mail and no mail action is possible. Fixed once the tenant holds a domain, account, group, list or report; the cluster must be active when set.",
+   "description": "Cluster for the tenant's mail. Blank means mail is off. Cannot be changed after mail data exists.",
    "fieldname": "stalwart_cluster",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -167,7 +166,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Outbound mail of this tenant's domains leaves through this pool instead of the cluster default. A domain may name its own pool. The pool must belong to the tenant's Stalwart cluster; without a cluster it is cleared.",
+   "description": "Pool for this tenant's outbound mail. Overrides the cluster default.",
    "fieldname": "egress_pool",
    "fieldtype": "Link",
    "label": "Egress Pool",
@@ -182,7 +181,7 @@
   },
   {
    "default": "10",
-   "description": "Mail Domains the tenant may hold. Adding one beyond the limit fails. 0 means unlimited.",
+   "description": "0 means unlimited.",
    "fieldname": "max_domains",
    "fieldtype": "Int",
    "label": "Max Domains",
@@ -191,7 +190,7 @@
   },
   {
    "default": "500",
-   "description": "Mail Accounts the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
+   "description": "0 means unlimited.",
    "fieldname": "max_accounts",
    "fieldtype": "Int",
    "label": "Max Accounts",
@@ -200,7 +199,7 @@
   },
   {
    "default": "50",
-   "description": "Mail Groups the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
+   "description": "0 means unlimited.",
    "fieldname": "max_groups",
    "fieldtype": "Int",
    "label": "Max Groups",
@@ -209,7 +208,7 @@
   },
   {
    "default": "50",
-   "description": "Mailing Lists the tenant may hold across all its domains. Creating one beyond the limit fails. 0 means unlimited.",
+   "description": "0 means unlimited.",
    "fieldname": "max_mailing_lists",
    "fieldtype": "Int",
    "label": "Max Mailing Lists",
@@ -226,7 +225,7 @@
    "label": "Usage"
   },
   {
-   "description": "Disk used by the tenant's mail accounts and groups together, as the Stalwart cluster last reported it (kept for 5 minutes); nothing is stored.",
+   "description": "Disk used by mail accounts and groups, read from the cluster.",
    "fieldname": "mail_used_disk_bytes",
    "fieldtype": "Int",
    "is_virtual": 1,
@@ -274,7 +273,7 @@
    "link_fieldname": "tenant"
   }
  ],
- "modified": "2026-10-16 18:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Tenant",

@@ -44,7 +44,6 @@
    "label": "Domain"
   },
   {
-   "description": "The domain the report is about, as the reporter names it in its policies. It is the Mail Domain's name whenever a tenant holds the domain.",
    "fieldname": "policy_domain",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -55,7 +54,7 @@
    "search_index": 1
   },
   {
-   "description": "The tenant that held the domain when the report was fetched, set only if the report was also addressed to one of its domains; the tenant API shows the report to this tenant only.",
+   "description": "Tenant that held the domain when the report was fetched. Only this tenant sees the report.",
    "fieldname": "tenant",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -70,7 +69,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "The cluster that intercepted the report. Stalwart parses reports mailed to postmaster@ and keeps them for a month.",
+   "description": "Cluster that received the report.",
    "fieldname": "cluster",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -80,7 +79,7 @@
    "reqd": 1
   },
   {
-   "description": "The id of the TlsExternalReport object on the cluster; with the cluster it says whether a report is stored already.",
+   "description": "ID of the report on the cluster.",
    "fieldname": "stalwart_id",
    "fieldtype": "Data",
    "label": "Stalwart ID",
@@ -93,7 +92,7 @@
    "label": "Reporter"
   },
   {
-   "description": "The organisation whose servers delivered mail to the domain and sent the report, such as Google Inc.",
+   "description": "Organization that sent the report, e.g. Google Inc.",
    "fieldname": "org_name",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -102,7 +101,7 @@
    "reqd": 1
   },
   {
-   "description": "The address the report was mailed from.",
+   "description": "Address the report came from.",
    "fieldname": "reporter_email",
    "fieldtype": "Data",
    "label": "Reporter Email",
@@ -110,7 +109,6 @@
    "read_only": 1
   },
   {
-   "description": "How the reporter asks to be reached about the report, often a mailto: address.",
    "fieldname": "contact_info",
    "fieldtype": "Small Text",
    "label": "Reporter Contact",
@@ -121,21 +119,20 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "The reporter's own id for the report; the same report resent carries the same id.",
+   "description": "Reporter's ID for the report.",
    "fieldname": "report_id",
    "fieldtype": "Data",
    "label": "Report ID",
    "read_only": 1
   },
   {
-   "description": "The subject line of the message that carried the report.",
    "fieldname": "subject",
    "fieldtype": "Small Text",
    "label": "Subject",
    "read_only": 1
   },
   {
-   "description": "The addresses the reporter mailed the report to, one per line; postmaster@ of the domain, normally.",
+   "description": "Addresses the report was sent to, one per line.",
    "fieldname": "sent_to",
    "fieldtype": "Small Text",
    "label": "Sent To",
@@ -147,7 +144,6 @@
    "label": "Period"
   },
   {
-   "description": "The start of the period the report covers, usually one day.",
    "fieldname": "date_range_begin",
    "fieldtype": "Datetime",
    "in_list_view": 1,
@@ -155,7 +151,6 @@
    "read_only": 1
   },
   {
-   "description": "The end of the period the report covers.",
    "fieldname": "date_range_end",
    "fieldtype": "Datetime",
    "in_list_view": 1,
@@ -168,14 +163,13 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "When the cluster received the report.",
    "fieldname": "received_at",
    "fieldtype": "Datetime",
    "label": "Received At",
    "read_only": 1
   },
   {
-   "description": "When Stalwart drops its copy; the report stays here until the retention in Suite Cloud Settings runs out.",
+   "description": "When Stalwart deletes its copy. The report stays here for the retention set in Suite Cloud Settings.",
    "fieldname": "expires_at",
    "fieldtype": "Datetime",
    "label": "Expires On Cluster",
@@ -187,7 +181,7 @@
    "label": "Totals"
   },
   {
-   "description": "Connections the reporter's servers made to the domain's MX hosts in the period, summed over the policies.",
+   "description": "Connections to the domain's MX hosts in the period.",
    "fieldname": "total_sessions",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -195,7 +189,7 @@
    "read_only": 1
   },
   {
-   "description": "Connections that negotiated TLS the way the policy asks for.",
+   "description": "Connections that used TLS as the policy asks.",
    "fieldname": "successful_sessions",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -203,7 +197,7 @@
    "read_only": 1
   },
   {
-   "description": "Connections that could not; the failures below say why.",
+   "description": "Connections that failed TLS. See Failures.",
    "fieldname": "failed_sessions",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -215,7 +209,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "The kinds of policy the reporter applied, comma-separated: sts (MTA-STS), tlsa (DANE) or no-policy-found.",
+   "description": "sts (MTA-STS), tlsa (DANE) or no-policy-found.",
    "fieldname": "policy_types",
    "fieldtype": "Data",
    "label": "Policy Types",
@@ -227,7 +221,7 @@
    "label": "Policies"
   },
   {
-   "description": "One row per policy the reporter evaluated, with the sessions it counted under it.",
+   "description": "One row for each policy checked.",
    "fieldname": "policies",
    "fieldtype": "Table",
    "label": "Policies",
@@ -240,7 +234,7 @@
    "label": "Failures"
   },
   {
-   "description": "One row per kind of failure and receiving host, as the reporter grouped the failed sessions.",
+   "description": "One row for each failure type and receiving host.",
    "fieldname": "failures",
    "fieldtype": "Table",
    "label": "Failures",
@@ -254,7 +248,7 @@
    "label": "Stalwart Object"
   },
   {
-   "description": "The TlsExternalReport object exactly as the cluster answered it, for anything the fields above leave out.",
+   "description": "Raw report object from the cluster.",
    "fieldname": "report",
    "fieldtype": "JSON",
    "label": "Stalwart Object",
@@ -265,7 +259,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-16 03:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "TLS Report",

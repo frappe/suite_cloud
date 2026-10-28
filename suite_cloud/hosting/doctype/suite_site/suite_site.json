@@ -34,7 +34,7 @@
  ],
  "fields": [
   {
-   "description": "The site's name on Pilot: suite- and eight hex digits under the server's wildcard zone, e.g. suite-3f9a1c2b.blr1.frappe.cloud.",
+   "description": "Site name on Pilot, e.g. suite-3f9a1c2b.blr1.frappe.cloud.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -43,7 +43,6 @@
    "unique": 1
   },
   {
-   "description": "Region the site is created in. Signups use the Default Region in Suite Cloud Settings.",
    "fieldname": "region",
    "fieldtype": "Link",
    "in_list_view": 1,
@@ -54,7 +53,6 @@
    "set_only_once": 1
   },
   {
-   "description": "Chosen when the site is created: the server of the region with most free slots.",
    "fieldname": "virtual_machine",
    "fieldtype": "Link",
    "in_standard_filter": 1,
@@ -69,7 +67,7 @@
   },
   {
    "default": "Pending",
-   "description": "Pending: waiting for a server with room. Creating: Pilot is creating it. Ready: in the pool, unclaimed. Assigned and Configuring: being connected to its tenant. Active: in use. Failed: stopped on an error; run Retry. Dropping: Drop Site is removing it; run Drop Site again after an error. Dropped: deleted from its server.",
+   "description": "Pending: waits for a server with room. Creating: Pilot creates it. Ready: in the pool, not claimed. Assigned, Configuring: being connected to its tenant. Active: in use. Failed: stopped on an error, run Retry. Dropping: being deleted. Dropped: deleted from its server.",
    "fieldname": "status",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -90,7 +88,7 @@
    "search_index": 1
   },
   {
-   "description": "The tenant's label. acme gives the site domain acme.sites.example.com and the mail domain acme.example.com, under the zones set in Suite Cloud Settings. Unique among sites; cleared when the site is dropped, though the tenant's mail domain keeps it for that tenant's next site.",
+   "description": "Short name of the tenant, e.g. acme. Gives the site domain and the mail domain.",
    "fieldname": "label",
    "fieldtype": "Data",
    "label": "Label",
@@ -98,7 +96,7 @@
    "unique": 1
   },
   {
-   "description": "The domain the site is served under once it is attached, e.g. acme.sites.example.com. Blank until then: the hostname serves the site.",
+   "description": "Domain the site is served under, e.g. acme.sites.example.com. Blank until a domain is attached.",
    "fieldname": "primary_domain",
    "fieldtype": "Data",
    "label": "Primary Domain",
@@ -111,7 +109,7 @@
   },
   {
    "default": "0",
-   "description": "Pilot has created the site with the Suite app on its server.",
+   "description": "Pilot created the site with the Suite app.",
    "fieldname": "site_created",
    "fieldtype": "Check",
    "label": "Site Created",
@@ -119,21 +117,21 @@
   },
   {
    "default": "0",
-   "description": "The site was given its Suite Cloud URL, tenant id and secret, finished onboarding and reached Suite Cloud with them. Cleared to configure the site again, e.g. after a secret could not be pushed.",
+   "description": "The site has its Suite Cloud URL, tenant ID and secret. Clear it to configure the site again.",
    "fieldname": "suite_configured",
    "fieldtype": "Check",
    "label": "Suite Configured",
    "read_only": 1
   },
   {
-   "description": "The Mail Account Request on the site inviting the tenant's owner, e.g. for john@acme.example.com. They choose their password when they accept it.",
+   "description": "Mail Account Request that invites the tenant owner. The owner sets a password when they accept it.",
    "fieldname": "owner_invite",
    "fieldtype": "Data",
    "label": "Owner Invite",
    "read_only": 1
   },
   {
-   "description": "When the invite was last sent. It stays valid for 7 days; Resend Owner Invite sends it again, or a fresh one once it expired.",
+   "description": "The invite is valid for 7 days.",
    "fieldname": "owner_invited_at",
    "fieldtype": "Datetime",
    "label": "Owner Invited At",
@@ -144,7 +142,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "The Pilot task creating or dropping the site, while it runs.",
+   "description": "Pilot task that creates or drops the site, while it runs.",
    "fieldname": "pilot_task",
    "fieldtype": "Data",
    "label": "Pilot Task",
@@ -152,21 +150,19 @@
   },
   {
    "default": "0",
-   "description": "Hostnames tried; one is taken by another server now and then.",
+   "description": "Number of hostnames tried.",
    "fieldname": "attempts",
    "fieldtype": "Int",
    "label": "Attempts",
    "read_only": 1
   },
   {
-   "description": "When the site turned Active: connected to its tenant, with the tenant's user.",
    "fieldname": "activated_at",
    "fieldtype": "Datetime",
    "label": "Activated At",
    "read_only": 1
   },
   {
-   "description": "When Drop Site deleted the site from its server.",
    "fieldname": "dropped_at",
    "fieldtype": "Datetime",
    "label": "Dropped At",
@@ -180,7 +176,7 @@
    "label": "Error"
   },
   {
-   "description": "Why the site failed, what it waits for, or why a step was skipped. A failed site stops until Retry; an Active site stays Active.",
+   "description": "Why the site failed or what it waits for.",
    "fieldname": "error",
    "fieldtype": "Small Text",
    "label": "Error",
@@ -193,14 +189,14 @@
   },
   {
    "default": "1",
-   "description": "Give the site its label under the site DNS zone, e.g. acme.sites.example.com, as its primary domain once it is active. Fixed once the domain is added: the site may already be reached under it.",
+   "description": "Make the label under the site DNS zone the primary domain, e.g. acme.sites.example.com. Fixed after the domain is added.",
    "fieldname": "assign_site_domain",
    "fieldtype": "Check",
    "label": "Assign Site Domain",
    "read_only_depends_on": "eval:(doc.domains || []).some((row) => row.managed)"
   },
   {
-   "description": "Domains the site is served under. Managed rows are published by Suite Cloud; the others are the tenant's to publish. Change them with the Domains actions.",
+   "description": "Suite Cloud publishes the managed domains. The tenant publishes the others.",
    "fieldname": "domains",
    "fieldtype": "Table",
    "label": "Domains",
@@ -212,7 +208,7 @@
    "label": "Mail"
   },
   {
-   "description": "The tenant's hosted mail domain, e.g. acme.example.com. Suite Cloud publishes its records and keeps the tenant API from changing it. Unlinked when the site is dropped: the domain and its mailboxes stay with the tenant until it is archived with its data.",
+   "description": "Hosted mail domain of the tenant, e.g. acme.example.com.",
    "fieldname": "mail_domain",
    "fieldtype": "Link",
    "label": "Mail Domain",
@@ -225,7 +221,7 @@
   },
   {
    "default": "0",
-   "description": "The mail domain's DNS records are live. The owner's invite waits for this.",
+   "description": "The mail domain's DNS records are live. The owner invite waits for this.",
    "fieldname": "mail_domain_verified",
    "fieldtype": "Check",
    "label": "Mail Domain Verified",
@@ -234,7 +230,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-19 12:00:00.000000",
+ "modified": "2026-10-28 17:45:14.960660",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",
