@@ -16,6 +16,7 @@ from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
 from suite_cloud.utils import dkim_algorithms, get_config, log_exception, validate_version
 
 LABEL = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+PUSH_TIMEOUT = 300  # seconds a config push may hold, or wait for, its cluster's lock
 STORE_KINDS = {
     "data_store": "Data",
     "blob_store": "Blob",
@@ -299,11 +300,15 @@ class StalwartCluster(Document):
         return self.push_config()
 
     def push_config(self) -> dict:
-        """The sync itself; also run on behalf of documents whose change alters the plan."""
+        """The sync itself; also run on behalf of documents whose change alters the plan. One push
+        per cluster at a time, each planning once it holds the lock, so a push that started later
+        never loses to an older plan finishing after it."""
 
-        rendered = plan.cluster_plan(self)
-        result = self.get_client().apply(rendered)
-        self.get_client().reload_settings()
+        lock = f"{frappe.local.site}:suite_cloud:push-config:{self.name}"
+        with frappe.cache.lock(lock, timeout=PUSH_TIMEOUT, blocking_timeout=PUSH_TIMEOUT):
+            rendered = plan.cluster_plan(self)
+            result = self.get_client().apply(rendered)
+            self.get_client().reload_settings()
         self.bump_config_version(rendered)
         self.db_set({"last_config_sync_at": now(), "drift_report": None}, update_modified=False)
         return {"created": result.created, "updated": result.updated, "unchanged": result.unchanged}

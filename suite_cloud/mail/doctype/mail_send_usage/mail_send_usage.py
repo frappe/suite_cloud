@@ -195,19 +195,26 @@ def delete_usage(account: str) -> None:
     frappe.db.delete("Mail Send Usage", {"account": account})
 
 
-def prune_usage() -> None:
-    """Daily: drops the days older than the retention and the months that ended before it, one
-    period per transaction, so a shortened retention never deletes months of rows at once."""
+def prune_usage_job() -> None:
+    """Scheduled daily, and the only place that commits: one expired period per transaction, so a
+    shortened retention never deletes months of rows at once."""
+
+    for period in get_expired_periods():
+        frappe.db.delete("Mail Send Usage", {"period": period})
+        if not frappe.in_test:
+            frappe.db.commit()
+
+
+def get_expired_periods() -> list[str]:
+    """The days older than the retention and the months that ended before it, oldest first."""
 
     day, month = periods_at(datetime.now(UTC) - timedelta(days=retention_days()))
     usage = frappe.qb.DocType("Mail Send Usage")
     old_days = usage.period.like("d:%") & (usage.period < day)
     old_months = usage.period.like("m:%") & (usage.period < month)
-    old = frappe.qb.from_(usage).select(usage.period).distinct().where(old_days | old_months).run(pluck=True)
-    for period in sorted(old):
-        frappe.db.delete("Mail Send Usage", {"period": period})
-        if not frappe.in_test:
-            frappe.db.commit()
+    return sorted(
+        frappe.qb.from_(usage).select(usage.period).distinct().where(old_days | old_months).run(pluck=True)
+    )
 
 
 def retention_days() -> int:

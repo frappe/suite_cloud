@@ -15,7 +15,7 @@ from suite_cloud.mail.doctype.mail_send_usage import mail_send_usage
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
     current_periods,
     periods_at,
-    prune_usage,
+    prune_usage_job,
     upsert_usage,
     usage_name,
 )
@@ -289,7 +289,7 @@ class TestUsageApi(SendingLimitsTestCase):
             patch(f"{mail_send_usage.__name__}.get_config", return_value=30),
             patch.object(frappe.db, "delete", wraps=frappe.db.delete) as delete,
         ):
-            prune_usage()
+            prune_usage_job()
         # One period per statement, so a shortened retention never deletes months of rows at once.
         self.assertTrue(delete.call_args_list)
         self.assertTrue(all(set(call.args[1]) == {"period"} for call in delete.call_args_list))

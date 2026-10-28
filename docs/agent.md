@@ -13,7 +13,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
   "state_dir": "/var/lib/suite-cloud-agent",
   "logs": [{"name": "stalwart", "path": "/var/log/stalwart/stalwart.*", "format": "stalwart", "ship_existing": false, "delete_after_days": 0}],
   "metrics": {"interval_seconds": 60, "mounts": ["/"], "stalwart": {"url": "https://127.0.0.1:443/metrics/prometheus", "username": "telemetry", "password": "<metrics password>", "tls_server_name": "n1.c1.example.com", "verify_tls": true}},
-  "quota": {"hook_port": 8095, "hook_token": "<quota hook token>", "store": {"type": "memory"}, "limits_poll_seconds": 60, "usage_push_seconds": 60}
+  "quota": {"hook_port": 8095, "hook_token": "<quota hook token>", "store": {"type": "memory"}}
 }
 ```
 
@@ -39,7 +39,7 @@ The agent starts from `/etc/suite-cloud-agent/config.json`. Provisioning writes 
 | `metrics.stalwart` | **Enable Prometheus Metrics** and **Metrics Password** of the cluster or gateway | Absent when the cluster has the switch off, and on an outbound-only node, which has no listener |
 | `quota.hook_port`, `quota.hook_token` | 8095, **Quota Hook Token** of the cluster | The loopback port and bearer token of the sending-limit hook. The whole section is absent on gateways and outbound-only nodes, which take no client mail, and until the last build is 0.2.0 or newer |
 | `quota.store` | The cluster's in-memory store | `{"type": "memory"}`, or `redis`, `redis_cluster` or `redis_sentinel` with the store's `urls` and credentials |
-| `quota.limits_poll_seconds`, `usage_push_seconds` | 60, 60 | How often limits are pulled and counts pushed |
+| `quota.limits_poll_seconds`, `usage_push_seconds` | Not written; the agent uses 60, 60 | How often limits are pulled and counts pushed |
 
 `suite-cloud-agent --config <path> --check` validates the file, the state directory and the log paths without a request. `--version` prints the version.
 

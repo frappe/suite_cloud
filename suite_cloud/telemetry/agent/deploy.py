@@ -16,7 +16,7 @@ from suite_cloud.telemetry.agent.build import (
     is_quota_enabled,
     is_telemetry_enabled,
 )
-from suite_cloud.utils import get_config, log_error, mask_secrets, secret_spellings
+from suite_cloud.utils import get_config, log_error, log_exception, mask_secrets, secret_spellings
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -26,6 +26,8 @@ CONFIG_PATH = "/etc/suite-cloud-agent/config.json"
 STATE_DIR = "/var/lib/suite-cloud-agent"
 PROMETHEUS_URL = "https://127.0.0.1:443/metrics/prometheus"
 PLAYBOOK = "install-agent.yml"
+ROLL_OUT_KEY = "suite_cloud:agent_roll_out"  # the settings change the last roll-out applied
+ROLL_OUT_TIMEOUT = 600  # seconds a roll-out may hold, or wait for, the roll-out lock
 NODE_BUILDER = "suite_cloud.mail.cluster.bootstrap.build_node_variables"
 GATEWAY_BUILDER = "suite_cloud.mail.cluster.egress.build_gateway_variables"
 
@@ -85,8 +87,6 @@ def quota_config(cluster: Document) -> dict:
         "hook_port": quota.HOOK_PORT,
         "hook_token": cluster.get_password("quota_hook_token"),
         "store": quota.store_config(cluster),
-        "limits_poll_seconds": 60,
-        "usage_push_seconds": 60,
     }
 
 
@@ -253,16 +253,20 @@ def filters_for(cluster: Document | None, statuses: tuple[str, ...]) -> dict:
 
 def switch_off_quota_hooks() -> None:
     """With telemetry off the Agents stop, so each active cluster's config is pushed again: its
-    plan then holds the hook switched off, and Stalwart stops calling Agents that are gone."""
+    plan then holds the hook switched off, and Stalwart stops calling Agents that are gone. Pushed
+    here, in the roll-out job, not queued: a queued resync is dropped while one that planned with
+    the hook on is still running."""
 
     for name in frappe.get_all("Stalwart Cluster", {"status": "Active"}, pluck="name"):
-        egress.resync_cluster_after_commit(name)
+        try:
+            egress.resync_cluster(frappe.get_doc("Stalwart Cluster", name))
+        except Exception:
+            log_exception(f"Quota hook not switched off on {name}")
 
 
 def enqueue_roll_out_agents() -> None:
     """Enable Telemetry changed. In the background, since the roll-out loads every server of every
-    cluster and creates a job for each; one job per turn of the setting, each reading the setting
-    when it runs, so quick turns end in the last one."""
+    cluster and creates a job for each."""
 
     if frappe.flags.do_not_enqueue:
         roll_out_agents()
@@ -271,6 +275,21 @@ def enqueue_roll_out_agents() -> None:
 
 
 def roll_out_agents() -> list[str]:
+    """Each turn of the setting queues a roll-out, and each reads the setting when it runs. They run
+    one at a time, and one that finds the settings as the last roll-out left them does nothing, so
+    quick turns end in the last one without a second job per server."""
+
+    lock = f"{frappe.local.site}:suite_cloud:roll-out-agents"
+    with frappe.cache.lock(lock, timeout=ROLL_OUT_TIMEOUT, blocking_timeout=ROLL_OUT_TIMEOUT):
+        change = str(frappe.db.get_single_value("Suite Cloud Settings", "modified"))
+        if frappe.cache.get_value(ROLL_OUT_KEY) == change:
+            return []
+        names = start_agent_jobs()
+        frappe.cache.set_value(ROLL_OUT_KEY, change)
+    return names
+
+
+def start_agent_jobs() -> list[str]:
     """Every server that runs an agent gets it installed, or stopped while telemetry is off. A
     missing build is an Error Log, not an exception: the setting is already saved."""
 
