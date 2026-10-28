@@ -5,18 +5,22 @@
  "engine": "InnoDB",
  "field_order": [
   "title",
+  "playbook",
   "server_doctype",
   "server",
-  "playbook",
   "column_break_main",
   "status",
   "retries",
   "max_retries",
+  "error_section",
+  "error_log",
   "timing_section",
   "started_at",
   "ended_at",
   "column_break_timing",
   "duration",
+  "tasks_section",
+  "tasks",
   "stats_section",
   "ok",
   "changed",
@@ -25,16 +29,12 @@
   "unreachable",
   "column_break_stats2",
   "skipped",
-  "tasks_section",
-  "tasks",
   "variables_section",
   "variables_builder",
   "callback",
   "context",
   "column_break_execution",
-  "variables",
-  "error_section",
-  "error_log"
+  "variables"
  ],
  "fields": [
   {
@@ -42,6 +42,16 @@
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Title",
+   "read_only": 1,
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Ansible playbook, e.g. bootstrap-cluster.yml.",
+   "fieldname": "playbook",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Playbook",
    "read_only": 1,
    "reqd": 1,
    "set_only_once": 1
@@ -67,16 +77,6 @@
    "read_only": 1,
    "reqd": 1,
    "search_index": 1,
-   "set_only_once": 1
-  },
-  {
-   "description": "Ansible playbook, e.g. bootstrap-cluster.yml.",
-   "fieldname": "playbook",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Playbook",
-   "read_only": 1,
-   "reqd": 1,
    "set_only_once": 1
   },
   {
@@ -112,6 +112,19 @@
    "set_only_once": 1
   },
   {
+   "depends_on": "eval: doc.error_log",
+   "fieldname": "error_section",
+   "fieldtype": "Section Break",
+   "label": "Error"
+  },
+  {
+   "description": "Why the job failed. Secrets hidden.",
+   "fieldname": "error_log",
+   "fieldtype": "Code",
+   "label": "Error Log",
+   "read_only": 1
+  },
+  {
    "fieldname": "timing_section",
    "fieldtype": "Section Break",
    "label": "Timing"
@@ -137,6 +150,19 @@
    "fieldname": "duration",
    "fieldtype": "Float",
    "label": "Duration (s)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tasks_section",
+   "fieldtype": "Section Break",
+   "label": "Tasks"
+  },
+  {
+   "description": "One row for each task, in run order. Reset on Retry.",
+   "fieldname": "tasks",
+   "fieldtype": "Table",
+   "label": "Tasks",
+   "options": "Server Job Task",
    "read_only": 1
   },
   {
@@ -189,19 +215,6 @@
    "read_only": 1
   },
   {
-   "fieldname": "tasks_section",
-   "fieldtype": "Section Break",
-   "label": "Tasks"
-  },
-  {
-   "description": "One row for each task, in run order. Reset on Retry.",
-   "fieldname": "tasks",
-   "fieldtype": "Table",
-   "label": "Tasks",
-   "options": "Server Job Task",
-   "read_only": 1
-  },
-  {
    "collapsible": 1,
    "fieldname": "variables_section",
    "fieldtype": "Section Break",
@@ -241,25 +254,11 @@
    "fieldtype": "JSON",
    "label": "Variables",
    "read_only": 1
-  },
-  {
-   "collapsible": 1,
-   "depends_on": "eval: doc.error_log",
-   "fieldname": "error_section",
-   "fieldtype": "Section Break",
-   "label": "Error"
-  },
-  {
-   "description": "Why the job failed. Secrets hidden.",
-   "fieldname": "error_log",
-   "fieldtype": "Code",
-   "label": "Error Log",
-   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Server Job",

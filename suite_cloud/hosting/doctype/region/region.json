@@ -13,11 +13,11 @@
   "enabled",
   "status",
   "reachable",
+  "last_synced_at",
   "hosting_section",
   "proxy_zone",
   "column_break_hosting",
-  "stalwart_region",
-  "last_synced_at"
+  "stalwart_region"
  ],
  "fields": [
   {
@@ -79,6 +79,12 @@
    "read_only": 1
   },
   {
+   "fieldname": "last_synced_at",
+   "fieldtype": "Datetime",
+   "label": "Last Synced At",
+   "read_only": 1
+  },
+  {
    "fieldname": "hosting_section",
    "fieldtype": "Section Break",
    "label": "Hosting"
@@ -99,17 +105,11 @@
    "fieldname": "stalwart_region",
    "fieldtype": "Data",
    "label": "Stalwart Region"
-  },
-  {
-   "fieldname": "last_synced_at",
-   "fieldtype": "Datetime",
-   "label": "Last Synced At",
-   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Region",

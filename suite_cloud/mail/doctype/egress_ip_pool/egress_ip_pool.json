@@ -5,16 +5,23 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "title",
   "cluster",
   "pool_name",
-  "title",
   "column_break_main",
-  "relay_port",
   "hostname",
+  "relay_port",
   "addresses_section",
   "addresses"
  ],
  "fields": [
+  {
+   "description": "Name shown in lists.",
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title"
+  },
   {
    "description": "Only gateways of this cluster can host the pool's addresses.",
    "fieldname": "cluster",
@@ -37,23 +44,8 @@
    "set_only_once": 1
   },
   {
-   "description": "Name shown in lists.",
-   "fieldname": "title",
-   "fieldtype": "Data",
-   "in_list_view": 1,
-   "label": "Title"
-  },
-  {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
-  },
-  {
-   "description": "Port the cluster relays to on each gateway. Set on save, from 2525.",
-   "fieldname": "relay_port",
-   "fieldtype": "Int",
-   "in_standard_filter": 1,
-   "label": "Relay Port",
-   "read_only": 1
   },
   {
    "description": "Resolves to each gateway that hosts the pool, e.g. p1.out.blr.frappemail.com.",
@@ -62,6 +54,14 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Hostname",
+   "read_only": 1
+  },
+  {
+   "description": "Port the cluster relays to on each gateway. Set on save, from 2525.",
+   "fieldname": "relay_port",
+   "fieldtype": "Int",
+   "in_standard_filter": 1,
+   "label": "Relay Port",
    "read_only": 1
   },
   {
@@ -95,7 +95,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress IP Pool",

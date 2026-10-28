@@ -5,8 +5,6 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
-  "section_zone",
-  "column_break_bgpr",
   "domain_name",
   "default_ttl",
   "column_break_zone",
@@ -26,10 +24,6 @@
   "dns_provider_private_zone"
  ],
  "fields": [
-  {
-   "fieldname": "section_zone",
-   "fieldtype": "Section Break"
-  },
   {
    "fieldname": "domain_name",
    "fieldtype": "Data",
@@ -146,10 +140,6 @@
    "fieldname": "dns_provider_private_zone",
    "fieldtype": "Check",
    "label": "Private Zone"
-  },
-  {
-   "fieldname": "column_break_bgpr",
-   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -165,7 +155,7 @@
    "link_fieldname": "dns_zone"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "DNS Zone",

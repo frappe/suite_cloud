@@ -4,26 +4,14 @@
  "doctype": "DocType",
  "engine": "InnoDB",
  "field_order": [
+  "report_tab",
   "domain_section",
   "policy_domain",
   "tenant",
-  "column_break_domain",
-  "cluster",
-  "stalwart_id",
-  "reporter_section",
   "org_name",
-  "reporter_email",
-  "contact_info",
-  "column_break_reporter",
-  "report_id",
-  "subject",
-  "sent_to",
-  "period_section",
+  "column_break_domain",
   "date_range_begin",
   "date_range_end",
-  "column_break_period",
-  "received_at",
-  "expires_at",
   "totals_section",
   "total_sessions",
   "successful_sessions",
@@ -34,14 +22,34 @@
   "policies",
   "failures_section",
   "failures",
+  "source_tab",
+  "reporter_section",
+  "reporter_email",
+  "contact_info",
+  "column_break_reporter",
+  "report_id",
+  "message_section",
+  "subject",
+  "column_break_message",
+  "sent_to",
+  "cluster_section",
+  "cluster",
+  "stalwart_id",
+  "column_break_cluster",
+  "received_at",
+  "expires_at",
   "stalwart_section",
   "report"
  ],
  "fields": [
   {
+   "fieldname": "report_tab",
+   "fieldtype": "Tab Break",
+   "label": "Report"
+  },
+  {
    "fieldname": "domain_section",
-   "fieldtype": "Section Break",
-   "label": "Domain"
+   "fieldtype": "Section Break"
   },
   {
    "fieldname": "policy_domain",
@@ -65,33 +73,6 @@
    "search_index": 1
   },
   {
-   "fieldname": "column_break_domain",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Cluster that received the report.",
-   "fieldname": "cluster",
-   "fieldtype": "Link",
-   "in_standard_filter": 1,
-   "label": "Stalwart Cluster",
-   "options": "Stalwart Cluster",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "description": "ID of the report on the cluster.",
-   "fieldname": "stalwart_id",
-   "fieldtype": "Data",
-   "label": "Stalwart ID",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "reporter_section",
-   "fieldtype": "Section Break",
-   "label": "Reporter"
-  },
-  {
    "description": "Organization that sent the report, e.g. Google Inc.",
    "fieldname": "org_name",
    "fieldtype": "Data",
@@ -101,47 +82,8 @@
    "reqd": 1
   },
   {
-   "description": "Address the report came from.",
-   "fieldname": "reporter_email",
-   "fieldtype": "Data",
-   "label": "Reporter Email",
-   "options": "Email",
-   "read_only": 1
-  },
-  {
-   "fieldname": "contact_info",
-   "fieldtype": "Small Text",
-   "label": "Reporter Contact",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_reporter",
+   "fieldname": "column_break_domain",
    "fieldtype": "Column Break"
-  },
-  {
-   "description": "Reporter's ID for the report.",
-   "fieldname": "report_id",
-   "fieldtype": "Data",
-   "label": "Report ID",
-   "read_only": 1
-  },
-  {
-   "fieldname": "subject",
-   "fieldtype": "Small Text",
-   "label": "Subject",
-   "read_only": 1
-  },
-  {
-   "description": "Addresses the report was sent to, one per line.",
-   "fieldname": "sent_to",
-   "fieldtype": "Small Text",
-   "label": "Sent To",
-   "read_only": 1
-  },
-  {
-   "fieldname": "period_section",
-   "fieldtype": "Section Break",
-   "label": "Period"
   },
   {
    "fieldname": "date_range_begin",
@@ -157,23 +99,6 @@
    "label": "Range Ends",
    "read_only": 1,
    "search_index": 1
-  },
-  {
-   "fieldname": "column_break_period",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "received_at",
-   "fieldtype": "Datetime",
-   "label": "Received At",
-   "read_only": 1
-  },
-  {
-   "description": "When Stalwart deletes its copy. The report stays here for the retention set in Suite Cloud Settings.",
-   "fieldname": "expires_at",
-   "fieldtype": "Datetime",
-   "label": "Expires On Cluster",
-   "read_only": 1
   },
   {
    "fieldname": "totals_section",
@@ -242,6 +167,103 @@
    "read_only": 1
   },
   {
+   "fieldname": "source_tab",
+   "fieldtype": "Tab Break",
+   "label": "Source"
+  },
+  {
+   "fieldname": "reporter_section",
+   "fieldtype": "Section Break",
+   "label": "Reporter"
+  },
+  {
+   "description": "Address the report came from.",
+   "fieldname": "reporter_email",
+   "fieldtype": "Data",
+   "label": "Reporter Email",
+   "options": "Email",
+   "read_only": 1
+  },
+  {
+   "fieldname": "contact_info",
+   "fieldtype": "Small Text",
+   "label": "Reporter Contact",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_reporter",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Reporter's ID for the report.",
+   "fieldname": "report_id",
+   "fieldtype": "Data",
+   "label": "Report ID",
+   "read_only": 1
+  },
+  {
+   "fieldname": "message_section",
+   "fieldtype": "Section Break",
+   "label": "Message"
+  },
+  {
+   "fieldname": "subject",
+   "fieldtype": "Small Text",
+   "label": "Subject",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_message",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Addresses the report was sent to, one per line.",
+   "fieldname": "sent_to",
+   "fieldtype": "Small Text",
+   "label": "Sent To",
+   "read_only": 1
+  },
+  {
+   "fieldname": "cluster_section",
+   "fieldtype": "Section Break",
+   "label": "Cluster"
+  },
+  {
+   "description": "Cluster that received the report.",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Stalwart Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "description": "ID of the report on the cluster.",
+   "fieldname": "stalwart_id",
+   "fieldtype": "Data",
+   "label": "Stalwart ID",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_cluster",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "received_at",
+   "fieldtype": "Datetime",
+   "label": "Received At",
+   "read_only": 1
+  },
+  {
+   "description": "When Stalwart deletes its copy. The report stays here for the retention set in Suite Cloud Settings.",
+   "fieldname": "expires_at",
+   "fieldtype": "Datetime",
+   "label": "Expires On Cluster",
+   "read_only": 1
+  },
+  {
    "collapsible": 1,
    "fieldname": "stalwart_section",
    "fieldtype": "Section Break",
@@ -259,7 +281,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "TLS Report",

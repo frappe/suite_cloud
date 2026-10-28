@@ -6,46 +6,51 @@
  "field_order": [
   "title",
   "region",
-  "max_sites",
+  "status",
   "column_break_main",
   "enabled",
-  "status",
+  "max_sites",
   "site_count",
   "foreign_site_count",
-  "server_section",
-  "image_offering",
-  "image_id",
-  "plan",
-  "vcpus",
-  "memory_mb",
-  "disk_gb",
-  "column_break_server",
-  "has_public_ipv4",
-  "has_public_ipv6",
-  "central_section",
-  "request_key",
-  "central_action",
-  "central_resource_id",
-  "column_break_central",
-  "gateway_url",
-  "pilot_audience",
-  "ipv6_address",
-  "public_ipv4",
-  "public_ipv6",
-  "host_section",
+  "error_section",
+  "error",
+  "setup_section",
   "wildcard_zone",
   "host_verified",
   "letsencrypt_email_set",
-  "column_break_host",
-  "suite_app_status",
-  "suite_app_task",
-  "suite_app_commit",
-  "state_section",
   "ready_since",
+  "column_break_setup",
+  "suite_app_status",
+  "suite_app_commit",
+  "suite_app_task",
+  "server_tab",
+  "size_section",
+  "plan",
+  "image_offering",
+  "image_id",
+  "column_break_size",
+  "vcpus",
+  "memory_mb",
+  "disk_gb",
+  "network_section",
+  "has_public_ipv4",
+  "public_ipv4",
+  "has_public_ipv6",
+  "public_ipv6",
+  "column_break_network",
+  "ipv6_address",
+  "central_tab",
+  "central_section",
+  "central_resource_id",
+  "central_action",
+  "request_key",
+  "column_break_central",
   "booted_at",
   "last_synced_at",
-  "column_break_state",
-  "error"
+  "pilot_section",
+  "gateway_url",
+  "column_break_pilot",
+  "pilot_audience"
  ],
  "fields": [
   {
@@ -67,10 +72,14 @@
    "set_only_once": 1
   },
   {
-   "description": "Most sites this server takes, Suite and others together. Calculated from memory and disk, up to Max Sites per Server.",
-   "fieldname": "max_sites",
-   "fieldtype": "Int",
-   "label": "Max Sites",
+   "default": "Pending",
+   "description": "Server status on Central.",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Status",
+   "options": "Pending\nProvisioning\nDeploying\nRunning\nPaused\nStopped\nFailed\nTerminated",
    "read_only": 1
   },
   {
@@ -86,14 +95,10 @@
    "label": "Accepts Sites"
   },
   {
-   "default": "Pending",
-   "description": "Server status on Central.",
-   "fieldname": "status",
-   "fieldtype": "Select",
-   "in_list_view": 1,
-   "in_standard_filter": 1,
-   "label": "Status",
-   "options": "Pending\nProvisioning\nDeploying\nRunning\nPaused\nStopped\nFailed\nTerminated",
+   "description": "Most sites this server takes, Suite and others together. Calculated from memory and disk, up to Max Sites per Server.",
+   "fieldname": "max_sites",
+   "fieldtype": "Int",
+   "label": "Max Sites",
    "read_only": 1
   },
   {
@@ -113,137 +118,22 @@
    "read_only": 1
   },
   {
-   "fieldname": "server_section",
+   "fieldname": "error_section",
    "fieldtype": "Section Break",
-   "label": "Server"
+   "label": "Error",
+   "depends_on": "eval:doc.error"
   },
   {
-   "description": "Central image offering the server boots from.",
-   "fieldname": "image_offering",
-   "fieldtype": "Data",
-   "label": "Image Offering",
+   "description": "Why setup stopped. Fix the cause, then run Retry.",
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
    "read_only": 1
   },
   {
-   "description": "Image the server was created from.",
-   "fieldname": "image_id",
-   "fieldtype": "Data",
-   "label": "Image",
-   "read_only": 1
-  },
-  {
-   "description": "Server plan on Central. Blank for a custom size.",
-   "fieldname": "plan",
-   "fieldtype": "Data",
-   "label": "Plan",
-   "read_only": 1
-  },
-  {
-   "fieldname": "vcpus",
-   "fieldtype": "Float",
-   "label": "vCPUs",
-   "read_only": 1
-  },
-  {
-   "fieldname": "memory_mb",
-   "fieldtype": "Int",
-   "label": "Memory (MB)",
-   "read_only": 1
-  },
-  {
-   "fieldname": "disk_gb",
-   "fieldtype": "Float",
-   "label": "Disk (GB)",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_server",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "0",
-   "description": "Optional. Sites are reached through Central's proxy.",
-   "fieldname": "has_public_ipv4",
-   "fieldtype": "Check",
-   "label": "Public IPv4",
-   "set_only_once": 1
-  },
-  {
-   "default": "0",
-   "description": "Optional. Sites are reached through Central's proxy.",
-   "fieldname": "has_public_ipv6",
-   "fieldtype": "Check",
-   "label": "Public IPv6",
-   "set_only_once": 1
-  },
-  {
-   "fieldname": "central_section",
+   "fieldname": "setup_section",
    "fieldtype": "Section Break",
-   "label": "Central"
-  },
-  {
-   "description": "Sent with create_server so a retry does not create a second server.",
-   "fieldname": "request_key",
-   "fieldtype": "Data",
-   "label": "Request Key",
-   "read_only": 1
-  },
-  {
-   "description": "Central ID of the create action. Retry runs it again.",
-   "fieldname": "central_action",
-   "fieldtype": "Data",
-   "label": "Central Action",
-   "read_only": 1
-  },
-  {
-   "description": "Central ID of the server, e.g. server-avq7a8iild.",
-   "fieldname": "central_resource_id",
-   "fieldtype": "Data",
-   "label": "Central Server",
-   "read_only": 1,
-   "unique": 1
-  },
-  {
-   "fieldname": "column_break_central",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "URL of the server's Pilot, e.g. https://admin-vm-1z1420a.mumbai.frappe.cloud.",
-   "fieldname": "gateway_url",
-   "fieldtype": "Data",
-   "label": "Gateway URL",
-   "read_only": 1
-  },
-  {
-   "description": "Audience of the bench tokens Central makes for this Pilot.",
-   "fieldname": "pilot_audience",
-   "fieldtype": "Data",
-   "label": "Pilot Audience",
-   "read_only": 1
-  },
-  {
-   "description": "Address on Central's private network.",
-   "fieldname": "ipv6_address",
-   "fieldtype": "Data",
-   "label": "Private IPv6",
-   "read_only": 1
-  },
-  {
-   "fieldname": "public_ipv4",
-   "fieldtype": "Data",
-   "label": "Public IPv4 Address",
-   "read_only": 1
-  },
-  {
-   "fieldname": "public_ipv6",
-   "fieldtype": "Data",
-   "label": "Public IPv6 Address",
-   "read_only": 1
-  },
-  {
-   "fieldname": "host_section",
-   "fieldtype": "Section Break",
-   "label": "Host"
+   "label": "Setup"
   },
   {
    "description": "Zone that Pilot registers new sites under.",
@@ -269,7 +159,14 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_host",
+   "description": "When setup finished. The server takes sites from then.",
+   "fieldname": "ready_since",
+   "fieldtype": "Datetime",
+   "label": "Ready Since",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_setup",
    "fieldtype": "Column Break"
   },
   {
@@ -283,6 +180,12 @@
    "read_only": 1
   },
   {
+   "fieldname": "suite_app_commit",
+   "fieldtype": "Data",
+   "label": "Suite App Commit",
+   "read_only": 1
+  },
+  {
    "description": "Pilot task that installs the Suite app, while it runs.",
    "fieldname": "suite_app_task",
    "fieldtype": "Data",
@@ -290,22 +193,137 @@
    "read_only": 1
   },
   {
-   "fieldname": "suite_app_commit",
-   "fieldtype": "Data",
-   "label": "Suite App Commit",
-   "read_only": 1
+   "fieldname": "server_tab",
+   "fieldtype": "Tab Break",
+   "label": "Server"
   },
   {
-   "fieldname": "state_section",
+   "fieldname": "size_section",
    "fieldtype": "Section Break",
-   "label": "State"
+   "label": "Size"
   },
   {
-   "description": "When setup finished. The server takes sites from then.",
-   "fieldname": "ready_since",
-   "fieldtype": "Datetime",
-   "label": "Ready Since",
+   "description": "Server plan on Central. Blank for a custom size.",
+   "fieldname": "plan",
+   "fieldtype": "Data",
+   "label": "Plan",
    "read_only": 1
+  },
+  {
+   "description": "Central image offering the server boots from.",
+   "fieldname": "image_offering",
+   "fieldtype": "Data",
+   "label": "Image Offering",
+   "read_only": 1
+  },
+  {
+   "description": "Image the server was created from.",
+   "fieldname": "image_id",
+   "fieldtype": "Data",
+   "label": "Image",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_size",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "vcpus",
+   "fieldtype": "Float",
+   "label": "vCPUs",
+   "read_only": 1
+  },
+  {
+   "fieldname": "memory_mb",
+   "fieldtype": "Int",
+   "label": "Memory (MB)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "disk_gb",
+   "fieldtype": "Float",
+   "label": "Disk (GB)",
+   "read_only": 1
+  },
+  {
+   "fieldname": "network_section",
+   "fieldtype": "Section Break",
+   "label": "Network"
+  },
+  {
+   "default": "0",
+   "description": "Optional. Sites are reached through Central's proxy.",
+   "fieldname": "has_public_ipv4",
+   "fieldtype": "Check",
+   "label": "Public IPv4",
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "public_ipv4",
+   "fieldtype": "Data",
+   "label": "Public IPv4 Address",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Optional. Sites are reached through Central's proxy.",
+   "fieldname": "has_public_ipv6",
+   "fieldtype": "Check",
+   "label": "Public IPv6",
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "public_ipv6",
+   "fieldtype": "Data",
+   "label": "Public IPv6 Address",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_network",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Address on Central's private network.",
+   "fieldname": "ipv6_address",
+   "fieldtype": "Data",
+   "label": "Private IPv6",
+   "read_only": 1
+  },
+  {
+   "fieldname": "central_tab",
+   "fieldtype": "Tab Break",
+   "label": "Central"
+  },
+  {
+   "fieldname": "central_section",
+   "fieldtype": "Section Break",
+   "label": "Central"
+  },
+  {
+   "description": "Central ID of the server, e.g. server-avq7a8iild.",
+   "fieldname": "central_resource_id",
+   "fieldtype": "Data",
+   "label": "Central Server",
+   "read_only": 1,
+   "unique": 1
+  },
+  {
+   "description": "Central ID of the create action. Retry runs it again.",
+   "fieldname": "central_action",
+   "fieldtype": "Data",
+   "label": "Central Action",
+   "read_only": 1
+  },
+  {
+   "description": "Sent with create_server so a retry does not create a second server.",
+   "fieldname": "request_key",
+   "fieldtype": "Data",
+   "label": "Request Key",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_central",
+   "fieldtype": "Column Break"
   },
   {
    "description": "When Central first reported the server running. Pilot has 30 minutes to respond.",
@@ -322,14 +340,26 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_state",
+   "fieldname": "pilot_section",
+   "fieldtype": "Section Break",
+   "label": "Pilot"
+  },
+  {
+   "description": "URL of the server's Pilot, e.g. https://admin-vm-1z1420a.mumbai.frappe.cloud.",
+   "fieldname": "gateway_url",
+   "fieldtype": "Data",
+   "label": "Gateway URL",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_pilot",
    "fieldtype": "Column Break"
   },
   {
-   "description": "Why setup stopped. Fix the cause, then run Retry.",
-   "fieldname": "error",
-   "fieldtype": "Small Text",
-   "label": "Error",
+   "description": "Audience of the bench tokens Central makes for this Pilot.",
+   "fieldname": "pilot_audience",
+   "fieldtype": "Data",
+   "label": "Pilot Audience",
    "read_only": 1
   }
  ],
@@ -340,7 +370,7 @@
    "link_fieldname": "virtual_machine"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Virtual Machine",

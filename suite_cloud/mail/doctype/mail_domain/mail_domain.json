@@ -7,27 +7,30 @@
  "field_order": [
   "domain_name",
   "tenant",
-  "cluster",
+  "description",
   "column_break_main",
   "enabled",
-  "description",
-  "stalwart_id",
   "hosted",
   "settings_section",
   "catch_all_address",
   "sub_addressing",
   "allow_relaying",
   "column_break_settings",
-  "publish_client_discovery_records",
   "egress_pool",
+  "cluster_section",
+  "cluster",
+  "column_break_cluster",
+  "stalwart_id",
+  "dns_tab",
   "dns_section",
   "is_verified",
-  "skip_scheduled_verification",
   "verification_skipped",
-  "last_verified_at",
+  "skip_scheduled_verification",
   "column_break_dns",
+  "last_verified_at",
   "last_refreshed_at",
   "dns_records_section",
+  "publish_client_discovery_records",
   "authentication_records",
   "routing_records",
   "transport_security_records",
@@ -60,15 +63,10 @@
    "set_only_once": 1
   },
   {
-   "description": "Set from the tenant.",
-   "fetch_from": "tenant.stalwart_cluster",
-   "fieldname": "cluster",
-   "fieldtype": "Link",
-   "in_standard_filter": 1,
-   "label": "Cluster",
-   "options": "Stalwart Cluster",
-   "read_only": 1,
-   "search_index": 1
+   "description": "Shown on the cluster. Blank uses the tenant name.",
+   "fieldname": "description",
+   "fieldtype": "Data",
+   "label": "Description"
   },
   {
    "fieldname": "column_break_main",
@@ -80,20 +78,6 @@
    "fieldname": "enabled",
    "fieldtype": "Check",
    "label": "Enabled"
-  },
-  {
-   "description": "Shown on the cluster. Blank uses the tenant name.",
-   "fieldname": "description",
-   "fieldtype": "Data",
-   "label": "Description"
-  },
-  {
-   "description": "ID of the domain on the cluster. Blank if not created there.",
-   "fieldname": "stalwart_id",
-   "fieldtype": "Data",
-   "label": "Stalwart ID",
-   "no_copy": 1,
-   "read_only": 1
   },
   {
    "default": "0",
@@ -135,16 +119,50 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "0",
-   "description": "Show MTA-STS, autoconfig and autodiscover records. Turn on only if the tenant handles HTTPS for them.",
-   "fieldname": "publish_client_discovery_records",
-   "fieldtype": "Check",
-   "label": "Publish Client Discovery Records"
+   "description": "Pool for outbound mail of this domain. Overrides the tenant and cluster default.",
+   "fieldname": "egress_pool",
+   "fieldtype": "Link",
+   "label": "Egress Pool",
+   "options": "Egress IP Pool"
+  },
+  {
+   "fieldname": "cluster_section",
+   "fieldtype": "Section Break",
+   "label": "Cluster",
+   "collapsible": 1
+  },
+  {
+   "description": "Set from the tenant.",
+   "fetch_from": "tenant.stalwart_cluster",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "column_break_cluster",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "ID of the domain on the cluster. Blank if not created there.",
+   "fieldname": "stalwart_id",
+   "fieldtype": "Data",
+   "label": "Stalwart ID",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "fieldname": "dns_tab",
+   "fieldtype": "Tab Break",
+   "label": "DNS"
   },
   {
    "fieldname": "dns_section",
    "fieldtype": "Section Break",
-   "label": "DNS"
+   "label": "Verification"
   },
   {
    "default": "0",
@@ -157,6 +175,15 @@
   },
   {
    "default": "0",
+   "description": "Verified without a DNS check because Skip Domain Verification is on.",
+   "fieldname": "verification_skipped",
+   "fieldtype": "Check",
+   "label": "Verification Skipped",
+   "permlevel": 1,
+   "read_only": 1
+  },
+  {
+   "default": "0",
    "description": "The hourly check does not change Verified for this domain.",
    "fieldname": "skip_scheduled_verification",
    "fieldtype": "Check",
@@ -164,13 +191,8 @@
    "permlevel": 1
   },
   {
-   "default": "0",
-   "description": "Verified without a DNS check because Skip Domain Verification is on.",
-   "fieldname": "verification_skipped",
-   "fieldtype": "Check",
-   "label": "Verification Skipped",
-   "permlevel": 1,
-   "read_only": 1
+   "fieldname": "column_break_dns",
+   "fieldtype": "Column Break"
   },
   {
    "description": "When the records were last checked.",
@@ -180,15 +202,23 @@
    "read_only": 1
   },
   {
-   "fieldname": "column_break_dns",
-   "fieldtype": "Column Break"
-  },
-  {
    "description": "When the records were last read from the cluster.",
    "fieldname": "last_refreshed_at",
    "fieldtype": "Datetime",
    "label": "Records Refreshed At",
    "read_only": 1
+  },
+  {
+   "fieldname": "dns_records_section",
+   "fieldtype": "Section Break",
+   "label": "DNS Records"
+  },
+  {
+   "default": "0",
+   "description": "Show MTA-STS, autoconfig and autodiscover records. Turn on only if the tenant handles HTTPS for them.",
+   "fieldname": "publish_client_discovery_records",
+   "fieldtype": "Check",
+   "label": "Publish Client Discovery Records"
   },
   {
    "description": "Required. SPF, DKIM and DMARC records that stop others sending as this domain.",
@@ -243,18 +273,6 @@
    "fieldtype": "Code",
    "label": "Zone File",
    "read_only": 1
-  },
-  {
-   "description": "Pool for outbound mail of this domain. Overrides the tenant and cluster default.",
-   "fieldname": "egress_pool",
-   "fieldtype": "Link",
-   "label": "Egress Pool",
-   "options": "Egress IP Pool"
-  },
-  {
-   "fieldname": "dns_records_section",
-   "fieldtype": "Section Break",
-   "label": "DNS Records"
   }
  ],
  "index_web_pages_for_search": 1,
@@ -285,7 +303,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Domain",

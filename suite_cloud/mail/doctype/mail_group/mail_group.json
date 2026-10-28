@@ -8,15 +8,17 @@
   "email",
   "domain",
   "tenant",
-  "cluster",
   "column_break_main",
   "description",
   "disable_receiving",
+  "aliases_section",
+  "aliases",
   "quotas_section",
   "quotas",
-  "stalwart_id",
-  "aliases_section",
-  "aliases"
+  "cluster_section",
+  "cluster",
+  "column_break_cluster",
+  "stalwart_id"
  ],
  "fields": [
   {
@@ -53,16 +55,6 @@
    "description": "Set from the domain."
   },
   {
-   "fetch_from": "domain.cluster",
-   "fieldname": "cluster",
-   "fieldtype": "Link",
-   "label": "Cluster",
-   "options": "Stalwart Cluster",
-   "read_only": 1,
-   "search_index": 1,
-   "description": "Set from the tenant."
-  },
-  {
    "fieldname": "column_break_main",
    "fieldtype": "Column Break"
   },
@@ -81,6 +73,18 @@
    "description": "Mail sent to the group bounces. Mail of the members is not affected."
   },
   {
+   "fieldname": "aliases_section",
+   "fieldtype": "Section Break",
+   "label": "Aliases"
+  },
+  {
+   "fieldname": "aliases",
+   "fieldtype": "Table",
+   "label": "Aliases",
+   "options": "Mail Address Alias",
+   "description": "Other addresses delivered to the group."
+  },
+  {
    "fieldname": "quotas_section",
    "fieldtype": "Section Break",
    "label": "Quotas"
@@ -93,24 +97,32 @@
    "options": "Mail Quota"
   },
   {
+   "fieldname": "cluster_section",
+   "fieldtype": "Section Break",
+   "label": "Cluster",
+   "collapsible": 1
+  },
+  {
+   "fetch_from": "domain.cluster",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1,
+   "search_index": 1,
+   "description": "Set from the tenant."
+  },
+  {
+   "fieldname": "column_break_cluster",
+   "fieldtype": "Column Break"
+  },
+  {
    "fieldname": "stalwart_id",
    "fieldtype": "Data",
    "label": "Stalwart ID",
    "no_copy": 1,
    "read_only": 1,
    "description": "ID of the group on the cluster."
-  },
-  {
-   "fieldname": "aliases_section",
-   "fieldtype": "Section Break",
-   "label": "Aliases"
-  },
-  {
-   "fieldname": "aliases",
-   "fieldtype": "Table",
-   "label": "Aliases",
-   "options": "Mail Address Alias",
-   "description": "Other addresses delivered to the group."
   }
  ],
  "index_web_pages_for_search": 1,
@@ -122,7 +134,7 @@
    "table_fieldname": "groups"
   }
  ],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Group",

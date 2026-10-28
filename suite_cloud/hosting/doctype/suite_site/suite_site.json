@@ -5,29 +5,30 @@
  "engine": "InnoDB",
  "field_order": [
   "hostname",
+  "primary_domain",
   "region",
   "virtual_machine",
   "column_break_main",
   "status",
   "tenant",
   "label",
-  "primary_domain",
-  "progress_section",
-  "site_created",
-  "suite_configured",
-  "owner_invite",
-  "owner_invited_at",
-  "column_break_progress",
-  "pilot_task",
-  "attempts",
-  "activated_at",
-  "dropped_at",
   "error_section",
   "error",
+  "progress_section",
+  "site_created",
+  "pilot_task",
+  "attempts",
+  "suite_configured",
+  "column_break_progress",
+  "owner_invite",
+  "owner_invited_at",
+  "activated_at",
+  "dropped_at",
   "domains_tab",
+  "site_domains_section",
   "assign_site_domain",
   "domains",
-  "mail_tab",
+  "mail_domain_section",
   "mail_domain",
   "column_break_mail",
   "mail_domain_verified"
@@ -41,6 +42,13 @@
    "label": "Hostname",
    "read_only": 1,
    "unique": 1
+  },
+  {
+   "description": "Domain the site is served under, e.g. acme.sites.example.com. Blank until a domain is attached.",
+   "fieldname": "primary_domain",
+   "fieldtype": "Data",
+   "label": "Primary Domain",
+   "read_only": 1
   },
   {
    "fieldname": "region",
@@ -96,16 +104,22 @@
    "unique": 1
   },
   {
-   "description": "Domain the site is served under, e.g. acme.sites.example.com. Blank until a domain is attached.",
-   "fieldname": "primary_domain",
-   "fieldtype": "Data",
-   "label": "Primary Domain",
+   "depends_on": "eval:doc.error",
+   "fieldname": "error_section",
+   "fieldtype": "Section Break",
+   "label": "Error"
+  },
+  {
+   "description": "Why the site failed or what it waits for.",
+   "fieldname": "error",
+   "fieldtype": "Small Text",
+   "label": "Error",
    "read_only": 1
   },
   {
    "fieldname": "progress_section",
    "fieldtype": "Section Break",
-   "label": "Progress"
+   "label": "Setup"
   },
   {
    "default": "0",
@@ -114,32 +128,6 @@
    "fieldtype": "Check",
    "label": "Site Created",
    "read_only": 1
-  },
-  {
-   "default": "0",
-   "description": "The site has its Suite Cloud URL, tenant ID and secret. Clear it to configure the site again.",
-   "fieldname": "suite_configured",
-   "fieldtype": "Check",
-   "label": "Suite Configured",
-   "read_only": 1
-  },
-  {
-   "description": "Mail Account Request that invites the tenant owner. The owner sets a password when they accept it.",
-   "fieldname": "owner_invite",
-   "fieldtype": "Data",
-   "label": "Owner Invite",
-   "read_only": 1
-  },
-  {
-   "description": "The invite is valid for 7 days.",
-   "fieldname": "owner_invited_at",
-   "fieldtype": "Datetime",
-   "label": "Owner Invited At",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_progress",
-   "fieldtype": "Column Break"
   },
   {
    "description": "Pilot task that creates or drops the site, while it runs.",
@@ -157,6 +145,32 @@
    "read_only": 1
   },
   {
+   "default": "0",
+   "description": "The site has its Suite Cloud URL, tenant ID and secret. Clear it to configure the site again.",
+   "fieldname": "suite_configured",
+   "fieldtype": "Check",
+   "label": "Suite Configured",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_progress",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Mail Account Request that invites the tenant owner. The owner sets a password when they accept it.",
+   "fieldname": "owner_invite",
+   "fieldtype": "Data",
+   "label": "Owner Invite",
+   "read_only": 1
+  },
+  {
+   "description": "The invite is valid for 7 days.",
+   "fieldname": "owner_invited_at",
+   "fieldtype": "Datetime",
+   "label": "Owner Invited At",
+   "read_only": 1
+  },
+  {
    "fieldname": "activated_at",
    "fieldtype": "Datetime",
    "label": "Activated At",
@@ -169,23 +183,14 @@
    "read_only": 1
   },
   {
-   "collapsible": 1,
-   "depends_on": "eval:doc.error",
-   "fieldname": "error_section",
-   "fieldtype": "Section Break",
-   "label": "Error"
-  },
-  {
-   "description": "Why the site failed or what it waits for.",
-   "fieldname": "error",
-   "fieldtype": "Small Text",
-   "label": "Error",
-   "read_only": 1
-  },
-  {
    "fieldname": "domains_tab",
    "fieldtype": "Tab Break",
    "label": "Domains"
+  },
+  {
+   "fieldname": "site_domains_section",
+   "fieldtype": "Section Break",
+   "label": "Site Domains"
   },
   {
    "default": "1",
@@ -203,9 +208,9 @@
    "options": "Suite Site Domain"
   },
   {
-   "fieldname": "mail_tab",
-   "fieldtype": "Tab Break",
-   "label": "Mail"
+   "fieldname": "mail_domain_section",
+   "fieldtype": "Section Break",
+   "label": "Mail Domain"
   },
   {
    "description": "Hosted mail domain of the tenant, e.g. acme.example.com.",
@@ -230,7 +235,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

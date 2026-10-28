@@ -7,59 +7,22 @@
   "general_tab",
   "suite_cloud_section",
   "public_url",
+  "default_dns_ttl",
   "column_break_general",
   "skip_domain_verification",
-  "jobs_section",
-  "server_job_timeout",
-  "column_break_jobs",
-  "dmarc_report_retention_days",
-  "tls_report_retention_days",
-  "send_usage_retention_days",
+  "signup_section",
+  "allow_signup",
+  "column_break_signup",
+  "allow_subaddressed_signups",
   "email_section",
   "tenant_email_accounts",
   "column_break_email",
   "use_tenant_title_as_sender_name",
-  "agent_telemetry_tab",
-  "agent_section",
-  "agent_requests_per_minute",
-  "agent_records_per_request",
-  "agent_max_attempts",
-  "agent_metrics_interval_seconds",
-  "agent_ship_existing_logs",
-  "agent_log_delete_after_days",
-  "column_break_agent",
-  "agent_built_version",
-  "agent_built_at",
-  "agent_build_error",
-  "telemetry_section",
-  "enable_telemetry",
-  "column_break_telemetry",
-  "telemetry_retention_days",
-  "telemetry_alerts_section",
-  "telemetry_alert_recipients",
-  "column_break_telemetry_alerts",
-  "telemetry_silence_minutes",
-  "telemetry_error_rate_percent",
-  "stalwart_tab",
-  "versions_section",
-  "stalwart_version",
-  "stalwart_download_url_template",
-  "spam_filter_rules_version",
-  "column_break_stalwart",
-  "stalwart_cli_version",
-  "stalwart_cli_download_url_template",
-  "connection_section",
-  "verify_stalwart_tls",
-  "dkim_section",
-  "sign_with_ed25519",
-  "certificates_tab",
-  "acme_section",
-  "acme_directory_url",
-  "column_break_acme",
-  "acme_contact_email",
-  "dns_tab",
-  "dns_section",
-  "default_dns_ttl",
+  "retention_section",
+  "dmarc_report_retention_days",
+  "tls_report_retention_days",
+  "column_break_retention",
+  "send_usage_retention_days",
   "frappe_cloud_tab",
   "central_section",
   "central_url",
@@ -87,11 +50,48 @@
   "suite_app_ref",
   "sites_section",
   "ready_sites_per_region",
-  "allow_signup",
-  "allow_subaddressed_signups",
   "column_break_sites",
   "site_dns_zone",
-  "tenant_mail_zone"
+  "tenant_mail_zone",
+  "stalwart_tab",
+  "versions_section",
+  "stalwart_version",
+  "stalwart_download_url_template",
+  "spam_filter_rules_version",
+  "column_break_stalwart",
+  "stalwart_cli_version",
+  "stalwart_cli_download_url_template",
+  "connection_section",
+  "server_job_timeout",
+  "column_break_connection",
+  "verify_stalwart_tls",
+  "acme_section",
+  "acme_directory_url",
+  "column_break_acme",
+  "acme_contact_email",
+  "dkim_section",
+  "sign_with_ed25519",
+  "agent_telemetry_tab",
+  "agent_section",
+  "agent_requests_per_minute",
+  "agent_records_per_request",
+  "agent_max_attempts",
+  "agent_metrics_interval_seconds",
+  "agent_ship_existing_logs",
+  "agent_log_delete_after_days",
+  "column_break_agent",
+  "agent_built_version",
+  "agent_built_at",
+  "agent_build_error",
+  "telemetry_section",
+  "enable_telemetry",
+  "column_break_telemetry",
+  "telemetry_retention_days",
+  "telemetry_alerts_section",
+  "telemetry_alert_recipients",
+  "column_break_telemetry_alerts",
+  "telemetry_silence_minutes",
+  "telemetry_error_rate_percent"
  ],
  "fields": [
   {
@@ -112,6 +112,14 @@
    "options": "URL"
   },
   {
+   "default": "300",
+   "description": "Used when a DNS Zone has no TTL. Also suggested to tenants.",
+   "fieldname": "default_dns_ttl",
+   "fieldtype": "Int",
+   "label": "Default DNS TTL (Seconds)",
+   "reqd": 1
+  },
+  {
    "fieldname": "column_break_general",
    "fieldtype": "Column Break"
   },
@@ -123,45 +131,27 @@
    "label": "Skip Domain Verification"
   },
   {
-   "fieldname": "jobs_section",
+   "fieldname": "signup_section",
    "fieldtype": "Section Break",
-   "label": "Server Jobs"
+   "label": "Signup"
   },
   {
-   "default": "1800",
-   "description": "Time limit for install, bootstrap and upgrade jobs. 1800 = 30 minutes.",
-   "fieldname": "server_job_timeout",
-   "fieldtype": "Int",
-   "label": "Server Job Timeout (Seconds)",
-   "reqd": 1
+   "default": "0",
+   "description": "Accept signups through the public signup API.",
+   "fieldname": "allow_signup",
+   "fieldtype": "Check",
+   "label": "Allow Signup"
   },
   {
-   "fieldname": "column_break_jobs",
+   "fieldname": "column_break_signup",
    "fieldtype": "Column Break"
   },
   {
-   "default": "90",
-   "description": "Days to keep DMARC reports. Stalwart deletes its copy after 30 days.",
-   "fieldname": "dmarc_report_retention_days",
-   "fieldtype": "Int",
-   "label": "DMARC Report Retention (Days)",
-   "reqd": 1
-  },
-  {
-   "default": "90",
-   "description": "Days to keep TLS reports. Stalwart deletes its copy after 30 days.",
-   "fieldname": "tls_report_retention_days",
-   "fieldtype": "Int",
-   "label": "TLS Report Retention (Days)",
-   "reqd": 1
-  },
-  {
-   "default": "90",
-   "description": "Days to keep sending counts for the Sending Usage dashboard.",
-   "fieldname": "send_usage_retention_days",
-   "fieldtype": "Int",
-   "label": "Sending Usage Retention (Days)",
-   "reqd": 1
+   "default": "0",
+   "description": "Accept signup emails with a +tag, e.g. john+test@example.com. The owner account on the site does not get the tag.",
+   "fieldname": "allow_subaddressed_signups",
+   "fieldtype": "Check",
+   "label": "Allow Sub-addressed Emails at Signup"
   },
   {
    "fieldname": "email_section",
@@ -188,270 +178,36 @@
    "label": "Use Tenant Title as Sender Name"
   },
   {
-   "fieldname": "agent_telemetry_tab",
-   "fieldtype": "Tab Break",
-   "label": "Agent & Telemetry"
-  },
-  {
-   "description": "The agent runs on each Stalwart node and egress gateway. It sends logs and metrics to Suite Cloud.",
-   "fieldname": "agent_section",
+   "fieldname": "retention_section",
    "fieldtype": "Section Break",
-   "label": "Agent"
+   "label": "Retention"
   },
   {
-   "default": "300",
-   "description": "Per agent.",
-   "fieldname": "agent_requests_per_minute",
+   "default": "90",
+   "description": "Days to keep DMARC reports. Stalwart deletes its copy after 30 days.",
+   "fieldname": "dmarc_report_retention_days",
    "fieldtype": "Int",
-   "label": "Agent Requests per Minute",
+   "label": "DMARC Report Retention (Days)",
    "reqd": 1
   },
   {
-   "default": "5000",
-   "description": "Log events, metric samples or usage records in one request.",
-   "fieldname": "agent_records_per_request",
+   "default": "90",
+   "description": "Days to keep TLS reports. Stalwart deletes its copy after 30 days.",
+   "fieldname": "tls_report_retention_days",
    "fieldtype": "Int",
-   "label": "Agent Records per Request",
+   "label": "TLS Report Retention (Days)",
    "reqd": 1
   },
   {
-   "default": "8",
-   "description": "Retries for a batch after a server or network failure. Rate limits do not count.",
-   "fieldname": "agent_max_attempts",
-   "fieldtype": "Int",
-   "label": "Agent Max Attempts",
-   "reqd": 1
-  },
-  {
-   "default": "60",
-   "description": "How often the agent collects metrics.",
-   "fieldname": "agent_metrics_interval_seconds",
-   "fieldtype": "Int",
-   "label": "Metrics Interval (Seconds)",
-   "reqd": 1
-  },
-  {
-   "default": "0",
-   "description": "Send old log files the first time the agent starts. Off sends only new lines.",
-   "fieldname": "agent_ship_existing_logs",
-   "fieldtype": "Check",
-   "label": "Ship Existing Logs"
-  },
-  {
-   "default": "0",
-   "description": "Days to keep a sent log file. 0 keeps it. The node deletes logs after 14 days in any case.",
-   "fieldname": "agent_log_delete_after_days",
-   "fieldtype": "Int",
-   "label": "Delete Shipped Logs After (Days)"
-  },
-  {
-   "fieldname": "column_break_agent",
-   "fieldtype": "Column Break"
-  },
-  {
-   "description": "Version that provisioning installs.",
-   "fieldname": "agent_built_version",
-   "fieldtype": "Data",
-   "label": "Built Agent Version",
-   "read_only": 1
-  },
-  {
-   "fieldname": "agent_built_at",
-   "fieldtype": "Datetime",
-   "label": "Built At",
-   "read_only": 1
-  },
-  {
-   "depends_on": "eval:doc.agent_build_error",
-   "fieldname": "agent_build_error",
-   "fieldtype": "Small Text",
-   "label": "Last Build Error",
-   "read_only": 1
-  },
-  {
-   "description": "Agents send logs and metrics to the telemetry API. A loader copies them into Insights.",
-   "fieldname": "telemetry_section",
-   "fieldtype": "Section Break",
-   "label": "Telemetry"
-  },
-  {
-   "default": "1",
-   "description": "Run the agent on each Stalwart node and egress gateway. Changing it queues an Install Agent job on each server.",
-   "fieldname": "enable_telemetry",
-   "fieldtype": "Check",
-   "label": "Enable Telemetry"
-  },
-  {
-   "fieldname": "column_break_telemetry",
+   "fieldname": "column_break_retention",
    "fieldtype": "Column Break"
   },
   {
    "default": "90",
-   "description": "Days to keep events and metrics in Insights.",
-   "fieldname": "telemetry_retention_days",
+   "description": "Days to keep sending counts for the Sending Usage dashboard.",
+   "fieldname": "send_usage_retention_days",
    "fieldtype": "Int",
-   "label": "Telemetry Retention (Days)",
-   "reqd": 1
-  },
-  {
-   "description": "Checked every five minutes. An alert opens for a node that stops reporting or logs too many errors.",
-   "fieldname": "telemetry_alerts_section",
-   "fieldtype": "Section Break",
-   "label": "Telemetry Alerts"
-  },
-  {
-   "description": "Emails to notify, separated by commas or lines. Blank records alerts without email.",
-   "fieldname": "telemetry_alert_recipients",
-   "fieldtype": "Small Text",
-   "label": "Telemetry Alert Recipients"
-  },
-  {
-   "fieldname": "column_break_telemetry_alerts",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "30",
-   "description": "A node with no data for this long gets a Silent Host alert.",
-   "fieldname": "telemetry_silence_minutes",
-   "fieldtype": "Int",
-   "label": "Silent Host After (Minutes)",
-   "reqd": 1
-  },
-  {
-   "default": "5",
-   "description": "A node with more errors than this share of its events in the last hour gets an alert. Needs at least 100 events.",
-   "fieldname": "telemetry_error_rate_percent",
-   "fieldtype": "Int",
-   "label": "Error Rate Alert (%)",
-   "reqd": 1
-  },
-  {
-   "fieldname": "stalwart_tab",
-   "fieldtype": "Tab Break",
-   "label": "Stalwart"
-  },
-  {
-   "fieldname": "versions_section",
-   "fieldtype": "Section Break",
-   "label": "Versions"
-  },
-  {
-   "default": "v0.16.20",
-   "description": "Stalwart release for new clusters, e.g. v0.16.20.",
-   "fieldname": "stalwart_version",
-   "fieldtype": "Data",
-   "label": "Stalwart Version",
-   "reqd": 1
-  },
-  {
-   "default": "https://github.com/stalwartlabs/stalwart/releases/download/{version}/stalwart-{target}.tar.gz",
-   "description": "{version} is the release and {target} the platform, e.g. x86_64-unknown-linux-gnu.",
-   "fieldname": "stalwart_download_url_template",
-   "fieldtype": "Data",
-   "label": "Stalwart Download URL Template",
-   "length": 255,
-   "reqd": 1
-  },
-  {
-   "default": "v3.0.1",
-   "description": "Spam filter rules a new cluster imports, e.g. v3.0.1. Change it with the Stalwart Version. Blank imports the latest.",
-   "fieldname": "spam_filter_rules_version",
-   "fieldtype": "Data",
-   "label": "Spam Filter Rules Version"
-  },
-  {
-   "fieldname": "column_break_stalwart",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "v1.0.12",
-   "description": "stalwart-cli release used to bootstrap a cluster, e.g. v1.0.12.",
-   "fieldname": "stalwart_cli_version",
-   "fieldtype": "Data",
-   "label": "Stalwart CLI Version",
-   "reqd": 1
-  },
-  {
-   "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
-   "description": "Same placeholders as the Stalwart URL. {target} is the static build, e.g. x86_64-unknown-linux-musl.",
-   "fieldname": "stalwart_cli_download_url_template",
-   "fieldtype": "Data",
-   "label": "Stalwart CLI Download URL Template",
-   "length": 255,
-   "reqd": 1
-  },
-  {
-   "fieldname": "connection_section",
-   "fieldtype": "Section Break",
-   "label": "Connection"
-  },
-  {
-   "default": "1",
-   "description": "Turn off only on a development site whose cluster uses a staging certificate.",
-   "fieldname": "verify_stalwart_tls",
-   "fieldtype": "Check",
-   "label": "Verify Stalwart TLS Certificates"
-  },
-  {
-   "fieldname": "dkim_section",
-   "fieldtype": "Section Break",
-   "label": "DKIM Signing"
-  },
-  {
-   "default": "0",
-   "description": "Add an Ed25519 DKIM key next to the RSA key. Applies to new domains only. Many receivers ignore Ed25519.",
-   "fieldname": "sign_with_ed25519",
-   "fieldtype": "Check",
-   "label": "Sign with Ed25519 as well as RSA"
-  },
-  {
-   "fieldname": "certificates_tab",
-   "fieldtype": "Tab Break",
-   "label": "Certificates"
-  },
-  {
-   "fieldname": "acme_section",
-   "fieldtype": "Section Break",
-   "label": "Let's Encrypt (ACME)"
-  },
-  {
-   "default": "https://acme-v02.api.letsencrypt.org/directory",
-   "description": "Certificate authority for clusters. For testing, use the Let's Encrypt staging URL.",
-   "fieldname": "acme_directory_url",
-   "fieldtype": "Data",
-   "label": "ACME Directory URL",
-   "length": 255,
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_acme",
-   "fieldtype": "Column Break"
-  },
-  {
-   "default": "admin@example.com",
-   "description": "Gets notices about expiring certificates.",
-   "fieldname": "acme_contact_email",
-   "fieldtype": "Data",
-   "label": "ACME Contact Email",
-   "options": "Email",
-   "reqd": 1
-  },
-  {
-   "fieldname": "dns_tab",
-   "fieldtype": "Tab Break",
-   "label": "DNS"
-  },
-  {
-   "fieldname": "dns_section",
-   "fieldtype": "Section Break",
-   "label": "Defaults"
-  },
-  {
-   "default": "300",
-   "description": "Used when a DNS Zone has no TTL. Also suggested to tenants.",
-   "fieldname": "default_dns_ttl",
-   "fieldtype": "Int",
-   "label": "Default DNS TTL (Seconds)",
+   "label": "Sending Usage Retention (Days)",
    "reqd": 1
   },
   {
@@ -627,20 +383,6 @@
    "reqd": 1
   },
   {
-   "default": "0",
-   "description": "Accept signups through the public signup API.",
-   "fieldname": "allow_signup",
-   "fieldtype": "Check",
-   "label": "Allow Signup"
-  },
-  {
-   "default": "0",
-   "description": "Accept signup emails with a +tag, e.g. john+test@example.com. The owner account on the site does not get the tag.",
-   "fieldname": "allow_subaddressed_signups",
-   "fieldtype": "Check",
-   "label": "Allow Sub-addressed Emails at Signup"
-  },
-  {
    "fieldname": "column_break_sites",
    "fieldtype": "Column Break"
   },
@@ -658,12 +400,268 @@
    "label": "Tenant Mail Zone",
    "mandatory_depends_on": "eval:doc.central_url",
    "options": "DNS Zone"
+  },
+  {
+   "fieldname": "stalwart_tab",
+   "fieldtype": "Tab Break",
+   "label": "Stalwart"
+  },
+  {
+   "fieldname": "versions_section",
+   "fieldtype": "Section Break",
+   "label": "Versions"
+  },
+  {
+   "default": "v0.16.20",
+   "description": "Stalwart release for new clusters, e.g. v0.16.20.",
+   "fieldname": "stalwart_version",
+   "fieldtype": "Data",
+   "label": "Stalwart Version",
+   "reqd": 1
+  },
+  {
+   "default": "https://github.com/stalwartlabs/stalwart/releases/download/{version}/stalwart-{target}.tar.gz",
+   "description": "{version} is the release and {target} the platform, e.g. x86_64-unknown-linux-gnu.",
+   "fieldname": "stalwart_download_url_template",
+   "fieldtype": "Data",
+   "label": "Stalwart Download URL Template",
+   "length": 255,
+   "reqd": 1
+  },
+  {
+   "default": "v3.0.1",
+   "description": "Spam filter rules a new cluster imports, e.g. v3.0.1. Change it with the Stalwart Version. Blank imports the latest.",
+   "fieldname": "spam_filter_rules_version",
+   "fieldtype": "Data",
+   "label": "Spam Filter Rules Version"
+  },
+  {
+   "fieldname": "column_break_stalwart",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "v1.0.12",
+   "description": "stalwart-cli release used to bootstrap a cluster, e.g. v1.0.12.",
+   "fieldname": "stalwart_cli_version",
+   "fieldtype": "Data",
+   "label": "Stalwart CLI Version",
+   "reqd": 1
+  },
+  {
+   "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
+   "description": "Same placeholders as the Stalwart URL. {target} is the static build, e.g. x86_64-unknown-linux-musl.",
+   "fieldname": "stalwart_cli_download_url_template",
+   "fieldtype": "Data",
+   "label": "Stalwart CLI Download URL Template",
+   "length": 255,
+   "reqd": 1
+  },
+  {
+   "fieldname": "connection_section",
+   "fieldtype": "Section Break",
+   "label": "Management"
+  },
+  {
+   "default": "1800",
+   "description": "Time limit for install, bootstrap and upgrade jobs. 1800 = 30 minutes.",
+   "fieldname": "server_job_timeout",
+   "fieldtype": "Int",
+   "label": "Server Job Timeout (Seconds)",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_connection",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "description": "Turn off only on a development site whose cluster uses a staging certificate.",
+   "fieldname": "verify_stalwart_tls",
+   "fieldtype": "Check",
+   "label": "Verify Stalwart TLS Certificates"
+  },
+  {
+   "fieldname": "acme_section",
+   "fieldtype": "Section Break",
+   "label": "Let's Encrypt (ACME)"
+  },
+  {
+   "default": "https://acme-v02.api.letsencrypt.org/directory",
+   "description": "Certificate authority for clusters. For testing, use the Let's Encrypt staging URL.",
+   "fieldname": "acme_directory_url",
+   "fieldtype": "Data",
+   "label": "ACME Directory URL",
+   "length": 255,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_acme",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "admin@example.com",
+   "description": "Gets notices about expiring certificates.",
+   "fieldname": "acme_contact_email",
+   "fieldtype": "Data",
+   "label": "ACME Contact Email",
+   "options": "Email",
+   "reqd": 1
+  },
+  {
+   "fieldname": "dkim_section",
+   "fieldtype": "Section Break",
+   "label": "DKIM Signing"
+  },
+  {
+   "default": "0",
+   "description": "Add an Ed25519 DKIM key next to the RSA key. Applies to new domains only. Many receivers ignore Ed25519.",
+   "fieldname": "sign_with_ed25519",
+   "fieldtype": "Check",
+   "label": "Sign with Ed25519 as well as RSA"
+  },
+  {
+   "fieldname": "agent_telemetry_tab",
+   "fieldtype": "Tab Break",
+   "label": "Agent & Telemetry"
+  },
+  {
+   "description": "The agent runs on each Stalwart node and egress gateway. It sends logs and metrics to Suite Cloud.",
+   "fieldname": "agent_section",
+   "fieldtype": "Section Break",
+   "label": "Agent"
+  },
+  {
+   "default": "300",
+   "description": "Per agent.",
+   "fieldname": "agent_requests_per_minute",
+   "fieldtype": "Int",
+   "label": "Agent Requests per Minute",
+   "reqd": 1
+  },
+  {
+   "default": "5000",
+   "description": "Log events, metric samples or usage records in one request.",
+   "fieldname": "agent_records_per_request",
+   "fieldtype": "Int",
+   "label": "Agent Records per Request",
+   "reqd": 1
+  },
+  {
+   "default": "8",
+   "description": "Retries for a batch after a server or network failure. Rate limits do not count.",
+   "fieldname": "agent_max_attempts",
+   "fieldtype": "Int",
+   "label": "Agent Max Attempts",
+   "reqd": 1
+  },
+  {
+   "default": "60",
+   "description": "How often the agent collects metrics.",
+   "fieldname": "agent_metrics_interval_seconds",
+   "fieldtype": "Int",
+   "label": "Metrics Interval (Seconds)",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Send old log files the first time the agent starts. Off sends only new lines.",
+   "fieldname": "agent_ship_existing_logs",
+   "fieldtype": "Check",
+   "label": "Ship Existing Logs"
+  },
+  {
+   "default": "0",
+   "description": "Days to keep a sent log file. 0 keeps it. The node deletes logs after 14 days in any case.",
+   "fieldname": "agent_log_delete_after_days",
+   "fieldtype": "Int",
+   "label": "Delete Shipped Logs After (Days)"
+  },
+  {
+   "fieldname": "column_break_agent",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Version that provisioning installs.",
+   "fieldname": "agent_built_version",
+   "fieldtype": "Data",
+   "label": "Built Agent Version",
+   "read_only": 1
+  },
+  {
+   "fieldname": "agent_built_at",
+   "fieldtype": "Datetime",
+   "label": "Built At",
+   "read_only": 1
+  },
+  {
+   "depends_on": "eval:doc.agent_build_error",
+   "fieldname": "agent_build_error",
+   "fieldtype": "Small Text",
+   "label": "Last Build Error",
+   "read_only": 1
+  },
+  {
+   "description": "Agents send logs and metrics to the telemetry API. A loader copies them into Insights.",
+   "fieldname": "telemetry_section",
+   "fieldtype": "Section Break",
+   "label": "Telemetry"
+  },
+  {
+   "default": "1",
+   "description": "Run the agent on each Stalwart node and egress gateway. Changing it queues an Install Agent job on each server.",
+   "fieldname": "enable_telemetry",
+   "fieldtype": "Check",
+   "label": "Enable Telemetry"
+  },
+  {
+   "fieldname": "column_break_telemetry",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "90",
+   "description": "Days to keep events and metrics in Insights.",
+   "fieldname": "telemetry_retention_days",
+   "fieldtype": "Int",
+   "label": "Telemetry Retention (Days)",
+   "reqd": 1
+  },
+  {
+   "description": "Checked every five minutes. An alert opens for a node that stops reporting or logs too many errors.",
+   "fieldname": "telemetry_alerts_section",
+   "fieldtype": "Section Break",
+   "label": "Telemetry Alerts"
+  },
+  {
+   "description": "Emails to notify, separated by commas or lines. Blank records alerts without email.",
+   "fieldname": "telemetry_alert_recipients",
+   "fieldtype": "Small Text",
+   "label": "Telemetry Alert Recipients"
+  },
+  {
+   "fieldname": "column_break_telemetry_alerts",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "30",
+   "description": "A node with no data for this long gets a Silent Host alert.",
+   "fieldname": "telemetry_silence_minutes",
+   "fieldtype": "Int",
+   "label": "Silent Host After (Minutes)",
+   "reqd": 1
+  },
+  {
+   "default": "5",
+   "description": "A node with more errors than this share of its events in the last hour gets an alert. Needs at least 100 events.",
+   "fieldname": "telemetry_error_rate_percent",
+   "fieldtype": "Int",
+   "label": "Error Rate Alert (%)",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-10-28 18:15:24.800932",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",
