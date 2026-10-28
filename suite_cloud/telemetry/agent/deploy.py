@@ -16,7 +16,7 @@ from suite_cloud.telemetry.agent.build import (
     is_quota_enabled,
     is_telemetry_enabled,
 )
-from suite_cloud.utils import get_config, log_error, log_exception, mask_secrets, secret_spellings
+from suite_cloud.utils import get_config, log_error, mask_secrets, secret_spellings
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -253,24 +253,19 @@ def filters_for(cluster: Document | None, statuses: tuple[str, ...]) -> dict:
 
 def switch_off_quota_hooks() -> None:
     """With telemetry off the Agents stop, so each active cluster's config is pushed again: its
-    plan then holds the hook switched off, and Stalwart stops calling Agents that are gone. Pushed
-    here, in the roll-out job, not queued: a queued resync is dropped while one that planned with
-    the hook on is still running."""
+    plan then holds the hook switched off, and Stalwart stops calling Agents that are gone. One job
+    per cluster, never deduplicated: a resync already running may have planned with the hook on,
+    and the cluster's push lock makes this one plan after it."""
 
     for name in frappe.get_all("Stalwart Cluster", {"status": "Active"}, pluck="name"):
-        try:
-            egress.resync_cluster(frappe.get_doc("Stalwart Cluster", name))
-        except Exception:
-            log_exception(f"Quota hook not switched off on {name}")
+        frappe.enqueue(egress.resync_cluster_job, cluster=name, queue="short", enqueue_after_commit=True)
 
 
 def enqueue_roll_out_agents() -> None:
     """Enable Telemetry changed. In the background, since the roll-out loads every server of every
-    cluster and creates a job for each."""
+    cluster and creates a job for each. Queued even where jobs otherwise run at once
+    (``do_not_enqueue``): it reaches every server of the site, so a test runs it only by name."""
 
-    if frappe.flags.do_not_enqueue:
-        roll_out_agents()
-        return
     frappe.enqueue(roll_out_agents, queue="long", enqueue_after_commit=True)
 
 
@@ -285,6 +280,8 @@ def roll_out_agents() -> list[str]:
         if frappe.cache.get_value(ROLL_OUT_KEY) == change:
             return []
         names = start_agent_jobs()
+        if not frappe.in_test:
+            frappe.db.commit()  # the jobs exist before the change is marked as rolled out
         frappe.cache.set_value(ROLL_OUT_KEY, change)
     return names
 

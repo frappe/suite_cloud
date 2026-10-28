@@ -27,6 +27,22 @@ class TestStalwartCluster(IntegrationTestCase):
     def tearDown(self) -> None:
         frappe.flags.do_not_enqueue = False
 
+    def test_a_config_push_waits_for_the_one_running(self) -> None:
+        from suite_cloud.mail.doctype.stalwart_cluster import stalwart_cluster
+
+        cluster = make_cluster()
+        held = frappe.cache.lock(f"{frappe.local.site}:suite_cloud:push-config:{cluster.name}", timeout=30)
+        self.assertTrue(held.acquire(blocking=False))
+        self.addCleanup(held.release)
+        # A web request gives up after its short wait, before planning anything.
+        with (
+            patch.object(stalwart_cluster, "REQUEST_PUSH_WAIT", 0.1),
+            patch.object(frappe.local, "request", object(), create=True),
+            patch.object(plan, "cluster_plan") as planned,
+        ):
+            self.assertRaisesRegex(frappe.ValidationError, "Another configuration push", cluster.push_config)
+        planned.assert_not_called()
+
     def test_connections_pin_the_host_key_recorded_at_first_contact(self) -> None:
         from suite_cloud.provisioning.ssh import SSHTarget, UnknownHostError, inventory_line, known_hosts_file
 

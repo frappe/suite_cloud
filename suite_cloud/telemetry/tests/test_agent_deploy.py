@@ -21,10 +21,7 @@ class TestAgentDeploy(AgentBuildFixture):
         settings = frappe.get_single("Suite Cloud Settings")
         settings.enable_telemetry = 1
         settings.public_url = "https://cloud.example.test"
-        # The class rolls back only at its end, so a test that turned telemetry off makes this a
-        # turn on, whose roll-out must not run real playbooks.
-        with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
-            settings.save()
+        settings.save()  # queues a roll-out at most, which runs after a commit a test never makes
         clear_config_cache()
         self.cluster = make_cluster()
         self.node = make_node(self.cluster)
@@ -122,18 +119,24 @@ class TestAgentDeploy(AgentBuildFixture):
         with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
             self.assertIn(version, deploy.install_agent(self.node).title)
 
-        # Off: the Agents stop, and each active cluster's config is pushed with the hook switched off.
+        # Off: the Agents stop, and each active cluster gets a push that switches the hook off.
         self.cluster.db_set("status", "Active")
         settings = frappe.get_single("Suite Cloud Settings")
         settings.enable_telemetry = 0
-        with (
-            patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
-            patch.object(deploy.egress, "resync_cluster") as resync,
-        ):
-            settings.save()
+        settings.save()
         clear_config_cache()
         self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])
-        self.assertIn(self.cluster.name, [call.args[0].name for call in resync.call_args_list])
+        with (
+            patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
+            patch("frappe.enqueue") as enqueue,
+        ):
+            deploy.roll_out_agents()
+        pushed = [
+            call.kwargs["cluster"]
+            for call in enqueue.call_args_list
+            if call.args[0] is egress.resync_cluster_job
+        ]
+        self.assertIn(self.cluster.name, pushed)
 
     def test_the_quota_section_waits_for_a_build_that_answers_the_hook(self) -> None:
         self.build().run()  # 0.1.0 refuses a config with a quota section
@@ -263,16 +266,17 @@ class TestAgentDeploy(AgentBuildFixture):
         self.node.db_set("status", "Active")
         settings = frappe.get_single("Suite Cloud Settings")
         settings.enable_telemetry = 0
+        settings.save()
         with (
             patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
-            patch.object(deploy.egress, "resync_cluster"),  # the site's own clusters
+            patch("frappe.enqueue"),
         ):
-            settings.save()  # with do_not_enqueue, the save rolls out at once
+            self.assertTrue(deploy.roll_out_agents())
             # A second job queued for the same change, say by a quick second turn, finds it done.
             self.assertEqual(deploy.roll_out_agents(), [])
 
     def test_the_settings_save_leaves_the_roll_out_to_a_background_job(self) -> None:
-        frappe.flags.do_not_enqueue = False
+        # Even with do_not_enqueue on, as in setUp: the roll-out reaches every server of the site.
         before = frappe.get_all("Server Job", pluck="name")
         settings = frappe.get_single("Suite Cloud Settings")
         settings.enable_telemetry = 0
@@ -301,11 +305,12 @@ class TestAgentDeploy(AgentBuildFixture):
             before = frappe.get_all("Server Job", pluck="name")
             settings.reload()
             settings.enable_telemetry = int(enabled)
-            with (
-                patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
-                patch.object(deploy.egress, "resync_cluster"),  # the site's own clusters
-            ):
+            with patch("frappe.enqueue") as enqueue:
                 settings.save()
+                # The save only queues the roll-out; it runs here as a worker would, without playbooks.
+                if any(call.args[:1] == (deploy.roll_out_agents,) for call in enqueue.call_args_list):
+                    with patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"):
+                        deploy.roll_out_agents()
             filters = {"name": ["not in", before], "server": ["in", ours]}
             return frappe.get_all("Server Job", filters, ["server", "title"])
 
