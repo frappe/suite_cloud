@@ -49,6 +49,9 @@ def validate(doc) -> None:
 
     before = doc.get_doc_before_save()
     for kind in KINDS:
+        if before is not None and not before.enabled:
+            keep_mirror(doc, before, kind)
+            continue
         if before is not None and not before.get(kind.field) and doc.stalwart_id and not is_loaded(doc, kind):
             load(doc, kind)  # an account mirrored for the first time starts from the cluster's list
         previous = baseline(doc, before, kind)
@@ -71,6 +74,13 @@ def validate(doc) -> None:
         place_site_login(doc, kind, limit)
         if limit and len(doc.get(kind.field)) > limit:
             frappe.throw(_("The account may have at most {0} {1}.").format(limit, kind.plural))
+
+
+def keep_mirror(doc, before, kind: Kind) -> None:
+    """The disabled role shuts the account's own session, which its credentials are managed through."""
+
+    if {fields(r) for r in doc.get(kind.field)} != {fields(r) for r in before.get(kind.field)}:
+        frappe.throw(_("Enable the account before changing its {0}.").format(kind.plural))
 
 
 def place_site_login(doc, kind: Kind, limit: int | None) -> None:
@@ -132,6 +142,8 @@ def parse_ips(text: str | None) -> list[str]:
 def rotate_site_login(doc, kind: Kind) -> str:
     """Mints the Suite Cloud credential anew; the previous one is revoked once the save commits."""
 
+    if not doc.enabled:
+        frappe.throw(_("Enable the account before changing its {0}.").format(kind.plural))
     if doc.stalwart_id and not doc.get(kind.field):
         load(doc, kind)  # an account mirrored for the first time: the old credential must be known to go
     doc.set(kind.field, [r for r in doc.get(kind.field) if r.description != SITE_LOGIN])
@@ -226,9 +238,9 @@ def baseline(doc, before, kind: Kind) -> dict:
 
 
 def refresh(doc) -> None:
-    """The form opens on the cluster's lists; the rows are rewritten when they differ from it."""
+    """The form opens on the cluster's lists; a disabled account, which has no session, on the mirror."""
 
-    if not doc.stalwart_id:
+    if not doc.stalwart_id or not doc.enabled:
         return
     try:
         changed = [kind for kind in KINDS if refresh_kind(doc, kind)]
@@ -306,7 +318,7 @@ def row_by_id(doc, kind: Kind, credential_id: str):
     """A saved row, or one the cluster holds that this side has not mirrored yet."""
 
     row = find_row(doc, kind, credential_id)
-    if row is None and doc.stalwart_id and not is_loaded(doc, kind):
+    if row is None and doc.stalwart_id and doc.enabled and not is_loaded(doc, kind):
         load(doc, kind)
         row = find_row(doc, kind, credential_id)
     if row is None:
