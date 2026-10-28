@@ -11,8 +11,16 @@ from datetime import UTC, datetime, timedelta
 
 import frappe
 from frappe import _
-from frappe.utils import cint, convert_utc_to_system_timezone, get_url_to_form, now_datetime
+from frappe.utils import (
+    cint,
+    convert_utc_to_system_timezone,
+    format_datetime,
+    get_system_timezone,
+    get_url_to_form,
+    now_datetime,
+)
 
+from suite_cloud.suite_cloud.doctype.tenant_email.email_types import get_inline_images
 from suite_cloud.telemetry.warehouse import Warehouse
 from suite_cloud.utils import get_config, log_exception
 
@@ -198,12 +206,32 @@ class Alerts:
             return
         state = _("resolved") if alert.status == "Resolved" else _("opened")
         try:
+            message = self.get_message(alert)
             frappe.sendmail(
                 recipients=self.recipients,
                 subject=f"[Suite Cloud] {alert.title} {state}",
-                message=f"{alert.details}<br><br>{get_url_to_form('Telemetry Alert', alert.name)}",
+                message=message,
+                inline_images=get_inline_images(message),
                 reference_doctype="Telemetry Alert",
                 reference_name=alert.name,
             )
         except Exception:
             log_exception(f"Telemetry alert mail not sent for {alert.name}", alert)
+
+    def get_message(self, alert) -> str:
+        """The HTML body, with times in the system timezone."""
+
+        timezone = get_system_timezone()
+        return frappe.render_template(
+            "templates/operator_emails/telemetry_alert.html",
+            {
+                "alert_type": alert.alert_type,
+                "status": alert.status,
+                "node": alert.hostname or alert.host_ip,
+                "host_ip": alert.host_ip,
+                "details": alert.details,
+                "opened_at": f"{format_datetime(alert.opened_at)} ({timezone})",
+                "resolved_at": alert.resolved_at and f"{format_datetime(alert.resolved_at)} ({timezone})",
+                "link": get_url_to_form("Telemetry Alert", alert.name),
+            },
+        )

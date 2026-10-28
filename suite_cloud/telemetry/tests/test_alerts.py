@@ -9,7 +9,7 @@ from uuid import uuid7
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import get_files_path, now_datetime
+from frappe.utils import get_files_path, get_url_to_form, now_datetime
 
 from suite_cloud.mail.tests.fixtures import error_log_count
 from suite_cloud.telemetry import EVENTS, METRICS
@@ -104,6 +104,17 @@ class TestAlerts(IntegrationTestCase):
             self.mails.call_args.kwargs["recipients"], ["ops@example.test", "oncall@example.test"]
         )
         self.assertIn("opened", self.mails.call_args.kwargs["subject"])
+        noisy = frappe.get_doc("Telemetry Alert", {"host_ip": NOISY})
+        message = self.mails.call_args.kwargs["message"]
+        self.assertIn("node-6 is logging too many errors", message)
+        self.assertIn("6 of 100 events in the last hour are errors", message)
+        self.assertIn(get_url_to_form("Telemetry Alert", noisy.name), message)
+        self.assertNotIn(">Resolved<", message)
+        (icon,) = self.mails.call_args.kwargs["inline_images"]
+        self.assertEqual(icon["filename"], "suite.png")
+        silent = self.mails.call_args_list[0].kwargs["message"]
+        self.assertIn("node-5 stopped reporting", silent)
+        self.assertIn("resolve the alert by hand", silent)
 
     def test_a_second_check_updates_the_open_alert_and_resolves_it_when_the_node_recovers(self) -> None:
         self.report(NOISY, NOW, self.events(errors=6))
@@ -121,6 +132,9 @@ class TestAlerts(IntegrationTestCase):
         self.assertIsNotNone(alert.resolved_at)
         self.assertIn("The condition cleared", alert.details)
         self.assertIn("resolved", self.mails.call_args.kwargs["subject"])
+        message = self.mails.call_args.kwargs["message"]
+        self.assertIn("Errors on node-6 are back under the threshold", message)
+        self.assertIn(">Resolved<", message)
 
     def test_a_silent_node_keeps_its_alert_past_the_lookback_until_it_reports_again(self) -> None:
         self.report(QUIET, NOW - timedelta(hours=2), table=METRICS)
