@@ -1,10 +1,17 @@
+from unittest.mock import patch
+
+import requests
 from frappe.tests import UnitTestCase
 
 from suite_cloud.mail.stalwart.client import StalwartClient
 from suite_cloud.mail.stalwart.connection import ConnectionInfo, JMAPConnection
 from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.mail.stalwart.directory import Account, Domain, EmailAlias, Group, MailingList
-from suite_cloud.mail.stalwart.errors import StalwartRejectedError, StalwartUnauthorizedError
+from suite_cloud.mail.stalwart.errors import (
+    StalwartRejectedError,
+    StalwartUnauthorizedError,
+    StalwartUnavailableError,
+)
 from suite_cloud.mail.stalwart.service import CORE_CAPABILITY
 from suite_cloud.mail.tests.fake_stalwart import FakeStalwart
 
@@ -32,6 +39,19 @@ class TestStalwartClient(UnitTestCase):
     def test_bad_credentials_raise_unauthorized(self) -> None:
         info = ConnectionInfo(self.fake.base_url, username="admin", password="wrong")
         self.assertRaises(StalwartUnauthorizedError, JMAPConnection, info)
+
+    def test_an_unreachable_server_names_the_url_and_the_cause(self) -> None:
+        session = requests.Session()
+        mismatch = requests.exceptions.SSLError("certificate verify failed: Hostname mismatch")
+        with (
+            patch("suite_cloud.mail.stalwart.connection.http_session_factory", return_value=session),
+            patch.object(session, "request", side_effect=mismatch),
+            self.assertRaises(StalwartUnavailableError) as raised,
+        ):
+            JMAPConnection(ConnectionInfo("https://mail.c1.example.test", token="tok-1"))
+        self.assertIn("https://mail.c1.example.test", str(raised.exception))
+        self.assertIn("Hostname mismatch", str(raised.exception))
+        self.assertTrue(str(raised.exception).startswith("Stalwart unavailable: GET "))
 
     def test_domain_lifecycle(self) -> None:
         domain_id = self.client.domains.create_id(Domain(name="example.com", description="Example"))

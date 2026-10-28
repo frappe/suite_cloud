@@ -18,7 +18,8 @@ class StalwartError(Exception):
 
     def summary(self) -> str:
         detail = self.detail if isinstance(self.detail, str) else json.dumps(self.detail)
-        return f"Stalwart {self.object_type or ''} {self.kind}: {detail}"
+        subject = " ".join(filter(None, ("Stalwart", self.object_type, self.kind)))
+        return f"{subject}: {detail}"
 
 
 class StalwartUnavailableError(StalwartError):

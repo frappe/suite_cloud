@@ -131,7 +131,7 @@ class JMAPConnection:
                 timeout=timeout or self.info.timeout,
             )
         except (requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-            raise StalwartUnavailableError() from e
+            raise StalwartUnavailableError(f"{method} {url}: {e}") from e
 
         raise_for_status(response)
         return response.json() if return_json else response.content
