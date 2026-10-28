@@ -82,7 +82,8 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Pending\nVerified\nProcessing\nCompleted\nFailed\nExpired",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "description": "Time from email confirmation to owner invite, with waits and retries.",
@@ -137,7 +138,8 @@
    "fieldtype": "Link",
    "label": "Tenant",
    "options": "Suite Tenant",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "fieldname": "column_break_result",
@@ -169,7 +171,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 18:22:33.441427",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Tenant Request",

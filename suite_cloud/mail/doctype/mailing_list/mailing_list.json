@@ -26,7 +26,6 @@
    "options": "Email",
    "reqd": 1,
    "set_only_once": 1,
-   "unique": 1,
    "description": "List address, e.g. news@acme.com. Mail sent to it goes to each enabled recipient. Cannot be changed after save."
   },
   {
@@ -113,7 +112,7 @@
    "link_fieldname": "mailing_list"
   }
  ],
- "modified": "2026-10-28 18:22:33.441427",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mailing List",

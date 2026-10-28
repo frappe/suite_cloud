@@ -178,6 +178,12 @@ class DNSRecord(Document):
         return bool(self.is_verified)
 
 
+def on_doctype_update() -> None:
+    """Duplicate and label checks look records up by zone and host."""
+
+    frappe.db.add_index("DNS Record", ["dns_zone", "host"])
+
+
 def reconcile_managed_records(owner_doctype: str, owner: str, desired: list[dict]) -> None:
     """Makes the owner's DNS Records exactly ``desired``.
 

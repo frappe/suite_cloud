@@ -82,7 +82,8 @@
    "in_standard_filter": 1,
    "label": "Status",
    "options": "Pending\nCreating\nReady\nAssigned\nConfiguring\nActive\nFailed\nDropping\nDropped",
-   "read_only": 1
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "description": "Empty while the site waits in the pool.",
@@ -237,7 +238,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 18:22:33.441427",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Suite Site",

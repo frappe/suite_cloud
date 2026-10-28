@@ -237,3 +237,9 @@ class SuiteSite(Document):
         self.assert_created()
         if not self.get_virtual_machine().letsencrypt_email_set:
             frappe.throw(_("The server has no Let's Encrypt email, so it cannot take custom domains."))
+
+
+def on_doctype_update() -> None:
+    """The site pool claims and counts a region's sites by status."""
+
+    frappe.db.add_index("Suite Site", ["region", "status"])

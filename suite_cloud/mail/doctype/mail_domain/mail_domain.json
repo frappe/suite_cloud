@@ -47,8 +47,7 @@
    "in_list_view": 1,
    "label": "Domain Name",
    "reqd": 1,
-   "set_only_once": 1,
-   "unique": 1
+   "set_only_once": 1
   },
   {
    "description": "Tenant that owns the domain. Cannot be changed.",
@@ -305,7 +304,7 @@
    "link_fieldname": "policy_domain"
   }
  ],
- "modified": "2026-10-28 18:22:33.441427",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Domain",

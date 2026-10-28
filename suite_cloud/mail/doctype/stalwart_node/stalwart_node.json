@@ -60,8 +60,7 @@
    "in_list_view": 1,
    "label": "Hostname",
    "read_only": 1,
-   "set_only_once": 1,
-   "unique": 1
+   "set_only_once": 1
   },
   {
    "description": "Where the server runs, e.g. DigitalOcean BLR1. For information only.",
@@ -248,7 +247,7 @@
    "link_fieldname": "managed_by"
   }
  ],
- "modified": "2026-10-28 18:22:33.441427",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Node",

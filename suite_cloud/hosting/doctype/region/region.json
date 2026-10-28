@@ -27,8 +27,7 @@
    "in_list_view": 1,
    "label": "Region",
    "reqd": 1,
-   "set_only_once": 1,
-   "unique": 1
+   "set_only_once": 1
   },
   {
    "fieldname": "display_name",
@@ -109,7 +108,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-10-28 18:15:24.800932",
+ "modified": "2026-10-28 18:40:27.034609",
  "modified_by": "Administrator",
  "module": "Hosting",
  "name": "Region",
