@@ -48,20 +48,32 @@ func (h *Hook) Run(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	return h.serve(ctx, listener)
+}
+
+// serve returns once the calls in flight when the context ended are answered, so their counts
+// reach the store before its last save. When Serve fails on its own, the shutdown is unregistered
+// and a run started again leaves nothing behind.
+func (h *Hook) serve(ctx context.Context, listener net.Listener) error {
 	mux := http.NewServeMux()
 	mux.Handle(HookPath, h)
 	server := &http.Server{Handler: mux, ReadHeaderTimeout: 5 * time.Second}
-	// Unregistered when Serve fails, so a run started again leaves nothing behind.
+	drained := make(chan struct{})
 	stop := context.AfterFunc(ctx, func() {
+		defer close(drained)
 		shutdown, cancel := context.WithTimeout(context.WithoutCancel(ctx), shutdownTimeout)
 		defer cancel()
 		server.Shutdown(shutdown)
 	})
-	defer stop()
-	if err := server.Serve(listener); !errors.Is(err, http.ErrServerClosed) {
+	err := server.Serve(listener)
+	if stop() {
 		return err
 	}
-	return nil
+	<-drained
+	if errors.Is(err, http.ErrServerClosed) {
+		return nil
+	}
+	return err
 }
 
 func (h *Hook) ServeHTTP(w http.ResponseWriter, r *http.Request) {

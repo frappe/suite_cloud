@@ -6,8 +6,10 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -131,5 +133,74 @@ func TestReadRequestNeedsAnEnvelope(t *testing.T) {
 	}
 	if _, _, err := readRequest(strings.NewReader(`[]`)); err == nil {
 		t.Fatal("accepted")
+	}
+}
+
+// blockingStore holds each Add until released, as a slow store would.
+type blockingStore struct {
+	Store
+	entered, release chan struct{}
+}
+
+func (b blockingStore) Add(context.Context, string, int64, Periods) (Verdict, Limit, error) {
+	b.entered <- struct{}{}
+	<-b.release
+	return Accepted, Limit{}, nil
+}
+
+func TestHookAnswersTheCallsInFlightBeforeItStops(t *testing.T) {
+	store := blockingStore{entered: make(chan struct{}), release: make(chan struct{})}
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	stopped := make(chan error, 1)
+	go func() { stopped <- newHook(t, store).serve(ctx, listener) }()
+
+	answered := make(chan int, 1)
+	go func() {
+		request, _ := http.NewRequest(http.MethodPost, "http://"+listener.Addr().String()+HookPath, strings.NewReader(strings.Replace(hookRequest, "%s", "hi", 1)))
+		request.Header.Set("Authorization", "Bearer t0ken")
+		if response, err := http.DefaultClient.Do(request); err == nil {
+			answered <- response.StatusCode
+			response.Body.Close()
+		}
+	}()
+	<-store.entered
+	cancel()
+	select {
+	case err := <-stopped:
+		t.Fatalf("stopped with a call in flight: %v", err)
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(store.release)
+	if code := <-answered; code != http.StatusOK {
+		t.Fatalf("in-flight call answered %d", code)
+	}
+	if err := <-stopped; err != nil {
+		t.Fatal(err)
+	}
+}
+
+// brokenListener fails every Accept, so Serve returns at once.
+type brokenListener struct{}
+
+func (brokenListener) Accept() (net.Conn, error) { return nil, errors.New("listener broke") }
+func (brokenListener) Close() error              { return nil }
+func (brokenListener) Addr() net.Addr            { return &net.TCPAddr{} }
+
+func TestAHookThatFailsOnItsOwnLeavesNothingBehind(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	hook := newHook(t, failingStore{})
+	before := runtime.NumGoroutine()
+	for range 20 {
+		if err := hook.serve(ctx, brokenListener{}); err == nil {
+			t.Fatal("a broken listener served")
+		}
+	}
+	if after := runtime.NumGoroutine(); after > before+2 {
+		t.Fatalf("goroutines grew from %d to %d over 20 failed runs", before, after)
 	}
 }
