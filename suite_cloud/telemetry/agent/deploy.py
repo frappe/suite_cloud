@@ -7,7 +7,7 @@ import frappe
 from frappe import _
 from frappe.utils import cint, get_url
 
-from suite_cloud.mail.cluster import egress, plan, quota
+from suite_cloud.mail.cluster import plan, push, quota
 from suite_cloud.mail.stalwart import verify_tls
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 from suite_cloud.telemetry.agent.build import (
@@ -256,7 +256,7 @@ def switch_off_quota_hooks() -> None:
     plan then holds the hook switched off, and Stalwart stops calling Agents that are gone."""
 
     for name in frappe.get_all("Stalwart Cluster", {"status": "Active"}, pluck="name"):
-        egress.resync_cluster_after_commit(name)
+        push.resync_cluster_after_commit(name)
 
 
 def enqueue_roll_out_agents() -> None:

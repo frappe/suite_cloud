@@ -128,7 +128,7 @@ class TestAgentDeploy(AgentBuildFixture):
         self.assertFalse(deploy.agent_variables(self.node)["agent_enabled"])
         with (
             patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
-            patch.object(deploy.egress, "resync_cluster_after_commit") as resync,
+            patch.object(deploy.push, "resync_cluster_after_commit") as resync,
         ):
             deploy.roll_out_agents()
         resync.assert_any_call(self.cluster.name)
@@ -264,7 +264,7 @@ class TestAgentDeploy(AgentBuildFixture):
         settings.save()
         with (
             patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
-            patch.object(deploy.egress, "resync_cluster_after_commit"),
+            patch.object(deploy.push, "resync_cluster_after_commit"),
         ):
             self.assertTrue(deploy.roll_out_agents())
             # A second job queued for the same change, say by a quick second turn, finds it done.
@@ -306,7 +306,7 @@ class TestAgentDeploy(AgentBuildFixture):
                 if any(call.args[:1] == (deploy.roll_out_agents,) for call in enqueue.call_args_list):
                     with (
                         patch("suite_cloud.suite_cloud.doctype.server_job.server_job.ServerJob.execute"),
-                        patch.object(deploy.egress, "resync_cluster_after_commit"),
+                        patch.object(deploy.push, "resync_cluster_after_commit"),
                     ):
                         deploy.roll_out_agents()
             filters = {"name": ["not in", before], "server": ["in", ours]}

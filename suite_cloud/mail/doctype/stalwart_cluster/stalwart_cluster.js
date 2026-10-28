@@ -67,6 +67,15 @@ frappe.ui.form.on('Stalwart Cluster', {
 				frm.dashboard.add_comment(frappe.utils.escape_html(summary.message), colors[summary.state], true)
 			})
 		}
+		if (frm.doc.last_config_sync_error) {
+			frm.dashboard.add_comment(
+				__('The last configuration push failed: {0}. Sync Config tries again.', [
+					frappe.utils.escape_html(frm.doc.last_config_sync_error),
+				]),
+				'red',
+				true,
+			)
+		}
 		if (frm.doc.drift_report) {
 			const report = JSON.parse(frm.doc.drift_report)
 			if (report.differences && report.differences.length) {

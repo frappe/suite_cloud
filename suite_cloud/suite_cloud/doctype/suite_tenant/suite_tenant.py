@@ -111,10 +111,10 @@ class SuiteTenant(Document):
     def on_update(self) -> None:
         before = self.get_doc_before_save()
         if before and before.egress_pool != self.egress_pool:
-            from suite_cloud.mail.cluster import egress
+            from suite_cloud.mail.cluster import push
 
             for name in {before.stalwart_cluster, self.stalwart_cluster} - {None}:
-                egress.resync_cluster_after_commit(name)
+                push.resync_cluster_after_commit(name)
 
     def on_trash(self) -> None:
         self.assert_no_live_site()

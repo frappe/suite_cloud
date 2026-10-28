@@ -8,7 +8,7 @@ from frappe.utils import cint, now
 
 from suite_cloud.dns.resolver import verify_dns_record
 from suite_cloud.mail.cluster import dns as cluster_dns
-from suite_cloud.mail.cluster import egress
+from suite_cloud.mail.cluster import push
 from suite_cloud.mail.cluster.zone import GROUPS, build_domain_records, group_summaries
 from suite_cloud.mail.doctype.dmarc_report.dmarc_report import DMARC_REPORTS
 from suite_cloud.mail.doctype.tls_report.tls_report import TLS_REPORTS
@@ -134,7 +134,7 @@ class MailDomain(Document):
             sync.push_destroy(self, "domains")  # the insert rolls back; the domain must not survive
             raise
         if self.allow_relaying:
-            egress.resync_cluster_after_commit(self.cluster)
+            push.resync_cluster_after_commit(self.cluster)
 
     def on_update(self) -> None:
         if self.hosted:
@@ -147,7 +147,7 @@ class MailDomain(Document):
         if before and any(before.get(f) != self.get(f) for f in PUSHED_FIELDS):
             sync.push_update(self, "domains", self.stalwart_patch())
         if before and any(before.get(f) != self.get(f) for f in ROUTED_FIELDS):
-            egress.resync_cluster_after_commit(self.cluster)
+            push.resync_cluster_after_commit(self.cluster)
 
     def on_trash(self) -> None:
         for doctype in ("Mail Account", "Mail Group", "Mailing List"):
@@ -172,7 +172,7 @@ class MailDomain(Document):
     def after_delete(self) -> None:
         on_a_pool = self.egress_pool or frappe.db.get_value("Suite Tenant", self.tenant, "egress_pool")
         if on_a_pool or self.allow_relaying:
-            egress.resync_cluster_after_commit(self.cluster)
+            push.resync_cluster_after_commit(self.cluster)
 
     # --- Stalwart -----------------------------------------------------------------
 

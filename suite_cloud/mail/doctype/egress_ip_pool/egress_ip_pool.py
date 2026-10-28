@@ -9,7 +9,7 @@ from frappe.model.document import Document
 from frappe.utils import cint
 
 from suite_cloud.dns.resolver import verify_ptr_record
-from suite_cloud.mail.cluster import dns, egress, naming
+from suite_cloud.mail.cluster import dns, egress, naming, push
 from suite_cloud.mail.doctype.stalwart_node.stalwart_node import validate_ip
 
 POOL_NAME = re.compile(r"^[a-z0-9]{1,8}$")
@@ -110,7 +110,7 @@ class EgressIPPool(Document):
     def after_delete(self) -> None:
         cluster = self.get_cluster()
         dns.sync_spf_record(cluster)
-        egress.resync_cluster_after_commit(cluster.name)
+        push.resync_cluster_after_commit(cluster.name)
 
     # --- actions ----------------------------------------------------------------
 

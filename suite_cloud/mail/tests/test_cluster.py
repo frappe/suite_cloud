@@ -1,11 +1,12 @@
 import json
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import CallbackManager
 
 from suite_cloud.mail.cluster import dns, plan
+from suite_cloud.mail.stalwart.errors import StalwartUnavailableError
 from suite_cloud.mail.tests.fixtures import (
     ROOT_DOMAIN,
     configure_settings,
@@ -43,34 +44,35 @@ class TestStalwartCluster(IntegrationTestCase):
         planned.assert_not_called()
         self.assertLess(stalwart_cluster.SYNC_CONFIG_WAIT, stalwart_cluster.PUSH_TIMEOUT)
 
-    def test_a_push_plans_from_a_fresh_snapshot_only_when_it_loses_nothing(self) -> None:
+    def test_a_queued_push_locks_before_it_reads_and_keeps_its_failure(self) -> None:
+        from suite_cloud.mail.cluster import push
+        from suite_cloud.mail.doctype.stalwart_cluster import stalwart_cluster
+
         cluster = make_cluster()
         cluster.db_set("status", "Active")
-        db = frappe.db
-        cases = {
-            "nothing pending": (0, False, True),
-            "writes": (3, False, False),
-            "queued job": (0, True, False),
-        }
-        for name, (writes, queued, refreshed) in cases.items():
-            after_commit = CallbackManager()
-            if queued:
-                after_commit.add(lambda: None)
-            with (
-                self.subTest(name),
-                patch.object(db, "transaction_writes", writes),
-                patch.object(db, "before_commit", CallbackManager()),
-                patch.object(db, "after_commit", after_commit),
-            ):
-                with (
-                    patch.object(db, "rollback") as rollback,
-                    patch.object(cluster, "reload") as reload,
-                    patch.object(plan, "cluster_plan", return_value=[]),
-                    patch.object(cluster, "get_client"),
-                    patch.object(cluster, "bump_config_version"),
-                ):
-                    cluster.push_config()
-                self.assertEqual((rollback.called, reload.called), (refreshed, refreshed))
+        steps = []
+
+        @contextmanager
+        def recording_lock(name, wait=stalwart_cluster.PUSH_TIMEOUT):
+            steps.append("lock")
+            yield
+
+        load = frappe.get_doc
+        with (
+            patch.object(stalwart_cluster, "push_lock", recording_lock),
+            patch("frappe.get_doc", side_effect=lambda *args: steps.append("read") or load(*args)),
+            patch.object(plan, "cluster_plan", side_effect=StalwartUnavailableError("cluster down")),
+        ):
+            self.assertRaises(StalwartUnavailableError, push.resync_cluster_job, cluster.name)
+        self.assertEqual(steps[:2], ["lock", "read"])
+        self.assertIn(
+            "cluster down", frappe.db.get_value("Stalwart Cluster", cluster.name, "last_config_sync_error")
+        )
+
+        # The next push that goes through clears it.
+        with patch.object(plan, "cluster_plan", return_value=[]), patch.object(type(cluster), "get_client"):
+            frappe.get_doc("Stalwart Cluster", cluster.name).push_config()
+        self.assertIsNone(frappe.db.get_value("Stalwart Cluster", cluster.name, "last_config_sync_error"))
 
     def test_a_push_that_outlived_its_lock_is_logged_not_raised(self) -> None:
         from suite_cloud.mail.doctype.stalwart_cluster import stalwart_cluster
@@ -82,15 +84,26 @@ class TestStalwartCluster(IntegrationTestCase):
             stalwart_cluster.release_push_lock(lock, "c1")
         log_error.assert_called_once()
 
-    def test_desk_changes_queue_their_push_on_the_long_queue(self) -> None:
-        from suite_cloud.mail.cluster import egress
+    def test_desk_changes_queue_one_waiting_push_per_cluster(self) -> None:
+        from suite_cloud.mail.cluster import push
 
         frappe.flags.do_not_enqueue = False
+        self.addCleanup(frappe.cache.delete, push.pending_push_key("c1"))
+        frappe.cache.delete(push.pending_push_key("c1"))
+        queued = len(frappe.db.after_commit)
+        push.resync_cluster_after_commit("c1")
+        self.assertEqual(len(frappe.db.after_commit), queued + 1)  # only once the save commits
+        frappe.db.after_commit.cut(queued)
+
         with patch("frappe.enqueue") as enqueue:
-            egress.resync_cluster_after_commit("c1")
-        enqueue.assert_called_once_with(
-            egress.resync_cluster_job, cluster="c1", queue="long", enqueue_after_commit=True
-        )
+            push.queue_cluster_push("c1")
+            push.queue_cluster_push("c1")  # a push still waiting covers this change too
+        enqueue.assert_called_once_with(push.resync_cluster_job, cluster="c1", queue="long")
+
+        frappe.cache.delete(push.pending_push_key("c1"))  # what the job does when it starts
+        with patch("frappe.enqueue") as enqueue:
+            push.queue_cluster_push("c1")
+        enqueue.assert_called_once()
 
     def test_tests_reach_only_test_hosts(self) -> None:
         from suite_cloud.mail.stalwart import get_client

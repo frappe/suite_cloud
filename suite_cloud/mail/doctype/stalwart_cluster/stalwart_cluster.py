@@ -2,6 +2,8 @@
 # For license information, please see license.txt
 
 import re
+from collections.abc import Iterator
+from contextlib import contextmanager
 
 import frappe
 from frappe import _
@@ -9,7 +11,7 @@ from frappe.model.document import Document
 from frappe.utils import now
 from redis.exceptions import LockNotOwnedError
 
-from suite_cloud.mail.cluster import bootstrap, dns, egress, naming, plan, reconcile
+from suite_cloud.mail.cluster import bootstrap, dns, egress, naming, plan, push, reconcile
 from suite_cloud.mail.stalwart import forget_sessions, get_admin_client, get_client
 from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
@@ -65,6 +67,7 @@ class StalwartCluster(Document):
         is_default: DF.Check
         label: DF.Data | None
         last_config_sync_at: DF.Datetime | None
+        last_config_sync_error: DF.SmallText | None
         metrics_password: DF.Password | None
         quota_backstop_per_day: DF.Int
         quota_hook_token: DF.Password | None
@@ -131,7 +134,7 @@ class StalwartCluster(Document):
         elif not before.enabled and self.enabled and self.status == "Disabled":
             self.db_set("status", "Active")
         if before.default_egress_pool != self.default_egress_pool:
-            egress.resync_cluster_after_commit(self.name)
+            push.resync_cluster_after_commit(self.name)
 
     def on_trash(self) -> None:
         if self.is_default and frappe.db.exists("Stalwart Cluster", {"name": ["!=", self.name]}):
@@ -302,30 +305,23 @@ class StalwartCluster(Document):
         return self.push_config(wait=SYNC_CONFIG_WAIT)
 
     def push_config(self, wait: float = PUSH_TIMEOUT) -> dict:
-        """The sync itself; also run, in a job, on behalf of documents whose change alters the
-        plan. One push per cluster at a time, so a push that started later never loses to an older
-        plan finishing after it; one that waits longer than ``wait`` seconds refuses."""
+        """The sync itself, under the cluster's push lock; a desk change reaches it through
+        ``push.resync_cluster_after_commit``."""
 
-        lock = frappe.cache.lock(
-            f"{frappe.local.site}:suite_cloud:push-config:{self.name}", timeout=PUSH_TIMEOUT
-        )
-        if not lock.acquire(blocking_timeout=wait):
-            frappe.throw(
-                _("Another configuration push to {0} is running; try again in a minute.").format(self.name)
-            )
-        try:
-            db = frappe.db
-            if not (db.transaction_writes or len(db.before_commit) or len(db.after_commit)):
-                # Nothing of the caller's to lose: a fresh snapshot sees what committed during the wait.
-                db.rollback()
-                self.reload()
-            rendered = plan.cluster_plan(self)
-            result = self.get_client().apply(rendered)
-            self.get_client().reload_settings()
-        finally:
-            release_push_lock(lock, self.name)
+        with push_lock(self.name, wait):
+            return self.apply_config()
+
+    def apply_config(self) -> dict:
+        """Pushes the plan; the caller holds the push lock."""
+
+        rendered = plan.cluster_plan(self)
+        result = self.get_client().apply(rendered)
+        self.get_client().reload_settings()
         self.bump_config_version(rendered)
-        self.db_set({"last_config_sync_at": now(), "drift_report": None}, update_modified=False)
+        self.db_set(
+            {"last_config_sync_at": now(), "last_config_sync_error": None, "drift_report": None},
+            update_modified=False,
+        )
         return {"created": result.created, "updated": result.updated, "unchanged": result.unchanged}
 
     @frappe.whitelist()
@@ -415,6 +411,22 @@ class StalwartCluster(Document):
         self.agent_secret = frappe.generate_hash(length=40)
         self.save(ignore_permissions=True)
         return upgrade_agents(self) if is_telemetry_enabled() else []
+
+
+@contextmanager
+def push_lock(cluster: str, wait: float = PUSH_TIMEOUT) -> Iterator[None]:
+    """One config push per cluster at a time, so a push that started later never loses to an older
+    plan finishing after it. Refuses after ``wait`` seconds."""
+
+    lock = frappe.cache.lock(f"{frappe.local.site}:suite_cloud:push-config:{cluster}", timeout=PUSH_TIMEOUT)
+    if not lock.acquire(blocking_timeout=wait):
+        frappe.throw(
+            _("Another configuration push to {0} is running; try again in a minute.").format(cluster)
+        )
+    try:
+        yield
+    finally:
+        release_push_lock(lock, cluster)
 
 
 def release_push_lock(lock, cluster: str) -> None:

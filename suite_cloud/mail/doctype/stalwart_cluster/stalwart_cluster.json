@@ -69,6 +69,7 @@
   "bootstrap_node",
   "config_version",
   "last_config_sync_at",
+  "last_config_sync_error",
   "column_break_config",
   "drift_report",
   "section_break_wysw",
@@ -483,6 +484,14 @@
    "read_only": 1
   },
   {
+   "description": "Why the last queued push failed, with its time. Cleared by the next push that goes through.",
+   "fieldname": "last_config_sync_error",
+   "fieldtype": "Small Text",
+   "label": "Last Config Sync Error",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
    "fieldname": "column_break_config",
    "fieldtype": "Column Break"
   },
@@ -549,7 +558,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-10-28 12:00:00.000000",
+ "modified": "2026-10-28 20:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",
