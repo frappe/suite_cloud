@@ -55,17 +55,16 @@ def hook_operation(cluster: Document, enabled: bool = True) -> dict:
 
 
 def backstop_operation(cluster: Document, enabled: bool = True) -> dict:
-    """The cluster's cap per signed-in account and UTC day, checked at MAIL FROM; 0 disables it.
-    Without ``match`` every unauthenticated session would share one bucket, since Stalwart
-    hashes an empty login too."""
+    """The cluster's cap per signed-in account and UTC day, checked at MAIL FROM. Without
+    ``match`` every unauthenticated session would share one bucket, since Stalwart hashes an
+    empty login too."""
 
-    per_day = cint(cluster.quota_backstop_per_day)
     throttle = {
-        "enable": enabled and per_day > 0,
+        "enable": enabled,
         "description": BACKSTOP_DESCRIPTION,
         "key": as_set(["authenticatedAs"]),
         "match": SIGNED_IN,
-        "rate": {"count": max(per_day, 1), "period": DAY_MS},  # a disabled throttle keeps a valid rate
+        "rate": {"count": cint(cluster.quota_backstop_per_day), "period": DAY_MS},
     }
     return {
         "@type": "upsert",

@@ -10,7 +10,7 @@ from frappe.utils import now_datetime
 from suite_cloud.api.mail import accounts, domains
 from suite_cloud.api.telemetry import quota as quota_api
 from suite_cloud.api.tenant import InvalidInputError
-from suite_cloud.mail.cluster import plan, quota
+from suite_cloud.mail.cluster import plan, push, quota
 from suite_cloud.mail.doctype.mail_send_usage import mail_send_usage
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
     current_periods,
@@ -21,7 +21,11 @@ from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
 )
 from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
-from suite_cloud.patches.v1_0 import fill_quota_hook_tokens, fill_send_limit_defaults
+from suite_cloud.patches.v1_0 import (
+    fill_cluster_backstop_default,
+    fill_quota_hook_tokens,
+    fill_send_limit_defaults,
+)
 from suite_cloud.telemetry import TELEMETRY_USER
 from suite_cloud.telemetry.agent.status import CACHE_KEY
 from suite_cloud.tests.fixtures import ROOT_DOMAIN
@@ -401,13 +405,13 @@ class TestQuotaPlan(SendingLimitsTestCase):
         self.assertEqual(throttle["match"], quota.SIGNED_IN)
         self.assertEqual(
             (throttle["enable"], throttle["key"], throttle["rate"]),
-            (True, {"authenticatedAs": True}, {"count": 5000, "period": 86_400_000}),
+            (True, {"authenticatedAs": True}, {"count": 10000, "period": 86_400_000}),
         )
 
-        # The cap is the cluster's; 0 turns the throttle off rather than leaving it behind.
-        self.cluster.db_set("quota_backstop_per_day", 0)
-        disabled = quota.backstop_operation(self.cluster)["value"]["quota-backstop"]
-        self.assertEqual((disabled["enable"], disabled["rate"]["count"]), (False, 1))
+        # The cap is the cluster's and is never off: nothing else caps an account while the Agents are down.
+        cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
+        cluster.quota_backstop_per_day = 0
+        self.assertRaisesRegex(frappe.ValidationError, "at least 1", cluster.save, ignore_permissions=True)
         self.cluster.db_set("quota_backstop_per_day", 20000)
         self.assertEqual(
             quota.backstop_operation(self.cluster)["value"]["quota-backstop"]["rate"]["count"], 20000
@@ -416,6 +420,16 @@ class TestQuotaPlan(SendingLimitsTestCase):
         # Stalwart adds its default throttles only when none exist, so recovery leaves ours out.
         self.assertIn("MtaHook", objects(recovery))
         self.assertNotIn("MtaInboundThrottle", objects(recovery))
+
+    def test_the_patch_turns_the_backstop_on_without_a_config_push(self) -> None:
+        self.cluster.db_set("quota_backstop_per_day", 0)
+        with patch.object(push, "resync_cluster_after_commit") as resync:
+            fill_cluster_backstop_default.execute()
+            fill_cluster_backstop_default.execute()  # a second run finds nothing to fill
+        self.assertEqual(
+            frappe.db.get_value("Stalwart Cluster", self.cluster.name, "quota_backstop_per_day"), 10000
+        )
+        resync.assert_not_called()
 
     def test_the_patch_gives_older_clusters_a_token_and_keeps_existing_ones(self) -> None:
         frappe.set_user("Administrator")

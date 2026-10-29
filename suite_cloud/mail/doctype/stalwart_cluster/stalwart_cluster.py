@@ -8,7 +8,7 @@ from contextlib import contextmanager
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now
+from frappe.utils import cint, now
 from redis.exceptions import LockNotOwnedError
 
 from suite_cloud.mail.cluster import bootstrap, dns, egress, naming, plan, push, reconcile
@@ -114,6 +114,7 @@ class StalwartCluster(Document):
         self.validate_stores()
         self.validate_default()
         self.validate_egress_pool()
+        self.validate_backstop()
 
     def validate_egress_pool(self) -> None:
         if (
@@ -121,6 +122,12 @@ class StalwartCluster(Document):
             and frappe.db.get_value("Egress IP Pool", self.default_egress_pool, "cluster") != self.name
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.default_egress_pool))
+
+    def validate_backstop(self) -> None:
+        """The backstop is what caps an account while the Agents are down, so it is never off."""
+
+        if cint(self.quota_backstop_per_day) < 1:
+            frappe.throw(_("Backstop Messages per Day must be at least 1."))
 
     def after_insert(self) -> None:
         dns.sync_spf_record(self)
