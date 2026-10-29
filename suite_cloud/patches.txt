@@ -30,3 +30,4 @@ suite_cloud.patches.v1_0.name_records_with_uuid7
 suite_cloud.patches.v1_0.fill_quota_hook_tokens
 suite_cloud.patches.v1_0.move_agent_auth_to_clusters
 suite_cloud.patches.v1_0.fill_send_usage_retention_default
+suite_cloud.patches.v1_0.fill_send_limit_defaults

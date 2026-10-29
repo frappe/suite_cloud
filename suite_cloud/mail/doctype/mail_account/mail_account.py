@@ -104,14 +104,12 @@ class MailAccount(QuotaHolder, Document):
         self.new_password = None
 
     def validate_send_limits(self) -> None:
-        """Recipients per UTC day and month; 0 means no limit, so a negative one means nothing."""
+        """Every account has a limit: at least 1 recipient per UTC day and month."""
 
         for field in ("daily_send_limit", "monthly_send_limit"):
-            if (value := cint(self.get(field))) < 0:
+            if (value := cint(self.get(field))) < 1:
                 frappe.throw(
-                    _("{0} must be 0 (no limit) or more, not {1}.").format(
-                        _(self.meta.get_label(field)), value
-                    ),
+                    _("{0} must be at least 1, not {1}.").format(_(self.meta.get_label(field)), value),
                     frappe.ValidationError,
                 )
 

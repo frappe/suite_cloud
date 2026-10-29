@@ -154,17 +154,16 @@
    "description": "Limits on outgoing mail. Applied about one minute after save.",
    "fieldname": "sending_limits_section",
    "fieldtype": "Section Break",
-   "label": "Sending Limits",
-   "collapsible": 1,
-   "collapsible_depends_on": "eval:doc.daily_send_limit || doc.monthly_send_limit"
+   "label": "Sending Limits"
   },
   {
    "default": "2000",
-   "description": "Recipients per UTC day. A message to 50 recipients counts as 50. 0 means no limit.",
+   "description": "Recipients per UTC day. A message to 50 recipients counts as 50.",
    "fieldname": "daily_send_limit",
    "fieldtype": "Int",
    "label": "Daily Send Limit",
-   "non_negative": 1
+   "non_negative": 1,
+   "reqd": 1
   },
   {
    "fieldname": "column_break_sending_limits",
@@ -172,11 +171,12 @@
   },
   {
    "default": "10000",
-   "description": "Recipients per UTC month. 0 means no limit.",
+   "description": "Recipients per UTC month.",
    "fieldname": "monthly_send_limit",
    "fieldtype": "Int",
    "label": "Monthly Send Limit",
-   "non_negative": 1
+   "non_negative": 1,
+   "reqd": 1
   },
   {
    "fieldname": "quotas_section",

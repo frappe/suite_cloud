@@ -108,8 +108,8 @@ def create_account(
     monthly_send_limit: int | None = None,
 ) -> dict:
     """``disable_receiving`` makes the account send-only: mail addressed to it bounces. The send
-    limits count recipients per UTC day and month; left out, the DocType defaults apply, and 0
-    means no limit."""
+    limits count recipients per UTC day and month, at least 1; left out, the DocType defaults
+    apply."""
 
     validate_password(password)
 
@@ -175,7 +175,7 @@ def update_account(
     """``quotas`` replaces the other limits (``{}`` lifts them all); the disk quota stays unless
     ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it, and 0 lifts it. ``disable_receiving``
     makes the account send-only or lets it receive again; left out, it stays as it is. So do the
-    send limits, where 0 lifts one."""
+    send limits."""
 
     doc = owned("Mail Account", email)
     for field, value in {
