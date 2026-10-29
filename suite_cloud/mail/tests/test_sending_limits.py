@@ -265,7 +265,7 @@ class TestUsageApi(SendingLimitsTestCase):
         payload = accounts.get_account("alice@acme.com")
         self.assertEqual(
             (payload["daily_send_limit"], payload["monthly_send_limit"], payload["send_usage"]),
-            (100, 0, usage),
+            (100, 10000, usage),
         )
         listed = {item["email"]: item for item in accounts.list_accounts()["items"]}
         self.assertEqual(listed["alice@acme.com"]["send_usage"], usage)
@@ -305,6 +305,12 @@ class TestUsageApi(SendingLimitsTestCase):
 
 
 class TestTenantSendLimits(SendingLimitsTestCase):
+    def test_a_new_account_gets_the_default_limits_unless_the_tenant_lifts_them(self) -> None:
+        created = accounts.create_account("dave@acme.com", "secret-pw")
+        self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (2000, 10000))
+        lifted = accounts.create_account("erin@acme.com", "secret-pw", monthly_send_limit=0)
+        self.assertEqual((lifted["daily_send_limit"], lifted["monthly_send_limit"]), (2000, 0))
+
     def test_tenants_set_and_lift_the_limits(self) -> None:
         updated = accounts.update_account("bob@acme.com", monthly_send_limit=2000)
         self.assertEqual((updated["daily_send_limit"], updated["monthly_send_limit"]), (100, 2000))

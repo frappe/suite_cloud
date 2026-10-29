@@ -64,7 +64,7 @@ An account's disk quota is whatever the tenant sets: `disk_quota_gb` of 0, or no
 
 ### Send limits
 
-`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50, and 0 means no limit. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about a minute. `send_usage` is what the account sent today and this month, in recipients, and how many of its messages were refused over a limit (`refused_day`, `refused_month`), as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits; `update_account` leaves out what it is not given.
+`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50, and 0 means no limit. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about a minute. `send_usage` is what the account sent today and this month, in recipients, and how many of its messages were refused over a limit (`refused_day`, `refused_month`), as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits. A new account gets a daily limit of 2000 and a monthly limit of 10000 unless `create_account` sets or lifts them; `update_account` leaves out what it is not given.
 
 ### Aliases
 
@@ -129,7 +129,7 @@ Answers the account's history, newest first, as far back as Suite Cloud keeps it
 | `locale` | string | `en-US` | One of `get_account_options` |
 | `time_zone` | string | | One of `get_account_options` |
 | `disable_receiving` | boolean | `false` | Send-only: the account logs in and sends, and mail addressed to it bounces |
-| `daily_send_limit`, `monthly_send_limit` | integer | 0 | Recipients per UTC day and month; 0 means no limit. See send limits |
+| `daily_send_limit`, `monthly_send_limit` | integer | 2000, 10000 | Recipients per UTC day and month; 0 means no limit. See send limits |
 
 Answers 201 with the account object plus `app_password`, the password the tenant uses for the account's mail access. It is returned only here; `rotate_app_password` issues a fresh one. Suite Cloud stores neither the app password nor the account's own password. An inactive domain or a reached limit is a 422; a taken address is a 409; an unknown group or list is a 404.
 

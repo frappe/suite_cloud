@@ -159,7 +159,7 @@
    "collapsible_depends_on": "eval:doc.daily_send_limit || doc.monthly_send_limit"
   },
   {
-   "default": "0",
+   "default": "2000",
    "description": "Recipients per UTC day. A message to 50 recipients counts as 50. 0 means no limit.",
    "fieldname": "daily_send_limit",
    "fieldtype": "Int",
@@ -171,7 +171,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "0",
+   "default": "10000",
    "description": "Recipients per UTC month. 0 means no limit.",
    "fieldname": "monthly_send_limit",
    "fieldtype": "Int",

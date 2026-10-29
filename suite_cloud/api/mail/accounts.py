@@ -104,11 +104,12 @@ def create_account(
     locale: str | None = None,
     time_zone: str | None = None,
     disable_receiving: bool = False,
-    daily_send_limit: int = 0,
-    monthly_send_limit: int = 0,
+    daily_send_limit: int | None = None,
+    monthly_send_limit: int | None = None,
 ) -> dict:
     """``disable_receiving`` makes the account send-only: mail addressed to it bounces. The send
-    limits count recipients per UTC day and month; 0 means no limit."""
+    limits count recipients per UTC day and month; left out, the DocType defaults apply, and 0
+    means no limit."""
 
     validate_password(password)
 
