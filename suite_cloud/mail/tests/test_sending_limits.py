@@ -405,7 +405,7 @@ class TestQuotaPlan(SendingLimitsTestCase):
         self.assertEqual(throttle["match"], quota.SIGNED_IN)
         self.assertEqual(
             (throttle["enable"], throttle["key"], throttle["rate"]),
-            (True, {"authenticatedAs": True}, {"count": 10000, "period": 86_400_000}),
+            (True, {"authenticatedAs": True}, {"count": 2000, "period": 86_400_000}),
         )
 
         # The cap is the cluster's and is never off: nothing else caps an account while the Agents are down.
@@ -427,7 +427,7 @@ class TestQuotaPlan(SendingLimitsTestCase):
             fill_cluster_backstop_default.execute()
             fill_cluster_backstop_default.execute()  # a second run finds nothing to fill
         self.assertEqual(
-            frappe.db.get_value("Stalwart Cluster", self.cluster.name, "quota_backstop_per_day"), 10000
+            frappe.db.get_value("Stalwart Cluster", self.cluster.name, "quota_backstop_per_day"), 2000
         )
         resync.assert_not_called()
 

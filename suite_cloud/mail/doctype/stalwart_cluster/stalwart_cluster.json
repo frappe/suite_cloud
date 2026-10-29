@@ -440,7 +440,7 @@
    "label": "Sending Limits"
   },
   {
-   "default": "10000",
+   "default": "2000",
    "description": "Most messages any account can send per UTC day. Keep it above the highest Daily Send Limit.",
    "fieldname": "quota_backstop_per_day",
    "fieldtype": "Int",
