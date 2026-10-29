@@ -9,7 +9,7 @@ from frappe.utils import now_datetime
 
 from suite_cloud.api.mail import accounts, domains
 from suite_cloud.api.telemetry import quota as quota_api
-from suite_cloud.api.tenant import InvalidInputError
+from suite_cloud.api.tenant import InvalidInputError, SendLimitsNotAllowedError
 from suite_cloud.mail.cluster import plan, push, quota
 from suite_cloud.mail.doctype.mail_send_usage import mail_send_usage
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
@@ -22,9 +22,9 @@ from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
 from suite_cloud.mail.tests.fixtures import make_cluster, make_node
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
 from suite_cloud.patches.v1_0 import (
-    fill_cluster_backstop_default,
     fill_quota_hook_tokens,
     fill_send_limit_defaults,
+    rename_backstop_to_max_daily_send_limit,
 )
 from suite_cloud.telemetry import TELEMETRY_USER
 from suite_cloud.telemetry.agent.status import CACHE_KEY
@@ -49,6 +49,8 @@ class SendingLimitsTestCase(TenantApiTestCase):
         super().setUp()
         domains.create_domain("acme.com")
         self.verify("acme.com")
+        self.tenant.db_set("allow_custom_send_limits", 1)
+        self.act_as(self.tenant)
         for name in ("alice", "bob", "carol"):
             accounts.create_account(f"{name}@acme.com", "secret-pw", daily_send_limit=100)
         frappe.set_user("Administrator")
@@ -309,26 +311,33 @@ class TestUsageApi(SendingLimitsTestCase):
 
 
 class TestTenantSendLimits(SendingLimitsTestCase):
-    def test_a_new_account_gets_its_cluster_s_default_limits_unless_the_tenant_sets_them(self) -> None:
+    def test_a_new_account_gets_its_tenant_s_default_limits_unless_the_tenant_sets_them(self) -> None:
         created = accounts.create_account("dave@acme.com", "secret-pw")
         self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (2000, 10000))
 
-        self.cluster.db_set({"default_daily_send_limit": 300, "default_monthly_send_limit": 4000})
+        self.tenant.db_set({"default_daily_send_limit": 300, "default_monthly_send_limit": 4000})
         created = accounts.create_account("erin@acme.com", "secret-pw", monthly_send_limit=500)
         self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (300, 500))
         created = accounts.create_account("fay@acme.com", "secret-pw", daily_send_limit=0)
         self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (300, 4000))
 
-    def test_tenants_set_the_limits_but_cannot_lift_them(self) -> None:
+    def test_tenants_set_the_limits_within_the_cluster_s_max_but_cannot_lift_them(self) -> None:
         updated = accounts.update_account("bob@acme.com", monthly_send_limit=2000)
         self.assertEqual((updated["daily_send_limit"], updated["monthly_send_limit"]), (100, 2000))
         self.assertRaises(frappe.ValidationError, accounts.update_account, "bob@acme.com", daily_send_limit=0)
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "Monthly Send Limit must be between 1 and the cluster's max of 10000, not 10001",
+            accounts.update_account,
+            "bob@acme.com",
+            monthly_send_limit=10001,
+        )
         # Every account has a limit, so create refuses a negative one too, naming the field and the value.
         for limits in ({"daily_send_limit": -1}, {"monthly_send_limit": -5}):
             with self.subTest(**limits):
                 self.assertRaisesRegex(
                     frappe.ValidationError,
-                    f"Send Limit must be at least 1, not {next(iter(limits.values()))}\\.",
+                    f"Send Limit must be between 1 and the cluster's max of \\d+, not {next(iter(limits.values()))}\\.",
                     accounts.create_account,
                     "dave@acme.com",
                     "secret-pw",
@@ -336,11 +345,34 @@ class TestTenantSendLimits(SendingLimitsTestCase):
                 )
         self.assertFalse(frappe.db.exists("Mail Account", "dave@acme.com"))
 
-    def test_the_patch_fills_unset_limits_from_the_cluster_and_the_agents_pull_them(self) -> None:
+    def test_a_tenant_passes_a_limit_only_once_an_operator_allowed_it(self) -> None:
+        self.tenant.db_set("allow_custom_send_limits", 0)
+        self.act_as(self.tenant)
+        for call in (
+            lambda: accounts.create_account("dave@acme.com", "secret-pw", daily_send_limit=50),
+            lambda: accounts.update_account("bob@acme.com", monthly_send_limit=50),
+        ):
+            self.assertRaisesRegex(SendLimitsNotAllowedError, "may not set send limits", call)
+        self.assertFalse(frappe.db.exists("Mail Account", "dave@acme.com"))
+
+        created = accounts.create_account("dave@acme.com", "secret-pw")
+        self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (2000, 10000))
+        self.assertEqual(accounts.update_account("bob@acme.com", display_name="Bob")["daily_send_limit"], 100)
+
+    def test_a_tenant_s_defaults_stay_within_the_cluster_s_max(self) -> None:
+        frappe.set_user("Administrator")
+        for value in (10001, 0):
+            tenant = frappe.get_doc("Suite Tenant", self.tenant.name)
+            tenant.default_monthly_send_limit = value
+            self.assertRaisesRegex(
+                frappe.ValidationError, f"between 1 and the cluster's max of 10000, not {value}", tenant.save
+            )
+
+    def test_the_patch_fills_unset_limits_from_the_tenant_and_the_agents_pull_them(self) -> None:
         cursor = self.pull()["next_version"]
         fields = list(fill_send_limit_defaults.FIELDS)
         frappe.db.set_value("Mail Account", "bob@acme.com", dict.fromkeys(fields, 0), update_modified=False)
-        self.cluster.db_set({"default_daily_send_limit": 300, "default_monthly_send_limit": 4000})
+        self.tenant.db_set({"default_daily_send_limit": 300, "default_monthly_send_limit": 4000})
 
         fill_send_limit_defaults.execute()
         fill_send_limit_defaults.execute()  # a second run finds nothing to fill
@@ -413,13 +445,13 @@ class TestQuotaPlan(SendingLimitsTestCase):
         )
 
         # The cap is the cluster's and is never off: nothing else caps an account while the Agents are down.
-        for field in ("quota_backstop_per_day", "default_daily_send_limit"):
+        for field in ("max_daily_send_limit", "max_monthly_send_limit"):
             cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
             cluster.set(field, 0)
             self.assertRaisesRegex(
                 frappe.ValidationError, "at least 1", cluster.save, ignore_permissions=True
             )
-        self.cluster.db_set("quota_backstop_per_day", 20000)
+        self.cluster.db_set("max_daily_send_limit", 20000)
         self.assertEqual(
             quota.backstop_operation(self.cluster)["value"]["quota-backstop"]["rate"]["count"], 20000
         )
@@ -429,12 +461,11 @@ class TestQuotaPlan(SendingLimitsTestCase):
         self.assertNotIn("MtaInboundThrottle", objects(recovery))
 
     def test_the_patch_turns_the_backstop_on_without_a_config_push(self) -> None:
-        self.cluster.db_set("quota_backstop_per_day", 0)
+        self.cluster.db_set("max_daily_send_limit", 0)
         with patch.object(push, "resync_cluster_after_commit") as resync:
-            fill_cluster_backstop_default.execute()
-            fill_cluster_backstop_default.execute()  # a second run finds nothing to fill
+            rename_backstop_to_max_daily_send_limit.execute()
         self.assertEqual(
-            frappe.db.get_value("Stalwart Cluster", self.cluster.name, "quota_backstop_per_day"), 2000
+            frappe.db.get_value("Stalwart Cluster", self.cluster.name, "max_daily_send_limit"), 2000
         )
         resync.assert_not_called()
 

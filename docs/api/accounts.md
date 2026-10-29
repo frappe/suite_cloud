@@ -64,7 +64,7 @@ An account's disk quota is whatever the tenant sets: `disk_quota_gb` of 0, or no
 
 ### Send limits
 
-`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50. Every account has both limits, each at least 1. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about a minute. `send_usage` is what the account sent today and this month, in recipients, and how many of its messages were refused over a limit (`refused_day`, `refused_month`), as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits. A new account starts at its cluster's default limits, 2000 per day and 10000 per month on a new cluster, unless `create_account` sets them; `update_account` leaves out what it is not given.
+`daily_send_limit` and `monthly_send_limit` cap the recipients the account may send to per UTC day and month; a message to 50 recipients counts as 50. Every account has both limits, each at least 1 and at most its cluster's max. Over a limit, the mail server refuses the message with `550 5.4.5`. A change applies within about a minute. `send_usage` is what the account sent today and this month, in recipients, and how many of its messages were refused over a limit (`refused_day`, `refused_month`), as the mail servers last reported it, up to a minute old. `create_account` and `update_account` take both limits. A new account starts at the tenant's default limits, which the [tenant object](tenant.md) shows, unless `create_account` sets them; `update_account` leaves out what it is not given. A tenant passes a limit only when an operator allowed it, `custom_send_limits` in the tenant object; otherwise the call is a 403.
 
 ### Aliases
 
@@ -129,13 +129,13 @@ Answers the account's history, newest first, as far back as Suite Cloud keeps it
 | `locale` | string | `en-US` | One of `get_account_options` |
 | `time_zone` | string | | One of `get_account_options` |
 | `disable_receiving` | boolean | `false` | Send-only: the account logs in and sends, and mail addressed to it bounces |
-| `daily_send_limit`, `monthly_send_limit` | integer | the cluster's defaults | Recipients per UTC day and month, at least 1. See send limits |
+| `daily_send_limit`, `monthly_send_limit` | integer | the tenant's defaults | Recipients per UTC day and month, at most the cluster's max. Needs `custom_send_limits`. See send limits |
 
-Answers 201 with the account object plus `app_password`, the password the tenant uses for the account's mail access. It is returned only here; `rotate_app_password` issues a fresh one. Suite Cloud stores neither the app password nor the account's own password. An inactive domain or a reached limit is a 422; a taken address is a 409; an unknown group or list is a 404.
+Answers 201 with the account object plus `app_password`, the password the tenant uses for the account's mail access. It is returned only here; `rotate_app_password` issues a fresh one. Suite Cloud stores neither the app password nor the account's own password. An inactive domain, a reached limit or a send limit over the cluster's max is a 422; a send limit the tenant may not set is a 403; a taken address is a 409; an unknown group or list is a 404.
 
 ## `update_account`
 
-Takes `email` and any of `display_name`, `description`, `disk_quota_gb`, `quotas`, `daily_send_limit`, `monthly_send_limit`, `locale`, `time_zone` and `disable_receiving`. Only the fields passed change. Returns the account object.
+Takes `email` and any of `display_name`, `description`, `disk_quota_gb`, `quotas`, `daily_send_limit`, `monthly_send_limit`, `locale`, `time_zone` and `disable_receiving`. Only the fields passed change. A send limit needs `custom_send_limits`. Returns the account object.
 
 ## `set_account_enabled`
 

@@ -81,9 +81,9 @@ class MailAccount(QuotaHolder, Document):
             assert_domain_live(domain)
         # Stalwart wants BCP 47 tags; POSIX-style names are a common slip.
         self.locale = (self.locale or "en-US").replace("_", "-")
-        self.validate_send_limits()
 
         tenant = frappe.get_cached_doc("Suite Tenant", self.tenant)
+        self.validate_send_limits(tenant)
         if self.is_new() and not self.flags.adopting:
             tenant.assert_can_add_account()
             account_credentials.apply_default_limits(self)
@@ -103,19 +103,25 @@ class MailAccount(QuotaHolder, Document):
             self.flags.password = self.new_password
         self.new_password = None
 
-    def validate_send_limits(self) -> None:
-        """Every account has a limit: at least 1 recipient per UTC day and month. A new account
-        starts at its cluster's defaults where the caller set none."""
+    def validate_send_limits(self, tenant: Document) -> None:
+        """Every account has a limit: at least 1 recipient per UTC day and month, at most the
+        cluster's max. A new account starts at its tenant's defaults where the caller set none."""
 
         if self.is_new():
-            cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
-            self.daily_send_limit = cint(self.daily_send_limit) or cluster.default_daily_send_limit
-            self.monthly_send_limit = cint(self.monthly_send_limit) or cluster.default_monthly_send_limit
+            self.daily_send_limit = cint(self.daily_send_limit) or tenant.default_daily_send_limit
+            self.monthly_send_limit = cint(self.monthly_send_limit) or tenant.default_monthly_send_limit
 
-        for field in ("daily_send_limit", "monthly_send_limit"):
-            if (value := cint(self.get(field))) < 1:
+        cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+        for field, maximum in (
+            ("daily_send_limit", cluster.max_daily_send_limit),
+            ("monthly_send_limit", cluster.max_monthly_send_limit),
+        ):
+            value = cint(self.get(field))
+            if value < 1 or value > maximum:
                 frappe.throw(
-                    _("{0} must be at least 1, not {1}.").format(_(self.meta.get_label(field)), value),
+                    _("{0} must be between 1 and the cluster's max of {1}, not {2}.").format(
+                        _(self.meta.get_label(field)), maximum, value
+                    ),
                     frappe.ValidationError,
                 )
 

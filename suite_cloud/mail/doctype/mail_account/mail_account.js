@@ -10,11 +10,11 @@ frappe.ui.form.on('Mail Account', {
 		frm.trigger('show_send_usage')
 	},
 
-	cluster(frm) {
-		// The cluster follows the domain; a new account starts at its default limits.
-		if (!frm.is_new() || !frm.doc.cluster) return
+	tenant(frm) {
+		// The tenant follows the domain; a new account starts at its default limits.
+		if (!frm.is_new() || !frm.doc.tenant) return
 		const fields = ['default_daily_send_limit', 'default_monthly_send_limit']
-		frappe.db.get_value('Stalwart Cluster', frm.doc.cluster, fields).then(({ message }) => {
+		frappe.db.get_value('Suite Tenant', frm.doc.tenant, fields).then(({ message }) => {
 			if (!frm.doc.daily_send_limit) frm.set_value('daily_send_limit', message.default_daily_send_limit)
 			if (!frm.doc.monthly_send_limit) frm.set_value('monthly_send_limit', message.default_monthly_send_limit)
 		})

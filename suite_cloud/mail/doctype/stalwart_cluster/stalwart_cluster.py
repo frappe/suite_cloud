@@ -56,10 +56,8 @@ class StalwartCluster(Document):
         config_version: DF.Int
         coordinator: DF.Literal["Disabled", "Default"]
         data_store: DF.Link
-        default_daily_send_limit: DF.Int
         default_domain: DF.Data | None
         default_egress_pool: DF.Link | None
-        default_monthly_send_limit: DF.Int
         dns_zone: DF.Link
         drift_report: DF.JSON | None
         enable_metrics: DF.Check
@@ -71,7 +69,8 @@ class StalwartCluster(Document):
         last_config_sync_at: DF.Datetime | None
         last_config_sync_error: DF.SmallText | None
         metrics_password: DF.Password | None
-        quota_backstop_per_day: DF.Int
+        max_daily_send_limit: DF.Int
+        max_monthly_send_limit: DF.Int
         quota_hook_token: DF.Password | None
         regions: DF.Table[StalwartClusterRegion]
         relay_password: DF.Password | None
@@ -126,10 +125,10 @@ class StalwartCluster(Document):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.default_egress_pool))
 
     def validate_send_limits(self) -> None:
-        """A new account starts at the defaults and the backstop caps it while the Agents are
-        down, so none of them is ever off."""
+        """The max limits cap every account and tenant default, and the daily one is also the
+        server's own cap while the Agents are down, so neither is ever off."""
 
-        for field in ("default_daily_send_limit", "default_monthly_send_limit", "quota_backstop_per_day"):
+        for field in ("max_daily_send_limit", "max_monthly_send_limit"):
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
 

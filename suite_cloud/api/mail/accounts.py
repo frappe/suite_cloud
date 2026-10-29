@@ -7,6 +7,7 @@ from frappe.utils import sbool
 from suite_cloud.api.mail import aliases
 from suite_cloud.api.tenant import (
     MEMBERSHIP_CAP,
+    SendLimitsNotAllowedError,
     as_alias_rows,
     as_list,
     current_tenant,
@@ -108,12 +109,13 @@ def create_account(
     monthly_send_limit: int | None = None,
 ) -> dict:
     """``disable_receiving`` makes the account send-only: mail addressed to it bounces. The send
-    limits count recipients per UTC day and month, at least 1; left out, the cluster's defaults
-    apply."""
+    limits count recipients per UTC day and month, up to the cluster's max; left out, the
+    tenant's defaults apply."""
 
     validate_password(password)
 
     tenant = current_tenant()
+    assert_may_set_send_limits(tenant, daily_send_limit, monthly_send_limit)
     # Everything the account depends on is resolved first: a refusal after the insert would leave
     # the Stalwart account behind while the database change rolls back.
     lists = [owned("Mailing List", email_) for email_ in as_list(mailing_lists, MEMBERSHIP_CAP)]
@@ -178,6 +180,7 @@ def update_account(
     send limits."""
 
     doc = owned("Mail Account", email)
+    assert_may_set_send_limits(current_tenant(), daily_send_limit, monthly_send_limit)
     for field, value in {
         "display_name": display_name,
         "description": description,
@@ -386,3 +389,10 @@ def delete_account(email: str) -> None:
     doc = owned("Mail Account", email)
     doc.delete(ignore_permissions=True)
     frappe.local.response["http_status_code"] = 204
+
+
+def assert_may_set_send_limits(tenant, daily: int | None, monthly: int | None) -> None:
+    """Refused rather than ignored, so the tenant learns of the setting."""
+
+    if (daily is not None or monthly is not None) and not tenant.allow_custom_send_limits:
+        raise SendLimitsNotAllowedError(_("This tenant may not set send limits."))

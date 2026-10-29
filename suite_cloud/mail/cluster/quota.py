@@ -64,7 +64,7 @@ def backstop_operation(cluster: Document, enabled: bool = True) -> dict:
         "description": BACKSTOP_DESCRIPTION,
         "key": as_set(["authenticatedAs"]),
         "match": SIGNED_IN,
-        "rate": {"count": cint(cluster.quota_backstop_per_day), "period": DAY_MS},
+        "rate": {"count": cint(cluster.max_daily_send_limit), "period": DAY_MS},
     }
     return {
         "@type": "upsert",

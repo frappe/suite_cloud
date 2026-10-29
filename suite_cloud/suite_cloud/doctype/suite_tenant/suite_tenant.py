@@ -37,8 +37,11 @@ class SuiteTenant(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
+        allow_custom_send_limits: DF.Check
         archived_at: DF.Datetime | None
         contact_email: DF.Data | None
+        default_daily_send_limit: DF.Int
+        default_monthly_send_limit: DF.Int
         egress_pool: DF.Link | None
         enabled: DF.Check
         max_accounts: DF.Int
@@ -84,6 +87,7 @@ class SuiteTenant(Document):
             assert_can_own(self.user)  # a missing owner is the mandatory check's to report
         self.validate_limits()
         self.validate_stalwart_cluster()
+        self.validate_send_limits()
 
     def validate_stalwart_cluster(self) -> None:
         """The cluster may be set, changed or cleared only while nothing of the tenant lives on it."""
@@ -230,6 +234,22 @@ class SuiteTenant(Document):
                 )
         if flt(self.max_disk_gb) < 0:
             frappe.throw(_("Total Disk Quota cannot be negative; 0 means unlimited."))
+
+    def validate_send_limits(self) -> None:
+        """A new account starts at these, so each is at least 1 and within the cluster's max."""
+
+        cluster = self.get_cluster() if self.stalwart_cluster else None
+        for field, maximum in (
+            ("default_daily_send_limit", cluster and cluster.max_daily_send_limit),
+            ("default_monthly_send_limit", cluster and cluster.max_monthly_send_limit),
+        ):
+            value = cint(self.get(field))
+            if value < 1 or (maximum and value > maximum):
+                frappe.throw(
+                    _("{0} must be between 1 and the cluster's max of {1}, not {2}.").format(
+                        _(self.meta.get_label(field)), maximum, value
+                    )
+                )
 
     def domain_count(self) -> int:
         return frappe.db.count("Mail Domain", {"tenant": self.name})
@@ -385,6 +405,9 @@ class SuiteTenant(Document):
                 "max_groups": self.max_groups,
                 "max_mailing_lists": self.max_mailing_lists,
                 "max_disk_gb": self.max_disk_gb,
+                "default_daily_send_limit": self.default_daily_send_limit,
+                "default_monthly_send_limit": self.default_monthly_send_limit,
+                "custom_send_limits": bool(self.allow_custom_send_limits),
             },
             "usage": {
                 "domains": self.domain_count(),
