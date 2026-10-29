@@ -63,8 +63,10 @@
   "relay_username",
   "relay_password",
   "sending_limits_section",
-  "quota_backstop_per_day",
+  "default_daily_send_limit",
+  "default_monthly_send_limit",
   "column_break_sending_limits",
+  "quota_backstop_per_day",
   "quota_hook_token",
   "config_tab",
   "bootstrap_node",
@@ -438,6 +440,24 @@
    "fieldname": "sending_limits_section",
    "fieldtype": "Section Break",
    "label": "Sending Limits"
+  },
+  {
+   "default": "2000",
+   "description": "Daily Send Limit of a new account on this cluster: recipients per UTC day.",
+   "fieldname": "default_daily_send_limit",
+   "fieldtype": "Int",
+   "label": "Default Daily Send Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "10000",
+   "description": "Monthly Send Limit of a new account on this cluster: recipients per UTC month.",
+   "fieldname": "default_monthly_send_limit",
+   "fieldtype": "Int",
+   "label": "Default Monthly Send Limit",
+   "non_negative": 1,
+   "reqd": 1
   },
   {
    "default": "2000",

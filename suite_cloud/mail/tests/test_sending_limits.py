@@ -309,18 +309,22 @@ class TestUsageApi(SendingLimitsTestCase):
 
 
 class TestTenantSendLimits(SendingLimitsTestCase):
-    def test_a_new_account_gets_the_default_limits_unless_the_tenant_sets_them(self) -> None:
+    def test_a_new_account_gets_its_cluster_s_default_limits_unless_the_tenant_sets_them(self) -> None:
         created = accounts.create_account("dave@acme.com", "secret-pw")
         self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (2000, 10000))
+
+        self.cluster.db_set({"default_daily_send_limit": 300, "default_monthly_send_limit": 4000})
         created = accounts.create_account("erin@acme.com", "secret-pw", monthly_send_limit=500)
-        self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (2000, 500))
+        self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (300, 500))
+        created = accounts.create_account("fay@acme.com", "secret-pw", daily_send_limit=0)
+        self.assertEqual((created["daily_send_limit"], created["monthly_send_limit"]), (300, 4000))
 
     def test_tenants_set_the_limits_but_cannot_lift_them(self) -> None:
         updated = accounts.update_account("bob@acme.com", monthly_send_limit=2000)
         self.assertEqual((updated["daily_send_limit"], updated["monthly_send_limit"]), (100, 2000))
         self.assertRaises(frappe.ValidationError, accounts.update_account, "bob@acme.com", daily_send_limit=0)
-        # Every account has a limit, so create refuses 0 and less too, naming the field and the value.
-        for limits in ({"daily_send_limit": 0}, {"monthly_send_limit": -5}):
+        # Every account has a limit, so create refuses a negative one too, naming the field and the value.
+        for limits in ({"daily_send_limit": -1}, {"monthly_send_limit": -5}):
             with self.subTest(**limits):
                 self.assertRaisesRegex(
                     frappe.ValidationError,
@@ -332,20 +336,20 @@ class TestTenantSendLimits(SendingLimitsTestCase):
                 )
         self.assertFalse(frappe.db.exists("Mail Account", "dave@acme.com"))
 
-    def test_the_patch_fills_unset_limits_and_the_agents_pull_them(self) -> None:
+    def test_the_patch_fills_unset_limits_from_the_cluster_and_the_agents_pull_them(self) -> None:
         cursor = self.pull()["next_version"]
-        unset = dict.fromkeys(fill_send_limit_defaults.FIELDS, 0)
-        frappe.db.set_value("Mail Account", "bob@acme.com", unset, update_modified=False)
+        fields = list(fill_send_limit_defaults.FIELDS)
+        frappe.db.set_value("Mail Account", "bob@acme.com", dict.fromkeys(fields, 0), update_modified=False)
+        self.cluster.db_set({"default_daily_send_limit": 300, "default_monthly_send_limit": 4000})
 
         fill_send_limit_defaults.execute()
         fill_send_limit_defaults.execute()  # a second run finds nothing to fill
 
-        fields = fill_send_limit_defaults.FIELDS
-        self.assertEqual(frappe.db.get_value("Mail Account", "bob@acme.com", fields), (2000, 10000))
+        self.assertEqual(frappe.db.get_value("Mail Account", "bob@acme.com", fields), (300, 4000))
         self.assertEqual(frappe.db.get_value("Mail Account", "alice@acme.com", fields), (100, 10000))
         pulled = {entry["account"]: entry for entry in self.pull(cursor)["limits"]}
         self.assertEqual(set(pulled), {"bob@acme.com"})
-        self.assertEqual((pulled["bob@acme.com"]["daily"], pulled["bob@acme.com"]["monthly"]), (2000, 10000))
+        self.assertEqual((pulled["bob@acme.com"]["daily"], pulled["bob@acme.com"]["monthly"]), (300, 4000))
 
     def test_tenants_read_an_account_s_daily_history(self) -> None:
         now = self.now
@@ -409,9 +413,12 @@ class TestQuotaPlan(SendingLimitsTestCase):
         )
 
         # The cap is the cluster's and is never off: nothing else caps an account while the Agents are down.
-        cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
-        cluster.quota_backstop_per_day = 0
-        self.assertRaisesRegex(frappe.ValidationError, "at least 1", cluster.save, ignore_permissions=True)
+        for field in ("quota_backstop_per_day", "default_daily_send_limit"):
+            cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
+            cluster.set(field, 0)
+            self.assertRaisesRegex(
+                frappe.ValidationError, "at least 1", cluster.save, ignore_permissions=True
+            )
         self.cluster.db_set("quota_backstop_per_day", 20000)
         self.assertEqual(
             quota.backstop_operation(self.cluster)["value"]["quota-backstop"]["rate"]["count"], 20000

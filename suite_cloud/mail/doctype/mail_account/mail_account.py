@@ -104,7 +104,13 @@ class MailAccount(QuotaHolder, Document):
         self.new_password = None
 
     def validate_send_limits(self) -> None:
-        """Every account has a limit: at least 1 recipient per UTC day and month."""
+        """Every account has a limit: at least 1 recipient per UTC day and month. A new account
+        starts at its cluster's defaults where the caller set none."""
+
+        if self.is_new():
+            cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+            self.daily_send_limit = cint(self.daily_send_limit) or cluster.default_daily_send_limit
+            self.monthly_send_limit = cint(self.monthly_send_limit) or cluster.default_monthly_send_limit
 
         for field in ("daily_send_limit", "monthly_send_limit"):
             if (value := cint(self.get(field))) < 1:

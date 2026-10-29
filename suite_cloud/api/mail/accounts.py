@@ -108,7 +108,7 @@ def create_account(
     monthly_send_limit: int | None = None,
 ) -> dict:
     """``disable_receiving`` makes the account send-only: mail addressed to it bounces. The send
-    limits count recipients per UTC day and month, at least 1; left out, the DocType defaults
+    limits count recipients per UTC day and month, at least 1; left out, the cluster's defaults
     apply."""
 
     validate_password(password)

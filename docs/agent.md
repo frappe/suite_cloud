@@ -75,7 +75,7 @@ Stalwart's Prometheus endpoint is part of the cluster plan. **Enable Prometheus 
 
 ## Sending limits
 
-A Mail Account's **Daily Send Limit** and **Monthly Send Limit** count recipients per UTC day and month; 0 means no limit. Stalwart enforces them through an MTA Hook at the data stage, for signed-in senders only, which covers SMTP submission and JMAP sends. The hook calls the Agent on the same node at `http://127.0.0.1:8095/hooks/quota` with the cluster's **Quota Hook Token**. The Agent reads only the context and the envelope of the request, never the message, and in one atomic step either adds the recipients to the account's day and month counters or, when that would pass a limit, counts the message as refused instead and answers `550 5.4.5` with the limit and when it resets.
+A Mail Account's **Daily Send Limit** and **Monthly Send Limit** count recipients per UTC day and month, each at least 1; a new account starts at its cluster's **Default Daily Send Limit** and **Default Monthly Send Limit**, 2,000 and 10,000 on a new cluster. Stalwart enforces them through an MTA Hook at the data stage, for signed-in senders only, which covers SMTP submission and JMAP sends. The hook calls the Agent on the same node at `http://127.0.0.1:8095/hooks/quota` with the cluster's **Quota Hook Token**. The Agent reads only the context and the envelope of the request, never the message, and in one atomic step either adds the recipients to the account's day and month counters or, when that would pass a limit, counts the message as refused instead and answers `550 5.4.5` with the limit and when it resets.
 
 | Cluster | Counters and limits |
 | --- | --- |

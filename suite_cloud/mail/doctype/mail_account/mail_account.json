@@ -157,8 +157,7 @@
    "label": "Sending Limits"
   },
   {
-   "default": "2000",
-   "description": "Recipients per UTC day. A message to 50 recipients counts as 50.",
+   "description": "Recipients per UTC day. A message to 50 recipients counts as 50. The cluster's default when left empty.",
    "fieldname": "daily_send_limit",
    "fieldtype": "Int",
    "label": "Daily Send Limit",
@@ -170,8 +169,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "10000",
-   "description": "Recipients per UTC month.",
+   "description": "Recipients per UTC month. The cluster's default when left empty.",
    "fieldname": "monthly_send_limit",
    "fieldtype": "Int",
    "label": "Monthly Send Limit",

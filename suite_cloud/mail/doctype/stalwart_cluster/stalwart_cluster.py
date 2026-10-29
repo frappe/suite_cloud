@@ -56,8 +56,10 @@ class StalwartCluster(Document):
         config_version: DF.Int
         coordinator: DF.Literal["Disabled", "Default"]
         data_store: DF.Link
+        default_daily_send_limit: DF.Int
         default_domain: DF.Data | None
         default_egress_pool: DF.Link | None
+        default_monthly_send_limit: DF.Int
         dns_zone: DF.Link
         drift_report: DF.JSON | None
         enable_metrics: DF.Check
@@ -114,7 +116,7 @@ class StalwartCluster(Document):
         self.validate_stores()
         self.validate_default()
         self.validate_egress_pool()
-        self.validate_backstop()
+        self.validate_send_limits()
 
     def validate_egress_pool(self) -> None:
         if (
@@ -123,11 +125,13 @@ class StalwartCluster(Document):
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.default_egress_pool))
 
-    def validate_backstop(self) -> None:
-        """The backstop is what caps an account while the Agents are down, so it is never off."""
+    def validate_send_limits(self) -> None:
+        """A new account starts at the defaults and the backstop caps it while the Agents are
+        down, so none of them is ever off."""
 
-        if cint(self.quota_backstop_per_day) < 1:
-            frappe.throw(_("Backstop Messages per Day must be at least 1."))
+        for field in ("default_daily_send_limit", "default_monthly_send_limit", "quota_backstop_per_day"):
+            if cint(self.get(field)) < 1:
+                frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
 
     def after_insert(self) -> None:
         dns.sync_spf_record(self)
