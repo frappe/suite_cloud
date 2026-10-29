@@ -8,7 +8,7 @@ from contextlib import contextmanager
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import now
+from frappe.utils import cint, now
 from redis.exceptions import LockNotOwnedError
 
 from suite_cloud.mail.cluster import bootstrap, dns, egress, naming, plan, push, reconcile
@@ -69,7 +69,8 @@ class StalwartCluster(Document):
         last_config_sync_at: DF.Datetime | None
         last_config_sync_error: DF.SmallText | None
         metrics_password: DF.Password | None
-        quota_backstop_per_day: DF.Int
+        max_daily_send_limit: DF.Int
+        max_monthly_send_limit: DF.Int
         quota_hook_token: DF.Password | None
         regions: DF.Table[StalwartClusterRegion]
         relay_password: DF.Password | None
@@ -114,6 +115,7 @@ class StalwartCluster(Document):
         self.validate_stores()
         self.validate_default()
         self.validate_egress_pool()
+        self.validate_send_limits()
 
     def validate_egress_pool(self) -> None:
         if (
@@ -121,6 +123,14 @@ class StalwartCluster(Document):
             and frappe.db.get_value("Egress IP Pool", self.default_egress_pool, "cluster") != self.name
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.default_egress_pool))
+
+    def validate_send_limits(self) -> None:
+        """The max limits cap every account and tenant default, and the daily one is also the
+        server's own cap while the Agents are down, so neither is ever off."""
+
+        for field in ("max_daily_send_limit", "max_monthly_send_limit"):
+            if cint(self.get(field)) < 1:
+                frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
 
     def after_insert(self) -> None:
         dns.sync_spf_record(self)

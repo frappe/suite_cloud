@@ -63,7 +63,8 @@
   "relay_username",
   "relay_password",
   "sending_limits_section",
-  "quota_backstop_per_day",
+  "max_daily_send_limit",
+  "max_monthly_send_limit",
   "column_break_sending_limits",
   "quota_hook_token",
   "config_tab",
@@ -440,12 +441,22 @@
    "label": "Sending Limits"
   },
   {
-   "default": "5000",
-   "description": "Most messages any account can send per UTC day. Keep it above the highest Daily Send Limit. 0 turns it off.",
-   "fieldname": "quota_backstop_per_day",
+   "default": "2000",
+   "description": "Ceiling for every account's Daily Send Limit and every tenant's default, in recipients per UTC day. Also the server's own cap per account while the Agents are down.",
+   "fieldname": "max_daily_send_limit",
    "fieldtype": "Int",
-   "label": "Backstop Messages per Day",
-   "non_negative": 1
+   "label": "Max Daily Send Limit",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
+   "default": "10000",
+   "description": "Ceiling for every account's Monthly Send Limit and every tenant's default, in recipients per UTC month.",
+   "fieldname": "max_monthly_send_limit",
+   "fieldtype": "Int",
+   "label": "Max Monthly Send Limit",
+   "non_negative": 1,
+   "reqd": 1
   },
   {
    "fieldname": "column_break_sending_limits",

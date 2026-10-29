@@ -52,6 +52,10 @@ class TenantAddressError(frappe.PermissionError):
     """The secret is valid but the request did not come from one of the tenant's allowed addresses."""
 
 
+class SendLimitsNotAllowedError(frappe.PermissionError):
+    """The call carries a send limit, which an operator has not allowed this tenant to set."""
+
+
 class InvalidInputError(frappe.ValidationError):
     """The request itself is malformed: a value the API could not even parse."""
 

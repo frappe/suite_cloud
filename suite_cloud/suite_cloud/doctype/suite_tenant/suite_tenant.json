@@ -28,6 +28,11 @@
   "column_break_limits",
   "max_groups",
   "max_mailing_lists",
+  "send_limits_section",
+  "default_daily_send_limit",
+  "default_monthly_send_limit",
+  "column_break_send_limits",
+  "allow_custom_send_limits",
   "usage_section",
   "mail_used_disk_bytes"
  ],
@@ -211,6 +216,46 @@
    "fieldname": "max_mailing_lists",
    "fieldtype": "Int",
    "label": "Max Mailing Lists",
+   "permlevel": 1,
+   "read_only_depends_on": "eval:!doc.stalwart_cluster"
+  },
+  {
+   "fieldname": "send_limits_section",
+   "fieldtype": "Section Break",
+   "label": "Sending Limits"
+  },
+  {
+   "default": "2000",
+   "description": "Daily Send Limit of a new account: recipients per UTC day, at most the cluster's max.",
+   "fieldname": "default_daily_send_limit",
+   "fieldtype": "Int",
+   "label": "Default Daily Send Limit",
+   "non_negative": 1,
+   "permlevel": 1,
+   "read_only_depends_on": "eval:!doc.stalwart_cluster",
+   "reqd": 1
+  },
+  {
+   "default": "10000",
+   "description": "Monthly Send Limit of a new account: recipients per UTC month, at most the cluster's max.",
+   "fieldname": "default_monthly_send_limit",
+   "fieldtype": "Int",
+   "label": "Default Monthly Send Limit",
+   "non_negative": 1,
+   "permlevel": 1,
+   "read_only_depends_on": "eval:!doc.stalwart_cluster",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_send_limits",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "Lets the tenant set an account's send limits through the API, up to the cluster's max. Off, the API refuses a limit.",
+   "fieldname": "allow_custom_send_limits",
+   "fieldtype": "Check",
+   "label": "Tenant May Set Send Limits",
    "permlevel": 1,
    "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
