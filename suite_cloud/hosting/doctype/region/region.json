@@ -17,7 +17,7 @@
   "hosting_section",
   "proxy_zone",
   "column_break_hosting",
-  "stalwart_region"
+  "mail_region"
  ],
  "fields": [
   {
@@ -100,10 +100,11 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Picks the mail cluster for tenants in this region, e.g. blr. Blank uses the region code.",
-   "fieldname": "stalwart_region",
-   "fieldtype": "Data",
-   "label": "Stalwart Region"
+   "description": "Mail cluster region for the tenants placed here. Blank uses the default cluster.",
+   "fieldname": "mail_region",
+   "fieldtype": "Link",
+   "label": "Mail Region",
+   "options": "Mail Region"
   }
  ],
  "index_web_pages_for_search": 1,

@@ -33,6 +33,7 @@ NAME_FIELDS = {
     "Mail Account": "email",
     "Mail Domain": "domain_name",
     "Mail Group": "email",
+    "Mail Region": "code",
     "Mailing List": "email",
     "Region": "region",
     "Stalwart Cluster": "hostname",

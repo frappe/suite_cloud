@@ -13,6 +13,7 @@
   "status",
   "stalwart_version",
   "naming_section",
+  "region",
   "label",
   "dns_zone",
   "column_break_naming",
@@ -25,7 +26,6 @@
   "acme_contact_email",
   "placement_section",
   "is_default",
-  "regions",
   "stores_tab",
   "data_store",
   "blob_store",
@@ -88,12 +88,11 @@
    "fieldtype": "Section Break"
   },
   {
-   "description": "Name shown in lists, e.g. Bangalore 1.",
+   "description": "Name shown in lists. Blank takes the region's title, e.g. Mumbai or Mumbai 2.",
    "fieldname": "title",
    "fieldtype": "Data",
    "in_list_view": 1,
-   "label": "Title",
-   "reqd": 1
+   "label": "Title"
   },
   {
    "default": "1",
@@ -129,11 +128,23 @@
    "label": "Naming"
   },
   {
-   "description": "Short ID under the zone, e.g. blr gives mail.blr.frappemail.com. Blank gives c1, c2 and so on. Cannot be changed.",
+   "description": "Tenants of this region are placed here. Cannot be changed.",
+   "fieldname": "region",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Region",
+   "options": "Mail Region",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Made from the region: bom for its first cluster in the zone, then bom-2, bom-3 and so on.",
    "fieldname": "label",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Label",
+   "read_only": 1,
    "set_only_once": 1
   },
   {
@@ -151,7 +162,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Public address of the cluster, e.g. mail.blr.frappemail.com.",
+   "description": "Public address of the cluster, e.g. mail.bom.frappemail.com.",
    "fieldname": "hostname",
    "fieldtype": "Data",
    "in_list_view": 1,
@@ -160,7 +171,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Sub-zone for nodes, gateways and pools, e.g. blr.frappemail.com.",
+   "description": "The hostname, as Stalwart's default domain. Nodes, gateways and pools are named under it, e.g. n1.mail.bom.frappemail.com.",
    "fieldname": "default_domain",
    "fieldtype": "Data",
    "label": "Default Domain",
@@ -203,17 +214,10 @@
   },
   {
    "default": "0",
-   "description": "Tenants go here when no cluster lists their region. There is always one default.",
+   "description": "Tenants go here when their region has no cluster. There is always one default.",
    "fieldname": "is_default",
    "fieldtype": "Check",
    "label": "Is Default"
-  },
-  {
-   "description": "Region codes this cluster serves, e.g. blr.",
-   "fieldname": "regions",
-   "fieldtype": "Table",
-   "label": "Regions Served",
-   "options": "Stalwart Cluster Region"
   },
   {
    "fieldname": "stores_tab",

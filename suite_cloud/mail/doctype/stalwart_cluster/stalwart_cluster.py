@@ -1,7 +1,6 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -18,7 +17,6 @@ from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_fie
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
 from suite_cloud.utils import dkim_algorithms, get_config, log_error, log_exception, validate_version
 
-LABEL = re.compile(r"^[a-z0-9][a-z0-9-]*$")
 PUSH_TIMEOUT = 300  # seconds a config push may hold its cluster's lock, and wait for it by default
 SYNC_CONFIG_WAIT = 20  # seconds Sync Config waits for the lock, well inside a web worker's timeout
 STORE_KINDS = {
@@ -37,10 +35,6 @@ class StalwartCluster(Document):
 
     if TYPE_CHECKING:
         from frappe.types import DF
-
-        from suite_cloud.mail.doctype.stalwart_cluster_region.stalwart_cluster_region import (
-            StalwartClusterRegion,
-        )
 
         acme_contact_email: DF.Data | None
         acme_directory_url: DF.Data | None
@@ -72,7 +66,7 @@ class StalwartCluster(Document):
         max_daily_send_limit: DF.Int
         max_monthly_send_limit: DF.Int
         quota_hook_token: DF.Password | None
-        regions: DF.Table[StalwartClusterRegion]
+        region: DF.Link
         relay_password: DF.Password | None
         relay_username: DF.Data | None
         search_store: DF.Link | None
@@ -82,7 +76,7 @@ class StalwartCluster(Document):
         ssh_public_key: DF.Code | None
         ssh_user: DF.Data
         stalwart_version: DF.Data | None
-        title: DF.Data
+        title: DF.Data | None
         status: DF.Literal["Pending", "Bootstrapping", "Active", "Failed", "Disabled"]
     # end: auto-generated types
 
@@ -163,51 +157,36 @@ class StalwartCluster(Document):
     # --- validation -----------------------------------------------------------
 
     def autoname(self) -> None:
-        # Naming runs before validate: the label and zone settle here so the hostname can be derived.
+        # Naming runs before validate: the region and zone settle here so the hostname can be derived.
         self.resolve_label()
         self.name = self.hostname
 
     def resolve_label(self) -> None:
-        """Label + zone give the hostname and default domain; both are fixed once the cluster exists."""
+        """Region + zone give the label, hostname and default domain; all are fixed once the cluster
+        exists. The default domain is the hostname itself, so its wildcard certificate covers the
+        nodes, gateways and pools named under it."""
 
         self.dns_zone = self.dns_zone or get_default_zone()
         if not self.dns_zone:
             frappe.throw(_("Create a DNS Zone before creating clusters."))
-        self.label = (self.label or "").strip().lower() or naming.next_cluster_label(self.dns_zone)
-        if not LABEL.match(self.label):
-            frappe.throw(_("Label must be lowercase letters, digits and dashes, e.g. c1 or eu."))
-        taken = frappe.db.exists(
-            "Stalwart Cluster", {"label": self.label, "dns_zone": self.dns_zone, "name": ["!=", self.name]}
-        )
-        if taken:
-            frappe.throw(
-                _("Label {0} is already used by another cluster in {1}.").format(self.label, self.dns_zone)
-            )
+        if not self.region:
+            frappe.throw(_("Select the Mail Region of the cluster."))
+        self.label = self.label or naming.next_cluster_label(self.dns_zone, self.region)
         self.hostname = f"mail.{self.label}.{self.dns_zone}"
-        self.default_domain = f"{self.label}.{self.dns_zone}"
+        self.default_domain = self.hostname
         self.base_url = f"https://{self.hostname}"
 
     def validate_names(self) -> None:
         self.resolve_label()
-        self.title = (self.title or "").strip() or self.hostname
-        self.validate_regions()
+        self.title = (self.title or "").strip() or self.region_title
 
-    def validate_regions(self) -> None:
-        seen = set()
-        for row in self.regions:
-            row.region = (row.region or "").strip().lower()
-            if not row.region:
-                frappe.throw(_("Region cannot be blank."))
-            if row.region in seen:
-                frappe.throw(_("Region {0} is listed twice.").format(row.region))
-            seen.add(row.region)
+    @property
+    def region_title(self) -> str:
+        """The region's title, numbered like the label: Mumbai, Mumbai 2, Mumbai 3."""
 
-    def serves(self, region: str | None) -> bool:
-        """No regions means any region."""
-
-        if not self.regions:
-            return True
-        return bool(region) and region.strip().lower() in {r.region for r in self.regions}
+        title = frappe.get_cached_value("Mail Region", self.region, "title")
+        sequence = self.label.removeprefix(self.region).replace("-", " ")
+        return f"{title}{sequence}"
 
     def apply_defaults(self) -> None:
         self.stalwart_version = validate_version(

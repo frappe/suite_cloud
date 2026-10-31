@@ -111,7 +111,7 @@ class TestRegionSync(HostingFixtures, IntegrationTestCase):
         region = frappe.get_doc("Region", REGION)
         self.assertEqual((region.display_name, region.reachable), ("Test Region", 1))
         self.assertEqual(
-            (region.enabled, region.proxy_zone, region.stalwart_region), (1, "zz1.frappe.test", "blr")
+            (region.enabled, region.proxy_zone, region.mail_region), (1, "zz1.frappe.test", "blr")
         )
 
 
@@ -119,31 +119,25 @@ class TestPlacement(HostingFixtures, IntegrationTestCase):
     def setUp(self) -> None:
         self.setup_hosting()
 
-    def test_a_cluster_listing_the_region_wins_else_the_default(self) -> None:
+    def test_the_cluster_of_the_mail_region_wins_else_the_default(self) -> None:
         serving = activate_cluster(make_cluster("blr", hostname=f"mail.blr.{ROOT_DOMAIN}"))
-        activate_cluster(make_cluster("any", hostname=f"mail.any.{ROOT_DOMAIN}", regions=[]))
-        default = activate_cluster(
-            make_cluster("eu", hostname=f"mail.eu.{ROOT_DOMAIN}", regions=[{"region": "eu"}])
-        )
+        default = activate_cluster(make_cluster("eu", hostname=f"mail.eu.{ROOT_DOMAIN}"))
         default.is_default = 1
         default.save()
 
-        self.assertEqual(pick_cluster(REGION), serving.name)  # the region's Stalwart region is blr
-        # A cluster listing no region no longer takes every region: the default does.
+        self.assertEqual(pick_cluster(REGION), serving.name)  # the region's mail region is blr
         self.assertEqual(pick_cluster("nowhere"), default.name)
 
-    def test_a_region_without_a_stalwart_region_falls_back_to_the_default(self) -> None:
+    def test_a_region_without_a_mail_region_falls_back_to_the_default(self) -> None:
         activate_cluster(make_cluster("blr", hostname=f"mail.blr.{ROOT_DOMAIN}"))
-        default = activate_cluster(
-            make_cluster("eu", hostname=f"mail.eu.{ROOT_DOMAIN}", regions=[{"region": "eu"}])
-        )
+        default = activate_cluster(make_cluster("eu", hostname=f"mail.eu.{ROOT_DOMAIN}"))
         default.is_default = 1
         default.save()
         region = frappe.get_doc("Region", REGION)
-        region.update({"enabled": 1, "proxy_zone": None, "stalwart_region": None})
+        region.update({"enabled": 1, "proxy_zone": None, "mail_region": None})
         region.save()  # neither is needed to enable it
 
-        self.assertEqual(pick_cluster(REGION), default.name)  # its own code, zz1, no cluster lists
+        self.assertEqual(pick_cluster(REGION), default.name)
 
     def test_a_new_suite_site_tenant_is_always_placed(self) -> None:
         cluster = activate_cluster(make_cluster())

@@ -4,20 +4,17 @@ import frappe
 
 
 def pick_cluster(region: str | None) -> str | None:
-    """An active cluster that lists the region's Stalwart region, else the default cluster.
+    """The oldest active cluster of the region's Mail Region, else the default cluster.
 
-    ``region`` names a Region; its ``stalwart_region`` (or its own code) is what a cluster lists.
+    ``region`` names a Region; its ``mail_region`` is what a cluster is placed in.
     """
 
-    code = region and (frappe.db.get_value("Region", region, "stalwart_region") or region)
-    names = frappe.get_all(
-        "Stalwart Cluster",
-        {"status": "Active", "enabled": 1},
-        pluck="name",
-        order_by="is_default desc, creation asc",
-    )
-    clusters = [frappe.get_cached_doc("Stalwart Cluster", name) for name in names]
-    for cluster in clusters:
-        if code and cluster.regions and cluster.serves(code):
-            return cluster.name
-    return next((c.name for c in clusters if c.is_default), None)
+    mail_region = region and frappe.db.get_value("Region", region, "mail_region")
+    active = {"status": "Active", "enabled": 1}
+    if mail_region:
+        serving = frappe.get_all(
+            "Stalwart Cluster", {**active, "region": mail_region}, pluck="name", order_by="creation asc"
+        )
+        if serving:
+            return serving[0]
+    return frappe.db.get_value("Stalwart Cluster", {**active, "is_default": 1})

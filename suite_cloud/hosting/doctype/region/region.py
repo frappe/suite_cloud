@@ -23,21 +23,20 @@ class Region(Document):
         display_name: DF.Data | None
         enabled: DF.Check
         last_synced_at: DF.Datetime | None
+        mail_region: DF.Link | None
         provider: DF.Data | None
         proxy_zone: DF.Data | None
         reachable: DF.Check
         region: DF.Data
-        stalwart_region: DF.Data | None
         status: DF.Data | None
     # end: auto-generated types
 
     def validate(self) -> None:
         self.proxy_zone = (self.proxy_zone or "").strip().lower().strip(".") or None
-        self.stalwart_region = (self.stalwart_region or "").strip().lower() or None
 
 
 def sync_regions() -> int:
-    """Upserts Central's regions; ``enabled``, ``stalwart_region`` and the learned ``proxy_zone`` stay."""
+    """Upserts Central's regions; ``enabled``, ``mail_region`` and the learned ``proxy_zone`` stay."""
 
     if not frappe.get_cached_doc("Suite Cloud Settings").is_central_configured:
         return 0

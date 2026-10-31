@@ -1,8 +1,9 @@
 """Hostnames under a cluster's default domain are handed out, never typed.
 
-Nodes are n1, n2, ...; gateways g1, g2, ...; egress pools p1, p2, ... (under the ``out`` sub-zone
-the gateway certificates cover); and the addresses of a pool p1-1, p1-2, ... Numbers count one
-past the highest in use in the cluster, so a rebuilt server never inherits a name whose reverse
+A cluster is named by its region: ``mail.bom``, then ``mail.bom-2``, ``mail.bom-3``, ... under the
+DNS zone. Nodes are n1, n2, ...; gateways g1, g2, ...; egress pools p1, p2, ... (under the ``out``
+sub-zone the gateway certificates cover); and the addresses of a pool p1-1, p1-2, ... Numbers count
+one past the highest in use in the cluster, so a rebuilt server never inherits a name whose reverse
 DNS may still point at the old one.
 """
 
@@ -11,7 +12,6 @@ from collections.abc import Iterable
 
 import frappe
 
-CLUSTER_PREFIX = "c"
 NODE_PREFIX = "n"
 GATEWAY_PREFIX = "g"
 POOL_PREFIX = "p"
@@ -53,8 +53,10 @@ def assign_ehlo_hostnames(pool, default_domain: str) -> None:
         row.ehlo_hostname = f"{label}.{default_domain}"
 
 
-def next_cluster_label(zone: str) -> str:
-    """The next free ``c<n>`` among the clusters of a zone; operators may type a label instead."""
+def next_cluster_label(zone: str, region: str) -> str:
+    """``<region>`` for the region's first cluster in the zone, then ``<region>-2``, ``<region>-3``."""
 
-    taken = frappe.get_all("Stalwart Cluster", {"dns_zone": zone}, pluck="label")
-    return next_label(CLUSTER_PREFIX, taken)
+    taken = frappe.get_all("Stalwart Cluster", {"dns_zone": zone, "region": region}, pluck="label")
+    if not taken:
+        return region
+    return next_label(f"{region}-", [f"{region}-1" if label == region else label for label in taken])

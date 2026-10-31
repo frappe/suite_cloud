@@ -43,7 +43,6 @@ class StalwartNode(Document):
         ssh_port: DF.Int
         ssh_user: DF.Data | None
         ssh_verified: DF.Check
-        location: DF.Data | None
         title: DF.Data | None
         status: DF.Literal[
             "Pending", "Provisioning", "Provisioned", "Active", "Draining", "Failed", "Disabled"

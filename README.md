@@ -47,7 +47,8 @@ The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what a
 | --- | --- |
 | **DNS Zone** | A domain you own (for example `frappemail.com`) plus the login for the DNS provider that manages it. Suite Cloud publishes server records there. You can have several zones; each cluster picks one. |
 | **Stalwart Store** | Where a cluster keeps its data: a PostgreSQL or MySQL database, an S3 bucket for message bodies, Redis for shared memory, and optionally a search engine. |
-| **Stalwart Cluster** | One mail service with its public hostname (`mail.c1.frappemail.com`), its stores, its admin credentials, an SSH key for its servers and the regions tenants may be placed from. |
+| **Mail Region** | A place with a cluster, for example `bom` (Mumbai). Its code names the cluster's hosts under the DNS zone, and a Region points at one to place its tenants' mail. |
+| **Stalwart Cluster** | One mail service per Mail Region, shared by the tenants placed there: its public hostname (`mail.bom.frappemail.com`), its stores, its admin credentials and an SSH key for its servers. |
 | **Stalwart Node** | One server (VPS) that runs Stalwart for a cluster. Nodes share the same stores, so any node can serve any user. |
 | **Egress Gateway** and **Egress IP Pool** | Optional extra servers used only for sending. A pool is a set of IP addresses; a domain, a tenant or a whole cluster can be told to send through it. |
 | **DNS Record** | One record Suite Cloud keeps in a zone (a node's address, the cluster's round-robin entry, the SPF list, and so on). Records are created and removed together with the thing that needs them. |
@@ -56,7 +57,7 @@ The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what a
 | **Mail Domain, Mail Account, Mail Group, Mailing List** | The mail directory of a tenant. Saving one of these pushes it to the cluster in the same step, so the records and the cluster never drift apart. Each carries the id Stalwart gave it. |
 | **DMARC Report** | One DMARC aggregate report another receiver sent about a domain, copied hourly from the cluster that intercepted it (Stalwart parses reports mailed to `postmaster@`). Attributed to the tenant that holds the domain, and only when the report was addressed to one of that tenant's domains; kept for the configured retention, and read by tenants through the API. |
 | **TLS Report** | One TLS aggregate report (RFC 8460) a sending server made about delivering to a domain: sessions that negotiated TLS as the domain's MTA-STS or DANE policy asks, sessions that failed and why. Copied, attributed, kept and served the same way as DMARC reports, with its own retention; a report whose policies name more than one domain is shown to no tenant. |
-| **Region** | A Frappe Cloud region, synced from Central. Sites and servers go only to regions an operator enabled. An optional Stalwart region picks the mail cluster of its tenants (else the default cluster); the proxy zone Central serves the region's sites under is learned from the region's first server. |
+| **Region** | A Frappe Cloud region, synced from Central. Sites and servers go only to regions an operator enabled. An optional Mail Region picks the mail cluster of its tenants (else the default cluster); the proxy zone Central serves the region's sites under is learned from the region's first server. |
 | **Virtual Machine** | A Frappe Cloud server Suite Cloud created in its Central team. Each one boots Pilot, is checked against its region's proxy zone and gets the Suite app from git; it then takes up to its Max Sites sites. |
 | **Suite Site** | A Suite site on a server: waiting in the region's pool, or assigned to a tenant, connected to Suite Cloud, given the domain `<label>.<site zone>` and a mail domain `<label>.<tenant mail zone>`, and then invites the tenant's owner. |
 | **Suite Tenant Request** | One request for a hosted workspace: the email, the organization, and a label made from it (Acme Inc. gives acme, or acme-2 when taken) unless one is given. Once the site can send mail, it invites the owner to an account at the tenant's mail domain, and the owner chooses their password when they accept. A signup through the public API confirms its email with a one-time code; one an operator creates in the desk is processed at once. Its Progress table lists every step from the code to the owner's invite, with when it ran and how long it took, and the form shows a progress bar while it runs. |
@@ -94,13 +95,13 @@ contact email; everything else sits at permission level 1, for System Managers.
 3. **Stores.** Create a PostgreSQL (or MySQL) data store, an S3 blob store and a Redis in-memory
    store. Redis also coordinates the nodes. RocksDB and local files only work for a single-node
    cluster.
-4. **Cluster.** Create a Stalwart Cluster. Give it a short label, or leave it blank to get `c1`,
-   `c2` and so on. The label and the zone make the hostname, `mail.c1.frappemail.com`, and the
-   default domain `c1.frappemail.com` that nodes, gateways and pools get their names under. The
-   label is only a namespace: a cluster may have servers in several regions. List the regions
-   tenants may be placed from, or none to serve every region. Copy the SSH public key.
+4. **Cluster.** Create a Mail Region (`bom`, Mumbai), then a Stalwart Cluster in it. The region
+   and the zone make the hostname, `mail.bom.frappemail.com`; a second cluster in the region gets
+   `mail.bom-2`. The hostname is also the default domain that nodes, gateways and pools get their
+   names under, so one wildcard certificate covers them all. Tenants of a Region that points at the
+   mail region are placed on its cluster. Copy the SSH public key.
 5. **First node.** Put that public key on a fresh VPS and set the reverse DNS (PTR) of its IP to the
-   node's hostname. Create a Stalwart Node (`n1.c1.frappemail.com` with its IPv4), click
+   node's hostname. Create a Stalwart Node (`n1.mail.bom.frappemail.com` with its IPv4), click
    **Verify SSH**, then **Provision**. The first Verify SSH records the server's host keys; every
    later connection must match them, and a changed address or port asks for a fresh verification. The job installs Stalwart and its CLI, sets up the system
    service and firewall, starts Stalwart once to write the store settings, applies the cluster
@@ -150,7 +151,7 @@ message takes.
 Frappe Cloud's control plane, Central, creates servers; Pilot, the bench agent on each server, creates sites on it. Central has no API for sites, so Suite Cloud asks Central for a bench token (`get_bench_link`) and drives Pilot's Admin API with it.
 
 1. **Central.** Create a user for Suite Cloud with an API key, and a team where that user holds a team-wide role with `server:create`, `server:view`, `cluster:view` and `server:console`. The team's spend limit bounds how many servers Suite Cloud can create. Enter the URL, team, key and secret in the **Frappe Cloud** tab of Suite Cloud Settings and run **Test Central Connection**.
-2. **Regions.** Run **Sync Regions**, then enable the regions to host in, optionally with the Stalwart region whose cluster takes their tenants' mail (else the default cluster). Pick the default region. The proxy zone, `<region>.<Central wildcard domain>`, is learned from each region's first server.
+2. **Regions.** Run **Sync Regions**, then enable the regions to host in, optionally with the Mail Region whose cluster takes their tenants' mail (else the default cluster). Pick the default region. The proxy zone, `<region>.<Central wildcard domain>`, is learned from each region's first server.
 3. **Zones.** Pick a site DNS zone and a tenant mail zone, DNS Zones with a DNS provider; every hosted site gets a mail domain, so the mail zone is required. They may be one zone: a tenant labelled `acme` then gets the mail domain `acme.<zone>` and the site domain `acme.sites.<zone>`, since the site's CNAME cannot share a name with the mail domain's MX and TXT records. The tenant mail zone must not be a cluster's zone.
 4. **Servers.** Create a Virtual Machine in a region, or turn on **Create Servers Automatically**. Each one is created on Central, waits for Pilot, is checked (its wildcard zone must be a zone of the region, and equal the proxy zone the region's first server reported; production mode on), and installs Suite from the repository and branch in Settings. Verify Host gives Pilot the ACME Contact Email as its Let's Encrypt email when it has none (Pilot v0.0.74-pre-alpha and later keep it); a server whose Pilot has no email takes sites but no site or custom domains.
 5. **Sites.** Each enabled region keeps **Ready Sites per Region** sites with Suite installed. **Create Hosted Site** on a Suite Tenant, or a signup, claims the oldest one, else creates one. The site is connected to Suite Cloud (Suite Settings, Mail Settings, onboarding) and turns **Active**. The site domain and the mail domain follow and never hold up Active. Once the mail domain is verified, Suite Cloud has the site invite the owner (Suite's own Mail Account Request, Suite Admin, valid 7 days) to `username@<label>.<tenant mail zone>`. The owner chooses their password when they accept; **Resend Invite** sends it again, or a fresh one once it expired.

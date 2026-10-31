@@ -67,7 +67,7 @@ The development site at Frappe uses two DigitalOcean zones:
 
 | Zone | Used for |
 | --- | --- |
-| `frappe.email` | The cluster (`mail.c1.frappe.email`) and the hosted sites' domains |
+| `frappe.email` | The cluster (`mail.bom.frappe.email`) and the hosted sites' domains |
 | `frappesuite.com` | The tenants' mail domains, for example `acme.frappesuite.com` |
 
 The tenant mail zone must not be a cluster's zone. One zone can hold both the site domains and the tenant mail domains. Then site domains go under `sites`, for example `acme.sites.example.com`.
@@ -89,9 +89,9 @@ Then set up the cluster:
 2. For a throwaway cluster, set **ACME Directory URL** to the Let's Encrypt staging URL, `https://acme-staging-v02.api.letsencrypt.org/directory`. This keeps you below the production rate limits.
 3. With a staging certificate, clear **Suite Cloud Settings > Stalwart > Verify Stalwart TLS Certificates**.
 4. Create a **Stalwart Store** with **Kind** Data and **Type** RocksDb.
-5. Create a **Stalwart Cluster** with your zone and that store. Leave **Label** blank to get `c1`.
+5. Create a **Mail Region** with the code `bom` and the title Mumbai, then a **Stalwart Cluster** in it with your zone and that store. Its hostname is `mail.bom.<zone>`.
 6. Copy the cluster's SSH public key into `~/.ssh/authorized_keys` on the VPS.
-7. At the VPS provider, set the reverse DNS (PTR) of the IPv4 address to the node's hostname, for example `n1.c1.example.com`.
+7. At the VPS provider, set the reverse DNS (PTR) of the IPv4 address to the node's hostname, for example `n1.mail.bom.example.com`.
 8. Create a **Stalwart Node** with that hostname and the IPv4 address.
 9. Click **Verify SSH**, then **Provision**. The Server Job shows each Ansible task as it runs.
 10. Wait for the certificate. Then **Finish Bootstrap** runs, by hand or from the five-minute job, and the cluster turns **Active**.
@@ -134,7 +134,7 @@ Suite Cloud creates servers through Central, Frappe Cloud's control plane, and c
 10. Set **Ready Sites per Region** to 0 or 1. Each ready site waits in a pool on a server, and each server costs money.
 11. Create a **Virtual Machine** in the region. It turns **Running** and installs Suite in about ten minutes.
 
-Clusters place tenants by region. A tenant whose region no cluster lists goes to the default cluster, so one cluster serves every region in development.
+A region's **Mail Region** picks the cluster of its tenants. A region without one goes to the default cluster, so one cluster serves every region in development.
 
 ## 7. Create a tenant end to end
 

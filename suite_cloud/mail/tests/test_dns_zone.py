@@ -79,7 +79,7 @@ class TestDNSZone(IntegrationTestCase):
         )
         self.assertTrue(zones)
         self.assertEqual(set(zones), {OTHER_ZONE})
-        self.assertTrue(frappe.db.exists("DNS Record", {"dns_zone": OTHER_ZONE, "host": "spf.eu"}))
+        self.assertTrue(frappe.db.exists("DNS Record", {"dns_zone": OTHER_ZONE, "host": "spf.mail.eu"}))
         remove_cluster(f"mail.eu.{OTHER_ZONE}")
 
     def test_cluster_hostname_follows_its_zone(self) -> None:
@@ -87,7 +87,7 @@ class TestDNSZone(IntegrationTestCase):
         remove_cluster(f"mail.eu.{OTHER_ZONE}")
         cluster = make_cluster("eu-1", hostname=f"mail.eu.{OTHER_ZONE}", dns_zone=OTHER_ZONE)
         self.assertEqual(
-            (cluster.name, cluster.default_domain), (f"mail.eu.{OTHER_ZONE}", f"eu.{OTHER_ZONE}")
+            (cluster.name, cluster.default_domain), (f"mail.eu.{OTHER_ZONE}", f"mail.eu.{OTHER_ZONE}")
         )
         remove_cluster(cluster.name)
 
