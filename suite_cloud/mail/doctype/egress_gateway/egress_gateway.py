@@ -42,7 +42,6 @@ class EgressGateway(Document):
         ssh_user: DF.Data | None
         ssh_verified: DF.Check
         stalwart_version: DF.Data | None
-        location: DF.Data | None
         metrics_password: DF.Password | None
         title: DF.Data | None
         status: DF.Literal["Pending", "Provisioning", "Provisioned", "Active", "Failed", "Disabled"]

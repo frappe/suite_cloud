@@ -8,7 +8,6 @@
   "title",
   "cluster",
   "hostname",
-  "location",
   "column_break_main",
   "enabled",
   "status",
@@ -68,12 +67,6 @@
    "label": "Hostname",
    "read_only": 1,
    "set_only_once": 1
-  },
-  {
-   "description": "Where the server runs, e.g. DigitalOcean BLR1. For information only.",
-   "fieldname": "location",
-   "fieldtype": "Data",
-   "label": "Location"
   },
   {
    "fieldname": "column_break_main",

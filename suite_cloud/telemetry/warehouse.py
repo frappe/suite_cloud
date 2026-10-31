@@ -216,21 +216,20 @@ class Warehouse:
 def get_node_rows() -> list[dict]:
     """One row per address of every Stalwart Node and Egress Gateway, since a batch names its host
     by address. A gateway runs a Stalwart of its own that sends the cluster's mail, so the
-    dashboards see it as a node of the cluster with the role ``gateway``. A node runs in its
-    cluster's region; a gateway says where it runs itself."""
+    dashboards see it as a node of the cluster with the role ``gateway``. Both run in their
+    cluster's region, which the rows carry as ``location``."""
 
     regions = dict(frappe.get_all("Stalwart Cluster", fields=["name", "region"], as_list=True))
     rows = []
     for node in frappe.get_all("Stalwart Node", fields=[*NODE_FIELDS, "role", "ipv6_address"]):
-        addresses = (node.ipv4_address, node.ipv6_address)
-        rows += get_host_rows(node, node.role, regions.get(node.cluster), addresses)
-    for gateway in frappe.get_all("Egress Gateway", fields=[*NODE_FIELDS, "location"]):
-        rows += get_host_rows(gateway, "gateway", gateway.location, (gateway.ipv4_address,))
+        rows += get_host_rows(node, node.role, regions, (node.ipv4_address, node.ipv6_address))
+    for gateway in frappe.get_all("Egress Gateway", fields=NODE_FIELDS):
+        rows += get_host_rows(gateway, "gateway", regions, (gateway.ipv4_address,))
     return rows
 
 
 def get_host_rows(
-    record: dict, role: str, location: str | None, addresses: tuple[str | None, ...]
+    record: dict, role: str, regions: dict[str, str], addresses: tuple[str | None, ...]
 ) -> list[dict]:
     return [
         {
@@ -238,7 +237,7 @@ def get_host_rows(
             "hostname": record.hostname,
             "cluster": record.cluster,
             "role": role,
-            "location": location,
+            "location": regions.get(record.cluster),
             "status": record.status,
         }
         for address in addresses
