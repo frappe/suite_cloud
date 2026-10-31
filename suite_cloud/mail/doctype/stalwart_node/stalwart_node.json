@@ -8,7 +8,6 @@
   "title",
   "cluster",
   "hostname",
-  "location",
   "role",
   "column_break_main",
   "enabled",
@@ -63,12 +62,6 @@
    "set_only_once": 1
   },
   {
-   "description": "Where the server runs, e.g. DigitalOcean BLR1. For information only.",
-   "fieldname": "location",
-   "fieldtype": "Data",
-   "label": "Location"
-  },
-  {
    "default": "full",
    "description": "full: serves clients and sends mail. frontend: serves clients only. outbound: sends mail only. Single-node clusters use full.",
    "fieldname": "role",
@@ -114,10 +107,10 @@
    "read_only": 1
   },
   {
+   "depends_on": "eval:doc.last_error",
    "fieldname": "error_section",
    "fieldtype": "Section Break",
-   "label": "Last Error",
-   "depends_on": "eval:doc.last_error"
+   "label": "Last Error"
   },
   {
    "description": "Why the last job or check failed.",
@@ -166,11 +159,11 @@
    "read_only": 1
   },
   {
+   "collapsible": 1,
+   "collapsible_depends_on": "eval:!doc.ssh_verified",
    "fieldname": "ssh_section",
    "fieldtype": "Section Break",
-   "label": "SSH",
-   "collapsible": 1,
-   "collapsible_depends_on": "eval:!doc.ssh_verified"
+   "label": "SSH"
   },
   {
    "description": "Blank uses the cluster SSH user.",
@@ -268,10 +261,10 @@
   }
  ],
  "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
  "sort_field": "creation",
  "sort_order": "DESC",
  "states": [],
- "track_changes": 1,
  "title_field": "title",
- "show_title_field_in_link": 1
+ "track_changes": 1
 }

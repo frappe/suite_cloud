@@ -36,6 +36,14 @@ def make_zone(domain_name: str = ROOT_DOMAIN, **fields):
     return zone
 
 
+def make_mail_region(code: str, title: str | None = None) -> str:
+    """A Mail Region clusters are placed in; the title defaults to the code, capitalised."""
+
+    if not frappe.db.exists("Mail Region", code):
+        frappe.get_doc({"doctype": "Mail Region", "code": code, "title": title or code.capitalize()}).insert()
+    return code
+
+
 def clear_request_cache() -> None:
     cache = getattr(frappe.local, "request_cache", None)
     if cache is not None:

@@ -21,7 +21,7 @@ from suite_cloud.utils import get_config, log_exception
 DATA_SOURCE = "suite_cloud_telemetry"  # the Insights data source and its file under private files
 BATCH_FILES = 200  # files loaded under one lock: with 5000 rows each, seconds of hold at most
 DEFAULT_RETENTION_DAYS = 90
-NODE_FIELDS = ("hostname", "cluster", "location", "status", "ipv4_address")
+NODE_FIELDS = ("hostname", "cluster", "status", "ipv4_address")
 
 
 def load_staged_batches() -> None:
@@ -216,24 +216,29 @@ class Warehouse:
 def get_node_rows() -> list[dict]:
     """One row per address of every Stalwart Node and Egress Gateway, since a batch names its host
     by address. A gateway runs a Stalwart of its own that sends the cluster's mail, so the
-    dashboards see it as a node of the cluster with the role ``gateway``."""
+    dashboards see it as a node of the cluster with the role ``gateway``. A node runs in its
+    cluster's region; a gateway says where it runs itself."""
 
+    regions = dict(frappe.get_all("Stalwart Cluster", fields=["name", "region"], as_list=True))
     rows = []
     for node in frappe.get_all("Stalwart Node", fields=[*NODE_FIELDS, "role", "ipv6_address"]):
-        rows += get_host_rows(node, node.role, (node.ipv4_address, node.ipv6_address))
-    for gateway in frappe.get_all("Egress Gateway", fields=NODE_FIELDS):
-        rows += get_host_rows(gateway, "gateway", (gateway.ipv4_address,))
+        addresses = (node.ipv4_address, node.ipv6_address)
+        rows += get_host_rows(node, node.role, regions.get(node.cluster), addresses)
+    for gateway in frappe.get_all("Egress Gateway", fields=[*NODE_FIELDS, "location"]):
+        rows += get_host_rows(gateway, "gateway", gateway.location, (gateway.ipv4_address,))
     return rows
 
 
-def get_host_rows(record: dict, role: str, addresses: tuple[str | None, ...]) -> list[dict]:
+def get_host_rows(
+    record: dict, role: str, location: str | None, addresses: tuple[str | None, ...]
+) -> list[dict]:
     return [
         {
             "host_ip": address,
             "hostname": record.hostname,
             "cluster": record.cluster,
             "role": role,
-            "location": record.location,
+            "location": location,
             "status": record.status,
         }
         for address in addresses

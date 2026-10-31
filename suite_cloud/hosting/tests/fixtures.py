@@ -5,7 +5,7 @@ from unittest.mock import patch
 import frappe
 
 from suite_cloud.hosting.tests.fakes import PROXY_ZONE, REGION, FakeCentral, FakePilot, FakeSite, install
-from suite_cloud.tests.fixtures import ROOT_DOMAIN, configure_settings, make_zone
+from suite_cloud.tests.fixtures import ROOT_DOMAIN, configure_settings, make_mail_region, make_zone
 from suite_cloud.utils import clear_config_cache
 
 SITE_ZONE = "sites.test"
@@ -98,8 +98,9 @@ def make_region(**fields):
     region = (
         frappe.get_doc("Region", REGION) if frappe.db.exists("Region", REGION) else frappe.new_doc("Region")
     )
+    mail_region = make_mail_region("blr")
     region.update(
-        {"region": REGION, "enabled": 1, "proxy_zone": PROXY_ZONE, "stalwart_region": "blr", **fields}
+        {"region": REGION, "enabled": 1, "proxy_zone": PROXY_ZONE, "mail_region": mail_region, **fields}
     )
     region.save()
     return region
