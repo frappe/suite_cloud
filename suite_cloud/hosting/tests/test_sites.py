@@ -175,7 +175,7 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
 
     def test_a_waiting_step_says_what_it_waits_for(self) -> None:
         site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
-        self.site_api.call = lambda method, **kwargs: (_ for _ in ()).throw(
+        self.site_api.run_doc_method = lambda doctype, name, method, **kwargs: (_ for _ in ()).throw(
             SiteUnavailableError(
                 "Suite Cloud is unreachable; try again shortly.", "SuiteCloudUnavailableError", 503
             )
