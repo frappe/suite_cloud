@@ -39,7 +39,7 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
         self.assertEqual(settings["suite_cloud_tenant"], self.tenant.name)
         self.assertEqual(settings["suite_cloud_secret"], self.tenant.get_password("secret"))
         methods = [call[0] for call in self.site_api.calls]
-        self.assertEqual(methods, ["suite.api.account.mark_onboarded", "validate_suite_cloud_credentials"])
+        self.assertEqual(methods, ["validate_suite_cloud_credentials"])  # the owner onboards in Suite
         self.assertFalse([key for key in self.site_api.docs if key[0] == "User"])  # Suite creates the owner
 
     def test_the_owner_is_invited_once_the_site_can_send_mail(self) -> None:
@@ -175,7 +175,7 @@ class TestSuiteSite(HostingFixtures, IntegrationTestCase):
 
     def test_a_waiting_step_says_what_it_waits_for(self) -> None:
         site = frappe.get_doc({"doctype": "Suite Site", "region": REGION}).insert()
-        self.site_api.call = lambda method, **kwargs: (_ for _ in ()).throw(
+        self.site_api.run_doc_method = lambda doctype, name, method, **kwargs: (_ for _ in ()).throw(
             SiteUnavailableError(
                 "Suite Cloud is unreachable; try again shortly.", "SuiteCloudUnavailableError", 503
             )

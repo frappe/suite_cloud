@@ -88,6 +88,28 @@ class TestTenantEmail(IntegrationTestCase):
                 (icon,) = email_types.get_inline_images(body)  # the product's, which heads every email
                 self.assertTrue(icon["filecontent"])
 
+    def test_an_invite_names_the_inviter_and_the_workspace_suite_sends(self) -> None:
+        params = {**INVITE, "invited_by_name": "Ana Lima", "workspace_name": "Acme", "workspace_logo": ""}
+        subject, body = email_types.render(
+            "account-invite", EMAIL_TYPES["account-invite"], params, "Old title"
+        )
+
+        self.assertEqual(subject, "Join Acme on Frappe Suite")
+        self.assertIn("Ana Lima invited you to join Acme on Frappe Suite.", body)
+
+    def test_the_owners_invite_names_no_one(self) -> None:
+        # Suite invites a new site's first Admin as Administrator, with no inviter's name.
+        for params in (
+            {"inviter": "Administrator", "link": INVITE["link"], "invited_by_name": ""},
+            {"inviter": "Administrator", "link": INVITE["link"]},
+        ):
+            with self.subTest(params):
+                _subject, body = email_types.render(
+                    "account-invite", EMAIL_TYPES["account-invite"], params, "Acme"
+                )
+                self.assertIn("You are invited to join Acme on Frappe Suite.", body)
+                self.assertNotIn("Administrator", body)
+
     def test_a_drive_email_embeds_the_drive_icon(self) -> None:
         params = {"sharer": "Ana", "item_type": "file", "item_name": "Plan.pdf", "link": INVITE["link"]}
         self.send(email_type="drive-share", params=params)
