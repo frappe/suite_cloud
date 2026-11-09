@@ -17,7 +17,8 @@ concurrency:
 jobs:
   tests:
     name: ${{ matrix.name }}
-    runs-on: ubuntu-latest
+    # Ubuntu 26.04 has no Python 3.8, which these tests need.
+    runs-on: ubuntu-24.04
 
     # One runner per deployment type. Core covers what every hosted product shares (sites,
     # zones, settings); each product's tests live in its own module folder and get a runner
