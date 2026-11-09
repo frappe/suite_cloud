@@ -30,7 +30,12 @@ class EmailType:
 
 EMAIL_TYPES = {
     "password-reset": EmailType("Reset your password", ("link",)),
-    "account-invite": EmailType("Join {{ workspace }} on Frappe Suite", ("inviter", "link")),
+    # Suite also sends the workspace's logo, which the email does not show yet.
+    "account-invite": EmailType(
+        "Join {{ workspace_name or workspace }} on Frappe Suite",
+        ("inviter", "link"),
+        ("invited_by_name", "workspace_name", "workspace_logo"),
+    ),
     "signup-code": EmailType("Verify your email address", ("code", "expires_in_minutes"), links=()),
     "drive-signup-code": EmailType("Your Frappe Drive sign-in code", ("code",), links=()),
     "drive-invite": EmailType(

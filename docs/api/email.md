@@ -20,7 +20,7 @@ Suite Cloud sends through the outgoing Email Account that **Suite Cloud Settings
 | Type | Required parameters | Optional parameters |
 | --- | --- | --- |
 | `password-reset` | `link` | |
-| `account-invite` | `inviter`, `link` | |
+| `account-invite` | `inviter`, `link` | `invited_by_name`, `workspace_name`, `workspace_logo` |
 | `signup-code` | `code`, `expires_in_minutes` | |
 | `drive-signup-code` | `code` | |
 | `drive-invite` | `inviter`, `link` | `team_name` |

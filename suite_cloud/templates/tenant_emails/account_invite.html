@@ -1,7 +1,14 @@
 {% extends "templates/tenant_emails/base.html" %}
 {% set product = "Suite" %}
-{% set heading = "Join " ~ workspace ~ " on Frappe Suite" %}
-{% set message = inviter ~ " invited you to join " ~ workspace ~ " on Frappe Suite." %}
+{#- A site's first Admin is invited by Administrator, which is not a person: no one is named then. -#}
+{% set team = workspace_name or workspace %}
+{% set who = invited_by_name if invited_by_name is defined else inviter %}
+{% set heading = "Join " ~ team ~ " on Frappe Suite" %}
+{% if who and who != "Administrator" %}
+{% set message = who ~ " invited you to join " ~ team ~ " on Frappe Suite." %}
+{% else %}
+{% set message = "You are invited to join " ~ team ~ " on Frappe Suite." %}
+{% endif %}
 {% set button = "Accept invitation" %}
 {% set show_link = true %}
 {% set fine_print = "If you did not expect it, you can ignore this email." %}

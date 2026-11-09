@@ -141,7 +141,7 @@ def mark_created(site) -> bool:
 
 def configure(site) -> bool:
     """Connects the site to its tenant; the site is then Active. Its owner is invited once the
-    site can send mail (``invite_owner``)."""
+    site can send mail (``invite_owner``), and sets the site up in Suite's own wizard."""
 
     site.db_set("status", "Configuring")
     if not site.suite_configured:
@@ -157,8 +157,6 @@ def configure_suite(site, client) -> None:
     push_tenant_credentials(client, tenant)
     if tenant.stalwart_cluster:
         client.set_single("Mail Settings", {"server_url": tenant.get_cluster().base_url})
-    request = site.get_request()
-    client.call("suite.api.account.mark_onboarded", timezone=request.timezone if request else None)
     # Suite's own check: the site pings Suite Cloud with what it was just given.
     client.run_doc_method("Suite Settings", "Suite Settings", "validate_suite_cloud_credentials")
 
@@ -201,7 +199,8 @@ def activate(site) -> None:
 
 def invite_owner(site) -> bool:
     """Suite's own invite to the owner, sent through Suite Cloud: they choose their password when
-    they accept, so none is ever sent."""
+    they accept, so none is ever sent. Suite then takes them through its setup wizard, which marks
+    the site onboarded."""
 
     invite = site.get_site_client().create_doc(
         "Mail Account Request",
