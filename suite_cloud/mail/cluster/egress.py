@@ -329,7 +329,8 @@ def gateway_plan(gateway: Document) -> list[dict]:
     # Each gateway signs its own mail (delivery status notifications) from a domain named after
     # itself. Gateways run separate Stalwarts with separate keys, so a domain shared between them
     # would publish clashing DKIM selectors. The certificate also covers the egress sub-zone, which
-    # every pool hostname sits under, so the relay listeners present it for any pool.
+    # every pool hostname sits under, so the relay listeners present it for any pool. The names
+    # replace the domain's own, so the hostname is listed too.
     domain = {
         "name": gateway.hostname,
         "description": "Gateway domain",
@@ -337,7 +338,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
         "certificateManagement": {
             "@type": "Automatic",
             "acmeProviderId": "#acme",
-            "subjectAlternativeNames": plan.as_set([f"*.{zone}"]),
+            "subjectAlternativeNames": plan.as_set([gateway.hostname, f"*.{zone}"]),
         },
         "dkimManagement": dkim_management_payload(dkim_algorithms()),
         "dnsManagement": {
