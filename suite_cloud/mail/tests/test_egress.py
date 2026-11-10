@@ -405,7 +405,7 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(domain["name"], self.gateway.hostname)
         self.assertEqual(
             domain["certificateManagement"]["subjectAlternativeNames"],
-            {f"*.out.{self.cluster.default_domain}": True},
+            {self.gateway.hostname: True, f"*.out.{self.cluster.default_domain}": True},
         )
         self.assertEqual(domain["dkimManagement"]["algorithms"], {"Dkim1RsaSha256": True})
         self.assertEqual(operations["SystemSettings"]["value"]["defaultDomainId"], "#gateway")
