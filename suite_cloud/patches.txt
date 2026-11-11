@@ -40,3 +40,4 @@ suite_cloud.patches.v1_0.rename_suite_cloud_token
 suite_cloud.patches.v1_0.rename_telemetry_user
 suite_cloud.patches.v1_0.fill_outbound_scan_defaults
 suite_cloud.patches.v1_0.clear_redis_store_default_username
+suite_cloud.patches.v1_0.keep_pool_addresses_on_public_ip

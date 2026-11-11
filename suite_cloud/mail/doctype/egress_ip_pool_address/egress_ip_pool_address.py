@@ -14,16 +14,22 @@ class EgressIPPoolAddress(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
+        bind_to_private_ip: DF.Check
         ehlo_hostname: DF.Data
         gateway: DF.Link
         ip_address: DF.Data
         parent: DF.Data
         parentfield: DF.Data
         parenttype: DF.Data
+        private_ip_address: DF.Data | None
         ptr_verified: DF.Check
     # end: auto-generated types
 
-    pass
+    @property
+    def source_ip(self) -> str:
+        """The address the gateway binds to; the provider maps a private one to the public IP."""
+
+        return self.private_ip_address if self.bind_to_private_ip else self.ip_address
 
 
 def on_doctype_update() -> None:

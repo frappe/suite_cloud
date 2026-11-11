@@ -295,7 +295,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "description": f"Egress pool {pool.pool_name}",
             "ehloHostname": gateway.hostname,
             "sourceIps": plan.as_list(
-                [{"sourceIp": a.ip_address, "ehloHostname": a.ehlo_hostname} for a in addresses]
+                [{"sourceIp": a.source_ip, "ehloHostname": a.ehlo_hostname} for a in addresses]
             ),
         }
         # The connection strategy is chosen at delivery time, where the listener is no longer

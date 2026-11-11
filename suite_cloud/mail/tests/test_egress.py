@@ -78,7 +78,9 @@ class TestEgress(IntegrationTestCase):
             {
                 "doctype": "Egress IP Pool",
                 "cluster": self.cluster.name,
-                "addresses": [{"gateway": self.gateway.name, "ip_address": ip} for ip in ips],
+                "addresses": [
+                    {"gateway": self.gateway.name, "ip_address": ip, "bind_to_private_ip": 0} for ip in ips
+                ],
                 **fields,
             }
         )
@@ -477,6 +479,48 @@ class TestEgress(IntegrationTestCase):
         self.assertIn('"object":"DnsResolver"', variables["defaults_ndjson"])
         self.assertIn('"@type":"RocksDb"', variables["bootstrap_ndjson"])
         self.assertIn(pool.pool_name, variables["cluster_ndjson"])
+
+    def test_a_pool_address_can_send_from_its_private_ip(self) -> None:
+        """On AWS an Elastic IP is not on the instance: Stalwart binds to the private IP it maps to."""
+
+        row = {"gateway": self.gateway.name, "ip_address": "203.0.113.51"}
+        pool = frappe.get_doc(
+            {
+                "doctype": "Egress IP Pool",
+                "cluster": self.cluster.name,
+                "addresses": [{**row, "private_ip_address": "172.31.8.200"}],
+            }
+        ).insert()
+        self.assertTrue(pool.addresses[0].bind_to_private_ip)  # on by default
+        operations = {op["object"]: op for op in egress.gateway_plan(self.gateway)}
+        self.assertEqual(
+            operations["MtaConnectionStrategy"]["value"]["p1"]["sourceIps"]["0"]["sourceIp"], "172.31.8.200"
+        )
+        # DNS keeps the public IP.
+        self.assertEqual(
+            frappe.db.get_value("DNS Record", {"managed_by": pool.name, "host": "p1-1.mail.blr"}, "value"),
+            "203.0.113.51",
+        )
+
+        pool.addresses[0].bind_to_private_ip = 0
+        pool.save()
+        self.assertIsNone(pool.addresses[0].private_ip_address)
+        operations = {op["object"]: op for op in egress.gateway_plan(self.gateway)}
+        self.assertEqual(
+            operations["MtaConnectionStrategy"]["value"]["p1"]["sourceIps"]["0"]["sourceIp"], "203.0.113.51"
+        )
+
+        for case, rows in {
+            "no private IP": [row],
+            "another IP version": [{**row, "private_ip_address": "fd00::1"}],
+            "a shared private IP": [
+                {**row, "private_ip_address": "172.31.8.200"},
+                {**row, "ip_address": "203.0.113.52", "private_ip_address": "172.31.8.200"},
+            ],
+        }.items():
+            with self.subTest(case):
+                pool.set("addresses", rows)
+                self.assertRaises(frappe.ValidationError, pool.save)
 
     def test_a_failed_ptr_lookup_keeps_the_last_state(self) -> None:
         pool = self.make_pool()
