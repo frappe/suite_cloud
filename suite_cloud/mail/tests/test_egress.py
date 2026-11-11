@@ -182,6 +182,25 @@ class TestEgress(IntegrationTestCase):
         # A typed pool name is ignored: names are handed out in order.
         self.assertEqual(self.make_pool(("203.0.113.54",), pool_name="custom").pool_name, "p3")
 
+    def test_check_sets_the_gateway_default_certificate(self) -> None:
+        """Clients without SNI get the gateway's certificate instead of a warning."""
+
+        self.gateway.db_set("status", "Active")
+        gateway_fake = FakeStalwart(
+            base_url=self.gateway.base_url, admin_password=self.gateway.get_password("admin_password")
+        )
+        gateway_fake.objects["Certificate"]["cert1"] = {
+            "id": "cert1",
+            "subjectAlternativeNames": {
+                f"*.out.{self.cluster.default_domain}": True,
+                self.gateway.hostname: True,
+            },
+        }
+        with gateway_fake.install():
+            forget_sessions(self.gateway)
+            self.assertTrue(egress.check_gateway(self.gateway))
+        self.assertEqual(gateway_fake.singletons["SystemSettings"]["defaultCertificateId"], "cert1")
+
     def test_a_pool_change_pushes_the_cluster_before_its_gateways(self) -> None:
         pool = self.make_pool()
         self.gateway.db_set("status", "Active")

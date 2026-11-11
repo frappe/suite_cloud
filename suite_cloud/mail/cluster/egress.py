@@ -564,12 +564,14 @@ def after_gateway_provision(gateway: Document, job: Document) -> None:
 def check_gateway(gateway: Document) -> bool:
     """Activates a provisioned gateway once its certificate is live; then wires the cluster to it."""
 
-    from suite_cloud.mail.cluster.bootstrap import ensure_api_key
+    from suite_cloud.mail.cluster.bootstrap import ensure_api_key, set_default_certificate
 
     if gateway.status not in ("Provisioned", "Active"):
         return False
     try:
-        ensure_api_key(gateway, gateway.get_admin_client())
+        admin = gateway.get_admin_client()
+        ensure_api_key(gateway, admin)
+        set_default_certificate(gateway, admin)
     except StalwartError as e:
         started = get_datetime(gateway.provisioned_at or now())
         expired = get_datetime(now()) > add_to_date(started, minutes=GATEWAY_DEADLINE_MINUTES)
