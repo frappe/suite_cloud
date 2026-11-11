@@ -201,6 +201,32 @@ class TestEgress(IntegrationTestCase):
             self.assertTrue(egress.check_gateway(self.gateway))
         self.assertEqual(gateway_fake.singletons["SystemSettings"]["defaultCertificateId"], "cert1")
 
+    def test_activation_adds_the_gateway_to_its_pool_hostnames(self) -> None:
+        """A pool made while its gateway was provisioning got no p1.out record, and activation added none."""
+
+        pool = self.make_pool()
+        pool_host = {"managed_by": pool.name, "host": "p1.out.mail.blr"}
+        self.gateway.db_set("status", "Provisioned")
+        self.assertFalse(frappe.db.exists("DNS Record", pool_host))
+
+        gateway_fake = FakeStalwart(
+            base_url=self.gateway.base_url, admin_password=self.gateway.get_password("admin_password")
+        )
+        with gateway_fake.install(), patch.object(egress, "resync_cluster"):
+            forget_sessions(self.gateway)
+            self.assertTrue(egress.check_gateway(self.gateway))
+        self.assertEqual(self.gateway.status, "Active")
+        self.assertEqual(frappe.db.get_value("DNS Record", pool_host, "value"), "203.0.113.50")
+
+        job = frappe._dict(name="job")
+        with (
+            patch.object(egress, "check_gateway"),
+            patch("suite_cloud.telemetry.install.mark_token_installed"),
+        ):
+            egress.after_gateway_provision(self.gateway, job)  # a re-provision stops serving for a while
+        self.assertEqual(self.gateway.status, "Provisioned")
+        self.assertFalse(frappe.db.exists("DNS Record", pool_host))
+
     def test_a_pool_change_pushes_the_cluster_before_its_gateways(self) -> None:
         pool = self.make_pool()
         self.gateway.db_set("status", "Active")
