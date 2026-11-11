@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+from urllib.parse import quote, urlsplit, urlunsplit
 from uuid import uuid7
 
 import frappe
@@ -138,6 +139,8 @@ class MailStore(Document):
             self.port = 5432 if self.type == "PostgreSql" else 3306
         if self.type == "S3":
             self.validate_s3_region()
+        if self.type == "Redis":
+            self.validate_redis_login()
 
     def validate_s3_region(self) -> None:
         """A region Stalwart does not name can only be reached through an endpoint."""
@@ -150,6 +153,26 @@ class MailStore(Document):
                     "Stalwart has no built-in endpoint for region {0}. Set the Endpoint, e.g. {1} for AWS."
                 ).format(self.region, f"https://s3.{self.region}.amazonaws.com")
             )
+
+    def validate_redis_login(self) -> None:
+        """The login lives in one place: the fields, or the URL of a store set up before them."""
+
+        if self.auth_username and not self.auth_secret:
+            frappe.throw(_("Set a Password for the Username, or clear the Username."))
+        if self.auth_secret and "@" in urlsplit(self.url or "").netloc:
+            frappe.throw(_("The URL already holds a login. Put it in Username and Password only."))
+
+    @property
+    def redis_url(self) -> str:
+        """The URL with the Username and Password as its login: Stalwart's Redis store and Rspamd
+        both take the login from the URL only."""
+
+        password = self.get_password("auth_secret", raise_exception=False) if self.auth_secret else None
+        if not password:
+            return self.url
+        url = urlsplit(self.url)
+        login = f"{quote(self.auth_username or '', safe='')}:{quote(password, safe='')}"
+        return urlunsplit(url._replace(netloc=f"{login}@{url.netloc}"))
 
     def on_trash(self) -> None:
         for field in STORE_FIELDS:
@@ -271,7 +294,7 @@ class MailStore(Document):
         }
 
     def _config_redis(self) -> dict:
-        return {"url": self.url, **self._pool()}
+        return {"url": self.redis_url, **self._pool()}
 
     def _config_rediscluster(self) -> dict:
         return {

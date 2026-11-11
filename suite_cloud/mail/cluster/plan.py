@@ -11,6 +11,7 @@ SpamSettings are also the defaults plan, applied before the first normal start.
 import hashlib
 import json
 from typing import TYPE_CHECKING
+from urllib.parse import unquote, urlsplit
 
 import frappe
 
@@ -511,6 +512,8 @@ def _collect_secrets(value, found: list[str]) -> None:
         for key, item in value.items():
             if key in SECRET_KEYS and isinstance(item, str) and item:
                 found.append(item)
+            elif password := url_password(key, item):
+                found.extend([password, unquote(password)])  # as the plan and the server spell it
             else:
                 _collect_secrets(item, found)
     elif isinstance(value, list):
@@ -551,13 +554,29 @@ def _redact(value):
     if isinstance(value, dict):
         if value.get("@type") == "Value" and "secret" in value:
             return {"@type": "Value", "secret": SECRET_MARKER}
-        return {
-            k: (SECRET_MARKER if k in SECRET_KEYS and isinstance(v, str) else _redact(v))
-            for k, v in value.items()
-        }
+        return {k: _redact_item(k, v) for k, v in value.items()}
     if isinstance(value, list):
         return [_redact(v) for v in value]
     return value
+
+
+def _redact_item(key: str, value):
+    if key in SECRET_KEYS and isinstance(value, str):
+        return SECRET_MARKER
+    if password := url_password(key, value):
+        return value.replace(f":{password}@", f":{SECRET_MARKER}@", 1)
+    return _redact(value)
+
+
+def url_password(key: str, value) -> str | None:
+    """The password in a ``url`` value such as ``redis://user:password@host``, as written there."""
+
+    if key != "url" or not isinstance(value, str):
+        return None
+    try:
+        return urlsplit(value).password
+    except ValueError:  # not a URL: nothing to hide
+        return None
 
 
 # --- drift ------------------------------------------------------------------------------------
