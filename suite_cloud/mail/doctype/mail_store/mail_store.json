@@ -106,7 +106,7 @@
    "fieldname": "connection_section",
    "fieldtype": "Section Break",
    "label": "Connection",
-   "depends_on": "eval: [\"PostgreSql\", \"MySql\", \"RedisCluster\", \"RedisSentinel\"].includes(doc.type)"
+   "depends_on": "eval: [\"PostgreSql\", \"MySql\", \"Redis\", \"RedisCluster\", \"RedisSentinel\"].includes(doc.type)"
   },
   {
    "fieldname": "host",
@@ -135,11 +135,10 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "stalwart",
    "fieldname": "auth_username",
    "fieldtype": "Data",
    "label": "Username",
-   "description": "Optional for Redis Cluster and Sentinel."
+   "description": "Blank uses stalwart for PostgreSQL and MySQL. Optional for Redis: leave it blank for a server with only a password."
   },
   {
    "fieldname": "auth_secret",
@@ -528,7 +527,7 @@
    "link_fieldname": "outbound_scan_store"
   }
  ],
- "modified": "2026-11-06 10:00:00.000000",
+ "modified": "2026-11-11 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Store",

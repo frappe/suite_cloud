@@ -292,6 +292,34 @@ class TestStalwartCluster(IntegrationTestCase):
         )
         self.assertRaisesRegex(frappe.ValidationError, "Data store", cluster.insert)
 
+    def test_a_redis_store_keeps_its_password_out_of_sight(self) -> None:
+        """Stalwart takes a Redis login in the URL only; the store keeps it in its Password field."""
+
+        url = "redis://[fdaa:1:0:4::89]:6379"
+        store = make_store("In-Memory", "Redis", url=url, auth_secret="p@ss:w/rd")
+        self.assertEqual(store.config["url"], "redis://:p%40ss%3Aw%2Frd@[fdaa:1:0:4::89]:6379")
+        store.auth_username = "mail"
+        store.save()
+        operations = [{"@type": "update", "object": "InMemoryStore", "value": store.config}]
+        self.assertEqual(operations[0]["value"]["url"], "redis://mail:p%40ss%3Aw%2Frd@[fdaa:1:0:4::89]:6379")
+        redacted = plan.redacted(operations)
+        self.assertNotIn("p%40ss", redacted)
+        self.assertIn(f"redis://mail:{plan.SECRET_MARKER}@[fdaa:1:0:4::89]:6379", redacted)
+        # Job output is masked in both spellings, and a new password changes the plan marker.
+        self.assertEqual(plan.secret_strings(operations), ["p%40ss%3Aw%2Frd", "p@ss:w/rd"])
+        before = plan.marker(operations)
+        store.auth_secret = "rotated"
+        store.save()
+        self.assertNotEqual(plan.marker([{**operations[0], "value": store.config}]), before)
+
+        self.assertEqual(make_store("In-Memory", "Redis", url=url).config["url"], url)
+        for case, fields in {
+            "a login in the URL too": {"url": "redis://u:p@redis.example.test", "auth_secret": "x"},
+            "a username without a password": {"url": url, "auth_username": "mail"},
+        }.items():
+            with self.subTest(case):
+                self.assertRaises(frappe.ValidationError, make_store, "In-Memory", "Redis", **fields)
+
     def test_s3_store_names_its_region_or_carries_its_endpoint(self) -> None:
         bucket = {"bucket": "mail", "access_key": "AK", "secret_key": "SK"}
 
