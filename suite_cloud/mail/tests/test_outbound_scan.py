@@ -285,6 +285,23 @@ class TestRspamd(OutboundScanTestCase):
         self.cluster.db_set("outbound_scan_store", None)
         self.assertEqual(rspamd.get_rspamd_files(self.cluster), without)
 
+    def test_the_outbound_scan_store_takes_the_password_field(self) -> None:
+        store = make_store("In-Memory", "Redis", url="redis://[fdaa:1:0:4::89]:6379", auth_secret='p@s"s')
+        self.cluster.db_set("outbound_scan_store", store.name)
+
+        self.assertEqual(
+            rspamd.get_redis_options(store),
+            {"servers": "[fdaa:1:0:4::89]:6379", "timeout": rspamd.REDIS_TIMEOUT, "password": 'p@s"s'},
+        )
+        fuzzy = rspamd.get_rspamd_files(self.cluster)["/etc/rspamd/local.d/worker-fuzzy.inc"]
+        self.assertIn('password = "p@s\\"s";', fuzzy)
+        self.assertEqual(rspamd.get_redis_secrets(self.cluster), ['p@s"s'])
+
+        store.auth_secret = "a{%b"  # Ansible would read it as a template
+        store.save()
+        self.cluster.outbound_scan_store = store.name
+        self.assertRaises(frappe.ValidationError, self.cluster.validate_stores)
+
     def test_the_outbound_scan_store_is_a_plain_redis(self) -> None:
         cases = {
             "Redis Cluster": make_store("In-Memory", "RedisCluster", urls="redis://a.example.test:6379"),

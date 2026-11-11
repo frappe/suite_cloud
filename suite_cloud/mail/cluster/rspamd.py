@@ -179,14 +179,10 @@ def get_redis_options(store: Document) -> dict[str, str | bool]:
 
     if store.kind != "In-Memory" or store.type != "Redis":
         frappe.throw(_("The Outbound Scan Store must be an In-Memory store of type Redis."))
-    url = urlsplit(store.url or "")
+    url = urlsplit(store.redis_url or "")
     database = url.path.strip("/")
     if url.scheme not in ("redis", "rediss") or not url.hostname or (database and not database.isdigit()):
-        frappe.throw(_("The Outbound Scan Store URL must look like redis://user:password@host:6379/1."))
-    if re.search(r"\{[{%#]", store.url):
-        frappe.throw(
-            _("The Outbound Scan Store URL cannot hold {{, {% or {#: Ansible reads them as a template.")
-        )
+        frappe.throw(_("The Outbound Scan Store URL must look like redis://host:6379/1."))
 
     host = f"[{url.hostname}]" if ":" in url.hostname else url.hostname
     options: dict[str, str | bool] = {"servers": f"{host}:{url.port or 6379}", "timeout": REDIS_TIMEOUT}
@@ -200,6 +196,10 @@ def get_redis_options(store: Document) -> dict[str, str | bool]:
         options["ssl"] = True
         if url.fragment == "insecure":  # Stalwart's way to skip the certificate check
             options["no_ssl_verify"] = True
+    if any(re.search(r"\{[{%#]", str(value)) for value in options.values()):
+        frappe.throw(
+            _("The Outbound Scan Store login cannot hold {{, {% or {#: Ansible reads them as a template.")
+        )
     return options
 
 
