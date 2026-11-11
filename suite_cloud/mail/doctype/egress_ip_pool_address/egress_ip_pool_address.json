@@ -7,6 +7,8 @@
  "field_order": [
   "gateway",
   "ip_address",
+  "bind_to_private_ip",
+  "private_ip_address",
   "column_break_address",
   "ehlo_hostname",
   "ptr_verified",
@@ -24,12 +26,27 @@
   },
   {
    "columns": 2,
-   "description": "Public IP for outbound mail. It must be configured on the gateway.",
+   "description": "Public IP for outbound mail. DNS, SPF and reverse DNS use it.",
    "fieldname": "ip_address",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "IP Address",
    "reqd": 1
+  },
+  {
+   "default": "1",
+   "description": "The provider maps the public IP to a private one on the gateway (AWS, GCP, Azure), so the gateway sends from the private IP. Turn off when the public IP is configured on the gateway itself.",
+   "fieldname": "bind_to_private_ip",
+   "fieldtype": "Check",
+   "label": "Bind to Private IP"
+  },
+  {
+   "depends_on": "bind_to_private_ip",
+   "description": "The private IP the public IP is mapped to, configured on the gateway, e.g. 172.31.8.200.",
+   "fieldname": "private_ip_address",
+   "fieldtype": "Data",
+   "label": "Private IP Address",
+   "mandatory_depends_on": "bind_to_private_ip"
   },
   {
    "fieldname": "column_break_address",
@@ -65,7 +82,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-10-28 17:45:14.960660",
+ "modified": "2026-11-11 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress IP Pool Address",

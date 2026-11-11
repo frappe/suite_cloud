@@ -59,6 +59,7 @@ class EgressIPPool(Document):
         seen: set[str] = set()
         for row in self.addresses:
             row.ip_address = validate_ip(row.ip_address, 6 if ":" in (row.ip_address or "") else 4)
+            self.validate_private_ip(row)
             row.ehlo_hostname = (row.ehlo_hostname or "").strip().lower().rstrip(".")
             if row.ip_address in seen:
                 frappe.throw(_("Address {0} is listed twice.").format(row.ip_address))
@@ -80,6 +81,25 @@ class EgressIPPool(Document):
             if other:
                 frappe.throw(_("Address {0} already belongs to pool {1}.").format(row.ip_address, other))
 
+    def validate_private_ip(self, row: Document) -> None:
+        """A private IP is the public one's twin on the gateway, so it shares its version and gateway."""
+
+        if not row.bind_to_private_ip:
+            row.private_ip_address = None
+            return
+        if not row.private_ip_address:
+            frappe.throw(
+                _("Set the Private IP Address of {0}, or turn off Bind to Private IP.").format(row.ip_address)
+            )
+        row.private_ip_address = validate_ip(row.private_ip_address, 6 if ":" in row.ip_address else 4)
+        twins = [
+            other.ip_address
+            for other in self.addresses
+            if other.gateway == row.gateway and other.source_ip == row.private_ip_address
+        ]
+        if len(twins) > 1:
+            frappe.throw(_("Addresses {0} share a private IP.").format(", ".join(twins)))
+
     def next_relay_port(self) -> int:
         ports = frappe.get_all("Egress IP Pool", {"cluster": self.cluster}, pluck="relay_port")
         return max([FIRST_RELAY_PORT - 1, *[p for p in ports if p]]) + 1
@@ -94,7 +114,9 @@ class EgressIPPool(Document):
 
     @staticmethod
     def snapshot(doc: Document) -> tuple:
-        addresses = sorted((r.gateway, r.ip_address, r.ehlo_hostname) for r in doc.addresses)
+        addresses = sorted(
+            (r.gateway, r.ip_address, r.source_ip or "", r.ehlo_hostname) for r in doc.addresses
+        )
         return (doc.relay_port, doc.hostname, tuple(addresses))
 
     def on_trash(self) -> None:
