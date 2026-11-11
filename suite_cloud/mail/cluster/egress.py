@@ -555,9 +555,9 @@ def after_gateway_provision(gateway: Document, job: Document) -> None:
 
     mark_token_installed(gateway)  # while the gateway is not running yet, so the push follows no change
     gateway.db_set(
-        {"status": "Provisioned", "provisioned_at": now(), "installed_version": gateway.stalwart_version},
-        update_modified=False,
+        {"provisioned_at": now(), "installed_version": gateway.stalwart_version}, update_modified=False
     )
+    gateway.set_status("Provisioned")  # through set_status, so a re-provisioned gateway leaves its pools
     check_gateway(gateway)
 
 
@@ -582,9 +582,8 @@ def check_gateway(gateway: Document) -> bool:
         return False
 
     if gateway.status != "Active":
-        gateway.db_set(
-            {"status": "Active", "last_error": None, "last_config_sync_at": now()}, update_modified=False
-        )
+        gateway.db_set({"last_error": None, "last_config_sync_at": now()}, update_modified=False)
+        gateway.set_status("Active")  # through set_status, so the pool hostnames list the gateway
         resync_cluster(gateway.get_cluster())
     return True
 
