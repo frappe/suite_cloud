@@ -308,7 +308,7 @@ def finish_bootstrap(cluster: Document) -> bool:
     try:
         admin = cluster.get_admin_client()
         ensure_api_key(cluster, admin)
-        _set_default_certificate(cluster, admin)
+        set_default_certificate(cluster, admin)
         registry = admin.cluster_nodes.find_by_hostname(node.hostname)
         problem = _registry_problem(cluster, registry)
     except StalwartError as e:
@@ -366,8 +366,12 @@ def _api_key_works(target: Document) -> bool:
     return True
 
 
-def _set_default_certificate(cluster: Document, client) -> None:
-    """Non-SNI clients (SMTP) need a default certificate; pick the issued one for the hostname."""
+def set_default_certificate(target: Document, client) -> None:
+    """Non-SNI clients (SMTP) need a default certificate; pick the issued one for the hostname.
+
+    Without one, Stalwart serves any certificate it holds and logs "Multiple TLS certificates
+    available" whenever it holds more than one name.
+    """
 
     try:
         for certificate in client.objects("Certificate").get_all(
@@ -375,11 +379,11 @@ def _set_default_certificate(cluster: Document, client) -> None:
         ):
             names = certificate.get("subjectAlternativeNames") or []
             names = list(names.keys()) if isinstance(names, dict) else list(names)
-            if cluster.hostname in names:
+            if target.hostname in names:
                 client.singleton("SystemSettings").write({"defaultCertificateId": certificate["id"]})
                 return
     except StalwartError:
-        log_exception(f"Could not pick a default certificate for {cluster.name}", cluster)
+        log_exception(f"Could not pick a default certificate for {target.name}", target)
 
 
 # --- draining / removal -----------------------------------------------------------------------
