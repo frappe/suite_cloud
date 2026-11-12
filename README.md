@@ -107,6 +107,10 @@ contact email; everything else sits at permission level 1, for System Managers.
    service and firewall, starts Stalwart once to write the store settings, applies the cluster
    configuration (roles, coordinator, certificate provider, wildcard certificate, system settings),
    and restarts it normally with the temporary admin credential removed.
+   A data store restored from another Stalwart is already initialised. The job then skips the
+   first start and applies the cluster configuration at once, stores included, so the hostname,
+   the stores and the admin password become this cluster's. To keep serving the old server's
+   hostname, list it in **Additional Hostnames**: the cluster's certificate then carries it too.
 6. **Finish bootstrap.** Once the certificate is issued, **Finish Bootstrap** (also tried every
    five minutes) creates the management API key and marks the cluster **Active**. The cluster
    hostname now points at this node.

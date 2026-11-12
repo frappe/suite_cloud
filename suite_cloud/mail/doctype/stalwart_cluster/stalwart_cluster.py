@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import re
 from collections.abc import Iterator
 from contextlib import contextmanager
 
@@ -29,6 +30,7 @@ from suite_cloud.utils import dkim_algorithms, get_config, log_error, log_except
 
 PUSH_TIMEOUT = 300  # seconds a config push may hold its cluster's lock, and wait for it by default
 SYNC_CONFIG_WAIT = 20  # seconds Sync Config waits for the lock, well inside a web worker's timeout
+HOSTNAME = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$")
 STORE_KINDS = {
     "data_store": "Data",
     "blob_store": "Blob",
@@ -48,6 +50,7 @@ class StalwartCluster(Document):
 
         acme_contact_email: DF.Data | None
         acme_directory_url: DF.Data | None
+        additional_hostnames: DF.SmallText | None
         admin_password: DF.Password | None
         admin_username: DF.Data | None
         api_key: DF.Password | None
@@ -104,6 +107,7 @@ class StalwartCluster(Document):
     def validate(self) -> None:
         validate_ssh_user_field(self)
         self.validate_names()
+        self.validate_additional_hostnames()
         self.apply_defaults()
         self.validate_stores()
         self.validate_default()
@@ -139,7 +143,10 @@ class StalwartCluster(Document):
             self.db_set("status", "Disabled")
         elif not before.enabled and self.enabled and self.status == "Disabled":
             self.db_set("status", "Active")
-        if before.default_egress_pool != self.default_egress_pool:
+        if (before.default_egress_pool, before.additional_hostnames) != (
+            self.default_egress_pool,
+            self.additional_hostnames,
+        ):
             push.resync_cluster_after_commit(self.name)
 
     def on_trash(self) -> None:
@@ -189,6 +196,23 @@ class StalwartCluster(Document):
         title = frappe.get_cached_value("Mail Region", self.region, "title")
         sequence = self.label.removeprefix(self.region).replace("-", " ")
         return f"{title}{sequence}"
+
+    def validate_additional_hostnames(self) -> None:
+        """The certificate is issued through the zone's DNS provider, so every name must be in the
+        zone; one the default domain's names cover already would be refused as redundant."""
+
+        hostnames = list(dict.fromkeys(h.lower().rstrip(".") for h in self.additional_hostname_list))
+        for hostname in hostnames:
+            if not HOSTNAME.match(hostname) or not hostname.endswith(f".{self.dns_zone}"):
+                frappe.throw(_("{0} is not a hostname in the zone {1}.").format(hostname, self.dns_zone))
+            parent = hostname.split(".", 1)[1]
+            if self.default_domain in (hostname, parent):
+                frappe.throw(_("The certificate already covers {0}.").format(hostname))
+        self.additional_hostnames = "\n".join(hostnames) or None
+
+    @property
+    def additional_hostname_list(self) -> list[str]:
+        return (self.additional_hostnames or "").split()
 
     def apply_defaults(self) -> None:
         self.stalwart_version = validate_version(
