@@ -149,6 +149,7 @@ def build_node_variables(context: dict) -> dict:
         "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := plan.bootstrap_plan(cluster)),
         "defaults_ndjson": plan.to_ndjson(plan.defaults_plan()),
         "cluster_ndjson": plan.to_ndjson(recovery_plan),
+        "unlink_certificates_ndjson": plan.to_ndjson(plan.unlink_certificates_plan(cluster)),
         "__secret_keys__": list(SECRET_VARIABLES),
         "__secret_values__": [
             cluster.get_password("admin_password"),
@@ -200,6 +201,8 @@ def after_provision(node: Document, job: Document) -> None:
         update_modified=False,
     )
     if node.is_bootstrap_node:
+        # One use only: a later recovery stage would delete the certificates Stalwart got since.
+        cluster.db_set("remove_existing_certificates", 0, update_modified=False)
         # The certificate check goes through the cluster hostname, so it must resolve to us.
         dns.sync_node_records(node, include_ingress=True)
     else:

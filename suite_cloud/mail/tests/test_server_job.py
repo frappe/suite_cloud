@@ -67,6 +67,11 @@ class TestServerJob(IntegrationTestCase):
         self.assertEqual(names[0], "Ensure a Debian-family host")  # from install-stalwart.yml
         self.assertIn("Install the Stalwart binary", names)  # inside a block
         self.assertIn("Apply the cluster plan", names)
+        # stalwart-cli runs destroys first, so the default certificate is unlinked by an earlier plan.
+        self.assertLess(
+            names.index("Apply the plan that clears the default certificate"),
+            names.index("Apply the cluster plan"),
+        )
         # Stalwart is pointed at Unbound, so Unbound must answer before Stalwart is installed.
         self.assertLess(
             names.index("Check that Unbound validates DNSSEC"), names.index("Install the Stalwart binary")

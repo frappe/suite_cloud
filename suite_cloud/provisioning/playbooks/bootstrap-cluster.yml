@@ -206,6 +206,23 @@
             group: stalwart
             mode: "0600"
 
+        # stalwart-cli runs a plan's destroys first, and Stalwart keeps a certificate that is
+        # still the default: so the default is cleared by a plan of its own.
+        - name: Clear the default certificate
+          when: unlink_certificates_ndjson | default('') | length > 0
+          block:
+            - name: Write the plan that clears the default certificate
+              copy:
+                content: "{{ unlink_certificates_ndjson }}"
+                dest: /etc/stalwart/unlink-certificates.ndjson
+                owner: stalwart
+                group: stalwart
+                mode: "0600"
+
+            - name: Apply the plan that clears the default certificate
+              command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/unlink-certificates.ndjson --json
+              environment: "{{ cli_env }}"
+
         - name: Apply the cluster plan
           command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/cluster.ndjson --json
           environment: "{{ cli_env }}"
@@ -221,6 +238,11 @@
         - name: Remove the cluster plan
           file:
             path: /etc/stalwart/cluster.ndjson
+            state: absent
+
+        - name: Remove the plan that clears the default certificate
+          file:
+            path: /etc/stalwart/unlink-certificates.ndjson
             state: absent
 
         - name: Write the runtime environment after the recovery stage

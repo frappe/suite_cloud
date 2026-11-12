@@ -78,6 +78,7 @@ class StalwartCluster(Document):
         region: DF.Link
         relay_password: DF.Password | None
         relay_username: DF.Data | None
+        remove_existing_certificates: DF.Check
         search_store: DF.Link | None
         single_node: DF.Check
         ssh_port: DF.Int
