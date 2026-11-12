@@ -25,6 +25,7 @@
   "column_break_tls",
   "acme_contact_email",
   "additional_hostnames",
+  "remove_existing_certificates",
   "placement_section",
   "is_default",
   "stores_tab",
@@ -206,6 +207,13 @@
    "fieldname": "additional_hostnames",
    "fieldtype": "Small Text",
    "label": "Additional Hostnames"
+  },
+  {
+   "default": "0",
+   "description": "For a data store restored from another server. The next provision of the first node deletes every certificate in the data store, and Stalwart gets new ones. Clears itself when that provision passes.",
+   "fieldname": "remove_existing_certificates",
+   "fieldtype": "Check",
+   "label": "Remove Existing Certificates"
   },
   {
    "fieldname": "placement_section",

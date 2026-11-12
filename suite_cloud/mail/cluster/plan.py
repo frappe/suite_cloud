@@ -329,12 +329,28 @@ def recovery_plan(cluster: Document) -> list[dict]:
     Stalwart provisions its built-in roles and inbound throttles only on a normal start that
     finds none, so the plan must not create any: the disabled-accounts role and the quota
     backstop are pushed once the cluster is active. The admin password is pinned here and only
-    here (see the helper), and so are the stores and the HTTPS port.
+    here (see the helper), and so are the stores and the HTTPS port. A restored data store's
+    certificates go here too, when the operator asks.
     """
 
     operations = [op for op in cluster_plan(cluster) if op["object"] not in DEFAULTS_PROVISIONED_BY_STALWART]
     operations.append(admin_account_operation(cluster, domain="#default"))
-    return [*store_operations(cluster), https_listener_operation(), *operations]
+    operations = [*store_operations(cluster), https_listener_operation(), *operations]
+    if cluster.remove_existing_certificates:
+        operations.insert(0, {"@type": "destroy", "object": "Certificate"})  # no filter: every one
+    return operations
+
+
+def unlink_certificates_plan(cluster: Document) -> list[dict]:
+    """Clears the default certificate, which Stalwart refuses to delete while it is linked.
+
+    A plan of its own, applied before the recovery plan: stalwart-cli runs the destroys of a plan
+    before its updates.
+    """
+
+    if not cluster.remove_existing_certificates:
+        return []
+    return [{"@type": "update", "object": "SystemSettings", "value": {"defaultCertificateId": None}}]
 
 
 def https_listener_operation() -> dict:

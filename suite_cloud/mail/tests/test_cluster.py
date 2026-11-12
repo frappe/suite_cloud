@@ -548,7 +548,12 @@ class TestStalwartCluster(IntegrationTestCase):
             node.reload()
 
             # No registry lease yet: a Redis-coordinated cluster keeps waiting (nothing fails).
+            cluster.db_set("remove_existing_certificates", 1)
             bootstrap.after_provision(node, job)
+            # One use only: the next recovery stage must not delete the new certificates.
+            self.assertFalse(
+                frappe.db.get_value("Stalwart Cluster", cluster.name, "remove_existing_certificates")
+            )
             self.assertEqual(frappe.db.get_value("Stalwart Cluster", cluster.name, "status"), "Bootstrapping")
 
             fake.add_cluster_node(node.hostname, node_id=7)
@@ -765,6 +770,21 @@ class TestStalwartCluster(IntegrationTestCase):
         account = operation["value"]["admin"]
         self.assertEqual((account["name"], account["domainId"]), ("admin", "#default"))
         self.assertEqual(account["roles"], {"@type": "Admin"})
+
+    def test_the_recovery_stage_removes_certificates_on_request(self) -> None:
+        # A restored data store holds certificates that read files the new nodes do not have.
+        cluster = make_cluster()
+        self.assertEqual(plan.unlink_certificates_plan(cluster), [])
+        self.assertNotIn("Certificate", [op["object"] for op in plan.recovery_plan(cluster)])
+
+        cluster.remove_existing_certificates = 1
+        self.assertEqual(plan.recovery_plan(cluster)[0], {"@type": "destroy", "object": "Certificate"})
+        # Stalwart keeps a certificate that is still the default, so that link goes first.
+        self.assertEqual(
+            plan.unlink_certificates_plan(cluster),
+            [{"@type": "update", "object": "SystemSettings", "value": {"defaultCertificateId": None}}],
+        )
+        self.assertNotIn("Certificate", [op["object"] for op in plan.cluster_plan(cluster)])
 
     def test_bootstrap_and_cluster_plans(self) -> None:
         cluster = make_cluster()
