@@ -753,6 +753,15 @@ class TestStalwartCluster(IntegrationTestCase):
         )
         self.assertIn("SK", plan.secret_strings(operations))
 
+    def test_the_recovery_stage_creates_a_missing_administrator(self) -> None:
+        # A restored data store may hold no administrator, or a mailbox of the same name elsewhere.
+        cluster = make_cluster()
+        operation = plan.recovery_plan(cluster)[-1]
+        self.assertEqual(operation["matchOn"], ["name", "domainId"])
+        account = operation["value"]["admin"]
+        self.assertEqual((account["name"], account["domainId"]), ("admin", "#default"))
+        self.assertEqual(account["roles"], {"@type": "Admin"})
+
     def test_bootstrap_and_cluster_plans(self) -> None:
         cluster = make_cluster()
 
