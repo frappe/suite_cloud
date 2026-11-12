@@ -329,12 +329,29 @@ def recovery_plan(cluster: Document) -> list[dict]:
     Stalwart provisions its built-in roles and inbound throttles only on a normal start that
     finds none, so the plan must not create any: the disabled-accounts role and the quota
     backstop are pushed once the cluster is active. The admin password is pinned here and only
-    here (see the helper), and so are the stores.
+    here (see the helper), and so are the stores and the HTTPS port.
     """
 
     operations = [op for op in cluster_plan(cluster) if op["object"] not in DEFAULTS_PROVISIONED_BY_STALWART]
     operations.append(admin_account_operation(cluster, domain="#default"))
-    return [*store_operations(cluster), *operations]
+    return [*store_operations(cluster), https_listener_operation(), *operations]
+
+
+def https_listener_operation() -> dict:
+    """Stalwart's own HTTPS listener, on the port every node is reached at.
+
+    A data store restored from a server that ran behind a proxy has it on another port, and the
+    sign-in page redirects to the hostname on 443. On a new data store this changes nothing.
+    """
+
+    listener = {
+        "name": "https",
+        "protocol": "http",
+        "bind": as_set(["[::]:443"]),
+        "useTls": True,
+        "tlsImplicit": True,
+    }
+    return {"@type": "upsert", "object": "NetworkListener", "matchOn": ["name"], "value": {"https": listener}}
 
 
 STORE_OBJECTS = {"blob_store": "BlobStore", "search_store": "SearchStore", "in_memory_store": "InMemoryStore"}

@@ -743,6 +743,10 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(
             [op["object"] for op in operations[:3]], ["BlobStore", "SearchStore", "InMemoryStore"]
         )
+        # Nodes are reached on 443, whatever port the restored HTTPS listener had.
+        self.assertEqual(operations[3]["object"], "NetworkListener")
+        self.assertEqual(operations[3]["value"]["https"]["bind"], {"[::]:443": True})
+        self.assertNotIn("NetworkListener", [op["object"] for op in plan.cluster_plan(cluster)])
         self.assertEqual(operations[0]["value"]["bucket"], "mail")
         self.assertEqual(operations[1]["value"], {"@type": "Default"})
         self.assertEqual(operations[2]["value"]["url"], "redis://redis.example.test:6379")
