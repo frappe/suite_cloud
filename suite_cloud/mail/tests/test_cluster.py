@@ -715,6 +715,44 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(frappe.db.get_value("Stalwart Node", nodes[1].name, "status"), "Active")
         self.assertEqual(frappe.get_all("DNS Record", ingress, pluck="value"), ["203.0.113.2"])
 
+    def test_additional_hostnames_join_the_certificate(self) -> None:
+        cluster = make_cluster(
+            additional_hostnames=f"Mail.{ROOT_DOMAIN}.\nold.{ROOT_DOMAIN}\nmail.{ROOT_DOMAIN}"
+        )
+        self.assertEqual(cluster.additional_hostnames, f"mail.{ROOT_DOMAIN}\nold.{ROOT_DOMAIN}")
+        domain = {op["object"]: op for op in plan.cluster_plan(cluster)}["Domain"]["value"]["default"]
+        self.assertEqual(
+            domain["certificateManagement"]["subjectAlternativeNames"],
+            {
+                cluster.hostname: True,
+                f"*.{cluster.default_domain}": True,
+                f"mail.{ROOT_DOMAIN}": True,
+                f"old.{ROOT_DOMAIN}": True,
+            },
+        )
+
+        # Issued through the zone's DNS provider; the wildcard covers the cluster's own names.
+        for refused in ("mail.other.test", f"n1.{cluster.default_domain}", cluster.hostname, "not a host"):
+            cluster.additional_hostnames = refused
+            self.assertRaises(frappe.ValidationError, cluster.save)
+
+    def test_the_recovery_stage_writes_the_stores(self) -> None:
+        # A data store restored from another server still names that server's stores.
+        cluster = make_cluster()
+        operations = plan.recovery_plan(cluster)
+        self.assertEqual(
+            [op["object"] for op in operations[:3]], ["BlobStore", "SearchStore", "InMemoryStore"]
+        )
+        self.assertEqual(operations[0]["value"]["bucket"], "mail")
+        self.assertEqual(operations[1]["value"], {"@type": "Default"})
+        self.assertEqual(operations[2]["value"]["url"], "redis://redis.example.test:6379")
+        # A sync must not move a running cluster to other stores.
+        self.assertFalse(
+            {"BlobStore", "SearchStore", "InMemoryStore"}
+            & {op["object"] for op in plan.cluster_plan(cluster)}
+        )
+        self.assertIn("SK", plan.secret_strings(operations))
+
     def test_bootstrap_and_cluster_plans(self) -> None:
         cluster = make_cluster()
 

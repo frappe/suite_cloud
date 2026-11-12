@@ -63,12 +63,16 @@
             and 'bootstrap mode' not in (bootstrap_apply.stdout + bootstrap_apply.stderr)
             and 'already been initialized' not in (bootstrap_apply.stdout + bootstrap_apply.stderr)
 
+        - name: Note a data store that is already initialised
+          set_fact:
+            store_initialised: "{{ 'already been initialized' in (bootstrap_apply.stdout + bootstrap_apply.stderr) }}"
+
         # config.json only names the data store. When the store was initialised by an earlier
         # run but the file is gone, Stalwart refuses to bootstrap again; writing the file back is
         # all that is needed (it is the same file every other node receives).
         - name: Restore config.json for an initialised data store
           no_log: true
-          when: "'already been initialized' in (bootstrap_apply.stdout + bootstrap_apply.stderr)"
+          when: store_initialised
           copy:
             content: "{{ config_json }}"
             dest: /etc/stalwart/config.json
@@ -81,67 +85,73 @@
             path: /etc/stalwart/config.json
             timeout: 120
 
-        # The first normal start names the node's cluster role (it fails when the role is missing),
-        # checks its DNS resolver for DNSSEC (Unbound is already up) and imports the spam filter
-        # rules, once, from wherever SpamSettings points. Only those are written here: an object
-        # Stalwart counts before inserting its defaults (routes, permission roles, tracers) would
-        # suppress them.
-        - name: Create what the first normal start needs
+        # A store that is already initialised, such as one restored from another server, holds
+        # that server's defaults and settings. A normal start now would run them, so the recovery
+        # stage below comes first.
+        - name: Provision the defaults of a new data store
+          when: not store_initialised
           block:
-            - name: Write the recovery environment for the defaults
+            # The first normal start names the node's cluster role (it fails when the role is missing),
+            # checks its DNS resolver for DNSSEC (Unbound is already up) and imports the spam filter
+            # rules, once, from wherever SpamSettings points. Only those are written here: an object
+            # Stalwart counts before inserting its defaults (routes, permission roles, tracers) would
+            # suppress them.
+            - name: Create what the first normal start needs
+              block:
+                - name: Write the recovery environment for the defaults
+                  no_log: true
+                  copy:
+                    content: "{{ env_recovery }}"
+                    dest: /etc/stalwart/stalwart.env
+                    owner: stalwart
+                    group: stalwart
+                    mode: "0600"
+
+                - name: Start Stalwart in recovery mode for the defaults
+                  systemd:
+                    name: stalwart
+                    state: restarted
+
+                - name: Wait for the recovery listener for the defaults
+                  wait_for:
+                    host: 127.0.0.1
+                    port: "{{ recovery_port }}"
+                    timeout: 120
+
+                - name: Write the defaults plan
+                  copy:
+                    content: "{{ defaults_ndjson }}"
+                    dest: /etc/stalwart/defaults.ndjson
+                    owner: stalwart
+                    group: stalwart
+                    mode: "0600"
+
+                - name: Apply the defaults plan
+                  command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/defaults.ndjson --json
+                  environment: "{{ cli_env }}"
+
+            # Stalwart provisions its built-in roles, the default role lists and other defaults only
+            # on a normal start; bootstrap and recovery mode skip that step. Without this start the
+            # administrator (and every account) would resolve to no permissions at all.
+            - name: Write the runtime environment for the first normal start
               no_log: true
               copy:
-                content: "{{ env_recovery }}"
+                content: "{{ env_normal }}"
                 dest: /etc/stalwart/stalwart.env
                 owner: stalwart
                 group: stalwart
                 mode: "0600"
 
-            - name: Start Stalwart in recovery mode for the defaults
+            - name: Start Stalwart normally so it provisions its defaults
               systemd:
                 name: stalwart
                 state: restarted
 
-            - name: Wait for the recovery listener for the defaults
+            - name: Wait for the normal listener
               wait_for:
                 host: 127.0.0.1
-                port: "{{ recovery_port }}"
+                port: 443
                 timeout: 120
-
-            - name: Write the defaults plan
-              copy:
-                content: "{{ defaults_ndjson }}"
-                dest: /etc/stalwart/defaults.ndjson
-                owner: stalwart
-                group: stalwart
-                mode: "0600"
-
-            - name: Apply the defaults plan
-              command: /usr/local/bin/stalwart-cli apply --file /etc/stalwart/defaults.ndjson --json
-              environment: "{{ cli_env }}"
-
-        # Stalwart provisions its built-in roles, the default role lists and other defaults only
-        # on a normal start; bootstrap and recovery mode skip that step. Without this start the
-        # administrator (and every account) would resolve to no permissions at all.
-        - name: Write the runtime environment for the first normal start
-          no_log: true
-          copy:
-            content: "{{ env_normal }}"
-            dest: /etc/stalwart/stalwart.env
-            owner: stalwart
-            group: stalwart
-            mode: "0600"
-
-        - name: Start Stalwart normally so it provisions its defaults
-          systemd:
-            name: stalwart
-            state: restarted
-
-        - name: Wait for the normal listener
-          wait_for:
-            host: 127.0.0.1
-            port: 443
-            timeout: 120
 
         - name: Stop Stalwart after bootstrap
           systemd:

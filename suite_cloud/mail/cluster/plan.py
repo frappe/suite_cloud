@@ -263,7 +263,9 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
             "acmeProviderId": "#acme",
             # The default domain is the ingress hostname, which its own wildcard does not cover.
             # Nodes stay out: Let's Encrypt rejects a name the wildcard already covers.
-            "subjectAlternativeNames": as_set([cluster.default_domain, f"*.{cluster.default_domain}"]),
+            "subjectAlternativeNames": as_set(
+                [cluster.default_domain, f"*.{cluster.default_domain}", *cluster.additional_hostname_list]
+            ),
         },
         "dkimManagement": dkim_management_payload(dkim_algorithms()),
         "subAddressing": {"@type": "Disabled"},
@@ -325,12 +327,33 @@ def recovery_plan(cluster: Document) -> list[dict]:
     Stalwart provisions its built-in roles and inbound throttles only on a normal start that
     finds none, so the plan must not create any: the disabled-accounts role and the quota
     backstop are pushed once the cluster is active. The admin password is pinned here and only
-    here (see the helper).
+    here (see the helper), and so are the stores.
     """
 
     operations = [op for op in cluster_plan(cluster) if op["object"] not in DEFAULTS_PROVISIONED_BY_STALWART]
     operations.append(admin_account_operation(cluster))
-    return operations
+    return [*store_operations(cluster), *operations]
+
+
+STORE_OBJECTS = {"blob_store": "BlobStore", "search_store": "SearchStore", "in_memory_store": "InMemoryStore"}
+
+
+def store_operations(cluster: Document) -> list[dict]:
+    """The stores the data store names, as the cluster's Mail Stores describe them.
+
+    The bootstrap plan sets them in an empty data store. One restored from another server refuses
+    that plan and still names that server's stores. Only the recovery stage writes them: a sync
+    must not move a running cluster to other stores.
+    """
+
+    return [
+        {
+            "@type": "update",
+            "object": object_type,
+            "value": store.config if (store := cluster.get_store(field)) else {"@type": "Default"},
+        }
+        for field, object_type in STORE_OBJECTS.items()
+    ]
 
 
 def defaults_plan() -> list[dict]:

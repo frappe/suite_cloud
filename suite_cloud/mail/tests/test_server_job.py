@@ -10,7 +10,7 @@ from frappe.tests import IntegrationTestCase
 
 from suite_cloud.mail.cluster import bootstrap, plan
 from suite_cloud.mail.tests.fixtures import configure_settings, make_cluster, make_node
-from suite_cloud.provisioning.ansible import RUNNER_ENV, playbook_task_names
+from suite_cloud.provisioning.ansible import RUNNER_ENV, playbook_path, playbook_task_names
 from suite_cloud.suite_cloud.doctype.server_job.server_job import create_server_job
 from suite_cloud.utils import secret_spellings
 
@@ -81,6 +81,9 @@ class TestServerJob(IntegrationTestCase):
             names.index("Apply the defaults plan"),
             names.index("Start Stalwart normally so it provisions its defaults"),
         )
+        # A restored data store never starts normally on the settings of the server it came from.
+        with open(playbook_path("bootstrap-cluster.yml")) as f:
+            self.assertIn("when: not store_initialised", f.read())
         # A start that logs configuration errors fails the job, though Stalwart keeps running.
         self.assertEqual(names[-1], "Check the start for configuration errors")
 

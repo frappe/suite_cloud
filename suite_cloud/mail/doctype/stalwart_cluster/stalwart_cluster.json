@@ -24,6 +24,7 @@
   "acme_directory_url",
   "column_break_tls",
   "acme_contact_email",
+  "additional_hostnames",
   "placement_section",
   "is_default",
   "stores_tab",
@@ -199,6 +200,12 @@
    "fieldtype": "Data",
    "label": "ACME Contact Email",
    "options": "Email"
+  },
+  {
+   "description": "More names for the cluster's certificate, one per line, e.g. the hostname of a server this cluster replaces. Each must be in the DNS Zone and point at the cluster.",
+   "fieldname": "additional_hostnames",
+   "fieldtype": "Small Text",
+   "label": "Additional Hostnames"
   },
   {
    "fieldname": "placement_section",
