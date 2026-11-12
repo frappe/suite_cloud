@@ -290,29 +290,31 @@ def dns_server_object(cluster: Document) -> dict | None:
     return frappe.get_cached_doc("DNS Zone", cluster.dns_zone).stalwart_dns_server()
 
 
-def admin_account_operation(server: Document) -> dict:
+def admin_account_operation(server: Document, domain: str | None = None) -> dict:
     """Pins the permanent administrator's password.
 
     Bootstrap creates the account with a password nobody is told (the recovery credential is a
     virtual login that bypasses the directory), so the recovery-stage plan sets it. Only that
     plan may carry it: credentials are a whole list, and once the management API key exists it
-    lives in the same list and would be wiped by a later push. The account always exists, so
-    the operation only ever updates it and names nothing else: sending a domain id would try to
-    move the account when bootstrap's default domain differs from the plan's.
+    lives in the same list and would be wiped by a later push.
+
+    A data store restored from another server may hold no administrator. With `domain`, the plan
+    reference of the default domain, the account is created there when it is missing, and a
+    mailbox of the same name in another domain is never taken for it.
     """
 
-    username = server.admin_username or "admin"
+    account = {
+        "@type": "User",
+        "name": server.admin_username or "admin",
+        "credentials": {"0": {"@type": "Password", "secret": server.get_password("admin_password")}},
+    }
+    if domain:
+        account.update({"domainId": domain, "roles": {"@type": "Admin"}})
     return {
         "@type": "upsert",
         "object": "Account",
-        "matchOn": ["name"],
-        "value": {
-            "admin": {
-                "@type": "User",
-                "name": username,
-                "credentials": {"0": {"@type": "Password", "secret": server.get_password("admin_password")}},
-            }
-        },
+        "matchOn": ["name", "domainId"] if domain else ["name"],
+        "value": {"admin": account},
     }
 
 
@@ -331,7 +333,7 @@ def recovery_plan(cluster: Document) -> list[dict]:
     """
 
     operations = [op for op in cluster_plan(cluster) if op["object"] not in DEFAULTS_PROVISIONED_BY_STALWART]
-    operations.append(admin_account_operation(cluster))
+    operations.append(admin_account_operation(cluster, domain="#default"))
     return [*store_operations(cluster), *operations]
 
 
