@@ -196,7 +196,8 @@ class DNSProvider:
 
         success = True
         for record in records:
-            config = {"action": "delete", "type": type, "name": host}
+            # Route53 deletes a record set only when the TTL matches; Lexicon would send 3600.
+            config = {"action": "delete", "type": type, "name": host, "ttl": record.get("ttl")}
             if value is not None:
                 config["content"] = record.get("content")  # by value: see ensure_dns_record
             else:
