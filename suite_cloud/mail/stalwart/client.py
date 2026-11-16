@@ -100,6 +100,12 @@ class StalwartClient:
 
         self.actions.run("ReloadLookupStores")
 
+    def reload_tls_certificates(self) -> None:
+        """The served certificates, and the default one in SystemSettings, apply only after this;
+        ReloadSettings leaves them. It reaches the cluster's other nodes too."""
+
+        self.actions.run("ReloadTlsCertificates")
+
     def apply(self, plan: list[dict]) -> ApplyResult:
         return PlanApplier(self).apply(plan)
 

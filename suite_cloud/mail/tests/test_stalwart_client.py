@@ -335,3 +335,7 @@ class TestStalwartClient(UnitTestCase):
     def test_reload_settings_runs_an_action(self) -> None:
         self.client.reload_settings()
         self.assertEqual(self.fake.all("Action")[0]["@type"], "ReloadSettings")
+
+    def test_reload_tls_certificates_runs_an_action(self) -> None:
+        self.client.reload_tls_certificates()
+        self.assertEqual(self.fake.all("Action")[0]["@type"], "ReloadTlsCertificates")

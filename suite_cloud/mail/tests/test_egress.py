@@ -202,6 +202,7 @@ class TestEgress(IntegrationTestCase):
             forget_sessions(self.gateway)
             self.assertTrue(egress.check_gateway(self.gateway))
         self.assertEqual(gateway_fake.singletons["SystemSettings"]["defaultCertificateId"], "cert1")
+        self.assertIn("ReloadTlsCertificates", [action["@type"] for action in gateway_fake.all("Action")])
 
     def test_activation_adds_the_gateway_to_its_pool_hostnames(self) -> None:
         """A pool made while its gateway was provisioning got no p1.out record, and activation added none."""
