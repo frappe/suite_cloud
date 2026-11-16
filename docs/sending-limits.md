@@ -62,7 +62,7 @@ The cluster plan holds two operations, from `quota.cluster_operations()`:
 
 | Operation | Purpose |
 | --- | --- |
-| `upsert` MtaHook `sending-limits` | `enable` for signed-in sessions only, `stages: rcpt`, `timeout: 1000`, `tempFailOnError: false`, the calling node's `SUITE_CLOUD_TOKEN` as the bearer, and the header `X-Suite-Cloud-Hook: sending-limits`. It stays switched off until every Provisioned, Active and Draining node of the cluster has **Suite Cloud Token Installed**, since a reload that names a variable a running node lacks fails. The plan matches the hook on the header, so a **Public URL** change updates it in place |
+| `upsert` MtaHook `sending-limits` | `enable` for signed-in sessions only, `stages: rcpt`, `timeout` from the cluster's **Sending Limit Hook Timeout (Seconds)** (1 by default, 1 to 10), `tempFailOnError: false`, the calling node's `SUITE_CLOUD_TOKEN` as the bearer, and the header `X-Suite-Cloud-Hook: sending-limits`. It stays switched off until every Provisioned, Active and Draining node of the cluster has **Suite Cloud Token Installed**, since a reload that names a variable a running node lacks fails. The plan matches the hook on the header, so a **Public URL** change updates it in place |
 | `upsert` MtaInboundThrottle `suite-cloud-quota-backstop` | Caps every signed-in account at the cluster's **Max Daily Send Limit** messages per UTC day, checked at MAIL FROM. Always on |
 
 The hook URL uses **Public URL**, else the site's own URL, as the telemetry WebHooks do. A change reaches the cluster with the next Sync Config.
@@ -71,7 +71,7 @@ The hook URL uses **Public URL**, else the site's own URL, as the telemetry WebH
 
 | Case | Effect |
 | --- | --- |
-| Suite Cloud down, slow (over 1 second) or failing | Stalwart accepts the recipient uncounted. The backstop caps each account at **Max Daily Send Limit** messages per UTC day. It counts messages, not recipients, so it is never stricter than an account's own limit. A deploy that restarts Suite Cloud opens a short gap |
+| Suite Cloud down, slow (over the cluster's **Sending Limit Hook Timeout**) or failing | Stalwart accepts the recipient uncounted. The backstop caps each account at **Max Daily Send Limit** messages per UTC day. It counts messages, not recipients, so it is never stricter than an account's own limit. A deploy that restarts Suite Cloud opens a short gap |
 | Redis evicts or loses counter keys | The counter is seeded again from Mail Send Usage. The counts since the last flush, up to 1 minute, are lost |
 | A transaction ends after RCPT (RSET, a refusal at DATA, a disconnect) | Its recipients stay counted |
 | Stalwart refuses a recipient after the hook accepted it, such as an unknown local address | The recipient stays counted. The hook runs before Stalwart's own recipient checks |

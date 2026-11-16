@@ -684,6 +684,16 @@ class TestQuotaPlan(SendingLimitsTestCase):
             quota.backstop_operation(self.cluster)["value"]["quota-backstop"]["rate"]["count"], 20000
         )
 
+        # Each cluster sets how long Stalwart waits for the hook, within 1 to 10 seconds.
+        for value in (0, 11):
+            cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
+            cluster.sending_limit_hook_timeout = value
+            self.assertRaisesRegex(
+                frappe.ValidationError, "between 1 and 10", cluster.save, ignore_permissions=True
+            )
+        self.cluster.db_set("sending_limit_hook_timeout", 3)
+        self.assertEqual(quota.hook_operation(self.cluster)["value"]["sending-limits"]["timeout"], 3000)
+
         # Stalwart adds its default throttles only when none exist, so recovery leaves ours out.
         recovery = {op["object"] for op in plan.recovery_plan(self.cluster)}
         self.assertIn("MtaHook", recovery)
