@@ -33,6 +33,7 @@ from suite_cloud.mail.tests.fixtures import (
     make_cluster,
     make_owner,
     make_tenant,
+    resolved_domain_records,
     verified_ownership,
 )
 from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError
@@ -341,14 +342,13 @@ class TestDomainOwnership(TenantApiTestCase):
         self.assertTrue(self.fake.all("Domain")[0]["isEnabled"])
 
         # Asking to verify does not take the word back, whatever the resolvers say.
-        target = f"{MAIL_DOMAIN}.verify_dns_record"
-        with patch(target, return_value=False):
+        with resolved_domain_records(False):
             self.assertTrue(domains.verify_dns_records("acme.com")["is_verified"])
 
         # Switched back on, the domain taken on the cloud's word is checked like any other - and
         # goes offline, having no records - and the next domain has to prove control again.
         frappe.set_user("Administrator")
-        with patch(target, return_value=False):
+        with resolved_domain_records(False):
             configure_settings(skip_domain_verification=0)
         domain.reload()
         self.assertFalse(domain.is_live())
@@ -370,7 +370,7 @@ class TestDomainOwnership(TenantApiTestCase):
         domain = frappe.get_doc("Mail Domain", "acme.com")
         self.assertTrue(domain.is_live() and domain.verification_skipped)
 
-        with patch(f"{MAIL_DOMAIN}.verify_dns_record", return_value=False):
+        with resolved_domain_records(False):
             verify_unverified_domains()
         domain.reload()
         self.assertFalse(domain.is_live())

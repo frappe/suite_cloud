@@ -38,6 +38,29 @@ class TestDnsResolver(UnitTestCase):
         with fake_resolvers({CLOUDFLARE: [mx]}):
             self.assertTrue(resolver.verify_dns_record("c1.example.test", "MX", "mail.c1.example.test"))
 
+    def test_spf_passes_when_the_one_record_includes_the_cluster(self) -> None:
+        cases = {
+            "v=spf1 include:spf.c1.example.test -all": True,
+            '"v=spf1 include:_spf.google.com " "+include:SPF.c1.example.test. ~all"': True,
+            "v=spf1 include:_spf.google.com -all": False,
+            "v=spf1 ~include:spf.c1.example.test -all": False,
+            "v=spf1 -all include:spf.c1.example.test": False,  # never evaluated after "all"
+            "v=spf1 include:spf.c1.example.test.evil.test -all": False,
+            "v=spf10 include:spf.c1.example.test -all": False,
+        }
+        for text, expected in cases.items():
+            with self.subTest(text), fake_resolvers({CLOUDFLARE: [text, "google-site-verification=abc"]}):
+                self.assertEqual(resolver.verify_spf_record("acme.test", "spf.c1.example.test"), expected)
+
+    def test_spf_fails_on_two_records_or_none(self) -> None:
+        two = ["v=spf1 include:spf.c1.example.test -all", "v=spf1 include:_spf.google.com ~all"]
+        with fake_resolvers(everywhere(two)):
+            self.assertFalse(resolver.verify_spf_record("acme.test", "spf.c1.example.test"))
+        with fake_resolvers(everywhere(dns.resolver.NoAnswer())):
+            self.assertFalse(resolver.verify_spf_record("acme.test", "spf.c1.example.test"))
+        with fake_resolvers(everywhere(dns.exception.Timeout())):
+            self.assertIsNone(resolver.verify_spf_record("acme.test", "spf.c1.example.test"))
+
     def test_ptr_is_verified_by_any_resolver(self) -> None:
         answers = {CLOUDFLARE: dns.resolver.NoAnswer(), GOOGLE_2: ["n1.c1.example.test."]}
         with fake_resolvers(answers):

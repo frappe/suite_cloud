@@ -29,6 +29,23 @@ def verify_dns_record(fqdn: str, type: str, expected_value: str, debug: bool = F
     return False if answered else None
 
 
+def verify_spf_record(fqdn: str, include_host: str) -> bool | None:
+    """True when ``fqdn`` publishes exactly one SPF record and it passes ``include_host``.
+
+    The owner may merge other senders into the record. Two SPF records are a permerror at the
+    receiver, so they fail however each one reads. Same None contract as ``verify_dns_record``.
+    """
+
+    answered = False
+    for values in answers_from_each_resolver(fqdn, "TXT"):
+        answered = True
+        texts = [normalize_record_value("TXT", value, fqdn) for value in values]
+        spf_texts = [text for text in texts if is_spf_text(text)]
+        if len(spf_texts) == 1 and has_spf_include(spf_texts[0], include_host):
+            return True
+    return False if answered else None
+
+
 def normalize_record_value(type: str, value: str, fqdn: str) -> str:
     """Makes provider and resolver renderings comparable (quotes, chunking, trailing dots)."""
 
@@ -38,6 +55,23 @@ def normalize_record_value(type: str, value: str, fqdn: str) -> str:
     if type == "TXT" and "._domainkey." in fqdn:
         value = value.replace(" ", "")
     return value
+
+
+def is_spf_text(text: str) -> bool:
+    return text.lower() == "v=spf1" or text.lower().startswith("v=spf1 ")
+
+
+def has_spf_include(spf_text: str, include_host: str) -> bool:
+    """True when a pass-qualified ``include:`` of ``include_host`` comes before any ``all``,
+    since a receiver never evaluates the mechanisms after ``all``."""
+
+    expected = f"include:{include_host.rstrip('.').lower()}"
+    for term in spf_text.lower().split()[1:]:
+        if term.lstrip("+-~?") == "all":
+            return False
+        if term.removeprefix("+").rstrip(".") == expected:
+            return True
+    return False
 
 
 def verify_ptr_record(ip_address: str, expected_hostname: str) -> bool | None:
