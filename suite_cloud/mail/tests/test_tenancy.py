@@ -19,6 +19,7 @@ from suite_cloud.mail.tests.fixtures import (
     make_cluster,
     make_owner,
     make_tenant,
+    resolved_domain_records,
 )
 from suite_cloud.patches.v1_0 import add_credential_quotas
 from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError, owner_query
@@ -580,7 +581,7 @@ class TestMailDomain(TenancyTestCase):
             row.is_verified = 1
         domain.save_records()
         # Simulate a verification pass where every record already resolves.
-        with patch("suite_cloud.mail.doctype.mail_domain.mail_domain.verify_dns_record", return_value=True):
+        with resolved_domain_records(True):
             result = domain.verify_dns_records()
 
         self.assertTrue(result["is_verified"])
@@ -599,8 +600,14 @@ class TestMailDomain(TenancyTestCase):
         def resolve(fqdn, type, value):
             return None if "_domainkey" in fqdn else True  # DKIM lookups time out
 
-        with patch("suite_cloud.mail.doctype.mail_domain.mail_domain.verify_dns_record", side_effect=resolve):
+        module = "suite_cloud.mail.doctype.mail_domain.mail_domain"
+        with (
+            patch(f"{module}.verify_dns_record", side_effect=resolve),
+            patch(f"{module}.verify_spf_record", return_value=True) as spf,
+        ):
             result = domain.verify_dns_records()
+        # SPF passes on any record that includes the cluster's, not only on the suggested one.
+        spf.assert_called_once_with("acme.com", f"spf.{domain.get_cluster().default_domain}")
         self.assertTrue(result["is_verified"])  # DKIM rows kept their verified state
         self.assertEqual(result["inconclusive"], 1)  # the one DKIM row
 
@@ -641,7 +648,7 @@ class TestMailDomain(TenancyTestCase):
         self.assertFalse({by_hand.name, unverified.name} & set(domains_due_for_verification()))
 
         # The action is not the schedule: it still resolves the records of a skipped domain.
-        with patch("suite_cloud.mail.doctype.mail_domain.mail_domain.verify_dns_record", return_value=False):
+        with resolved_domain_records(False):
             self.assertFalse(by_hand.verify_dns_records()["is_verified"])
 
     def test_reserved_names_cover_every_cluster_zone(self) -> None:

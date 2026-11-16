@@ -204,7 +204,9 @@ The verb follows the method name (`list_` and `get_` are GETs, `update_` a PATCH
 3. `get_dns_records` lists what the owner must publish next: an MX record pointing at the
    cluster, an SPF record of the form `v=spf1 include:spf.<zone> -all`, the DKIM keys Stalwart
    generated for the domain, and DMARC and TLS reporting records. The rows come from Stalwart's
-   `dnsZoneFile`, with SPF rewritten so egress gateways are covered. Stalwart generates and holds
+   `dnsZoneFile`, with SPF rewritten so egress gateways are covered. A domain that already has an
+   SPF record adds the include to it instead: SPF verifies when the domain has exactly one
+   `v=spf1` record and it includes the cluster's before any `all`. Stalwart generates and holds
    the keys; they use fixed selectors, `frappemail-rsa` and `frappemail-ed25519`, and never rotate,
    so the records an owner publishes stay valid for the life of the domain. Should a key leak,
    **Replace DKIM Keys** on the Mail Domain (and on a cluster or gateway, for their own domains)

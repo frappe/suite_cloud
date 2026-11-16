@@ -1,5 +1,6 @@
 """Fixtures for the Mail tests; the generic ones are re-exported from the core tests."""
 
+from contextlib import contextmanager
 from unittest.mock import patch
 
 import frappe
@@ -90,6 +91,18 @@ def verified_ownership():
     """Every domain's ownership record resolves, so tests may add domains without publishing one."""
 
     return patch("suite_cloud.mail.tenancy.ownership.verify_dns_record", return_value=True)
+
+
+@contextmanager
+def resolved_domain_records(verified: bool | None):
+    """Every Mail Domain record lookup, SPF included, returns ``verified``."""
+
+    module = "suite_cloud.mail.doctype.mail_domain.mail_domain"
+    with (
+        patch(f"{module}.verify_dns_record", return_value=verified),
+        patch(f"{module}.verify_spf_record", return_value=verified),
+    ):
+        yield
 
 
 def activate_cluster(cluster, token: str = "test-token"):

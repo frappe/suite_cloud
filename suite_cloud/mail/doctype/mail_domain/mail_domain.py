@@ -6,7 +6,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, now
 
-from suite_cloud.dns.resolver import verify_dns_record
+from suite_cloud.dns.resolver import verify_dns_record, verify_spf_record
 from suite_cloud.mail.cluster import dns as cluster_dns
 from suite_cloud.mail.cluster import push
 from suite_cloud.mail.cluster.zone import GROUPS, build_domain_records, group_summaries
@@ -267,7 +267,7 @@ class MailDomain(Document):
         checked_at = now()
         inconclusive = 0
         for row in self.dns_rows():
-            verified = verify_dns_record(row.fqdn, row.record_type, self.expected_value(row))
+            verified = self.verify_dns_row(row)
             if verified is None:
                 inconclusive += 1  # resolver trouble says nothing about the record: keep its state
                 continue
@@ -282,6 +282,13 @@ class MailDomain(Document):
             sync.push_update(self, "domains", {"isEnabled": self.is_live()})
         self.save_records()
         return {"inconclusive": inconclusive, "is_verified": bool(self.is_verified), **self.records_payload()}
+
+    def verify_dns_row(self, row: Document) -> bool | None:
+        """SPF passes on any record that includes the cluster's, so the owner can merge other senders."""
+
+        if row.category == "SPF":
+            return verify_spf_record(row.fqdn, cluster_dns.spf_include(self.get_cluster()))
+        return verify_dns_record(row.fqdn, row.record_type, self.expected_value(row))
 
     def compute_is_verified(self) -> bool:
         """SPF and DMARC must verify, plus at least one DKIM selector.

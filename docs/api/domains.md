@@ -111,6 +111,6 @@ Each takes `domain` and answers the record set:
 }
 ```
 
-The groups are `authentication_records` (SPF, DKIM, DMARC; mandatory), `routing_records` (MX), `transport_security_records` (TLS reporting, MTA-STS), `discovery_records` and `autoconfig_records`. The last two appear only with `publish_client_discovery_records` on. A domain is verified once SPF, DMARC and at least one DKIM selector resolve; MX is optional, for a domain that only sends.
+The groups are `authentication_records` (SPF, DKIM, DMARC; mandatory), `routing_records` (MX), `transport_security_records` (TLS reporting, MTA-STS), `discovery_records` and `autoconfig_records`. The last two appear only with `publish_client_discovery_records` on. A domain is verified once SPF, DMARC and at least one DKIM selector resolve; MX is optional, for a domain that only sends. The SPF row shows the record for a domain with no SPF yet; the check passes on any single `v=spf1` record that includes the cluster's SPF host before `all`, so an owner can keep other senders in the same record. Two `v=spf1` records fail, because receivers treat them as a permerror.
 
 `refresh_dns_records` re-reads the zone the cluster generates, for example to pick up a DKIM key that was still generating when the domain was created. `verify_dns_records` resolves every record on public resolvers and adds `inconclusive`, the number of records a resolver failure said nothing about; those keep their previous state. Verification also runs hourly for every unverified domain.
