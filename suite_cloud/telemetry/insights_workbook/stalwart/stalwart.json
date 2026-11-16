@@ -3986,6 +3986,14 @@
      {
       "data_type": "Decimal",
       "expression": {
+       "expression": "avg(score)",
+       "type": "expression"
+      },
+      "measure_name": "Average Score"
+     },
+     {
+      "data_type": "Decimal",
+      "expression": {
        "expression": "median(score)",
        "type": "expression"
       },
@@ -10247,7 +10255,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-05 13:00:00.000000",
+ "modified": "2026-11-16 07:15:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",

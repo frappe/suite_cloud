@@ -180,7 +180,7 @@ The subject, the body and the recipient addresses are not recorded.
 | Outbound Scores | Messages per score band of one point. Use it to set the reject score |
 | Rules That Raised Scores | The rules that added to a score most often |
 | Outbound Scan Time (ms) | The median and slowest scan per hour |
-| Outbound Scores by Account | Each sender's message count, median and highest score, and refusals |
+| Outbound Scores by Account | Each sender's message count, average, median and highest score, and refusals |
 | Scanned Messages | One row per message, newest first |
 | Rules per Message | Each rule that matched each message and what it added |
 
