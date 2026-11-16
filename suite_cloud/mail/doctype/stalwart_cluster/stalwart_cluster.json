@@ -62,6 +62,7 @@
   "max_daily_send_limit",
   "column_break_sending_limits",
   "max_monthly_send_limit",
+  "sending_limit_hook_timeout",
   "config_tab",
   "bootstrap_node",
   "config_version",
@@ -435,6 +436,15 @@
    "reqd": 1
   },
   {
+   "default": "1",
+   "description": "Seconds Stalwart waits for Suite Cloud's answer on each recipient, connect included, from 1 to 10. After it, Stalwart accepts the recipient uncounted. Reaches the cluster with the next Sync Config.",
+   "fieldname": "sending_limit_hook_timeout",
+   "fieldtype": "Int",
+   "label": "Sending Limit Hook Timeout (Seconds)",
+   "non_negative": 1,
+   "reqd": 1
+  },
+  {
    "fieldname": "column_break_sending_limits",
    "fieldtype": "Column Break"
   },
@@ -540,7 +550,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-11-06 10:00:00.000000",
+ "modified": "2026-11-16 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

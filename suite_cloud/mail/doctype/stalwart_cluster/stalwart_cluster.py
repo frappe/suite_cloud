@@ -30,6 +30,7 @@ from suite_cloud.utils import dkim_algorithms, get_config, log_error, log_except
 
 PUSH_TIMEOUT = 300  # seconds a config push may hold its cluster's lock, and wait for it by default
 SYNC_CONFIG_WAIT = 20  # seconds Sync Config waits for the lock, well inside a web worker's timeout
+MAX_HOOK_TIMEOUT = 10  # seconds
 HOSTNAME = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$")
 STORE_KINDS = {
     "data_store": "Data",
@@ -80,6 +81,7 @@ class StalwartCluster(Document):
         relay_username: DF.Data | None
         remove_existing_certificates: DF.Check
         search_store: DF.Link | None
+        sending_limit_hook_timeout: DF.Int
         single_node: DF.Check
         ssh_port: DF.Int
         ssh_private_key: DF.Password | None
@@ -129,6 +131,10 @@ class StalwartCluster(Document):
         for field in ("max_daily_send_limit", "max_monthly_send_limit"):
             if cint(self.get(field)) < 1:
                 frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
+        # Stalwart holds each recipient of a signed-in sender for up to this long.
+        if not 1 <= cint(self.sending_limit_hook_timeout) <= MAX_HOOK_TIMEOUT:
+            label = _(self.meta.get_label("sending_limit_hook_timeout"))
+            frappe.throw(_("{0} must be between 1 and {1}.").format(label, MAX_HOOK_TIMEOUT))
 
     def after_insert(self) -> None:
         dns.sync_spf_record(self)

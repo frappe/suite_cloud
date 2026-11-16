@@ -14,7 +14,6 @@ if TYPE_CHECKING:
     from frappe.model.document import Document
 
 HOOK_METHOD = "/api/v2/method/suite_cloud.api.sending_limits.check"
-HOOK_TIMEOUT_MS = 1000  # covers the connect too; Stalwart accepts the recipient after it
 # MtaHook has no description, and its URL follows the Public URL, so this header names the hook.
 HOOK_HEADER = "X-Suite-Cloud-Hook"
 BACKSTOP_DESCRIPTION = "suite-cloud-quota-backstop"
@@ -30,13 +29,14 @@ def cluster_operations(cluster: Document) -> list[dict]:
 def hook_operation(cluster: Document) -> dict:
     """One call per recipient at the RCPT stage, which JMAP sends pass through too, with the
     calling node's Suite Cloud token. Stalwart accepts the recipient when Suite Cloud fails or
-    times out. Off until every running node has its token, as the reload needs it."""
+    passes the cluster's timeout, which covers the connect too. Off until every running node has
+    its token, as the reload needs it."""
 
     hook = {
         "enable": SIGNED_IN if server_token.has_every_token(cluster) else NEVER,
         "url": f"{public_url()}{HOOK_METHOD}",
         "stages": as_set(["rcpt"]),
-        "timeout": HOOK_TIMEOUT_MS,
+        "timeout": cint(cluster.sending_limit_hook_timeout) * 1000,
         "tempFailOnError": False,
         "httpAuth": server_token.bearer_auth(),
         "httpHeaders": {HOOK_HEADER: "sending-limits"},
