@@ -361,10 +361,16 @@ class TestStalwartCluster(IntegrationTestCase):
                 "bucket": "mail",
                 "accessKey": {"@type": "Value", "value": "AK"},
                 "secretKey": {"@type": "Value", "secret": "SK"},
-                "timeout": 15000,
+                "timeout": 30000,
                 "maxRetries": 3,
-                "verifyAfterWrite": True,
+                "verifyAfterWrite": False,
             },
+        )
+
+        # A blank timeout takes the default of the store's type, not one shared by every type.
+        self.assertEqual(make_store("Data", "PostgreSql", host="db.example.test").config["timeout"], 15000)
+        self.assertEqual(
+            make_store("In-Memory", "Redis", url="redis://r.example.test").config["timeout"], 10000
         )
 
         # An S3-compatible service is a Custom region holding the endpoint: the store itself has
