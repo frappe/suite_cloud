@@ -71,6 +71,8 @@ The development site at Frappe uses two DigitalOcean zones:
 
 The tenant mail zone must not be a cluster's zone. One zone can hold both the site domains and the tenant mail domains. Then site domains go under `sites`, for example `acme.sites.example.com`.
 
+No tenant can add a zone or a name under it as a mail domain. Blocklists such as Spamhaus want a contact address on the domain in the servers' PTR records, which is the cluster's zone. To get `postmaster@` and `abuse@` there, set **Mail Service Tenant** in Suite Cloud Settings to the operator's own tenant. That tenant can then add the zone apex, for example `frappe.email`, as a normal mail domain and publish its records. Names under the zone stay reserved.
+
 ## 4. A Stalwart cluster
 
 A cluster is one or more Stalwart servers that Suite Cloud installs and configures over SSH. For development, one node with RocksDB is enough.

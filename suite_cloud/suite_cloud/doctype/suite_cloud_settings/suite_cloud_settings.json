@@ -10,6 +10,7 @@
   "default_dns_ttl",
   "column_break_general",
   "skip_domain_verification",
+  "mail_service_tenant",
   "signup_section",
   "allow_signup",
   "column_break_signup",
@@ -126,6 +127,13 @@
    "fieldname": "skip_domain_verification",
    "fieldtype": "Check",
    "label": "Skip Domain Verification"
+  },
+  {
+   "description": "The operator's own tenant. It alone may add the apex of a DNS Zone, such as the domain in the mail servers' PTR records, as a mail domain. Subdomains of a zone stay reserved for everyone.",
+   "fieldname": "mail_service_tenant",
+   "fieldtype": "Link",
+   "label": "Mail Service Tenant",
+   "options": "Suite Tenant"
   },
   {
    "fieldname": "signup_section",
@@ -644,7 +652,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-05 23:00:00.000000",
+ "modified": "2026-11-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

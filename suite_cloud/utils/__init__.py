@@ -58,6 +58,7 @@ CONFIG_KEYS = (
     "allow_subaddressed_signups",
     "site_dns_zone",
     "tenant_mail_zone",
+    "mail_service_tenant",
 )
 
 
