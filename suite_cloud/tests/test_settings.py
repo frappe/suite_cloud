@@ -1,7 +1,7 @@
 import frappe
 from frappe.tests import IntegrationTestCase
 
-from suite_cloud.utils import get_config
+from suite_cloud.utils import DEFAULT_CONFIG, get_config
 
 
 class TestSuiteCloudSettings(IntegrationTestCase):
@@ -156,6 +156,30 @@ class TestSuiteCloudSettings(IntegrationTestCase):
         frappe.db.set_single_value(patch.SETTINGS, patch.FIELD, 0)
         patch.execute()
         self.assertEqual(frappe.db.get_single_value(patch.SETTINGS, patch.FIELD), 0)
+
+    def test_blank_stalwart_settings_use_the_app_defaults(self) -> None:
+        for field in DEFAULT_CONFIG:
+            self.settings.set(field, "")
+        self.settings.save()
+        clear_config_cache()
+        self.assertEqual(get_config(tuple(DEFAULT_CONFIG)), tuple(DEFAULT_CONFIG.values()))
+
+        self.settings.stalwart_version = "v0.16.30"
+        self.settings.save()
+        clear_config_cache()
+        self.assertEqual(get_config("stalwart_version"), "v0.16.30")
+
+    def test_saved_copies_of_the_app_defaults_are_cleared(self) -> None:
+        from suite_cloud.patches.v1_0 import clear_stalwart_release_defaults as patch
+
+        for field, default in DEFAULT_CONFIG.items():
+            frappe.db.set_single_value(patch.SETTINGS, field, default)
+        frappe.db.set_single_value(patch.SETTINGS, "stalwart_version", "v0.16.20")
+        patch.execute()
+
+        saved = {field: frappe.db.get_single_value(patch.SETTINGS, field) for field in DEFAULT_CONFIG}
+        self.assertEqual(saved.pop("stalwart_version"), "v0.16.20")  # a chosen release stays
+        self.assertFalse(any(saved.values()))
 
     def patch_site_config(self, **values):
         from unittest.mock import patch

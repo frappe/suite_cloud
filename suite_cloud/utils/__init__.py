@@ -61,6 +61,18 @@ CONFIG_KEYS = (
     "mail_service_tenant",
 )
 
+# The maintainer keeps these current; a value set in Suite Cloud Settings takes their place.
+DEFAULT_CONFIG = {
+    "stalwart_version": "v0.16.27",
+    "stalwart_cli_version": "v1.0.12",
+    "stalwart_download_url_template": (
+        "https://github.com/stalwartlabs/stalwart/releases/download/{version}/stalwart-{target}.tar.gz"
+    ),
+    "stalwart_cli_download_url_template": (
+        "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz"
+    ),
+}
+
 
 @request_cache
 def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tuple | Any:
@@ -71,6 +83,8 @@ def get_config(key: str | tuple[str, ...] | None = None) -> dict[str, Any] | tup
 
     settings = frappe.get_cached_doc("Suite Cloud Settings")
     config = {field: settings.get(field) for field in CONFIG_KEYS}
+    for field, default in DEFAULT_CONFIG.items():
+        config[field] = config[field] or default
 
     if not key:
         return config
@@ -278,6 +292,15 @@ def validate_version(value: str | None, label: str) -> str | None:
     if not VERSION.match(value):
         frappe.throw(_("{0} must be a version such as v0.16.20.").format(label))
     return value
+
+
+def is_older_version(version: str, than: str) -> bool:
+    """Compares two release tags such as v0.16.20 by their numbers."""
+
+    def numbers(tag: str) -> tuple[int, ...]:
+        return tuple(int(part) for part in tag.removeprefix("v").split("."))
+
+    return numbers(version) < numbers(than)
 
 
 def secret_spellings(secrets: Iterable[str | None]) -> list[str]:

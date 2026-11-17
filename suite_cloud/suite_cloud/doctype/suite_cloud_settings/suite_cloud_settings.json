@@ -419,21 +419,17 @@
    "label": "Versions"
   },
   {
-   "default": "v0.16.27",
-   "description": "Stalwart release for new clusters, e.g. v0.16.27.",
+   "description": "Stalwart release for new clusters, e.g. v0.16.27. Leave blank to use the app default.",
    "fieldname": "stalwart_version",
    "fieldtype": "Data",
-   "label": "Stalwart Version",
-   "reqd": 1
+   "label": "Stalwart Version"
   },
   {
-   "default": "https://github.com/stalwartlabs/stalwart/releases/download/{version}/stalwart-{target}.tar.gz",
-   "description": "{version} is the release and {target} the platform, e.g. x86_64-unknown-linux-gnu.",
+   "description": "{version} is the release and {target} the platform. Leave blank to use the app default.",
    "fieldname": "stalwart_download_url_template",
    "fieldtype": "Data",
    "label": "Stalwart Download URL Template",
-   "length": 255,
-   "reqd": 1
+   "length": 255
   },
   {
    "default": "v3.0.1",
@@ -447,21 +443,17 @@
    "fieldtype": "Column Break"
   },
   {
-   "default": "v1.0.12",
-   "description": "stalwart-cli release used to bootstrap a cluster, e.g. v1.0.12.",
+   "description": "stalwart-cli release used to bootstrap a cluster, e.g. v1.0.12. Leave blank to use the app default.",
    "fieldname": "stalwart_cli_version",
    "fieldtype": "Data",
-   "label": "Stalwart CLI Version",
-   "reqd": 1
+   "label": "Stalwart CLI Version"
   },
   {
-   "default": "https://github.com/stalwartlabs/cli/releases/download/{version}/stalwart-cli-{target}.tar.xz",
-   "description": "Same placeholders as the Stalwart URL. {target} is the static build, e.g. x86_64-unknown-linux-musl.",
+   "description": "Same placeholders as the Stalwart URL. Leave blank to use the app default.",
    "fieldname": "stalwart_cli_download_url_template",
    "fieldtype": "Data",
    "label": "Stalwart CLI Download URL Template",
-   "length": 255,
-   "reqd": 1
+   "length": 255
   },
   {
    "fieldname": "connection_section",
@@ -652,7 +644,7 @@
  "index_web_pages_for_search": 1,
  "issingle": 1,
  "links": [],
- "modified": "2026-11-17 12:00:00.000000",
+ "modified": "2026-11-17 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Cloud Settings",

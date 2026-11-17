@@ -67,6 +67,17 @@ frappe.ui.form.on('Stalwart Node', {
 				true,
 			)
 		}
+		const cluster_version = (frm.doc.__onload || {}).cluster_stalwart_version
+		if (cluster_version) {
+			frm.dashboard.add_comment(
+				__('This node runs Stalwart {0}, older than {1} set on its cluster. Run Upgrade.', [
+					frappe.utils.escape_html(frm.doc.installed_version),
+					frappe.utils.escape_html(cluster_version),
+				]),
+				'orange',
+				true,
+			)
+		}
 		if (['Provisioned', 'Active', 'Draining'].includes(frm.doc.status)) frm.events.show_telemetry_status(frm)
 	},
 

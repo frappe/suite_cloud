@@ -19,7 +19,7 @@ from suite_cloud.mail.tests.fixtures import (
     no_dns_provider,
     remove_cluster,
 )
-from suite_cloud.utils import user_context
+from suite_cloud.utils import get_config, user_context
 
 
 class TestStalwartCluster(IntegrationTestCase):
@@ -194,9 +194,24 @@ class TestStalwartCluster(IntegrationTestCase):
         self.assertEqual(cluster.status, "Pending")
         self.assertTrue(cluster.ssh_public_key.startswith("ssh-ed25519 "))
         self.assertEqual(len(cluster.get_password("admin_password")), 32)
-        self.assertEqual(
-            cluster.stalwart_version, frappe.db.get_single_value("Suite Cloud Settings", "stalwart_version")
-        )
+        self.assertEqual(cluster.stalwart_version, get_config("stalwart_version"))
+
+    def test_a_cluster_and_node_behind_their_version_are_flagged(self) -> None:
+        cluster = make_cluster()
+        node = make_node(cluster)
+        self.assertFalse(cluster.is_version_behind)
+        self.assertFalse(node.is_version_behind)  # not installed yet
+
+        cluster.db_set("stalwart_version", "v0.16.9")
+        cluster.reload()
+        self.assertTrue(cluster.is_version_behind)
+        cluster.onload()
+        self.assertEqual(cluster.get_onload().default_stalwart_version, get_config("stalwart_version"))
+
+        node.installed_version = "v0.16.8"
+        self.assertTrue(node.is_version_behind)
+        node.installed_version = "v0.16.9"
+        self.assertFalse(node.is_version_behind)
 
     def test_the_region_names_the_cluster_and_its_hosts(self) -> None:
         bad = frappe.get_doc({"doctype": "Mail Region", "code": "Bad Code!", "title": "Bad"})

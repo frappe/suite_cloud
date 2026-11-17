@@ -66,6 +66,17 @@ frappe.ui.form.on('Stalwart Cluster', {
 				for (const item of summary.indicators) frm.dashboard.add_indicator(frappe.utils.escape_html(item.text), item.color)
 			})
 		}
+		const default_version = (frm.doc.__onload || {}).default_stalwart_version
+		if (default_version) {
+			frm.dashboard.add_comment(
+				__('This cluster is set to Stalwart {0}, older than the default {1}. Change Stalwart Version and run Upgrade Nodes.', [
+					frappe.utils.escape_html(frm.doc.stalwart_version),
+					frappe.utils.escape_html(default_version),
+				]),
+				'orange',
+				true,
+			)
+		}
 		const outdated = (frm.doc.__onload || {}).outdated_scanner_nodes || []
 		if (outdated.length) {
 			frm.dashboard.add_comment(
