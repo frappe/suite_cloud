@@ -8,11 +8,13 @@ and a counter Redis lost is seeded again from there.
 """
 
 from datetime import UTC, datetime, timedelta
+from functools import cache
 from typing import NamedTuple
 
 import frappe
 import redis
 from frappe.utils import cint
+from redis.commands.core import Script
 
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import (
     periods_at,
@@ -62,6 +64,7 @@ redis.call('EXPIRE', month, ARGV[4])
 redis.call('SADD', touched, ARGV[5], ARGV[6])
 return {verdict, day_sent, month_sent}
 """
+CHECK = Script(None, CHECK_SCRIPT.encode())  # hashed once; each call passes its client
 
 
 class Limits(NamedTuple):
@@ -73,7 +76,14 @@ class Limits(NamedTuple):
 def get_client() -> redis.Redis:
     """The cache's connections, without Frappe's pickling wrapper."""
 
-    return redis.Redis(connection_pool=frappe.cache.connection_pool)
+    return get_pool_client(frappe.cache.connection_pool)
+
+
+@cache
+def get_pool_client(pool: redis.ConnectionPool) -> redis.Redis:
+    """One client per pool: building one costs more than the commands the hook sends."""
+
+    return redis.Redis(connection_pool=pool)
 
 
 def make_key(key: str) -> bytes:
@@ -122,7 +132,7 @@ def run_check(account: str, day: str, month: str, limits: Limits, seed: list[int
     client = get_client()
     keys = [counter_key(account, day), counter_key(account, month), make_key(TOUCHED)]
     args = [limits.daily, limits.monthly, DAY_TTL, MONTH_TTL, f"{account}|{day}", f"{account}|{month}"]
-    return client.register_script(CHECK_SCRIPT)(keys=keys, args=[*args, *(seed or [])], client=client)[0]
+    return CHECK(keys=keys, args=[*args, *(seed or [])], client=client)[0]
 
 
 def counter_key(account: str, period: str) -> bytes:
