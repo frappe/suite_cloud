@@ -599,6 +599,7 @@ class TestStalwartCluster(IntegrationTestCase):
             self.assertIn(cluster.get_password("api_key"), fake.tokens)
             self.assertNotEqual(cluster.get_password("api_key"), first_key)
             self.assertEqual(fake.singletons["SystemSettings"]["defaultCertificateId"], "cert1")
+            self.assertIn("ReloadTlsCertificates", [action["@type"] for action in fake.all("Action")])
             self.assertEqual(len(fake.all("ApiKey:" + fake.admin_id)), 1)
 
             # The minted key works for management calls and rotation revokes the old one.

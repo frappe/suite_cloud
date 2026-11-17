@@ -373,7 +373,8 @@ def set_default_certificate(target: Document, client) -> None:
     """Non-SNI clients (SMTP) need a default certificate; pick the issued one for the hostname.
 
     Without one, Stalwart serves any certificate it holds and logs "Multiple TLS certificates
-    available" whenever it holds more than one name.
+    available" whenever it holds more than one name. Stalwart reads the default only when it
+    rebuilds its certificates, so a write without the reload waits for a restart or renewal.
     """
 
     try:
@@ -384,6 +385,7 @@ def set_default_certificate(target: Document, client) -> None:
             names = list(names.keys()) if isinstance(names, dict) else list(names)
             if target.hostname in names:
                 client.singleton("SystemSettings").write({"defaultCertificateId": certificate["id"]})
+                client.reload_tls_certificates()
                 return
     except StalwartError:
         log_exception(f"Could not pick a default certificate for {target.name}", target)
