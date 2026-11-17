@@ -427,6 +427,17 @@ class StalwartCluster(Document):
         return [bootstrap.upgrade_node(node).name for node in self.get_nodes(("Active",))]
 
     @frappe.whitelist()
+    def upgrade_to_default_version(self) -> list[str]:
+        """Sets the cluster to the default Stalwart release and upgrades its nodes."""
+
+        frappe.only_for("System Manager")
+        if not self.is_version_behind:
+            frappe.throw(_("This cluster is not behind the default Stalwart version."))
+        self.stalwart_version = get_config("stalwart_version")
+        self.save()
+        return self.upgrade_nodes()
+
+    @frappe.whitelist()
     def install_suite_cloud_tokens(self) -> list[str]:
         """Installs the Suite Cloud token on every active or draining node and every active
         gateway, and switches on what sends it once all have it."""

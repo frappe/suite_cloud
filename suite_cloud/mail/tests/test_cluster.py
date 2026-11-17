@@ -213,6 +213,18 @@ class TestStalwartCluster(IntegrationTestCase):
         node.installed_version = "v0.16.9"
         self.assertFalse(node.is_version_behind)
 
+    def test_upgrade_to_default_version_sets_it_and_upgrades_the_nodes(self) -> None:
+        cluster = make_cluster()
+        cluster.db_set({"status": "Active", "stalwart_version": "v0.16.9"})
+        make_node(cluster).db_set("status", "Active")
+        cluster.reload()
+
+        with patch("suite_cloud.mail.cluster.bootstrap.create_server_job") as create_job:
+            cluster.upgrade_to_default_version()
+        self.assertEqual(cluster.reload().stalwart_version, get_config("stalwart_version"))
+        self.assertEqual(create_job.call_count, 1)
+        self.assertRaisesRegex(frappe.ValidationError, "not behind", cluster.upgrade_to_default_version)
+
     def test_the_region_names_the_cluster_and_its_hosts(self) -> None:
         bad = frappe.get_doc({"doctype": "Mail Region", "code": "Bad Code!", "title": "Bad"})
         self.assertRaisesRegex(frappe.ValidationError, "Code must be", bad.insert)
