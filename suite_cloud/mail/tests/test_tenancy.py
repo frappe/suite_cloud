@@ -23,6 +23,7 @@ from suite_cloud.mail.tests.fixtures import (
 )
 from suite_cloud.patches.v1_0 import add_credential_quotas
 from suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant import MailNotConfiguredError, owner_query
+from suite_cloud.tests.fixtures import ROOT_DOMAIN
 from suite_cloud.utils import user_context
 
 
@@ -654,6 +655,28 @@ class TestMailDomain(TenancyTestCase):
     def test_reserved_names_cover_every_cluster_zone(self) -> None:
         self.assertRaisesRegex(
             frappe.ValidationError, "belongs to the mail service", self.make_domain, "mail.other.example.test"
+        )
+
+    def test_mail_service_tenant_adds_a_zone_apex_only(self) -> None:
+        from suite_cloud.mail.tenancy.addresses import assert_domain_not_reserved
+
+        other = make_tenant(self.cluster, "other.frappe.test")
+        configure_settings(mail_service_tenant=self.tenant.name)
+        self.addCleanup(configure_settings, mail_service_tenant=None)
+
+        self.assertEqual(self.make_domain(ROOT_DOMAIN).name, ROOT_DOMAIN)
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "belongs to the mail service",
+            self.make_domain,
+            self.cluster.default_domain,
+        )
+        self.assertRaisesRegex(
+            frappe.ValidationError,
+            "belongs to the mail service",
+            assert_domain_not_reserved,
+            ROOT_DOMAIN,
+            other.name,
         )
 
     def test_domain_name_collision_is_neutral(self) -> None:

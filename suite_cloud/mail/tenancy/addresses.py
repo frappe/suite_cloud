@@ -85,7 +85,7 @@ def assert_domain_available(domain_name: str, tenant: str) -> None:
     if owner:
         # Neutral on purpose: another tenant holding the name is not this tenant's business.
         frappe.throw(_("Domain {0} is not available.").format(domain_name), frappe.DuplicateEntryError)
-    assert_domain_not_reserved(domain_name)
+    assert_domain_not_reserved(domain_name, tenant)
 
 
 def assert_hosted_domain(domain_name: str, tenant: str) -> None:
@@ -103,8 +103,16 @@ def assert_hosted_domain(domain_name: str, tenant: str) -> None:
         frappe.throw(_("Tenant {0} has no site labelled {1}.").format(tenant, label))
 
 
-def assert_domain_not_reserved(domain_name: str) -> None:
+def assert_domain_not_reserved(domain_name: str, tenant: str) -> None:
+    """Zones carry the service's own records. Only the mail service tenant may add a zone apex,
+    for the postmaster and abuse addresses blocklists expect at the PTR domain."""
+
+    from suite_cloud.utils import get_config
+
+    service_tenant = get_config("mail_service_tenant")
     for zone in frappe.get_all("DNS Zone", pluck="name"):
+        if domain_name == zone and tenant == service_tenant:
+            continue
         if domain_name == zone or domain_name.endswith(f".{zone}"):
             frappe.throw(_("{0} belongs to the mail service and cannot be added.").format(domain_name))
 

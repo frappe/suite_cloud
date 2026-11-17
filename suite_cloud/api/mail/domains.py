@@ -36,7 +36,8 @@ def check_domain(domain: str) -> dict:
         frappe.throw(
             _("Domain {0} is already added to this tenant.").format(domain), frappe.DuplicateEntryError
         )
-    assert_domain_not_reserved(domain)  # whether another tenant holds it is told only to a proven owner
+    # Whether another tenant holds it is told only to a proven owner.
+    assert_domain_not_reserved(domain, tenant.name)
     return {"domain": domain, "ownership_record": ownership_record(tenant, domain)}
 
 

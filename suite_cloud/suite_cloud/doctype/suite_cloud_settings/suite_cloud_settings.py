@@ -54,6 +54,7 @@ class SuiteCloudSettings(Document):
         disk_per_site_gb: DF.Int
         dmarc_report_retention_days: DF.Int
         enable_telemetry: DF.Check
+        mail_service_tenant: DF.Link | None
         max_sites_per_vm: DF.Int
         memory_per_site_mb: DF.Int
         min_free_site_slots: DF.Int

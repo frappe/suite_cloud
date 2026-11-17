@@ -59,7 +59,7 @@ Stores nothing. Answers the TXT record the owner must publish at the apex. The r
 }
 ```
 
-A domain the tenant already holds is a 409. A domain of the mail infrastructure itself is a 422. Whether another tenant holds the domain is told only to a proven owner, at `create_domain`.
+A domain the tenant already holds is a 409. A domain of the mail infrastructure itself, a DNS Zone or any name under one, is a 422. The one exception is the tenant set as **Mail Service Tenant** in Suite Cloud Settings: it can add the apex of a zone, but not a name under it. Whether another tenant holds the domain is told only to a proven owner, at `create_domain`.
 
 ## `create_domain`
 
