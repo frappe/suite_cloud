@@ -71,10 +71,10 @@ class SuiteCloudSettings(Document):
         site_dns_zone: DF.Link | None
         skip_domain_verification: DF.Check
         spam_filter_rules_version: DF.Data | None
-        stalwart_cli_download_url_template: DF.Data
-        stalwart_cli_version: DF.Data
-        stalwart_download_url_template: DF.Data
-        stalwart_version: DF.Data
+        stalwart_cli_download_url_template: DF.Data | None
+        stalwart_cli_version: DF.Data | None
+        stalwart_download_url_template: DF.Data | None
+        stalwart_version: DF.Data | None
         suite_app_ref: DF.Data
         suite_app_repo: DF.Data
         telemetry_alert_recipients: DF.SmallText | None

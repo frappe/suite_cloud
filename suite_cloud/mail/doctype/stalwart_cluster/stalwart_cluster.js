@@ -34,6 +34,10 @@ frappe.ui.form.on('Stalwart Cluster', {
 			frm.add_custom_button(__('Rotate API Key'), () => frm.trigger('rotate_api_key'), __('Access'))
 			frm.add_custom_button(__('Replace DKIM Keys'), () => frm.trigger('replace_dkim_keys'), __('Access'))
 			frm.add_custom_button(__('Upgrade Nodes'), () => frm.trigger('upgrade_nodes'), __('Nodes'))
+			const default_version = (frm.doc.__onload || {}).default_stalwart_version
+			if (default_version) {
+				frm.add_custom_button(__('Upgrade to {0}', [default_version]), () => frm.trigger('upgrade_to_default_version'), __('Nodes'))
+			}
 			frm.add_custom_button(__('Install Suite Cloud Tokens'), () => frm.trigger('install_suite_cloud_tokens'), __('Nodes'))
 			frm.add_custom_button(__('Install Outbound Scanners'), () => frm.trigger('install_outbound_scanners'), __('Nodes'))
 		}
@@ -65,6 +69,17 @@ frappe.ui.form.on('Stalwart Cluster', {
 			frappe.xcall('suite_cloud.telemetry.status.get_cluster_summary', { cluster: frm.doc.name }).then((summary) => {
 				for (const item of summary.indicators) frm.dashboard.add_indicator(frappe.utils.escape_html(item.text), item.color)
 			})
+		}
+		const default_version = (frm.doc.__onload || {}).default_stalwart_version
+		if (default_version) {
+			frm.dashboard.add_comment(
+				__('This cluster is set to Stalwart {0}, older than the default {1}. Change Stalwart Version and run Upgrade Nodes.', [
+					frappe.utils.escape_html(frm.doc.stalwart_version),
+					frappe.utils.escape_html(default_version),
+				]),
+				'orange',
+				true,
+			)
 		}
 		const outdated = (frm.doc.__onload || {}).outdated_scanner_nodes || []
 		if (outdated.length) {
@@ -163,6 +178,13 @@ frappe.ui.form.on('Stalwart Cluster', {
 	upgrade_nodes(frm) {
 		frappe.confirm(__('Upgrade every active node to {0}, one at a time?', [frm.doc.stalwart_version]), () => {
 			frm.events.call(frm, 'upgrade_nodes', {}, __('Queueing upgrades...'))
+		})
+	},
+
+	upgrade_to_default_version(frm) {
+		const default_version = frm.doc.__onload.default_stalwart_version
+		frappe.confirm(__('Set this cluster to Stalwart {0} and upgrade every active node, one at a time?', [default_version]), () => {
+			frm.events.call(frm, 'upgrade_to_default_version', {}, __('Queueing upgrades...'))
 		})
 	},
 

@@ -12,7 +12,7 @@ from suite_cloud.dns.resolver import verify_ptr_record
 from suite_cloud.mail.cluster import bootstrap, dns, naming, rspamd, server_token
 from suite_cloud.provisioning.ansible import ping
 from suite_cloud.provisioning.ssh import SSHTarget, scan_host_keys, validate_ssh_user_field
-from suite_cloud.utils import log_exception
+from suite_cloud.utils import is_older_version, log_exception
 
 REMOVABLE_STATUSES = ("Pending", "Failed", "Disabled")
 
@@ -62,6 +62,10 @@ class StalwartNode(Document):
 
     def before_insert(self) -> None:
         server_token.fill_token(self)
+
+    def onload(self) -> None:
+        if self.is_version_behind:
+            self.set_onload("cluster_stalwart_version", self.get_cluster().stalwart_version)
 
     def validate(self) -> None:
         validate_ssh_user_field(self)
@@ -142,6 +146,15 @@ class StalwartNode(Document):
 
     def get_cluster(self) -> Document:
         return frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+
+    @property
+    def is_version_behind(self) -> bool:
+        """Runs an older release than its cluster is configured for."""
+
+        configured = self.get_cluster().stalwart_version
+        return bool(self.installed_version and configured) and is_older_version(
+            self.installed_version, configured
+        )
 
     def revalidate_cluster(self) -> None:
         """Saves a fresh copy of the cluster, which checks its stores against the new node count."""

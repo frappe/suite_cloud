@@ -26,7 +26,14 @@ from suite_cloud.mail.stalwart import forget_sessions, get_admin_client, get_cli
 from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
-from suite_cloud.utils import dkim_algorithms, get_config, log_error, log_exception, validate_version
+from suite_cloud.utils import (
+    dkim_algorithms,
+    get_config,
+    is_older_version,
+    log_error,
+    log_exception,
+    validate_version,
+)
 
 PUSH_TIMEOUT = 300  # seconds a config push may hold its cluster's lock, and wait for it by default
 SYNC_CONFIG_WAIT = 20  # seconds Sync Config waits for the lock, well inside a web worker's timeout
@@ -141,6 +148,8 @@ class StalwartCluster(Document):
 
     def onload(self) -> None:
         self.set_onload("outdated_scanner_nodes", rspamd.get_outdated_nodes(self))
+        if self.is_version_behind:
+            self.set_onload("default_stalwart_version", get_config("stalwart_version"))
 
     def on_update(self) -> None:
         before = self.get_doc_before_save()
@@ -220,6 +229,14 @@ class StalwartCluster(Document):
     @property
     def additional_hostname_list(self) -> list[str]:
         return (self.additional_hostnames or "").split()
+
+    @property
+    def is_version_behind(self) -> bool:
+        """Older than the default release in Suite Cloud Settings or the app."""
+
+        return bool(self.stalwart_version) and is_older_version(
+            self.stalwart_version, get_config("stalwart_version")
+        )
 
     def apply_defaults(self) -> None:
         self.stalwart_version = validate_version(
@@ -408,6 +425,17 @@ class StalwartCluster(Document):
 
         frappe.only_for("System Manager")
         return [bootstrap.upgrade_node(node).name for node in self.get_nodes(("Active",))]
+
+    @frappe.whitelist()
+    def upgrade_to_default_version(self) -> list[str]:
+        """Sets the cluster to the default Stalwart release and upgrades its nodes."""
+
+        frappe.only_for("System Manager")
+        if not self.is_version_behind:
+            frappe.throw(_("This cluster is not behind the default Stalwart version."))
+        self.stalwart_version = get_config("stalwart_version")
+        self.save()
+        return self.upgrade_nodes()
 
     @frappe.whitelist()
     def install_suite_cloud_tokens(self) -> list[str]:

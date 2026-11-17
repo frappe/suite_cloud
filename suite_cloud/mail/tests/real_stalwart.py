@@ -25,6 +25,7 @@ from suite_cloud.mail.stalwart.client import StalwartClient
 from suite_cloud.mail.stalwart.connection import ConnectionInfo, JMAPConnection
 from suite_cloud.mail.stalwart.directory import Domain
 from suite_cloud.mail.tests.mail_sink import MailSink
+from suite_cloud.utils import get_config
 
 HOSTNAME = "mail.example.org"
 ADMIN = "admin"
@@ -43,7 +44,7 @@ def pinned_stalwart() -> tuple[str | None, str]:
     Another release may route differently, which is the one thing these tests are about.
     """
 
-    wanted = frappe.get_meta("Suite Cloud Settings").get_field("stalwart_version").default
+    wanted = get_config("stalwart_version")
     binary = shutil.which("stalwart")
     if not binary:
         return None, f"needs Stalwart {wanted} on PATH"

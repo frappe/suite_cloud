@@ -40,7 +40,7 @@ CI runs each test module on its own, in four jobs: Core (`suite_cloud/tests`), M
 
 The tests create records under `.frappe.test` and delete only those. So you can run them on the site that holds your real cluster and zones.
 
-`test_delivery` sends mail through a local Stalwart. It needs the `stalwart` binary of the version in **Suite Cloud Settings > Stalwart Version** on your `PATH`. Without it, the test is skipped.
+`test_delivery` sends mail through a local Stalwart. It needs the `stalwart` binary of the default Stalwart version on your `PATH`: **Suite Cloud Settings > Stalwart Version**, or `DEFAULT_CONFIG` in `suite_cloud/utils/__init__.py` when that is blank. Without it, the test is skipped.
 
 Lint with the Ruff version CI pins:
 
