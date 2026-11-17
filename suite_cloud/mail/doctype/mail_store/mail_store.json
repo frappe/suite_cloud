@@ -281,11 +281,11 @@
    "label": "Secret Key"
   },
   {
-   "default": "1",
+   "default": "0",
    "fieldname": "verify_after_write",
    "fieldtype": "Check",
    "label": "Verify After Write",
-   "description": "Read each object back after writing. Doubles requests."
+   "description": "Read each object back after writing. Doubles requests. Only needed for a backend that can acknowledge a write before it is readable."
   },
   {
    "fieldname": "server_section",
@@ -439,7 +439,6 @@
    "depends_on": "eval: [\"PostgreSql\", \"MySql\", \"S3\", \"ElasticSearch\", \"Meilisearch\", \"Redis\", \"RedisCluster\", \"RedisSentinel\"].includes(doc.type)"
   },
   {
-   "default": "15",
    "description": "In seconds. Defaults: databases 15, S3 and search 30, Redis 10.",
    "fieldname": "timeout",
    "fieldtype": "Float",
@@ -527,7 +526,7 @@
    "link_fieldname": "outbound_scan_store"
   }
  ],
- "modified": "2026-11-11 12:00:00.000000",
+ "modified": "2026-11-17 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Store",
