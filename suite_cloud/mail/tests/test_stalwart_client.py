@@ -1,3 +1,4 @@
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import requests
@@ -230,6 +231,40 @@ class TestStalwartClient(UnitTestCase):
         third = self.client.apply(plan)
         self.assertEqual(third.updated, [first.ids["full"], "SystemSettings/singleton"])
         self.assertEqual(self.fake.get("ClusterRole", first.ids["full"])["description"], "changed")
+
+    def test_admin_takes_system_sender_mail_without_its_credentials_being_touched(self) -> None:
+        from suite_cloud.mail.cluster import plan
+
+        domain_op = {
+            "@type": "upsert",
+            "object": "Domain",
+            "matchOn": ["name"],
+            "value": {"default": {"name": "mail.blr.test"}},
+        }
+        admin = self.fake.get("Account", self.fake.admin_id)
+        admin["domainId"] = self.fake._add("Domain", {"name": "mail.blr.test"})
+        admin["credentials"] = {"0": {"@type": "Password", "secret": "pinned"}}
+        # A tenant's own admin@ must never be taken for the cluster's administrator.
+        tenant_admin = self.fake._add(
+            "Account",
+            {"@type": "User", "name": "admin", "domainId": self.fake._add("Domain", {"name": "t.test"})},
+        )
+        operations = [domain_op, plan.admin_aliases_operation(SimpleNamespace(admin_username="admin"))]
+
+        first = self.client.apply(operations)
+        second = self.client.apply(operations)
+
+        admin = self.fake.get("Account", self.fake.admin_id)  # an update stores a new object
+        aliases = admin["aliases"]
+        self.assertEqual([a["name"] for a in aliases.values()], list(plan.SYSTEM_SENDERS))
+        self.assertEqual({a["domainId"] for a in aliases.values()}, {admin["domainId"]})
+        self.assertEqual(admin["credentials"]["0"]["secret"], "pinned")
+        self.assertNotIn("aliases", self.fake.get("Account", tenant_admin))
+        self.assertIn(self.fake.admin_id, first.updated)
+        self.assertEqual(second.updated, [])
+        with patch.object(plan, "cluster_plan", return_value=operations):
+            report = plan.drift_report(SimpleNamespace(get_client=lambda: self.client))
+        self.assertEqual(report["differences"], [])
 
     def test_tracers_are_matched_by_kind(self) -> None:
         from suite_cloud.mail.cluster.plan import tracer_operation
