@@ -232,7 +232,11 @@ class TestServerJob(IntegrationTestCase):
         # Matched by name and domain, so an account elsewhere is never moved into the default domain.
         self.assertEqual(account_op["matchOn"], ["name", "domainId"])
         self.assertEqual(account_op["value"]["admin"]["domainId"], "#default")
-        self.assertNotIn("Account", [op["object"] for op in plan.cluster_plan(self.node.get_cluster())])
+        self.assertEqual(len([op for op in recovery_ops if op["object"] == "Account"]), 1)
+        self.assertEqual(len(account_op["value"]["admin"]["aliases"]), len(plan.SYSTEM_SENDERS))
+        pushed = [op for op in plan.cluster_plan(self.node.get_cluster()) if op["object"] == "Account"]
+        self.assertEqual(len(pushed), 1)
+        self.assertNotIn("credentials", pushed[0]["value"]["admin"])
         # No Role may exist before the first normal start, or Stalwart skips its built-in roles.
         self.assertNotIn("Role", [op["object"] for op in recovery_ops])
         self.assertIn("pg-secret", variables["__secret_values__"])

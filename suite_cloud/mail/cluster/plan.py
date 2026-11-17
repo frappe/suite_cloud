@@ -3,9 +3,10 @@
 Two plans exist. The bootstrap plan is applied once on the first node in bootstrap mode and
 only names the stores and hostnames (Stalwart provisions everything else with defaults).
 The cluster plan holds the objects Suite Cloud manages afterwards (roles, coordinator, ACME,
-DNS provider, DNS resolver, default domain, system settings, spam rules source, licences, sending
-limits, outbound scan) and is re-applied on every sync. Its cluster roles, DNS resolver and
-SpamSettings are also the defaults plan, applied before the first normal start.
+DNS provider, DNS resolver, default domain, system settings, the administrator's sender aliases,
+spam rules source, licences, sending limits, outbound scan) and is re-applied on every sync. Its
+cluster roles, DNS resolver and SpamSettings are also the defaults plan, applied before the first
+normal start.
 """
 
 import hashlib
@@ -28,6 +29,9 @@ API_KEY_DESCRIPTION = "suite-cloud"
 DISABLED_ROLE_DESCRIPTION = "suite-disabled"
 FIREWALL_PORTS = (25, 465, 587, 143, 993, 110, 995, 443, 4190)
 SECRET_MARKER = "***"
+# Stalwart's default senders on the default domain: SPF, DKIM, DMARC and TLS reports, then DSNs
+# and Sieve messages.
+SYSTEM_SENDERS = ("noreply-spf", "noreply-dkim", "noreply-dmarc", "noreply-tls", "mailer-daemon")
 SPAM_RULES_URL = (
     "https://github.com/stalwartlabs/spam-filter/releases/download/{version}/spam-filter-rules.json.gz"
 )
@@ -214,6 +218,7 @@ def cluster_plan(cluster: Document) -> list[dict]:
             },
         }
     )
+    plan.append(admin_aliases_operation(cluster))
     plan.append(
         {
             "@type": "upsert",
@@ -309,13 +314,45 @@ def admin_account_operation(server: Document, domain: str | None = None) -> dict
         "credentials": {"0": {"@type": "Password", "secret": server.get_password("admin_password")}},
     }
     if domain:
-        account.update({"domainId": domain, "roles": {"@type": "Admin"}})
+        account.update(
+            {"domainId": domain, "roles": {"@type": "Admin"}, "aliases": system_sender_aliases(domain)}
+        )
     return {
         "@type": "upsert",
         "object": "Account",
         "matchOn": ["name", "domainId"] if domain else ["name"],
         "value": {"admin": account},
     }
+
+
+def admin_aliases_operation(cluster: Document) -> dict:
+    """Gives the administrator of the default domain the system senders' addresses on every push.
+    It carries no credentials: only the recovery plan may write those."""
+
+    account = {
+        "@type": "User",
+        "name": cluster.admin_username or "admin",
+        "domainId": "#default",
+        "aliases": system_sender_aliases("#default"),
+    }
+    return {
+        "@type": "upsert",
+        "object": "Account",
+        "matchOn": ["name", "domainId"],
+        "value": {"admin": account},
+    }
+
+
+def system_sender_aliases(domain: str) -> dict:
+    """Stalwart sends its own mail from these addresses of the default domain. As aliases, a bounce
+    or reply to that mail reaches the administrator's mailbox instead of being refused."""
+
+    return as_list(
+        [
+            {"name": name, "domainId": domain, "enabled": True, "description": "System sender"}
+            for name in SYSTEM_SENDERS
+        ]
+    )
 
 
 # Stalwart inserts its defaults of these only on a normal start that finds none, so the recovery
@@ -333,7 +370,13 @@ def recovery_plan(cluster: Document) -> list[dict]:
     certificates go here too, when the operator asks.
     """
 
-    operations = [op for op in cluster_plan(cluster) if op["object"] not in DEFAULTS_PROVISIONED_BY_STALWART]
+    # The administrator's own operation replaces the aliases-only one: on a restored store it may
+    # have to create the account, which needs the password.
+    operations = [
+        op
+        for op in cluster_plan(cluster)
+        if op["object"] not in (*DEFAULTS_PROVISIONED_BY_STALWART, "Account")
+    ]
     operations.append(admin_account_operation(cluster, domain="#default"))
     operations = [*store_operations(cluster), https_listener_operation(), *operations]
     if cluster.remove_existing_certificates:
@@ -645,22 +688,31 @@ def drift_report(cluster: Document) -> dict:
 
     client = cluster.get_client()
     differences: list[dict] = []
+    ids: dict[str, str] = {}  # plan refs of matched objects, so a later match on ``#ref`` works
     for operation in cluster_plan(cluster):
         object_type = operation["object"]
         if operation["@type"] == "upsert":
             match_on = operation.get("matchOn") or ["name"]
             existing = client.objects(object_type).get_all()
             for ref, value in operation["value"].items():
-                live = next((o for o in existing if all(o.get(k) == value.get(k) for k in match_on)), None)
+                wanted = {k: resolve_ref(value.get(k), ids) for k in match_on}
+                live = next((o for o in existing if all(o.get(k) == wanted[k] for k in match_on)), None)
                 if live is None:
                     differences.append({"object": object_type, "ref": ref, "missing": True})
                     continue
+                ids[ref] = live["id"]
                 differences += _drifted(object_type, live, value, ref)
         elif operation["@type"] == "update" and not operation.get("id"):
             live = client.singleton(object_type).read()
             differences += _drifted(object_type, live, operation["value"])
 
     return {"checked_at": frappe.utils.now(), "differences": differences}
+
+
+def resolve_ref(value, ids: dict[str, str]):
+    if isinstance(value, str) and value.startswith("#"):
+        return ids.get(value[1:], value)
+    return value
 
 
 def _drifted(object_type: str, live: dict, wanted: dict, ref: str | None = None) -> list[dict]:
