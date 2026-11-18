@@ -26,6 +26,11 @@ frappe.ui.form.on('Stalwart Cluster', {
 		if (frm.doc.__islocal) return
 
 		frm.add_custom_button(__('Preview Plan'), () => frm.trigger('preview_plan'), __('Configuration'))
+		// An externally managed server's platform runs its nodes: no upgrades, tokens or scanners.
+		const external = frm.doc.externally_managed
+		if (external && ['Pending', 'Failed', 'Active'].includes(frm.doc.status)) {
+			frm.add_custom_button(__('Adopt External Server'), () => frm.trigger('adopt_external_server'), __('Nodes'))
+		}
 
 		if (frm.doc.status === 'Active') {
 			frm.add_custom_button(__('Sync Config'), () => frm.trigger('sync_config'), __('Configuration'))
@@ -33,6 +38,8 @@ frappe.ui.form.on('Stalwart Cluster', {
 			frm.add_custom_button(__('Reconcile Directory'), () => frm.trigger('reconcile_directory'), __('Configuration'))
 			frm.add_custom_button(__('Rotate API Key'), () => frm.trigger('rotate_api_key'), __('Access'))
 			frm.add_custom_button(__('Replace DKIM Keys'), () => frm.trigger('replace_dkim_keys'), __('Access'))
+		}
+		if (frm.doc.status === 'Active' && !external) {
 			frm.add_custom_button(__('Upgrade Nodes'), () => frm.trigger('upgrade_nodes'), __('Nodes'))
 			const default_version = (frm.doc.__onload || {}).default_stalwart_version
 			if (default_version) {
@@ -60,7 +67,9 @@ frappe.ui.form.on('Stalwart Cluster', {
 		}
 		if (frm.doc.status === 'Pending') {
 			frm.dashboard.add_comment(
-				__('Add the cluster SSH public key to the first node VPS, create a Stalwart Node and provision it.'),
+				frm.doc.externally_managed
+					? __('Run Adopt External Server with the server\'s recovery administrator.')
+					: __('Add the cluster SSH public key to the first node VPS, create a Stalwart Node and provision it.'),
 				'blue',
 				true,
 			)
@@ -71,7 +80,7 @@ frappe.ui.form.on('Stalwart Cluster', {
 			})
 		}
 		const default_version = (frm.doc.__onload || {}).default_stalwart_version
-		if (default_version) {
+		if (default_version && !frm.doc.externally_managed) {
 			frm.dashboard.add_comment(
 				__('This cluster is set to Stalwart {0}, older than the default {1}. Change Stalwart Version and run Upgrade Nodes.', [
 					frappe.utils.escape_html(frm.doc.stalwart_version),
@@ -173,6 +182,22 @@ frappe.ui.form.on('Stalwart Cluster', {
 		frappe.confirm(__('Generate new DKIM keys for {0}? Without a DNS provider on the zone the new records must be published by hand.', [frm.doc.default_domain]), () => {
 			frm.events.call(frm, 'replace_dkim_keys', {}, __('Replacing keys...'))
 		})
+	},
+
+	adopt_external_server(frm) {
+		frappe.prompt(
+			[
+				{ fieldname: 'username', fieldtype: 'Data', label: __('Recovery Administrator'), reqd: 1 },
+				{ fieldname: 'password', fieldtype: 'Password', label: __('Password'), reqd: 1 },
+			],
+			(values) => {
+				frm.events.call(frm, 'adopt_external_server', values, __('Adopting the server...'), () => {
+					frappe.show_alert({ message: __('Cluster is active'), indicator: 'green' })
+				})
+			},
+			__('Adopt External Server'),
+			__('Adopt'),
+		)
 	},
 
 	upgrade_nodes(frm) {

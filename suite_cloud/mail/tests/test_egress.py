@@ -415,6 +415,38 @@ class TestEgress(IntegrationTestCase):
         moving.delete()
         self.assertEqual(self.live_route(), ([local, foreign], "'egress-p1'"))
 
+    def test_a_1x_cluster_and_gateway_get_1x_names(self) -> None:
+        self.cluster.db_set("stalwart_version", "v1.1.1")
+        frappe.clear_document_cache("Stalwart Cluster", self.cluster.name)
+        self.gateway.db_set("stalwart_version", "v1.1.1")
+        pool = self.make_pool(("203.0.113.51",))
+        frappe.get_doc(
+            {
+                "doctype": "Mail Domain",
+                "domain_name": "acme.com",
+                "tenant": self.tenant.name,
+                "egress_pool": pool.name,
+            }
+        ).insert()
+
+        cluster = frappe.get_doc("Stalwart Cluster", self.cluster.name)
+        route = {op["object"]: op for op in egress.cluster_operations(cluster)}["MtaRoute"]["value"][
+            "egress-p1"
+        ]
+        self.assertEqual(route["host"], pool.hostname)
+        self.assertNotIn("address", route)
+
+        operations = {
+            op["object"]: op
+            for op in egress.gateway_plan(frappe.get_doc("Egress Gateway", self.gateway.name))
+        }
+        listener = operations["NetworkListener"]["value"]["relay-p1"]
+        self.assertIs(listener["implicitTls"], False)
+        self.assertNotIn("tlsImplicit", listener)
+        domain = operations["Domain"]["value"]["gateway"]
+        self.assertIs(domain["enable"], True)
+        self.assertNotIn("isEnabled", domain)
+
     def test_gateway_plan(self) -> None:
         pool = self.make_pool(("203.0.113.51",))
         operations = {

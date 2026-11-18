@@ -12,6 +12,7 @@ from suite_cloud.mail.cluster import push
 from suite_cloud.mail.cluster.zone import GROUPS, build_domain_records, group_summaries
 from suite_cloud.mail.doctype.dmarc_report.dmarc_report import DMARC_REPORTS
 from suite_cloud.mail.doctype.tls_report.tls_report import TLS_REPORTS
+from suite_cloud.mail.stalwart import schema
 from suite_cloud.mail.stalwart.directory import Domain
 from suite_cloud.mail.tenancy import ownership, sync
 from suite_cloud.mail.tenancy.addresses import (
@@ -191,12 +192,19 @@ class MailDomain(Document):
             sub_addressing=bool(self.sub_addressing),
             allow_relaying=bool(self.allow_relaying),
             report_address_uri=f"mailto:postmaster@{self.domain_name}",
+            v1=self.is_v1(),
         )
+
+    def is_v1(self) -> bool:
+        return schema.is_v1(frappe.get_cached_doc("Stalwart Cluster", self.cluster))
+
+    def enabled_field(self) -> str:
+        return schema.field("Domain", "isEnabled", self.is_v1())
 
     def stalwart_patch(self) -> dict:
         return {
             "description": self.description or f"Suite Tenant {self.tenant}",
-            "isEnabled": self.is_live(),
+            self.enabled_field(): self.is_live(),
             "catchAllAddress": self.catch_all_address or None,
             "subAddressing": {"@type": "Enabled" if self.sub_addressing else "Disabled"},
             "allowRelaying": bool(self.allow_relaying),
@@ -279,7 +287,7 @@ class MailDomain(Document):
         self.last_verified_at = checked_at
         if self.stalwart_id and was_live != self.is_live():
             # Cluster first: a failed push must not leave the local flag ahead of Stalwart.
-            sync.push_update(self, "domains", {"isEnabled": self.is_live()})
+            sync.push_update(self, "domains", {self.enabled_field(): self.is_live()})
         self.save_records()
         return {"inconclusive": inconclusive, "is_verified": bool(self.is_verified), **self.records_payload()}
 

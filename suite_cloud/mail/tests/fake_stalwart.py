@@ -170,6 +170,8 @@ class FakeStalwart:
                 username, password = base64.b64decode(value).decode().split(":", 1)
             except Exception:
                 return None
+            if account := self._password_login(username, password):
+                return account
             if password != self.admin_password:
                 return None
             if username == self.admin_user:
@@ -180,6 +182,15 @@ class FakeStalwart:
                 return None
             account = next((a for a in self.all("Account") if a.get("emailAddress") == email), None)
             return account["id"] if account else None
+        return None
+
+    def _password_login(self, name: str, password: str) -> str | None:
+        """A directory account signing in with its own password, as the permanent administrator does."""
+
+        for account in self.all("Account"):
+            passwords = [c.get("secret") for c in (account.get("credentials") or {}).values()]
+            if account.get("name") == name and password in passwords:
+                return account["id"]
         return None
 
     def _is_receive_only(self, account_id: str) -> bool:

@@ -17,6 +17,7 @@ from urllib.parse import unquote, urlsplit
 import frappe
 
 from suite_cloud.mail.cluster import server_token
+from suite_cloud.mail.stalwart import is_external, schema
 from suite_cloud.mail.stalwart.client import is_write_only
 from suite_cloud.mail.stalwart.directory import dkim_management_payload
 from suite_cloud.utils import dkim_algorithms, get_config
@@ -152,33 +153,45 @@ def dns_resolver_operation() -> dict:
 def bootstrap_plan(cluster: Document) -> list[dict]:
     """The single Bootstrap update applied while the first node runs in bootstrap mode."""
 
-    store = cluster.get_store
+    def store(field: str) -> dict:
+        return cluster.get_store(field).config_for(cluster) if cluster.get(field) else {"@type": "Default"}
+
     value = {
         "serverHostname": cluster.hostname,
         "defaultDomain": cluster.default_domain,
         "requestTlsCertificate": False,
         "generateDkimKeys": False,
-        "dataStore": store("data_store").config,
-        "blobStore": store("blob_store").config if cluster.blob_store else {"@type": "Default"},
-        "searchStore": store("search_store").config if cluster.search_store else {"@type": "Default"},
-        "inMemoryStore": store("in_memory_store").config if cluster.in_memory_store else {"@type": "Default"},
+        "dataStore": store("data_store"),
+        "blobStore": store("blob_store"),
+        "searchStore": store("search_store"),
+        "inMemoryStore": store("in_memory_store"),
         "directory": {"@type": "Internal"},
         "tracer": log_tracer(),
         "dnsServer": {"@type": "Manual"},
     }
-    return [{"@type": "update", "object": "Bootstrap", "value": value}]
+    return [
+        {
+            "@type": "update",
+            "object": "Bootstrap",
+            "value": schema.adapt("Bootstrap", value, schema.is_v1(cluster)),
+        }
+    ]
 
 
 # --- cluster --------------------------------------------------------------------------
 
 
 def cluster_plan(cluster: Document) -> list[dict]:
+    """On an externally managed cluster, the platform owns the nodes' files, resolver, logging,
+    certificates and telemetry, so the plan leaves those out."""
+
+    external = is_external(cluster)
     plan: list[dict] = [
         {"@type": "update", "object": "Coordinator", "value": {"@type": cluster.coordinator or "Disabled"}},
-        *defaults_plan(),
-        tracer_operation(),
-        *telemetry_operations(cluster),
+        *defaults_plan(cluster),
     ]
+    if not external:
+        plan.extend([tracer_operation(), *telemetry_operations(cluster)])
 
     dns_server = dns_server_object(cluster)
     if dns_server:
@@ -191,14 +204,15 @@ def cluster_plan(cluster: Document) -> list[dict]:
             }
         )
 
-    plan.append(
-        {
-            "@type": "upsert",
-            "object": "AcmeProvider",
-            "matchOn": ["directory"],
-            "value": {"acme": acme_provider(cluster)},
-        }
-    )
+    if not external:
+        plan.append(
+            {
+                "@type": "upsert",
+                "object": "AcmeProvider",
+                "matchOn": ["directory"],
+                "value": {"acme": acme_provider(cluster)},
+            }
+        )
     plan.append(
         {
             "@type": "upsert",
@@ -207,17 +221,15 @@ def cluster_plan(cluster: Document) -> list[dict]:
             "value": {"default": default_domain(cluster, with_dns=bool(dns_server))},
         }
     )
-    plan.append(
-        {
-            "@type": "update",
-            "object": "SystemSettings",
-            "value": {
-                "defaultHostname": cluster.hostname,
-                "defaultDomainId": "#default",
-                "mailExchangers": as_list([{"hostname": cluster.hostname, "priority": 10}]),
-            },
-        }
-    )
+    settings = {
+        "defaultHostname": cluster.hostname,
+        "defaultDomainId": "#default",
+        "mailExchangers": as_list([{"hostname": cluster.hostname, "priority": 10}]),
+    }
+    if external and cluster.jmap_hostname:
+        # The host Stalwart writes into its JMAP session URLs, which tenants' sites follow.
+        settings["services/jmap"] = {"hostname": cluster.jmap_hostname, "cleartext": False}
+    plan.append({"@type": "update", "object": "SystemSettings", "value": settings})
     plan.append(admin_aliases_operation(cluster))
     plan.append(
         {
@@ -262,7 +274,7 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
     domain = {
         "name": cluster.default_domain,
         "description": "Cluster default domain",
-        "isEnabled": True,
+        schema.field("Domain", "isEnabled", schema.is_v1(cluster)): True,
         "certificateManagement": {
             "@type": "Automatic",
             "acmeProviderId": "#acme",
@@ -271,7 +283,9 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
             "subjectAlternativeNames": as_set(
                 [cluster.default_domain, f"*.{cluster.default_domain}", *cluster.additional_hostname_list]
             ),
-        },
+        }
+        if not is_external(cluster)
+        else {"@type": "Manual"},  # the platform holds an external server's certificates
         "dkimManagement": dkim_management_payload(dkim_algorithms()),
         "subAddressing": {"@type": "Disabled"},
     }
@@ -315,7 +329,11 @@ def admin_account_operation(server: Document, domain: str | None = None) -> dict
     }
     if domain:
         account.update(
-            {"domainId": domain, "roles": {"@type": "Admin"}, "aliases": system_sender_aliases(domain)}
+            {
+                "domainId": domain,
+                "roles": {"@type": "Admin"},
+                "aliases": system_sender_aliases(domain, schema.is_v1(server)),
+            }
         )
     return {
         "@type": "upsert",
@@ -333,7 +351,7 @@ def admin_aliases_operation(cluster: Document) -> dict:
         "@type": "User",
         "name": cluster.admin_username or "admin",
         "domainId": "#default",
-        "aliases": system_sender_aliases("#default"),
+        "aliases": system_sender_aliases("#default", schema.is_v1(cluster)),
     }
     return {
         "@type": "upsert",
@@ -343,13 +361,14 @@ def admin_aliases_operation(cluster: Document) -> dict:
     }
 
 
-def system_sender_aliases(domain: str) -> dict:
+def system_sender_aliases(domain: str, v1: bool) -> dict:
     """Stalwart sends its own mail from these addresses of the default domain. As aliases, a bounce
     or reply to that mail reaches the administrator's mailbox instead of being refused."""
 
+    enabled = schema.field("EmailAlias", "enabled", v1)
     return as_list(
         [
-            {"name": name, "domainId": domain, "enabled": True, "description": "System sender"}
+            {"name": name, "domainId": domain, enabled: True, "description": "System sender"}
             for name in SYSTEM_SENDERS
         ]
     )
@@ -378,7 +397,7 @@ def recovery_plan(cluster: Document) -> list[dict]:
         if op["object"] not in (*DEFAULTS_PROVISIONED_BY_STALWART, "Account")
     ]
     operations.append(admin_account_operation(cluster, domain="#default"))
-    operations = [*store_operations(cluster), https_listener_operation(), *operations]
+    operations = [*store_operations(cluster), https_listener_operation(cluster), *operations]
     if cluster.remove_existing_certificates:
         operations.insert(0, {"@type": "destroy", "object": "Certificate"})  # no filter: every one
     return operations
@@ -396,7 +415,7 @@ def unlink_certificates_plan(cluster: Document) -> list[dict]:
     return [{"@type": "update", "object": "SystemSettings", "value": {"defaultCertificateId": None}}]
 
 
-def https_listener_operation() -> dict:
+def https_listener_operation(cluster: Document) -> dict:
     """Stalwart's own HTTPS listener, on the port every node is reached at.
 
     A data store restored from a server that ran behind a proxy has it on another port, and the
@@ -410,6 +429,7 @@ def https_listener_operation() -> dict:
         "useTls": True,
         "tlsImplicit": True,
     }
+    listener = schema.adapt("NetworkListener", listener, schema.is_v1(cluster))
     return {"@type": "upsert", "object": "NetworkListener", "matchOn": ["name"], "value": {"https": listener}}
 
 
@@ -428,13 +448,15 @@ def store_operations(cluster: Document) -> list[dict]:
         {
             "@type": "update",
             "object": object_type,
-            "value": store.config if (store := cluster.get_store(field)) else {"@type": "Default"},
+            "value": store.config_for(cluster)
+            if (store := cluster.get_store(field))
+            else {"@type": "Default"},
         }
         for field, object_type in STORE_OBJECTS.items()
     ]
 
 
-def defaults_plan() -> list[dict]:
+def defaults_plan(cluster: Document | None = None) -> list[dict]:
     """Applied in recovery mode before the first normal start, which needs all of it.
 
     That start names the node's cluster role (Stalwart fails the start when it is missing),
@@ -445,7 +467,8 @@ def defaults_plan() -> list[dict]:
 
     return [
         {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
-        dns_resolver_operation(),
+        # An external server resolves through its platform (Kubernetes DNS): no local Unbound.
+        *([] if is_external(cluster) else [dns_resolver_operation()]),
         *spam_settings_operations(),
     ]
 
@@ -522,7 +545,7 @@ def api_key_permissions() -> dict:
 def node_config(cluster: Document) -> dict:
     """``/etc/stalwart/config.json``: only the data store; everything else lives in it."""
 
-    return cluster.get_store("data_store").config
+    return cluster.get_store("data_store").config_for(cluster)
 
 
 def node_env(node: Document, mode: str = "normal") -> dict[str, str]:
@@ -720,12 +743,21 @@ def _drifted(object_type: str, live: dict, wanted: dict, ref: str | None = None)
     for key, value in wanted.items():
         if key == "@type" or is_write_only(key, value):
             continue  # secrets are never echoed back
-        if not same_value(live.get(key), value):
+        if not same_value(live_value(live, key), value):
             entry = {"object": object_type, "property": key}
             if ref:
                 entry["ref"] = ref
             found.append(entry)
     return found
+
+
+def live_value(live: dict, key: str):
+    """A property, or a JSON pointer such as ``services/jmap`` that an update patches in place."""
+
+    value = live
+    for part in key.split("/"):
+        value = value.get(part) if isinstance(value, dict) else None
+    return value
 
 
 def same_value(live, wanted) -> bool:

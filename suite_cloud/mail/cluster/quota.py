@@ -9,6 +9,7 @@ from frappe.utils import cint
 from suite_cloud.mail.cluster import server_token
 from suite_cloud.mail.cluster.plan import as_list, as_set
 from suite_cloud.mail.cluster.telemetry import public_url
+from suite_cloud.mail.stalwart import is_external
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -23,6 +24,10 @@ NEVER = {"match": as_list([]), "else": "false"}
 
 
 def cluster_operations(cluster: Document) -> list[dict]:
+    # The hook authenticates with a token each node holds in its environment, which Suite Cloud
+    # installs only on servers it provisions; an external server keeps the native backstop.
+    if is_external(cluster):
+        return [backstop_operation(cluster)]
     return [hook_operation(cluster), backstop_operation(cluster)]
 
 
