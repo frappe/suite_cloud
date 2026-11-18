@@ -155,17 +155,20 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual((pool.relay_port, second.relay_port), (2525, 2526))
         self.assertEqual((pool.pool_name, second.pool_name), ("p1", "p2"))
         self.assertEqual(pool.hostname, f"p1.out.{self.cluster.default_domain}")
-        hosts = sorted(
-            (r.host, r.value)
-            for r in frappe.get_all("DNS Record", {"managed_by": pool.name}, ["host", "value"])
-        )
+        hosts = self.pool_addresses(pool)
         # The gateway is still Pending, so the pool hostname lists nobody yet.
         self.assertEqual(hosts, [("p1-1.mail.blr", "203.0.113.51"), ("p1-2.mail.blr", "203.0.113.52")])
-        self.gateway.set_status("Active")
-        hosts = sorted(
-            (r.host, r.value)
-            for r in frappe.get_all("DNS Record", {"managed_by": pool.name}, ["host", "value"])
+        # DSNs have a null sender, so SPF is checked against the EHLO name.
+        spf = frappe.get_all("DNS Record", {"managed_by": pool.name, "type": "TXT"}, ["host", "value"])
+        self.assertEqual(
+            sorted((r.host, r.value) for r in spf),
+            [
+                (host, f"v=spf1 include:spf.{self.cluster.default_domain} -all")
+                for host in ("p1-1.mail.blr", "p1-2.mail.blr")
+            ],
         )
+        self.gateway.set_status("Active")
+        hosts = self.pool_addresses(pool)
         self.assertEqual(
             hosts,
             [
@@ -183,6 +186,12 @@ class TestEgress(IntegrationTestCase):
         self.assertRaisesRegex(frappe.ValidationError, "already belongs", self.make_pool, ("203.0.113.51",))
         # A typed pool name is ignored: names are handed out in order.
         self.assertEqual(self.make_pool(("203.0.113.54",), pool_name="custom").pool_name, "p3")
+
+    def pool_addresses(self, pool) -> list[tuple[str, str]]:
+        records = frappe.get_all(
+            "DNS Record", {"managed_by": pool.name, "type": ["in", ["A", "AAAA"]]}, ["host", "value"]
+        )
+        return sorted((r.host, r.value) for r in records)
 
     def test_check_sets_the_gateway_default_certificate(self) -> None:
         """Clients without SNI get the gateway's certificate instead of a warning."""
@@ -434,7 +443,7 @@ class TestEgress(IntegrationTestCase):
         )
         self.assertEqual(
             operations["MtaOutboundStrategy"]["value"]["connection"],
-            {"match": {"0": {"if": "received_via_port == 2525", "then": "'p1'"}}, "else": "'default'"},
+            {"match": {"0": {"if": "received_via_port == 2525", "then": "'p1'"}}, "else": "'p1'"},
         )
         # The relay login belongs to the egress zone; customer sender addresses must pass on relay ports.
         self.assertEqual(
@@ -481,6 +490,32 @@ class TestEgress(IntegrationTestCase):
         self.assertIn('"@type":"RocksDb"', variables["bootstrap_ndjson"])
         self.assertIn(pool.pool_name, variables["cluster_ndjson"])
 
+    def test_gateway_own_mail_leaves_through_a_pool(self) -> None:
+        """DSNs arrive on no relay port; they bind to a pool address and use its EHLO name, also
+        when that address is the gateway's own IP."""
+
+        gateway = frappe.get_doc("Egress Gateway", self.gateway.name)
+        connection = self.plan_by_object(gateway)["MtaOutboundStrategy"]["value"]["connection"]
+        self.assertEqual(connection, {"match": {}, "else": "'default'"})  # no pool, nothing to bind
+
+        self.make_pool((self.gateway.ipv4_address,))
+        operations = self.plan_by_object(gateway)
+        fallback = operations["MtaOutboundStrategy"]["value"]["connection"]["else"].strip("'")
+        source_ips = operations["MtaConnectionStrategy"]["value"][fallback]["sourceIps"]
+        self.assertEqual(
+            source_ips,
+            {
+                "0": {
+                    "sourceIp": self.gateway.ipv4_address,
+                    "ehloHostname": f"p1-1.{self.cluster.default_domain}",
+                }
+            },
+        )
+        self.assertNotIn(gateway.hostname, [row["ehloHostname"] for row in source_ips.values()])
+
+    def plan_by_object(self, gateway) -> dict:
+        return {op["object"]: op for op in egress.gateway_plan(gateway)}
+
     def test_a_pool_address_can_send_from_its_private_ip(self) -> None:
         """On AWS an Elastic IP is not on the instance: Stalwart binds to the private IP it maps to."""
 
@@ -499,7 +534,9 @@ class TestEgress(IntegrationTestCase):
         )
         # DNS keeps the public IP.
         self.assertEqual(
-            frappe.db.get_value("DNS Record", {"managed_by": pool.name, "host": "p1-1.mail.blr"}, "value"),
+            frappe.db.get_value(
+                "DNS Record", {"managed_by": pool.name, "host": "p1-1.mail.blr", "type": "A"}, "value"
+            ),
             "203.0.113.51",
         )
 
