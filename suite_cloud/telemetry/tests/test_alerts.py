@@ -2,7 +2,7 @@
 alerts, which close when the telemetry says so."""
 
 import shutil
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import skipUnless
 from unittest.mock import patch
@@ -20,7 +20,7 @@ from suite_cloud.telemetry.spool import Spool
 from suite_cloud.telemetry.warehouse import Warehouse
 from suite_cloud.tests.fixtures import configure_settings
 
-NOW = datetime.now(UTC).replace(tzinfo=None)
+NOW = now_datetime()
 QUIET = "203.0.113.5"
 NOISY = "203.0.113.6"
 SCANNER = "203.0.113.8"

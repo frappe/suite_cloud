@@ -231,7 +231,7 @@ DUCKDB_TYPES = {
     pyarrow.int64(): "BIGINT",
 }
 
-# What every row of one batch shares. Timestamps are naive UTC by contract.
+# What every row of one batch shares. Timestamps are naive, in the system timezone, so the charts read in it.
 ENVELOPE_FIELDS = (
     pyarrow.field("batch_id", pyarrow.string(), nullable=False),
     pyarrow.field("received_at", pyarrow.timestamp("us"), nullable=False),

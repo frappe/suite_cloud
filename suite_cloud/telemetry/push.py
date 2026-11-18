@@ -6,7 +6,7 @@ refused request until it gives up on it, so one bad event would cost the whole b
 
 import hashlib
 import math
-from datetime import UTC, datetime
+from datetime import datetime, tzinfo
 from uuid import NAMESPACE_URL, uuid5
 
 import orjson
@@ -14,6 +14,7 @@ from opentelemetry.proto.collector.metrics.v1.metrics_service_pb2 import ExportM
 from opentelemetry.proto.common.v1.common_pb2 import AnyValue
 
 from suite_cloud.telemetry import ERROR_EVENTS, EVENT_LEVELS, WARN_EVENTS
+from suite_cloud.utils import get_system_zone
 
 EVENT_NAME_LIMIT = 128
 SPAN_ID_LIMIT = 64
@@ -51,9 +52,10 @@ def get_event_rows(events: list, stream: str) -> tuple[list[dict], list[str]]:
     or warn level. An event the stream does not list is left out."""
 
     rows, problems = [], []
+    zone = get_system_zone()
     for index, event in enumerate(events):
         try:
-            row = parse_event(event)
+            row = parse_event(event, zone)
         except Skipped as problem:
             problems.append(f"events[{index}]: {problem}")
             continue
@@ -62,7 +64,7 @@ def get_event_rows(events: list, stream: str) -> tuple[list[dict], list[str]]:
     return rows, problems
 
 
-def parse_event(event: object) -> dict:
+def parse_event(event: object, zone: tzinfo) -> dict:
     if not isinstance(event, dict):
         raise Skipped("not an object")
     name = event.get("type")
@@ -75,7 +77,7 @@ def parse_event(event: object) -> dict:
     span_id = data.pop("spanId", None)
     span_id = None if span_id is None else str(span_id)[:SPAN_ID_LIMIT]
     return {
-        "timestamp": parse_timestamp(event.get("createdAt")),
+        "timestamp": parse_timestamp(event.get("createdAt"), zone),
         "level": LEVELS.get(name, "error"),
         "event": name,
         "span_id": span_id,
@@ -83,8 +85,8 @@ def parse_event(event: object) -> dict:
     }
 
 
-def parse_timestamp(value: object) -> datetime:
-    """An RFC 3339 instant with its offset, stored as naive UTC."""
+def parse_timestamp(value: object, zone: tzinfo) -> datetime:
+    """An RFC 3339 instant with its offset, stored as a naive time in the zone."""
 
     try:
         moment = datetime.fromisoformat(value)
@@ -92,7 +94,7 @@ def parse_timestamp(value: object) -> datetime:
         raise Skipped("createdAt must be an RFC 3339 timestamp") from None
     if moment.tzinfo is None:
         raise Skipped("createdAt must carry a UTC offset")
-    return moment.astimezone(UTC).replace(tzinfo=None)
+    return moment.astimezone(zone).replace(tzinfo=None)
 
 
 def get_metric_rows(body: bytes) -> tuple[list[dict], int]:
@@ -105,13 +107,14 @@ def get_metric_rows(body: bytes) -> tuple[list[dict], int]:
     request = ExportMetricsServiceRequest()
     request.ParseFromString(body)
     rows, skipped = [], 0
+    zone = get_system_zone()
     for resource in request.resource_metrics:
         for scope in resource.scope_metrics:
             for metric in scope.metrics:
                 points, row_type = get_points(metric)
                 for point in points:
                     try:
-                        rows.append({"name": metric.name, **parse_point(point, row_type)})
+                        rows.append({"name": metric.name, **parse_point(point, row_type, zone)})
                     except Skipped:
                         skipped += 1
     return rows, skipped
@@ -126,11 +129,11 @@ def get_points(metric) -> tuple[list, str | None]:
     return points, {"sum": "counter", "gauge": "gauge", "histogram": "histogram"}.get(kind)
 
 
-def parse_point(point, row_type: str | None) -> dict:
+def parse_point(point, row_type: str | None, zone: tzinfo) -> dict:
     if row_type is None:
         raise Skipped("unsupported point type")
     row = {
-        "timestamp": datetime.fromtimestamp(point.time_unix_nano / 1e9, UTC).replace(tzinfo=None),
+        "timestamp": datetime.fromtimestamp(point.time_unix_nano / 1e9, zone).replace(tzinfo=None),
         "type": row_type,
         "count": None,
         "sum": None,

@@ -70,7 +70,7 @@ class TestOutboundScanApi(OutboundScanTestCase):
         self.assertEqual(self.push([scan_record()]), {"accepted": 1, "skipped": 0})
 
         [scan] = self.rows()
-        self.assertEqual(scan["timestamp"], datetime(2026, 10, 20, 9, 59, 0, 250000))
+        self.assertEqual(scan["timestamp"], datetime(2026, 10, 20, 15, 29, 0, 250000))
         self.assertEqual(
             {key: scan[key] for key in ("account", "message_id", "action", "score", "scan_time")},
             {

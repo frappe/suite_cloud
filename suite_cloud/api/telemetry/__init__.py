@@ -12,12 +12,11 @@ when each host last sent each kind of telemetry, for the status on the node form
 """
 
 from collections.abc import Callable
-from datetime import UTC, datetime
 from functools import wraps
 
 import frappe
 from frappe import _
-from frappe.utils import cint
+from frappe.utils import cint, now_datetime
 from google.protobuf.message import DecodeError
 from werkzeug.wrappers import Response
 
@@ -201,7 +200,7 @@ def get_server_envelope(server: frappe._dict, batch_id: str) -> dict:
 
     return {
         "batch_id": batch_id,
-        "received_at": datetime.now(UTC).replace(tzinfo=None),
+        "received_at": now_datetime(),
         "source": SOURCE,
         "host_ip": server.ipv4_address,
         "hostname": server.hostname,

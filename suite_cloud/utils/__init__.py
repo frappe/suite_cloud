@@ -129,12 +129,22 @@ def utc_iso(value) -> str | None:
     if not value:
         return None
     from datetime import UTC
-    from zoneinfo import ZoneInfo
 
     moment = frappe.utils.get_datetime(value)
     if moment.tzinfo is None:
-        moment = moment.replace(tzinfo=ZoneInfo(frappe.utils.get_system_timezone()))
+        moment = moment.replace(tzinfo=get_system_zone())
     return moment.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def get_system_zone():
+    """The system timezone, which Frappe and the telemetry tables store their naive times in.
+
+    Look it up once per request, not per row.
+    """
+
+    from zoneinfo import ZoneInfo
+
+    return ZoneInfo(frappe.utils.get_system_timezone())
 
 
 def local_datetime(value):
@@ -143,12 +153,11 @@ def local_datetime(value):
     if not value:
         return None
     from datetime import UTC
-    from zoneinfo import ZoneInfo
 
     moment = frappe.utils.get_datetime(value)
     if moment.tzinfo is None:
         moment = moment.replace(tzinfo=UTC)
-    return moment.astimezone(ZoneInfo(frappe.utils.get_system_timezone())).replace(tzinfo=None)
+    return moment.astimezone(get_system_zone()).replace(tzinfo=None)
 
 
 def password_or_none(doc, field: str) -> str | None:

@@ -10,14 +10,12 @@ hand.
 """
 
 from dataclasses import dataclass
-from datetime import UTC, datetime, timedelta
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 
 import frappe
 from frappe import _
 from frappe.utils import (
     cint,
-    convert_utc_to_system_timezone,
     format_datetime,
     get_system_timezone,
     get_url_to_form,
@@ -129,7 +127,7 @@ class Alerts:
         open alert stays silent until a newer push proves it is back: past the lookback it keeps
         its alert, and once the retention has deleted its last rows it is still not recovered."""
 
-        now = datetime.now(UTC).replace(tzinfo=None)
+        now = now_datetime()
         rows = self.get_last_pushes("received_at >= $since", {"since": now - LOOKBACK})
         recent = {host_ip for host_ip, _hostname, _last in rows}
         if stale := [host_ip for host_ip in watched if host_ip not in recent]:
@@ -140,8 +138,8 @@ class Alerts:
                 METRICS_SILENT,
                 host_ip,
                 hostname,
-                _("No metrics received since {0} UTC.").format(last.strftime("%Y-%m-%d %H:%M")),
-                seen_at=convert_utc_to_system_timezone(last).replace(tzinfo=None),
+                _("No metrics received since {0}.").format(format_seen(last)),
+                seen_at=last,
             )
             for host_ip, hostname, last in rows
             if last < silent
@@ -193,9 +191,7 @@ class Alerts:
                         SCAN_SILENT,
                         node.ipv4_address,
                         node.hostname,
-                        _("No check-in from the scan shipper since {0} UTC.").format(
-                            to_utc(seen).strftime("%Y-%m-%d %H:%M")
-                        ),
+                        _("No check-in from the scan shipper since {0}.").format(format_seen(seen)),
                         seen_at=seen,
                     )
                 )
@@ -214,7 +210,7 @@ class Alerts:
         """Servers that logged at least the threshold of error events in the last hour. Stalwart
         pushes only the events Suite Cloud lists, so a share of all events means nothing."""
 
-        since = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=1)
+        since = now_datetime() - timedelta(hours=1)
         rows = self.warehouse.query(
             'SELECT host_ip, arg_max(hostname, "timestamp"), count(*) FROM "events" '
             "WHERE \"timestamp\" >= $since AND level = 'error' GROUP BY host_ip HAVING count(*) >= $limit",
@@ -285,7 +281,7 @@ class Alerts:
         )
 
 
-def to_utc(moment: datetime) -> datetime:
-    """A naive system-timezone time as naive UTC, as the other alert details write their times."""
+def format_seen(moment: datetime) -> str:
+    """A naive system-timezone time with its zone, as an alert's details write it."""
 
-    return moment.replace(tzinfo=ZoneInfo(get_system_timezone())).astimezone(UTC).replace(tzinfo=None)
+    return f"{moment:%Y-%m-%d %H:%M} ({get_system_timezone()})"
