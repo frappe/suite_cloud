@@ -6,13 +6,13 @@ file and this loader never collide: files are checked before the lock is taken, 
 held only for the insert.
 """
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from pathlib import Path
 
 import frappe
 import pyarrow.parquet as parquet
 from frappe import _
-from frappe.utils import cint
+from frappe.utils import cint, now_datetime
 
 from suite_cloud.telemetry import (
     CURRENT_METRICS,
@@ -293,7 +293,7 @@ class Warehouse:
     def refresh_current_metrics(self) -> None:
         """Rewrites current_metrics from the newest gauge readings of the nodes still pushing."""
 
-        since = datetime.now(UTC).replace(tzinfo=None) - CURRENT_AFTER
+        since = now_datetime() - CURRENT_AFTER
         columns = ", ".join(f'"{column}"' for column in CURRENT_METRICS.columns)
         with self.write_connection() as db:
             db.con.begin()
@@ -307,7 +307,7 @@ class Warehouse:
             db.con.commit()
 
     def prune_expired(self) -> None:
-        cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=self.retention_days)
+        cutoff = now_datetime() - timedelta(days=self.retention_days)
         with self.write_connection() as db:
             for table in TABLES:
                 db.raw_sql(table.create_statement)

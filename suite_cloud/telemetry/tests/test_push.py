@@ -7,6 +7,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from unittest.mock import patch
+from zoneinfo import ZoneInfo
 
 import frappe
 import pyarrow.parquet as parquet
@@ -109,6 +110,12 @@ class TelemetryApiTestCase(IntegrationTestCase):
         patcher = patch("suite_cloud.api.telemetry.Spool", return_value=self.spool)
         patcher.start()
         self.addCleanup(patcher.stop)
+        for module in ("push", "outbound_scans"):
+            self.enterContext(
+                patch(
+                    f"suite_cloud.telemetry.{module}.get_system_zone", return_value=ZoneInfo("Asia/Kolkata")
+                )
+            )
 
     def tearDown(self) -> None:
         frappe.local.request = None
@@ -234,7 +241,7 @@ class TestWebhook(PushTestCase):
             ],
         )
         delivered = rows[1]
-        self.assertEqual(delivered["timestamp"], datetime(2026, 10, 20, 9, 59))
+        self.assertEqual(delivered["timestamp"], datetime(2026, 10, 20, 15, 29))  # the system timezone
         self.assertEqual(
             (delivered["span_id"], json.loads(delivered["data"])), ("42", {"remoteIp": "198.51.100.7"})
         )
@@ -312,7 +319,7 @@ class TestOtlp(PushTestCase):
             (histogram["type"], histogram["value"], histogram["count"], histogram["sum"]),
             ("histogram", 2.5, 4, 10.0),
         )
-        self.assertEqual(memory["timestamp"], datetime(2026, 10, 20, 9, 59))
+        self.assertEqual(memory["timestamp"], datetime(2026, 10, 20, 15, 29))
         self.assertEqual(memory["host_ip"], self.node.ipv4_address)
 
     def test_a_body_that_is_not_otlp_is_a_400(self) -> None:

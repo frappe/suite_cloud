@@ -7,7 +7,7 @@ again on every run until its backlog drops it.
 
 import hashlib
 import math
-from datetime import UTC, datetime
+from datetime import datetime, tzinfo
 from uuid import NAMESPACE_URL, uuid5
 
 import orjson
@@ -15,7 +15,7 @@ from frappe.utils import flt
 
 from suite_cloud.mail.cluster.rspamd import SCAN_FIELDS
 from suite_cloud.telemetry.push import Skipped
-from suite_cloud.utils import get_config
+from suite_cloud.utils import get_config, get_system_zone
 
 ADDRESS_LIMIT = 320
 TEXT_LIMIT = 998  # a header line's limit; Message-IDs are shorter in practice
@@ -36,9 +36,10 @@ def get_scan_rows(scans: list) -> tuple[list[dict], list[dict], list[str]]:
     mode, score = get_config(SCAN_FIELDS)
     settings = {"mode": mode, "reject_score": flt(score) if mode != "Off" else None}
     rows, symbol_rows, problems = [], [], []
+    zone = get_system_zone()
     for index, scan in enumerate(scans):
         try:
-            row, symbols = parse_scan(scan)
+            row, symbols = parse_scan(scan, zone)
         except Skipped as problem:
             problems.append(f"scans[{index}]: {problem}")
             continue
@@ -47,7 +48,7 @@ def get_scan_rows(scans: list) -> tuple[list[dict], list[dict], list[str]]:
     return rows, symbol_rows, problems
 
 
-def parse_scan(scan: object) -> tuple[dict, dict[str, float]]:
+def parse_scan(scan: object, zone: tzinfo) -> tuple[dict, dict[str, float]]:
     if not isinstance(scan, dict):
         raise Skipped("not an object")
     account = get_text(scan, "user", ADDRESS_LIMIT)
@@ -55,7 +56,7 @@ def parse_scan(scan: object) -> tuple[dict, dict[str, float]]:
     if not (account and action):
         raise Skipped("user and action must be set")
     row = {
-        "timestamp": parse_time(scan.get("time")),
+        "timestamp": parse_time(scan.get("time"), zone),
         "account": account.lower(),
         "envelope_from": get_text(scan, "envelope_from", ADDRESS_LIMIT),
         "header_from": get_text(scan, "header_from", ADDRESS_LIMIT),
@@ -79,12 +80,12 @@ def get_symbol_rows(row: dict, symbols: dict[str, float]) -> list[dict]:
     ]
 
 
-def parse_time(value: object) -> datetime:
-    """Unix seconds, stored as naive UTC."""
+def parse_time(value: object, zone: tzinfo) -> datetime:
+    """Unix seconds, stored as a naive time in the zone."""
 
     seconds = get_number(value, "time")
     try:
-        return datetime.fromtimestamp(seconds, UTC).replace(tzinfo=None)
+        return datetime.fromtimestamp(seconds, zone).replace(tzinfo=None)
     except (OverflowError, OSError, ValueError):
         raise Skipped("time is out of range") from None
 

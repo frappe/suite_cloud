@@ -1,7 +1,7 @@
 """The loader: whole batches into Insights' DuckDB once, bad files aside, old rows out."""
 
 import shutil
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest import skipUnless
 from unittest.mock import patch
@@ -10,7 +10,7 @@ from uuid import NAMESPACE_URL, uuid5, uuid7
 import frappe
 from duckdb import IOException
 from frappe.tests import IntegrationTestCase
-from frappe.utils import get_files_path
+from frappe.utils import get_files_path, now_datetime
 
 from suite_cloud.mail.tests.fixtures import error_log_count, make_cluster, make_node
 from suite_cloud.telemetry import (
@@ -26,8 +26,9 @@ from suite_cloud.telemetry.outbound_scans import get_scan_rows
 from suite_cloud.telemetry.spool import Spool
 from suite_cloud.telemetry.warehouse import Warehouse
 from suite_cloud.tests.fixtures import configure_settings
+from suite_cloud.utils import get_system_zone
 
-NOW = datetime.now(UTC).replace(tzinfo=None)
+NOW = now_datetime()
 ENVELOPE = {"received_at": NOW, "source": "stalwart", "host_ip": "203.0.113.5", "hostname": "n1"}
 STALWART_DATA = (
     '{"accountName": "ana", "remoteIp": "198.51.100.7", "listenerId": "smtp", "domain": "example.com", '
@@ -202,7 +203,7 @@ class TestWarehouse(IntegrationTestCase):
 
     def test_a_load_takes_the_outbound_scans_and_their_rules(self) -> None:
         record = {
-            "time": NOW.replace(tzinfo=UTC).timestamp(),
+            "time": NOW.replace(tzinfo=get_system_zone()).timestamp(),
             "user": "ana@acme.test",
             "action": "reject",
             "score": 16.2,
@@ -418,6 +419,34 @@ class TestWarehouse(IntegrationTestCase):
         self.warehouse.prune_expired()
 
         self.assertEqual((self.count(EVENTS), self.count(METRICS)), (1, 0))
+
+    def test_the_stored_utc_times_move_to_the_system_timezone(self) -> None:
+        from suite_cloud.patches.v1_0 import shift_telemetry_to_system_time as shift
+
+        utc = datetime(2026, 10, 20, 20, 30)
+        self.stage(EVENTS, [event(timestamp=utc)])  # staged before the deploy, so still UTC
+
+        with patch.object(shift, "get_system_timezone", return_value="Asia/Kolkata"):
+            shift.execute(self.warehouse)
+
+        rows = self.warehouse.query('SELECT "timestamp", received_at FROM "events"', {})
+        self.assertEqual(rows, [(datetime(2026, 10, 21, 2, 0), NOW + timedelta(hours=5, minutes=30))])
+
+    def test_the_times_stay_put_while_a_staged_batch_did_not_load(self) -> None:
+        from suite_cloud.patches.v1_0 import shift_telemetry_to_system_time as shift
+
+        utc = datetime(2026, 10, 20, 20, 30)
+        self.stage(EVENTS, [event(timestamp=utc)])
+        self.warehouse.load_pending()
+        self.stage(EVENTS, [event()])
+
+        with (
+            patch.object(Warehouse, "load_pending", return_value={}),
+            self.assertRaisesRegex(frappe.ValidationError, "did not load"),
+        ):
+            shift.execute(self.warehouse)
+
+        self.assertEqual(self.warehouse.query('SELECT "timestamp" FROM "events"', {}), [(utc,)])
 
     def test_the_agents_rows_go_staged_or_loaded_and_stalwarts_stay(self) -> None:
         from suite_cloud.patches.v1_0 import delete_agent_telemetry as cleanup

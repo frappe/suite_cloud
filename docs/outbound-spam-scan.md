@@ -156,7 +156,7 @@ Nothing in the scan waits for Suite Cloud: the recorder only writes a local file
 
 | Record field | Column | Content |
 | --- | --- | --- |
-| `time` | `timestamp` | When Rspamd finished the scan, in UTC |
+| `time` | `timestamp` | When Rspamd finished the scan, in the system timezone |
 | `user` | `account` | The signed-in login, in lowercase. `account_domain` is its domain |
 | `envelope_from` | `envelope_from` | The SMTP `MAIL FROM` address |
 | `header_from` | `header_from` | The address of the `From` header |
