@@ -432,6 +432,22 @@ class TestWarehouse(IntegrationTestCase):
         rows = self.warehouse.query('SELECT "timestamp", received_at FROM "events"', {})
         self.assertEqual(rows, [(datetime(2026, 10, 21, 2, 0), NOW + timedelta(hours=5, minutes=30))])
 
+    def test_the_times_stay_put_while_a_staged_batch_did_not_load(self) -> None:
+        from suite_cloud.patches.v1_0 import shift_telemetry_to_system_time as shift
+
+        utc = datetime(2026, 10, 20, 20, 30)
+        self.stage(EVENTS, [event(timestamp=utc)])
+        self.warehouse.load_pending()
+        self.stage(EVENTS, [event()])
+
+        with (
+            patch.object(Warehouse, "load_pending", return_value={}),
+            self.assertRaisesRegex(frappe.ValidationError, "did not load"),
+        ):
+            shift.execute(self.warehouse)
+
+        self.assertEqual(self.warehouse.query('SELECT "timestamp" FROM "events"', {}), [(utc,)])
+
     def test_the_agents_rows_go_staged_or_loaded_and_stalwarts_stay(self) -> None:
         from suite_cloud.patches.v1_0 import delete_agent_telemetry as cleanup
 
