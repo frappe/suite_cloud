@@ -18,10 +18,6 @@ if TYPE_CHECKING:
     from frappe.model.document import Document
 
 
-def cluster_zone(cluster_name: str) -> str:
-    return frappe.get_cached_value("Stalwart Cluster", cluster_name, "dns_zone")
-
-
 def address_records(zone: str, fqdn: str, ipv4: str | None, ipv6: str | None, category: str) -> list[dict]:
     host = relative_host(fqdn, zone)
     records = []
@@ -66,6 +62,18 @@ def spf_host(cluster: Document) -> str:
 
 def spf_include(cluster: Document) -> str:
     return f"spf.{cluster.default_domain}"
+
+
+def include_spf_record(cluster: Document, fqdn: str) -> dict:
+    """SPF for a name the cluster sends as, allowing every sending address of the cluster."""
+
+    return {
+        "dns_zone": cluster.dns_zone,
+        "host": relative_host(fqdn, cluster.dns_zone),
+        "type": "TXT",
+        "value": f"v=spf1 include:{spf_include(cluster)} -all",
+        "category": "SPF",
+    }
 
 
 # A TXT character-string holds 255 bytes; a longer SPF text is a permerror at the receiver.
@@ -170,15 +178,7 @@ def gateway_records(gateway: Document) -> list[dict]:
 
     cluster = frappe.get_cached_doc("Stalwart Cluster", gateway.cluster)
     records = address_records(cluster.dns_zone, gateway.hostname, gateway.ipv4_address, None, "Egress")
-    records.append(
-        {
-            "dns_zone": cluster.dns_zone,
-            "host": relative_host(gateway.hostname, cluster.dns_zone),
-            "type": "TXT",
-            "value": f"v=spf1 include:{spf_include(cluster)} -all",
-            "category": "SPF",
-        }
-    )
+    records.append(include_spf_record(cluster, gateway.hostname))
     return records
 
 
@@ -191,9 +191,12 @@ def delete_gateway_records(gateway: Document) -> None:
 
 
 def pool_records(pool: Document) -> list[dict]:
-    """``<pool>.out.<zone>`` -> every gateway hosting the pool, plus one A record per EHLO name."""
+    """``<pool>.out.<zone>`` -> every gateway hosting the pool, plus an address and SPF per EHLO name.
 
-    zone = cluster_zone(pool.cluster)
+    A DSN has a null sender, so receivers check SPF against the HELO name instead."""
+
+    cluster = frappe.get_cached_doc("Stalwart Cluster", pool.cluster)
+    zone = cluster.dns_zone
     records = []
     for gateway_name in pool.gateway_names():
         ip, status = frappe.db.get_value("Egress Gateway", gateway_name, ["ipv4_address", "status"])
@@ -203,6 +206,7 @@ def pool_records(pool: Document) -> list[dict]:
     for row in pool.addresses:
         ipv4, ipv6 = (None, row.ip_address) if ":" in row.ip_address else (row.ip_address, None)
         records += address_records(zone, row.ehlo_hostname, ipv4, ipv6, "Egress")
+        records.append(include_spf_record(cluster, row.ehlo_hostname))
     return records
 
 

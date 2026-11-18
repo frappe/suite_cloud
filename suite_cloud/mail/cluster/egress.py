@@ -409,11 +409,15 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "value": {"mustMatchSender": {"match": plan.as_list(sender_rules), "else": "true"}},
         }
     )
+    # The gateway's own mail (DSNs, reports) arrives on no port and matches no rule. Stalwart's
+    # 'default' strategy would send it from an IP the OS picks with the gateway hostname as EHLO,
+    # which fails the PTR check when that IP is a pool address; a pool strategy keeps both aligned.
+    fallback = f"'{next(iter(strategies))}'" if strategies else "'default'"
     operations.append(
         {
             "@type": "update",
             "object": "MtaOutboundStrategy",
-            "value": {"connection": {"match": plan.as_list(rules), "else": "'default'"}},
+            "value": {"connection": {"match": plan.as_list(rules), "else": fallback}},
         }
     )
     return operations
