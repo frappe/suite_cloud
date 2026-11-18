@@ -13,6 +13,8 @@ from suite_cloud.mail.cluster import dns, egress, naming, push
 from suite_cloud.mail.doctype.stalwart_node.stalwart_node import validate_ip
 
 POOL_NAME = re.compile(r"^[a-z0-9]{1,8}$")
+# Only hostname characters: the suffix is quoted into a Stalwart expression.
+MX_HOST_SUFFIX = re.compile(r"^(\.[a-z0-9-]+)+$")
 FIRST_RELAY_PORT = 2525
 
 
@@ -53,6 +55,7 @@ class EgressIPPool(Document):
         if not self.relay_port:
             self.relay_port = self.next_relay_port()
         self.validate_addresses(cluster)
+        self.validate_catch_all_addresses()
 
     def validate_addresses(self, cluster: Document) -> None:
         naming.assign_ehlo_hostnames(self, cluster.default_domain)
@@ -60,6 +63,7 @@ class EgressIPPool(Document):
         for row in self.addresses:
             row.ip_address = validate_ip(row.ip_address, 6 if ":" in (row.ip_address or "") else 4)
             self.validate_private_ip(row)
+            self.validate_mx_host_suffixes(row)
             row.ehlo_hostname = (row.ehlo_hostname or "").strip().lower().rstrip(".")
             if row.ip_address in seen:
                 frappe.throw(_("Address {0} is listed twice.").format(row.ip_address))
@@ -100,6 +104,25 @@ class EgressIPPool(Document):
         if len(twins) > 1:
             frappe.throw(_("Addresses {0} share a private IP.").format(", ".join(twins)))
 
+    def validate_mx_host_suffixes(self, row: Document) -> None:
+        suffixes: list[str] = []
+        for line in (row.mx_host_suffixes or "").split():
+            suffix = "." + line.lower().strip(".")
+            if not MX_HOST_SUFFIX.match(suffix):
+                frappe.throw(_("{0} is not an MX host suffix such as .google.com.").format(line))
+            if suffix not in suffixes:
+                suffixes.append(suffix)
+        row.mx_host_suffixes = "\n".join(suffixes) or None
+
+    def validate_catch_all_addresses(self) -> None:
+        """Mail to the MX hosts no address is kept for needs an address on every gateway."""
+
+        for gateway in self.gateway_names():
+            if all(row.mx_suffixes for row in self.addresses_on(gateway)):
+                frappe.throw(
+                    _("Gateway {0} needs an address without MX hosts, for all other mail.").format(gateway)
+                )
+
     def next_relay_port(self) -> int:
         ports = frappe.get_all("Egress IP Pool", {"cluster": self.cluster}, pluck="relay_port")
         return max([FIRST_RELAY_PORT - 1, *[p for p in ports if p]]) + 1
@@ -115,7 +138,8 @@ class EgressIPPool(Document):
     @staticmethod
     def snapshot(doc: Document) -> tuple:
         addresses = sorted(
-            (r.gateway, r.ip_address, r.source_ip or "", r.ehlo_hostname) for r in doc.addresses
+            (r.gateway, r.ip_address, r.source_ip or "", r.ehlo_hostname, r.mx_suffixes)
+            for r in doc.addresses
         )
         return (doc.relay_port, doc.hostname, tuple(addresses))
 

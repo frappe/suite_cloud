@@ -166,6 +166,8 @@ connection and leaves from the pool's addresses. The `spf.c1.frappemail.com` rec
 domains include always lists every node and pool address, so SPF stays valid whichever path a
 message takes.
 
+An address's **Only for MX Hosts** lists MX host suffixes, one per line, such as `.google.com`. The gateway sends from that address only to MX hosts that end with one of them, and sends to every other MX host from the addresses that have no list. Each gateway of the pool must keep at least one address without a list. Use it when an IP is on a blocklist that some receivers check but keeps a good reputation where it counts: an IP on Spamhaus CSS with a good history at Gmail can keep `.google.com` while new IPs take the receivers that check Spamhaus. The rule matches the MX host, not the recipient's domain, so `.google.com` also covers Google Workspace domains.
+
 ## Hosting Suite sites on Frappe Cloud
 
 Frappe Cloud's control plane, Central, creates servers; Pilot, the bench agent on each server, creates sites on it. Central has no API for sites, so Suite Cloud asks Central for a bench token (`get_bench_link`) and drives Pilot's Admin API with it.

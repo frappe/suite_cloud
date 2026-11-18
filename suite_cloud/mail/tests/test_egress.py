@@ -560,6 +560,46 @@ class TestEgress(IntegrationTestCase):
                 pool.set("addresses", rows)
                 self.assertRaises(frappe.ValidationError, pool.save)
 
+    def test_an_address_can_be_kept_for_some_mx_hosts(self) -> None:
+        """A blocklisted IP with a good reputation at Google sends only to Google's MX hosts."""
+
+        pool = self.make_pool(("203.0.113.51", "203.0.113.52", "203.0.113.53"))
+        pool.addresses[0].mx_host_suffixes = "Google.com\n.outlook.com.\ngoogle.com"
+        with patch.object(egress, "apply_pool_changes") as apply:
+            pool.save()
+        apply.assert_called_once()  # a suffix change alone is pushed
+        self.assertEqual(pool.addresses[0].mx_host_suffixes, ".google.com\n.outlook.com")
+
+        operations = {op["object"]: op for op in egress.gateway_plan(self.gateway)}
+        strategies = operations["MtaConnectionStrategy"]["value"]
+        self.assertEqual(
+            {name: [ip["sourceIp"] for ip in s["sourceIps"].values()] for name, s in strategies.items()},
+            {"p1-mx1": ["203.0.113.51"], "p1": ["203.0.113.52", "203.0.113.53"]},
+        )
+        connection = operations["MtaOutboundStrategy"]["value"]["connection"]
+        self.assertEqual(
+            connection["match"],
+            {
+                "0": {
+                    "if": "received_via_port == 2525 && "
+                    "(ends_with(mx, '.google.com') || ends_with(mx, '.outlook.com'))",
+                    "then": "'p1-mx1'",
+                },
+                "1": {"if": "received_via_port == 2525", "then": "'p1'"},
+            },
+        )
+        self.assertEqual(connection["else"], "'p1'")  # the gateway's own mail skips the kept address
+
+        for case, suffixes in {
+            "a quote": [".goo'gle.com", None, None],
+            "no address for other mail": [".google.com", ".google.com", ".outlook.com"],
+        }.items():
+            with self.subTest(case):
+                pool.reload()
+                for row, value in zip(pool.addresses, suffixes, strict=True):
+                    row.mx_host_suffixes = value
+                self.assertRaises(frappe.ValidationError, pool.save)
+
     def test_a_failed_ptr_lookup_keeps_the_last_state(self) -> None:
         pool = self.make_pool()
         row = pool.addresses[0]

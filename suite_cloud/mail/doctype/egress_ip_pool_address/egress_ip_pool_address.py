@@ -18,6 +18,7 @@ class EgressIPPoolAddress(Document):
         ehlo_hostname: DF.Data
         gateway: DF.Link
         ip_address: DF.Data
+        mx_host_suffixes: DF.SmallText | None
         parent: DF.Data
         parentfield: DF.Data
         parenttype: DF.Data
@@ -30,6 +31,12 @@ class EgressIPPoolAddress(Document):
         """The address the gateway binds to; the provider maps a private one to the public IP."""
 
         return self.private_ip_address if self.bind_to_private_ip else self.ip_address
+
+    @property
+    def mx_suffixes(self) -> tuple[str, ...]:
+        """The MX host suffixes this address is kept for; empty when it sends to any MX host."""
+
+        return tuple((self.mx_host_suffixes or "").split())
 
 
 def on_doctype_update() -> None:
