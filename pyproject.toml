@@ -25,7 +25,7 @@ build-backend = "flit_core.buildapi"
 
 [tool.bench.frappe-dependencies]
 frappe = ">=16.0.0,<18.0.0"
-insights = ">=3.50.0-dev,<5.0.0"
+# insights >=3.50.0-dev,<5.0.0 is optional: it holds the telemetry warehouse (suite_cloud.telemetry).
 
 # Installed from Ubuntu repositories when the app is hosted on Frappe Cloud
 [deploy.dependencies.apt]
