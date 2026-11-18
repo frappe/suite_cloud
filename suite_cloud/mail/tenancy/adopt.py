@@ -16,6 +16,7 @@ from frappe.utils import cint
 
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
 from suite_cloud.mail.cluster.reconcile import INFRA_ACCOUNTS
+from suite_cloud.mail.stalwart import schema
 from suite_cloud.mail.stalwart.directory import RECEIVE_PERMISSION
 
 SAVEPOINT = "adopt_object"
@@ -80,12 +81,13 @@ def _adopt_domains(tenant, cluster, client, report: Report) -> dict[str, str]:
     """``{stalwart id: domain name}`` for every domain of the cluster, adopted or already known."""
 
     names = {}
+    enabled_field = schema.field("Domain", "isEnabled", schema.is_v1(cluster))
     for live in client.domains.get_all(
         properties=[
             "id",
             "name",
             "description",
-            "isEnabled",
+            enabled_field,
             "catchAllAddress",
             "subAddressing",
             "allowRelaying",
@@ -98,7 +100,7 @@ def _adopt_domains(tenant, cluster, client, report: Report) -> dict[str, str]:
         if frappe.db.exists("Mail Domain", name):
             report.skip("Mail Domain", name, _("already exists"))
             continue
-        enabled = bool(live.get("isEnabled"))
+        enabled = bool(live.get(enabled_field))
         _insert(
             report,
             "Mail Domain",
@@ -242,7 +244,8 @@ def _alias_rows(live: dict, domains: dict[str, str]) -> list[dict]:
         rows.append(
             {
                 "alias_email": f"{alias['name']}@{domain}".lower(),
-                "enabled": int(alias.get("enabled", True)),
+                # Stalwart 1.x names the flag "enable", 0.16 "enabled".
+                "enabled": int(alias.get("enable", alias.get("enabled", True))),
                 "description": alias.get("description"),
             }
         )

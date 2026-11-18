@@ -22,7 +22,7 @@ from suite_cloud.mail.cluster import (
     reconcile,
     rspamd,
 )
-from suite_cloud.mail.stalwart import forget_sessions, get_admin_client, get_client
+from suite_cloud.mail.stalwart import forget_sessions, get_admin_client, get_client, schema
 from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
@@ -232,10 +232,14 @@ class StalwartCluster(Document):
 
     @property
     def is_version_behind(self) -> bool:
-        """Older than the default release in Suite Cloud Settings or the app."""
+        """Older than the default release in Suite Cloud Settings or the app, on the same schema:
+        a 0.16 data store cannot be upgraded to 1.x in place."""
 
-        return bool(self.stalwart_version) and is_older_version(
-            self.stalwart_version, get_config("stalwart_version")
+        default = get_config("stalwart_version")
+        return (
+            bool(self.stalwart_version)
+            and schema.is_v1(self.stalwart_version) == schema.is_v1(default)
+            and is_older_version(self.stalwart_version, default)
         )
 
     def apply_defaults(self) -> None:

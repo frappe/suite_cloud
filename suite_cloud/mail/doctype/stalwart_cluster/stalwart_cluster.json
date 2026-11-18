@@ -113,7 +113,7 @@
    "read_only": 1
   },
   {
-   "description": "Stalwart release the nodes run. Change it and run Upgrade Nodes.",
+   "description": "Stalwart release the nodes run. Change it and run Upgrade Nodes. Suite Cloud writes the field names of this release; a 0.16 cluster cannot move to 1.x in place.",
    "fieldname": "stalwart_version",
    "fieldtype": "Data",
    "label": "Stalwart Version"
@@ -550,7 +550,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-11-16 10:00:00.000000",
+ "modified": "2026-11-18 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

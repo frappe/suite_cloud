@@ -5,6 +5,7 @@ import time
 from dataclasses import dataclass, field
 from typing import ClassVar
 
+from suite_cloud.mail.stalwart import schema
 from suite_cloud.mail.stalwart.errors import StalwartError, StalwartKeylessDomainError
 from suite_cloud.mail.stalwart.service import ManagementService, id_set, indexed
 
@@ -32,12 +33,13 @@ class EmailAlias:
     domain_id: str
     enabled: bool = True
     description: str | None = None
+    v1: bool = False  # the server speaks the Stalwart 1.x schema (schema.py)
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "domainId": self.domain_id,
-            "enabled": self.enabled,
+            schema.field("EmailAlias", "enabled", self.v1): self.enabled,
             "description": self.description,
         }
 
@@ -192,12 +194,13 @@ class Domain:
     sub_addressing: bool = True
     allow_relaying: bool = False
     report_address_uri: str | None = "mailto:postmaster"
+    v1: bool = False  # the server speaks the Stalwart 1.x schema (schema.py)
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "aliases": id_set(self.aliases),
-            "isEnabled": self.is_enabled,
+            schema.field("Domain", "isEnabled", self.v1): self.is_enabled,
             "description": self.description,
             "certificateManagement": self.certificate_management or {"@type": "Manual"},
             "dkimManagement": dkim_management_payload(self.dkim_algorithms),
@@ -346,7 +349,8 @@ class GroupService(AccountService):
 
 class DomainService(ManagementService):
     type = "Domain"
-    default_properties: ClassVar[list[str]] = ["id", "name", "description", "isEnabled", "createdAt"]
+    # Without the enabled flag, whose name depends on the server's release (schema.py).
+    default_properties: ClassVar[list[str]] = ["id", "name", "description", "createdAt"]
 
     def find_by_name(self, name: str, properties: list[str] | None = None) -> dict | None:
         return self.find({"name": name}, properties=properties or ["id", "name"])

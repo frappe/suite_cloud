@@ -15,7 +15,7 @@ from frappe.utils import add_to_date, get_datetime, now
 
 from suite_cloud.mail.cluster import dns, plan, server_token
 from suite_cloud.mail.cluster.push import recorded_failure, resync_cluster
-from suite_cloud.mail.stalwart import has_credentials
+from suite_cloud.mail.stalwart import has_credentials, schema
 from suite_cloud.mail.stalwart.directory import dkim_management_payload
 from suite_cloud.mail.stalwart.errors import StalwartError
 from suite_cloud.utils import dkim_algorithms
@@ -117,7 +117,7 @@ def cluster_operations(cluster: Document) -> list[dict]:
     routes = {}
     for pool_name in sorted(pools):
         pool = frappe.get_cached_doc("Egress IP Pool", pool_name)
-        routes[f"egress-{pool.pool_name}"] = {
+        route = {
             "@type": "Relay",
             "name": f"egress-{pool.pool_name}",
             "description": f"Egress pool {pool.pool_name}",
@@ -129,6 +129,7 @@ def cluster_operations(cluster: Document) -> list[dict]:
             "implicitTls": False,
             "allowInvalidCerts": False,
         }
+        routes[f"egress-{pool.pool_name}"] = schema.adapt("MtaRouteRelay", route, schema.is_v1(cluster))
 
     return [
         {"@type": "upsert", "object": "MtaRoute", "matchOn": ["name"], "value": routes},
@@ -277,19 +278,24 @@ def gateway_plan(gateway: Document) -> list[dict]:
     cluster = gateway.get_cluster()
     zone = dns.egress_zone(cluster)
     pools = gateway.pools()
+    v1 = schema.is_v1(gateway)
     listeners, strategies, rules, sender_rules = {}, {}, [], []
     for pool in pools:
         addresses = pool.addresses_on(gateway.name)
         if not addresses:
             continue
         listener = f"relay-{pool.pool_name}"
-        listeners[listener] = {
-            "name": listener,
-            "protocol": "smtp",
-            "bind": {f"0.0.0.0:{pool.relay_port}": True},
-            "useTls": True,
-            "tlsImplicit": False,
-        }
+        listeners[listener] = schema.adapt(
+            "NetworkListener",
+            {
+                "name": listener,
+                "protocol": "smtp",
+                "bind": {f"0.0.0.0:{pool.relay_port}": True},
+                "useTls": True,
+                "tlsImplicit": False,
+            },
+            v1,
+        )
         strategies[pool.pool_name] = {
             "name": pool.pool_name,
             "description": f"Egress pool {pool.pool_name}",
@@ -334,7 +340,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
     domain = {
         "name": gateway.hostname,
         "description": "Gateway domain",
-        "isEnabled": True,
+        schema.field("Domain", "isEnabled", v1): True,
         "certificateManagement": {
             "@type": "Automatic",
             "acmeProviderId": "#acme",
@@ -451,7 +457,7 @@ def gateway_bootstrap_plan(gateway: Document) -> list[dict]:
         "defaultDomain": gateway.hostname,
         "requestTlsCertificate": False,
         "generateDkimKeys": False,
-        "dataStore": gateway.get_store("data_store").config,
+        "dataStore": gateway.get_store("data_store").config_for(gateway),
         "blobStore": {"@type": "Default"},
         "searchStore": {"@type": "Default"},
         "inMemoryStore": {"@type": "Default"},
@@ -459,7 +465,13 @@ def gateway_bootstrap_plan(gateway: Document) -> list[dict]:
         "tracer": plan.log_tracer(),
         "dnsServer": {"@type": "Manual"},
     }
-    return [{"@type": "update", "object": "Bootstrap", "value": value}]
+    return [
+        {
+            "@type": "update",
+            "object": "Bootstrap",
+            "value": schema.adapt("Bootstrap", value, schema.is_v1(gateway)),
+        }
+    ]
 
 
 def gateway_env(gateway: Document, mode: str = "normal") -> dict[str, str]:
@@ -534,7 +546,7 @@ def build_gateway_variables(context: dict) -> dict:
         "env_normal": plan.render_env(gateway_env(gateway, "normal")),
         "env_bootstrap": plan.render_env(gateway_env(gateway, "bootstrap")),
         "env_recovery": plan.render_env(gateway_env(gateway, "recovery")),
-        "config_json": frappe.as_json(gateway.get_store("data_store").config),
+        "config_json": frappe.as_json(gateway.get_store("data_store").config_for(gateway)),
         "bootstrap_ndjson": plan.to_ndjson(bootstrap_plan := gateway_bootstrap_plan(gateway)),
         "defaults_ndjson": plan.to_ndjson(gateway_defaults_plan()),
         "cluster_ndjson": plan.to_ndjson(recovery_plan),

@@ -11,6 +11,7 @@ from frappe.utils import cint, get_url
 
 from suite_cloud.mail.cluster import server_token
 from suite_cloud.mail.cluster.plan import as_set
+from suite_cloud.mail.stalwart import schema
 from suite_cloud.telemetry import ERROR_EVENTS, WARN_EVENTS, WEBHOOK_EVENTS
 from suite_cloud.utils import get_config
 
@@ -55,13 +56,16 @@ def get_operations(owner: Document) -> list[dict]:
     Prometheus endpoint, which sits on the public listener, so it stays off."""
 
     enabled = is_push_enabled(owner)
+    v1 = schema.is_v1(owner)
     webhooks = {
-        "telemetry-events": webhook("events", "info", WEBHOOK_EVENTS, enabled),
-        "telemetry-errors": webhook("errors", "error", ERROR_EVENTS, enabled),
-        "telemetry-warnings": webhook("warnings", "warn", WARN_EVENTS, enabled),
+        "telemetry-events": webhook("events", "info", schema.events(WEBHOOK_EVENTS, v1), enabled),
+        "telemetry-errors": webhook("errors", "error", schema.events(ERROR_EVENTS, v1), enabled),
+        "telemetry-warnings": webhook("warnings", "warn", schema.events(WARN_EVENTS, v1), enabled),
     }
     metrics = {
-        "openTelemetry": otlp_exporter() if enabled else {"@type": "Disabled"},
+        "openTelemetry": schema.adapt("MetricsOtelHttp", otlp_exporter(), v1)
+        if enabled
+        else {"@type": "Disabled"},
         "prometheus": {"@type": "Disabled"},
     }
     return [
