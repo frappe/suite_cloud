@@ -9,7 +9,7 @@ from frappe.model.document import Document
 from frappe.utils import cint, now
 
 from suite_cloud.dns.resolver import verify_ptr_record
-from suite_cloud.mail.cluster import bootstrap, dns, naming, rspamd, server_token
+from suite_cloud.mail.cluster import bootstrap, dns, external, naming, rspamd, server_token
 from suite_cloud.provisioning.ansible import ping
 from suite_cloud.provisioning.ssh import SSHTarget, scan_host_keys, validate_ssh_user_field
 from suite_cloud.utils import is_older_version, log_exception
@@ -70,6 +70,7 @@ class StalwartNode(Document):
     def validate(self) -> None:
         validate_ssh_user_field(self)
         cluster = self.get_cluster()
+        external.validate_node(self, cluster)
         self.title = (self.title or "").strip() or self.hostname
         self.hostname = (self.hostname or "").strip().lower().rstrip(".")
         suffix = f".{cluster.default_domain}"

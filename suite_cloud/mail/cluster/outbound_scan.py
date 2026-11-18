@@ -9,7 +9,7 @@ import frappe
 from suite_cloud.mail.cluster import rspamd
 from suite_cloud.mail.cluster.plan import as_list, as_set
 from suite_cloud.mail.cluster.quota import NEVER
-from suite_cloud.mail.stalwart import schema
+from suite_cloud.mail.stalwart import is_external, schema
 from suite_cloud.utils import get_config
 
 if TYPE_CHECKING:
@@ -33,6 +33,9 @@ SCANNED = {
 
 
 def cluster_operations(cluster: Document) -> list[dict]:
+    # The scanner is an Rspamd that Suite Cloud installs next to each node it provisions.
+    if is_external(cluster):
+        return []
     return [milter_operation(cluster)]
 
 

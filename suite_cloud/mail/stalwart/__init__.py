@@ -34,7 +34,13 @@ def get_client(target: Document, timeout: tuple[float, float] = DEFAULT_TIMEOUT)
     token = target.get_password("api_key", raise_exception=False)
     password = target.get_password("admin_password", raise_exception=False)
     if token:
-        info = ConnectionInfo(get_base_url(target), token=token, timeout=timeout, verify_ssl=verify_tls())
+        info = ConnectionInfo(
+            get_base_url(target),
+            token=token,
+            timeout=timeout,
+            verify_ssl=verify_tls(),
+            pin_api_url=is_external(target),
+        )
     elif password:
         info = ConnectionInfo(
             get_base_url(target),
@@ -42,6 +48,7 @@ def get_client(target: Document, timeout: tuple[float, float] = DEFAULT_TIMEOUT)
             password=password,
             timeout=timeout,
             verify_ssl=verify_tls(),
+            pin_api_url=is_external(target),
         )
     else:
         frappe.throw(
@@ -54,6 +61,13 @@ def get_client(target: Document, timeout: tuple[float, float] = DEFAULT_TIMEOUT)
     secret = hashlib.sha1((token or password).encode()).hexdigest()
     store = session_store(f"{target.doctype}:{target.name}:{secret}")
     return StalwartClient(JMAPConnection(info, session_store=store))
+
+
+def is_external(target: Document | None) -> bool:
+    """An externally managed cluster (suite_cloud.mail.cluster.external): its platform owns the
+    nodes, and it is reached at its Base URL only (see ConnectionInfo)."""
+
+    return bool(getattr(target, "externally_managed", None))
 
 
 def get_base_url(target: Document) -> str:
@@ -81,6 +95,7 @@ def get_admin_client(target: Document, timeout: tuple[float, float] = DEFAULT_TI
         password=target.get_password("admin_password"),
         timeout=timeout,
         verify_ssl=verify_tls(),
+        pin_api_url=is_external(target),
     )
     return StalwartClient(JMAPConnection(info))
 
@@ -100,6 +115,7 @@ def get_account_client(
         password=target.get_password("admin_password"),
         timeout=timeout,
         verify_ssl=verify_tls(),
+        pin_api_url=is_external(target),
     )
     return StalwartClient(JMAPConnection(info))
 

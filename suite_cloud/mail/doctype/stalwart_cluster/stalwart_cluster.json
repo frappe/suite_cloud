@@ -20,6 +20,9 @@
   "hostname",
   "default_domain",
   "base_url",
+  "external_section",
+  "externally_managed",
+  "jmap_hostname",
   "tls_section",
   "acme_directory_url",
   "column_break_tls",
@@ -59,6 +62,7 @@
   "relay_username",
   "relay_password",
   "sending_limits_section",
+  "external_sending_limits_note",
   "max_daily_send_limit",
   "column_break_sending_limits",
   "max_monthly_send_limit",
@@ -174,11 +178,31 @@
    "read_only": 1
   },
   {
-   "description": "JMAP URL given to tenants.",
+   "description": "JMAP URL given to tenants. Derived from the hostname. For an externally managed cluster, the server's management URL: it must use https, except a Kubernetes Service name (ending in .svc or .svc.cluster.local), whose traffic stays on the cluster network. Tenants' sites receive it as their JMAP URL, so an in-cluster URL only works for sites on the same network.",
    "fieldname": "base_url",
    "fieldtype": "Data",
    "label": "Base URL",
-   "read_only": 1
+   "read_only_depends_on": "eval:!doc.externally_managed"
+  },
+  {
+   "fieldname": "external_section",
+   "fieldtype": "Section Break",
+   "label": "External Server"
+  },
+  {
+   "fieldname": "externally_managed",
+   "fieldtype": "Check",
+   "default": "0",
+   "label": "Externally Managed",
+   "set_only_once": 1,
+   "description": "Stalwart runs outside Suite Cloud (for example on Kubernetes, deployed by Argo CD). Suite Cloud never provisions nodes over SSH for it: it adopts the running server over the JMAP management API and manages its configuration and directory. The sending-limit hook, the outbound scanner and the telemetry push need software Suite Cloud installs on its own nodes, so they are off on such a cluster."
+  },
+  {
+   "fieldname": "jmap_hostname",
+   "fieldtype": "Data",
+   "label": "JMAP Service Hostname",
+   "depends_on": "externally_managed",
+   "description": "Host name Stalwart writes into its JMAP session URLs (https://<host>/jmap/), which tenants' sites follow, e.g. the Kubernetes Service name. It must resolve to the server and match its certificate. Blank keeps the server's default hostname."
   },
   {
    "fieldname": "tls_section",
@@ -269,7 +293,8 @@
   {
    "fieldname": "outbound_scan_section",
    "fieldtype": "Section Break",
-   "label": "Outbound Scan"
+   "label": "Outbound Scan",
+   "depends_on": "eval:!doc.externally_managed"
   },
   {
    "description": "Redis that the nodes' spam scanners share for fuzzy hashes and history. Blank runs them without Redis.",
@@ -313,11 +338,11 @@
    "label": "Stalwart Admin"
   },
   {
-   "default": "admin",
+   "description": "Left blank, a new cluster gets admin, and an externally managed one suite-admin: its recovery administrator is usually named admin.",
    "fieldname": "admin_username",
    "fieldtype": "Data",
    "label": "Admin Username",
-   "read_only": 1
+   "read_only_depends_on": "eval:!doc.__islocal || !doc.externally_managed"
   },
   {
    "description": "Generated on save.",
@@ -348,7 +373,7 @@
    "fieldname": "ssh_user",
    "fieldtype": "Data",
    "label": "SSH User",
-   "reqd": 1
+   "mandatory_depends_on": "eval:!doc.externally_managed"
   },
   {
    "default": "22",
@@ -356,7 +381,7 @@
    "fieldname": "ssh_port",
    "fieldtype": "Int",
    "label": "SSH Port",
-   "reqd": 1
+   "mandatory_depends_on": "eval:!doc.externally_managed"
   },
   {
    "fieldname": "column_break_ssh",
@@ -418,6 +443,12 @@
    "label": "Sending Limits"
   },
   {
+   "depends_on": "externally_managed",
+   "fieldname": "external_sending_limits_note",
+   "fieldtype": "HTML",
+   "options": "<p class=\"text-muted\">This cluster is externally managed, so Stalwart does not ask Suite Cloud about each recipient: account and tenant send limits and the Max Monthly Send Limit are not enforced on it. Stalwart caps every account at the Max Daily Send Limit.</p>"
+  },
+  {
    "default": "2000",
    "description": "Upper limit, in recipients per UTC day, for each account's Daily Send Limit and each tenant default. Stalwart also applies it when Suite Cloud does not answer.",
    "fieldname": "max_daily_send_limit",
@@ -442,7 +473,8 @@
    "fieldtype": "Int",
    "label": "Sending Limit Hook Timeout (Seconds)",
    "non_negative": 1,
-   "reqd": 1
+   "reqd": 1,
+   "depends_on": "eval:!doc.externally_managed"
   },
   {
    "fieldname": "column_break_sending_limits",
@@ -550,7 +582,7 @@
    "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-11-18 10:00:00.000000",
+ "modified": "2026-11-18 11:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

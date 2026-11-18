@@ -17,7 +17,7 @@ from urllib.parse import unquote, urlsplit
 import frappe
 
 from suite_cloud.mail.cluster import server_token
-from suite_cloud.mail.stalwart import schema
+from suite_cloud.mail.stalwart import is_external, schema
 from suite_cloud.mail.stalwart.client import is_write_only
 from suite_cloud.mail.stalwart.directory import dkim_management_payload
 from suite_cloud.utils import dkim_algorithms, get_config
@@ -182,12 +182,16 @@ def bootstrap_plan(cluster: Document) -> list[dict]:
 
 
 def cluster_plan(cluster: Document) -> list[dict]:
+    """On an externally managed cluster, the platform owns the nodes' files, resolver, logging,
+    certificates and telemetry, so the plan leaves those out."""
+
+    external = is_external(cluster)
     plan: list[dict] = [
         {"@type": "update", "object": "Coordinator", "value": {"@type": cluster.coordinator or "Disabled"}},
-        *defaults_plan(),
-        tracer_operation(),
-        *telemetry_operations(cluster),
+        *defaults_plan(cluster),
     ]
+    if not external:
+        plan.extend([tracer_operation(), *telemetry_operations(cluster)])
 
     dns_server = dns_server_object(cluster)
     if dns_server:
@@ -200,14 +204,15 @@ def cluster_plan(cluster: Document) -> list[dict]:
             }
         )
 
-    plan.append(
-        {
-            "@type": "upsert",
-            "object": "AcmeProvider",
-            "matchOn": ["directory"],
-            "value": {"acme": acme_provider(cluster)},
-        }
-    )
+    if not external:
+        plan.append(
+            {
+                "@type": "upsert",
+                "object": "AcmeProvider",
+                "matchOn": ["directory"],
+                "value": {"acme": acme_provider(cluster)},
+            }
+        )
     plan.append(
         {
             "@type": "upsert",
@@ -216,17 +221,15 @@ def cluster_plan(cluster: Document) -> list[dict]:
             "value": {"default": default_domain(cluster, with_dns=bool(dns_server))},
         }
     )
-    plan.append(
-        {
-            "@type": "update",
-            "object": "SystemSettings",
-            "value": {
-                "defaultHostname": cluster.hostname,
-                "defaultDomainId": "#default",
-                "mailExchangers": as_list([{"hostname": cluster.hostname, "priority": 10}]),
-            },
-        }
-    )
+    settings = {
+        "defaultHostname": cluster.hostname,
+        "defaultDomainId": "#default",
+        "mailExchangers": as_list([{"hostname": cluster.hostname, "priority": 10}]),
+    }
+    if external and cluster.jmap_hostname:
+        # The host Stalwart writes into its JMAP session URLs, which tenants' sites follow.
+        settings["services/jmap"] = {"hostname": cluster.jmap_hostname, "cleartext": False}
+    plan.append({"@type": "update", "object": "SystemSettings", "value": settings})
     plan.append(admin_aliases_operation(cluster))
     plan.append(
         {
@@ -280,7 +283,9 @@ def default_domain(cluster: Document, with_dns: bool) -> dict:
             "subjectAlternativeNames": as_set(
                 [cluster.default_domain, f"*.{cluster.default_domain}", *cluster.additional_hostname_list]
             ),
-        },
+        }
+        if not is_external(cluster)
+        else {"@type": "Manual"},  # the platform holds an external server's certificates
         "dkimManagement": dkim_management_payload(dkim_algorithms()),
         "subAddressing": {"@type": "Disabled"},
     }
@@ -451,7 +456,7 @@ def store_operations(cluster: Document) -> list[dict]:
     ]
 
 
-def defaults_plan() -> list[dict]:
+def defaults_plan(cluster: Document | None = None) -> list[dict]:
     """Applied in recovery mode before the first normal start, which needs all of it.
 
     That start names the node's cluster role (Stalwart fails the start when it is missing),
@@ -462,7 +467,8 @@ def defaults_plan() -> list[dict]:
 
     return [
         {"@type": "upsert", "object": "ClusterRole", "matchOn": ["name"], "value": CLUSTER_ROLES},
-        dns_resolver_operation(),
+        # An external server resolves through its platform (Kubernetes DNS): no local Unbound.
+        *([] if is_external(cluster) else [dns_resolver_operation()]),
         *spam_settings_operations(),
     ]
 
@@ -737,12 +743,21 @@ def _drifted(object_type: str, live: dict, wanted: dict, ref: str | None = None)
     for key, value in wanted.items():
         if key == "@type" or is_write_only(key, value):
             continue  # secrets are never echoed back
-        if not same_value(live.get(key), value):
+        if not same_value(live_value(live, key), value):
             entry = {"object": object_type, "property": key}
             if ref:
                 entry["ref"] = ref
             found.append(entry)
     return found
+
+
+def live_value(live: dict, key: str):
+    """A property, or a JSON pointer such as ``services/jmap`` that an update patches in place."""
+
+    value = live
+    for part in key.split("/"):
+        value = value.get(part) if isinstance(value, dict) else None
+    return value
 
 
 def same_value(live, wanted) -> bool:

@@ -15,6 +15,7 @@ from suite_cloud.mail.cluster import (
     bootstrap,
     dns,
     egress,
+    external,
     naming,
     outbound_scan,
     plan,
@@ -22,7 +23,7 @@ from suite_cloud.mail.cluster import (
     reconcile,
     rspamd,
 )
-from suite_cloud.mail.stalwart import forget_sessions, get_admin_client, get_client, schema
+from suite_cloud.mail.stalwart import forget_sessions, get_admin_client, get_client, is_external, schema
 from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
 from suite_cloud.suite_cloud.doctype.dns_zone.dns_zone import get_default_zone
@@ -74,9 +75,11 @@ class StalwartCluster(Document):
         dns_zone: DF.Link
         drift_report: DF.JSON | None
         enabled: DF.Check
+        externally_managed: DF.Check
         hostname: DF.Data
         in_memory_store: DF.Link | None
         is_default: DF.Check
+        jmap_hostname: DF.Data | None
         label: DF.Data | None
         last_config_sync_at: DF.Datetime | None
         last_config_sync_error: DF.SmallText | None
@@ -90,10 +93,10 @@ class StalwartCluster(Document):
         search_store: DF.Link | None
         sending_limit_hook_timeout: DF.Int
         single_node: DF.Check
-        ssh_port: DF.Int
+        ssh_port: DF.Int | None
         ssh_private_key: DF.Password | None
         ssh_public_key: DF.Code | None
-        ssh_user: DF.Data
+        ssh_user: DF.Data | None
         stalwart_version: DF.Data | None
         title: DF.Data | None
         status: DF.Literal["Pending", "Bootstrapping", "Active", "Failed", "Disabled"]
@@ -103,13 +106,13 @@ class StalwartCluster(Document):
 
     def before_insert(self) -> None:
         self.status = "Pending"
-        self.admin_username = self.admin_username or "admin"
+        self.admin_username = self.admin_username or external.default_admin_username(self)
         if not self.admin_password:
             self.admin_password = frappe.generate_hash(length=32)
         self.relay_username = self.relay_username or "relay"
         if not self.relay_password:
             self.relay_password = frappe.generate_hash(length=32)
-        if not self.ssh_public_key:
+        if not self.ssh_public_key and not is_external(self):
             self.ssh_private_key, self.ssh_public_key = generate_keypair(f"suite-cloud-{self.hostname}")
         if not frappe.db.exists("Stalwart Cluster", {"is_default": 1}):
             self.is_default = 1  # the first cluster: there is always a default
@@ -117,6 +120,7 @@ class StalwartCluster(Document):
     def validate(self) -> None:
         validate_ssh_user_field(self)
         self.validate_names()
+        external.validate_cluster(self)
         self.validate_additional_hostnames()
         self.apply_defaults()
         self.validate_stores()
@@ -199,7 +203,8 @@ class StalwartCluster(Document):
         self.label = self.label or naming.next_cluster_label(self.dns_zone, self.region)
         self.hostname = f"mail.{self.label}.{self.dns_zone}"
         self.default_domain = self.hostname
-        self.base_url = f"https://{self.hostname}"
+        if not (is_external(self) and self.base_url):
+            self.base_url = f"https://{self.hostname}"
 
     def validate_names(self) -> None:
         self.resolve_label()
@@ -378,6 +383,16 @@ class StalwartCluster(Document):
 
         frappe.only_for("System Manager")
         return reconcile.directory_report(self)
+
+    @frappe.whitelist()
+    def adopt_external_server(self, username: str, password: str) -> dict:
+        """Takes over a running Stalwart that Suite Cloud did not install (Kubernetes, Argo CD).
+
+        The credentials are the server's recovery administrator; they are used for this call only
+        and never stored."""
+
+        frappe.only_for("System Manager")
+        return external.adopt(self, username, password)
 
     @frappe.whitelist()
     def finish_bootstrap(self) -> bool:

@@ -2,7 +2,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import requests
 
@@ -30,6 +30,9 @@ class ConnectionInfo:
     token: str | None = field(default=None, repr=False)
     timeout: tuple[float, float] = (15.0, 60.0)
     verify_ssl: bool = True
+    # Send API calls to ``url`` whatever host the session names: a server inside a private
+    # network (a Kubernetes Service) advertises a name only its own pod resolves.
+    pin_api_url: bool = False
 
 
 class SessionStore:
@@ -92,6 +95,8 @@ class JMAPConnection:
 
     @property
     def api_url(self) -> str:
+        if self.info.pin_api_url:
+            return urljoin(self.info.url, urlsplit(self.session["apiUrl"]).path)
         return self.session["apiUrl"]
 
     @property
