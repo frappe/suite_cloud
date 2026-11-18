@@ -112,11 +112,11 @@ jobs:
       - name: Install Suite Cloud
         working-directory: /home/runner/frappe-bench
         run: |
-          bench get-app insights --branch develop --skip-assets  # required by suite_cloud
+          bench get-app insights --branch develop --skip-assets  # optional, holds the telemetry the tests cover
           bench get-app suite_cloud "$GITHUB_WORKSPACE" --skip-assets
           bench setup requirements --dev
           bench new-site --db-root-password root --admin-password admin test_site
-          bench --site test_site install-app suite_cloud
+          bench --site test_site install-app insights suite_cloud
         env:
           CI: "Yes"
 
