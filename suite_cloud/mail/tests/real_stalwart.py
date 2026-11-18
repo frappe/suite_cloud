@@ -21,6 +21,7 @@ from urllib.parse import urljoin
 import frappe
 
 from suite_cloud.mail.cluster import plan
+from suite_cloud.mail.stalwart import schema
 from suite_cloud.mail.stalwart.client import StalwartClient
 from suite_cloud.mail.stalwart.connection import ConnectionInfo, JMAPConnection
 from suite_cloud.mail.stalwart.directory import Domain
@@ -77,7 +78,9 @@ class RealStalwart:
         self.prepare_first_start()
         self.launch("normal")
         self.take_test_mail()
-        self.management.domains.create_id(Domain(name=PROBE_DOMAIN, dkim_algorithms=(), allow_relaying=True))
+        self.management.domains.create_id(
+            Domain(name=PROBE_DOMAIN, dkim_algorithms=(), allow_relaying=True, v1=schema.is_v1(None))
+        )
 
     def stop(self) -> None:
         try:
@@ -137,7 +140,7 @@ class RealStalwart:
         store = frappe.get_doc(
             {"doctype": "Mail Store", "kind": "Data", "type": "RocksDb", "path": self.path("data")}
         )
-        return {
+        value = {
             "serverHostname": HOSTNAME,
             "defaultDomain": HOSTNAME.partition(".")[2],
             "requestTlsCertificate": False,
@@ -150,6 +153,7 @@ class RealStalwart:
             "tracer": {**plan.log_tracer(), "path": self.path("logs")},
             "dnsServer": {"@type": "Manual"},
         }
+        return schema.adapt("Bootstrap", value, schema.is_v1(None))
 
     def prepare_first_start(self) -> None:
         """The first normal start imports the spam rules, once, and opens Stalwart's public
@@ -158,14 +162,15 @@ class RealStalwart:
         client = self.client(self.recovery_port)
         client.apply(plan.spam_settings_operations())
         for protocol, port in (("http", self.http_port), ("smtp", self.smtp_port)):
+            listener = {
+                "name": protocol,
+                "protocol": protocol,
+                "bind": plan.as_set([f"127.0.0.1:{port}"]),
+                "useTls": False,
+                "tlsImplicit": False,
+            }
             client.objects("NetworkListener").create(
-                {
-                    "name": protocol,
-                    "protocol": protocol,
-                    "bind": plan.as_set([f"127.0.0.1:{port}"]),
-                    "useTls": False,
-                    "tlsImplicit": False,
-                }
+                schema.adapt("NetworkListener", listener, schema.is_v1(None))
             )
 
     def take_test_mail(self) -> None:
@@ -178,17 +183,16 @@ class RealStalwart:
         self.management.singleton("MtaStageData").write({"enableSpamFilter": never})
         throttles = self.management.objects("MtaInboundThrottle")
         throttles.delete(throttles.query_ids())  # five commands a second from one address
-        self.management.objects("MtaRoute").create(
-            {
-                "@type": "Relay",
-                "name": SINK_ROUTE,
-                "address": "127.0.0.1",
-                "port": self.sink.port,
-                "protocol": "smtp",
-                "implicitTls": False,
-                "allowInvalidCerts": True,
-            }
-        )
+        route = {
+            "@type": "Relay",
+            "name": SINK_ROUTE,
+            "address": "127.0.0.1",
+            "port": self.sink.port,
+            "protocol": "smtp",
+            "implicitTls": False,
+            "allowInvalidCerts": True,
+        }
+        self.management.objects("MtaRoute").create(schema.adapt("MtaRouteRelay", route, schema.is_v1(None)))
         self.management.reload_settings()
 
     # --- what tests use ------------------------------------------------------------------

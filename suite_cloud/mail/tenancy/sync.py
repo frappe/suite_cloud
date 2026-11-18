@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 import frappe
 from frappe import _
 
-from suite_cloud.mail.stalwart import get_client
+from suite_cloud.mail.stalwart import get_client, schema
 from suite_cloud.mail.stalwart.directory import RECEIVE_PERMISSION, EmailAlias
 from suite_cloud.mail.stalwart.errors import StalwartRejectedError
 from suite_cloud.mail.tenancy.addresses import assert_address_available, validate_email_address
@@ -74,12 +74,14 @@ def validate_aliases(doc: Document) -> None:
 
 
 def aliases(doc: Document) -> list[EmailAlias]:
+    v1 = schema.is_v1(frappe.get_cached_doc("Stalwart Cluster", doc.cluster))
     return [
         EmailAlias(
             name=row.alias_email.split("@", 1)[0],
             domain_id=domain_stalwart_id(row.alias_email.split("@", 1)[1]),
             enabled=bool(row.enabled),
             description=row.description or None,
+            v1=v1,
         )
         for row in doc.aliases
     ]

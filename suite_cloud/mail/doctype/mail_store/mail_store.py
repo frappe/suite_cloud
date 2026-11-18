@@ -9,6 +9,8 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, flt
 
+from suite_cloud.mail.stalwart import schema
+
 # Which backend variants, as Stalwart names them, may back each store kind. Embedded backends
 # (RocksDb, FileSystem) only work for a single node; the cluster validates that.
 KIND_TYPES = {
@@ -190,6 +192,15 @@ class MailStore(Document):
         if builder:
             payload.update(builder())
         return {k: v for k, v in payload.items() if v is not None}
+
+    def config_for(self, server: Document) -> dict:
+        """``config`` with the field names of the Stalwart release the cluster or gateway runs."""
+
+        config = self.config
+        v1 = schema.is_v1(server)
+        if config.get("region", {}).get("@type") == "Custom":
+            config["region"] = schema.adapt("S3StoreCustomRegion", config["region"], v1)
+        return schema.adapt(f"{self.type}Store", config, v1)
 
     # --- variants -------------------------------------------------------------
 
