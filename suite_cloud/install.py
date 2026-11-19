@@ -50,7 +50,7 @@ def ensure_user(email: str, first_name: str) -> None:
             "user_type": "Website User",
             "send_welcome_email": 0,
         }
-    ).insert(ignore_permissions=True)
+    ).insert(ignore_permissions=True, set_name=email)
 
 
 def ensure_setting_defaults() -> None:
