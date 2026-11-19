@@ -6,6 +6,7 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.mail.cluster import dns, egress, plan, push, server_token
 from suite_cloud.mail.stalwart import forget_sessions
 from suite_cloud.mail.stalwart.errors import StalwartError
+from suite_cloud.mail.stalwart.service import ManagementService
 from suite_cloud.mail.tests.fake_stalwart import FakeStalwart
 from suite_cloud.mail.tests.fixtures import (
     ROOT_DOMAIN,
@@ -629,6 +630,60 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(
             operations["MtaOutboundStrategy"]["value"]["connection"], {"match": {}, "else": "'default'"}
         )
+
+    def test_the_same_mx_hosts_in_another_order_share_one_strategy(self) -> None:
+        pool = self.make_pool(("203.0.113.51", "203.0.113.52", "203.0.113.53"))
+        pool.addresses[0].mx_host_suffixes = ".outlook.com\n.google.com"
+        pool.addresses[1].mx_host_suffixes = ".google.com\n.outlook.com"
+        with patch.object(egress, "apply_pool_changes"):
+            pool.save()
+        self.assertEqual(pool.addresses[0].mx_host_suffixes, ".google.com\n.outlook.com")
+        self.assertEqual(
+            self.strategy_source_ips(), {"p1-mx1": ["203.0.113.51", "203.0.113.52"], "p1": ["203.0.113.53"]}
+        )
+
+        # A row saved before the pool sorted its suffixes groups the same way.
+        pool.addresses[0].db_set("mx_host_suffixes", ".outlook.com\n.google.com", update_modified=False)
+        self.assertEqual(
+            self.strategy_source_ips(), {"p1-mx1": ["203.0.113.51", "203.0.113.52"], "p1": ["203.0.113.53"]}
+        )
+
+    def test_a_push_removes_the_pool_strategies_the_plan_dropped(self) -> None:
+        """A cleared MX list leaves its strategy unused on the gateway; the next push deletes it."""
+
+        pool = self.make_pool(("203.0.113.51", "203.0.113.52"))
+        gateway_fake = FakeStalwart(
+            base_url=self.gateway.base_url, admin_password=self.gateway.get_password("admin_password")
+        )
+        gateway_fake._add("MtaConnectionStrategy", {"name": "custom", "description": "Set by hand"})
+        with gateway_fake.install(), patch.object(egress, "apply_pool_changes"):
+            forget_sessions(self.gateway)
+            pool.addresses[0].mx_host_suffixes = ".google.com"
+            pool.save()
+            self.gateway.push_config()
+            self.assertEqual(self.strategy_names(gateway_fake), ["custom", "p1", "p1-mx1"])
+
+            pool.addresses[0].mx_host_suffixes = None
+            pool.save()
+            # A refused delete fails the push only after the new rules are live.
+            reloads = self.reload_count(gateway_fake)
+            with (
+                patch.object(ManagementService, "delete", side_effect=StalwartError("refused")),
+                self.assertRaises(StalwartError),
+            ):
+                self.gateway.push_config()
+            self.assertEqual(self.reload_count(gateway_fake), reloads + 1)
+            self.assertIn("p1-mx1", self.strategy_names(gateway_fake))
+
+            result = self.gateway.push_config()
+        self.assertEqual(self.strategy_names(gateway_fake), ["custom", "p1"])
+        self.assertEqual(len(result["destroyed"]), 1)
+
+    def reload_count(self, fake: FakeStalwart) -> int:
+        return sum(action["@type"] == "ReloadSettings" for action in fake.all("Action"))
+
+    def strategy_names(self, fake: FakeStalwart) -> list[str]:
+        return sorted(s["name"] for s in fake.all("MtaConnectionStrategy"))
 
     def strategy_source_ips(self) -> dict[str, list[str]]:
         strategies = self.plan_by_object(self.gateway)["MtaConnectionStrategy"]["value"]

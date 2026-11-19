@@ -35,9 +35,12 @@ class EgressIPPoolAddress(Document):
 
     @property
     def mx_suffixes(self) -> tuple[str, ...]:
-        """The MX host suffixes this address is kept for; empty when it sends to any MX host."""
+        """The MX host suffixes this address is kept for; empty when it sends to any MX host.
 
-        return tuple((self.mx_host_suffixes or "").split())
+        Sorted, so the same suffixes in another order share one strategy, also on rows saved
+        before the pool sorted them."""
+
+        return tuple(sorted((self.mx_host_suffixes or "").split()))
 
     @property
     def is_ready_to_send(self) -> bool:
