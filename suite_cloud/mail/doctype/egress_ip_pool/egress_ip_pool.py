@@ -138,7 +138,7 @@ class EgressIPPool(Document):
     @staticmethod
     def snapshot(doc: Document) -> tuple:
         addresses = sorted(
-            (r.gateway, r.ip_address, r.source_ip or "", r.ehlo_hostname, r.mx_suffixes)
+            (r.gateway, r.ip_address, r.source_ip or "", r.ehlo_hostname, r.mx_suffixes, r.allow_without_ptr)
             for r in doc.addresses
         )
         return (doc.relay_port, doc.hostname, tuple(addresses))

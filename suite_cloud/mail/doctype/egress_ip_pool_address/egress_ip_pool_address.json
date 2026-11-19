@@ -13,6 +13,7 @@
   "column_break_address",
   "ehlo_hostname",
   "ptr_verified",
+  "allow_without_ptr",
   "verify_ptr"
  ],
  "fields": [
@@ -71,12 +72,19 @@
   {
    "columns": 1,
    "default": "0",
-   "description": "Reverse DNS points to the EHLO hostname. Checked daily.",
+   "description": "Reverse DNS points to the EHLO hostname. Checked daily. The gateway sends only from verified addresses.",
    "fieldname": "ptr_verified",
    "fieldtype": "Check",
    "in_list_view": 1,
    "label": "PTR Verified",
    "read_only": 1
+  },
+  {
+   "default": "0",
+   "description": "Send from this address even when its PTR is not verified.",
+   "fieldname": "allow_without_ptr",
+   "fieldtype": "Check",
+   "label": "Allow Without PTR"
   },
   {
    "columns": 1,
@@ -89,7 +97,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-11-18 18:00:00.000000",
+ "modified": "2026-11-19 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Egress IP Pool Address",

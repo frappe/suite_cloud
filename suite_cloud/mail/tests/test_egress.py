@@ -79,7 +79,13 @@ class TestEgress(IntegrationTestCase):
                 "doctype": "Egress IP Pool",
                 "cluster": self.cluster.name,
                 "addresses": [
-                    {"gateway": self.gateway.name, "ip_address": ip, "bind_to_private_ip": 0} for ip in ips
+                    {
+                        "gateway": self.gateway.name,
+                        "ip_address": ip,
+                        "bind_to_private_ip": 0,
+                        "ptr_verified": 1,
+                    }
+                    for ip in ips
                 ],
                 **fields,
             }
@@ -519,7 +525,7 @@ class TestEgress(IntegrationTestCase):
     def test_a_pool_address_can_send_from_its_private_ip(self) -> None:
         """On AWS an Elastic IP is not on the instance: Stalwart binds to the private IP it maps to."""
 
-        row = {"gateway": self.gateway.name, "ip_address": "203.0.113.51"}
+        row = {"gateway": self.gateway.name, "ip_address": "203.0.113.51", "ptr_verified": 1}
         pool = frappe.get_doc(
             {
                 "doctype": "Egress IP Pool",
@@ -571,9 +577,8 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(pool.addresses[0].mx_host_suffixes, ".google.com\n.outlook.com")
 
         operations = {op["object"]: op for op in egress.gateway_plan(self.gateway)}
-        strategies = operations["MtaConnectionStrategy"]["value"]
         self.assertEqual(
-            {name: [ip["sourceIp"] for ip in s["sourceIps"].values()] for name, s in strategies.items()},
+            self.strategy_source_ips(),
             {"p1-mx1": ["203.0.113.51"], "p1": ["203.0.113.52", "203.0.113.53"]},
         )
         connection = operations["MtaOutboundStrategy"]["value"]["connection"]
@@ -599,6 +604,35 @@ class TestEgress(IntegrationTestCase):
                 for row, value in zip(pool.addresses, suffixes, strict=True):
                     row.mx_host_suffixes = value
                 self.assertRaises(frappe.ValidationError, pool.save)
+
+    def test_only_addresses_with_a_verified_ptr_send(self) -> None:
+        """Receivers reject an IP whose PTR does not match; an admin can still allow one."""
+
+        pool = self.make_pool(("203.0.113.51", "203.0.113.52"))
+        pool.addresses[1].db_set("ptr_verified", 0, update_modified=False)
+        self.assertEqual(self.strategy_source_ips(), {"p1": ["203.0.113.51"]})
+
+        pool.reload()
+        pool.addresses[1].allow_without_ptr = 1
+        with patch.object(egress, "apply_pool_changes") as apply:
+            pool.save()
+        apply.assert_called_once()  # the override alone is pushed
+        self.assertEqual(self.strategy_source_ips(), {"p1": ["203.0.113.51", "203.0.113.52"]})
+
+        # Without a ready address for all other mail, the gateway does not host the pool.
+        pool.addresses[1].mx_host_suffixes = ".google.com"
+        with patch.object(egress, "apply_pool_changes"):
+            pool.save()
+        pool.addresses[0].db_set("ptr_verified", 0, update_modified=False)
+        operations = self.plan_by_object(self.gateway)
+        self.assertNotIn("NetworkListener", operations)
+        self.assertEqual(
+            operations["MtaOutboundStrategy"]["value"]["connection"], {"match": {}, "else": "'default'"}
+        )
+
+    def strategy_source_ips(self) -> dict[str, list[str]]:
+        strategies = self.plan_by_object(self.gateway)["MtaConnectionStrategy"]["value"]
+        return {name: [ip["sourceIp"] for ip in s["sourceIps"].values()] for name, s in strategies.items()}
 
     def test_a_failed_ptr_lookup_keeps_the_last_state(self) -> None:
         pool = self.make_pool()

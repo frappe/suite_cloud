@@ -279,9 +279,9 @@ def gateway_plan(gateway: Document) -> list[dict]:
     pools = gateway.pools()
     listeners, strategies, rules, sender_rules = {}, {}, [], []
     for pool in pools:
-        addresses = pool.addresses_on(gateway.name)
-        if not addresses:
-            continue
+        addresses = [a for a in pool.addresses_on(gateway.name) if a.is_ready_to_send]
+        if all(a.mx_suffixes for a in addresses):
+            continue  # no address here can take all other mail yet
         listener = f"relay-{pool.pool_name}"
         listeners[listener] = {
             "name": listener,
