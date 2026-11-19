@@ -225,11 +225,18 @@ class EgressGateway(Document):
 
     def push_config(self) -> dict:
         rendered = egress.gateway_plan(self)
-        result = self.get_client().apply(rendered)
-        self.get_client().reload_settings()
+        client = self.get_client()
+        result = client.apply(rendered)
+        destroyed = egress.remove_stale_strategies(client, rendered)
+        client.reload_settings()
         self.bump_config_version(rendered)
         self.db_set("last_config_sync_at", now(), update_modified=False)
-        return {"created": result.created, "updated": result.updated, "unchanged": result.unchanged}
+        return {
+            "created": result.created,
+            "updated": result.updated,
+            "unchanged": result.unchanged,
+            "destroyed": destroyed,
+        }
 
     @frappe.whitelist()
     def preview_plan(self) -> str:

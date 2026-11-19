@@ -27,6 +27,8 @@ GATEWAY_ROLE = "egress"
 GATEWAY_DEADLINE_MINUTES = 45
 GATEWAY_VARIABLES_BUILDER = "suite_cloud.mail.cluster.egress.build_gateway_variables"
 SUITE_RULE_PREFIX = "'egress-"
+# Marks the gateway connection strategies Suite Cloud owns, so the ones a plan drops can be removed.
+POOL_STRATEGY_DESCRIPTION = "Egress pool"
 # Mail between domains of the cluster never leaves it: without this rule first, a relay fallback
 # would send it out through a gateway only to come back through the cluster's own MX.
 LOCAL_RULE = {"if": "is_local_domain(rcpt_domain)", "then": "'local'"}
@@ -428,17 +430,34 @@ def pool_connection_plan(pool: Document, addresses: list[Document], ehlo_hostnam
     for address in addresses:
         groups.setdefault(address.mx_suffixes, []).append(address)
     port = f"received_via_port == {pool.relay_port}"
-    description = f"Egress pool {pool.pool_name}"
+    description = f"{POOL_STRATEGY_DESCRIPTION} {pool.pool_name}"
     strategies = {pool.pool_name: connection_strategy(pool.pool_name, description, groups[()], ehlo_hostname)}
     rules = []
     for number, suffixes in enumerate([s for s in groups if s], start=1):
         name = f"{pool.pool_name}-mx{number}"
-        description = f"Egress pool {pool.pool_name} for {', '.join(suffixes)}"
+        description = f"{POOL_STRATEGY_DESCRIPTION} {pool.pool_name} for {', '.join(suffixes)}"
         strategies[name] = connection_strategy(name, description, groups[suffixes], ehlo_hostname)
         hosts = " || ".join(f"ends_with(mx, '{suffix}')" for suffix in suffixes)
         rules.append({"if": f"{port} && ({hosts})", "then": f"'{name}'"})
     rules.append({"if": port, "then": f"'{pool.pool_name}'"})
     return strategies, rules
+
+
+def remove_stale_strategies(client, rendered_plan: list[dict]) -> list[str]:
+    """Deletes the pool strategies a gateway holds that the plan dropped, such as a cleared MX
+    list's. Run after the plan, once the connection rules no longer name them."""
+
+    planned = next((op["value"] for op in rendered_plan if op["object"] == "MtaConnectionStrategy"), {})
+    service = client.objects("MtaConnectionStrategy")
+    stale = [
+        strategy["id"]
+        for strategy in service.get_all()
+        if (strategy.get("description") or "").startswith(POOL_STRATEGY_DESCRIPTION)
+        and strategy.get("name") not in planned
+    ]
+    if stale:
+        service.delete(stale)
+    return stale
 
 
 def connection_strategy(name: str, description: str, addresses: list[Document], ehlo_hostname: str) -> dict:

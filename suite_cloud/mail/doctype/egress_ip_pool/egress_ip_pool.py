@@ -105,14 +105,13 @@ class EgressIPPool(Document):
             frappe.throw(_("Addresses {0} share a private IP.").format(", ".join(twins)))
 
     def validate_mx_host_suffixes(self, row: Document) -> None:
-        suffixes: list[str] = []
+        suffixes: set[str] = set()
         for line in (row.mx_host_suffixes or "").split():
             suffix = "." + line.lower().strip(".")
             if not MX_HOST_SUFFIX.match(suffix):
                 frappe.throw(_("{0} is not an MX host suffix such as .google.com.").format(line))
-            if suffix not in suffixes:
-                suffixes.append(suffix)
-        row.mx_host_suffixes = "\n".join(suffixes) or None
+            suffixes.add(suffix)
+        row.mx_host_suffixes = "\n".join(sorted(suffixes)) or None
 
     def validate_catch_all_addresses(self) -> None:
         """Mail to the MX hosts no address is kept for needs an address on every gateway."""
