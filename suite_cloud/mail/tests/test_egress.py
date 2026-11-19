@@ -6,6 +6,7 @@ from frappe.tests import IntegrationTestCase
 from suite_cloud.mail.cluster import dns, egress, plan, push, server_token
 from suite_cloud.mail.stalwart import forget_sessions
 from suite_cloud.mail.stalwart.errors import StalwartError
+from suite_cloud.mail.stalwart.service import ManagementService
 from suite_cloud.mail.tests.fake_stalwart import FakeStalwart
 from suite_cloud.mail.tests.fixtures import (
     ROOT_DOMAIN,
@@ -664,9 +665,22 @@ class TestEgress(IntegrationTestCase):
 
             pool.addresses[0].mx_host_suffixes = None
             pool.save()
+            # A refused delete fails the push only after the new rules are live.
+            reloads = self.reload_count(gateway_fake)
+            with (
+                patch.object(ManagementService, "delete", side_effect=StalwartError("refused")),
+                self.assertRaises(StalwartError),
+            ):
+                self.gateway.push_config()
+            self.assertEqual(self.reload_count(gateway_fake), reloads + 1)
+            self.assertIn("p1-mx1", self.strategy_names(gateway_fake))
+
             result = self.gateway.push_config()
         self.assertEqual(self.strategy_names(gateway_fake), ["custom", "p1"])
         self.assertEqual(len(result["destroyed"]), 1)
+
+    def reload_count(self, fake: FakeStalwart) -> int:
+        return sum(action["@type"] == "ReloadSettings" for action in fake.all("Action"))
 
     def strategy_names(self, fake: FakeStalwart) -> list[str]:
         return sorted(s["name"] for s in fake.all("MtaConnectionStrategy"))

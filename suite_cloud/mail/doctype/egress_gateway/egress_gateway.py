@@ -227,10 +227,11 @@ class EgressGateway(Document):
         rendered = egress.gateway_plan(self)
         client = self.get_client()
         result = client.apply(rendered)
-        destroyed = egress.remove_stale_strategies(client, rendered)
         client.reload_settings()
         self.bump_config_version(rendered)
         self.db_set("last_config_sync_at", now(), update_modified=False)
+        # Last, so a refused delete leaves the new rules live; the next push retries it.
+        destroyed = egress.remove_stale_strategies(client, rendered)
         return {
             "created": result.created,
             "updated": result.updated,
