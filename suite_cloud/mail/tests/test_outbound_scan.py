@@ -76,10 +76,10 @@ class TestMilterPlan(OutboundScanTestCase):
                 "hostname": "127.0.0.1",
                 "port": 11332,
                 "stages": {"data": True},
-                "tempFailOnError": False,
+                "tempFailOnError": True,  # no signed-in sender's mail leaves without the scan
                 "timeoutConnect": 1000,
                 "timeoutCommand": 5000,
-                "timeoutData": 6000,
+                "timeoutData": 12000,
                 "protocolVersion": "v6",
                 "useTls": False,
                 "maxResponseSize": 52428800,
@@ -222,6 +222,9 @@ class TestRspamd(OutboundScanTestCase):
         self.assertIn('bind_socket = "127.0.0.1:11332";', proxy)
         self.assertIn(f"count = {rspamd.CPU_COUNT_PLACEHOLDER};", proxy)
         self.assertEqual(files["/etc/rspamd/local.d/worker-normal.inc"], "enabled = false;\n")
+        options = files["/etc/rspamd/local.d/options.inc"]
+        self.assertIn("task_timeout = 8s;", options)  # inside the milter's timeoutData
+        self.assertIn("soft_reject_on_timeout = true;", options)  # a partial scan defers the message
         for module in ("dkim_signing", "arc"):  # Stalwart signs
             self.assertEqual(files[f"/etc/rspamd/local.d/{module}.conf"], "enabled = false;\n")
         # Ansible templates the variables it is given, so no file may hold Jinja.
@@ -342,6 +345,9 @@ class TestRspamd(OutboundScanTestCase):
         recorder = files[rspamd.RECORDER_PATH]
         self.assertIn("type = 'idempotent'", recorder)  # runs after the score, refused mail too
         self.assertIn(f'local SPOOL = "{load_shipper().SPOOL}"', recorder)
+        self.assertIn("name = 'SUITE_CLOUD_REJECT_REPLY'", recorder)  # the top rules in the refusal
+        self.assertIn("'smtp_message'", recorder)  # the milter sends it instead of reject_message
+        self.assertIn("local TIMEOUT_MODULE = 'task timeout'", recorder)  # soft_reject_on_timeout's
         self.assertEqual(
             files[rspamd.SHIPPER_PATH], (rspamd.SOURCE_DIRECTORY / "ship_outbound_scans.py").read_text()
         )

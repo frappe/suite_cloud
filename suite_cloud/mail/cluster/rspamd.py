@@ -32,13 +32,14 @@ SHIPPER_UNIT = "suite-cloud-scans"
 MILTER_HOST = "127.0.0.1"
 MILTER_PORT = 11332
 CPU_COUNT_PLACEHOLDER = "__CPU_COUNT__"  # the playbook puts the node's vCPU count here
+# The reply only when scan_recorder.lua sets none. Its reply names the score, limit and top rules.
 REJECT_MESSAGE = "Message refused: it looks like spam. Contact your administrator if this is wrong."
 # Off the outbound profile: ASN and MX checks only judge the sender's network, which is ours, and
 # neural and statistics need training outbound mail does not give. Fuzzy stays off without the
 # cluster's Redis: its stock rule sends hashes of the mail to rspamd.com.
 DISABLED_GROUPS = ("neural", "statistics", "asn", "mx_check")
 SCAN_FIELDS = ("outbound_scan_mode", "outbound_scan_reject_score")  # what the files depend on
-REDIS_TIMEOUT = "1s"  # inside the scan's 4s task timeout
+REDIS_TIMEOUT = "1s"  # inside the scan's task timeout
 FUZZY_PORT = 11335
 # The files that hold the Redis password: readable by Rspamd only.
 PRIVATE_FILES = (f"{CONFIG_DIRECTORY}/worker-fuzzy.inc", f"{CONFIG_DIRECTORY}/history_redis.conf")
@@ -130,7 +131,8 @@ OPTIONS = """dns {
   timeout = 1s;
   retransmits = 2;
 }
-task_timeout = 4s;
+task_timeout = 8s;
+soft_reject_on_timeout = true;
 """
 
 
