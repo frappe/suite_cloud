@@ -152,7 +152,7 @@ class TestStalwartCluster(IntegrationTestCase):
         node.reload()
         self.assertEqual((node.ssh_host_keys, node.ssh_verified), (None, 0))
         audit = {"reference_doctype": "Stalwart Node", "reference_name": node.name, "comment_type": "Info"}
-        self.assertEqual(frappe.get_all("Comment", audit, pluck="comment_email"), [frappe.session.user])
+        self.assertEqual(frappe.get_all("Comment", audit, pluck="owner"), [frappe.session.user])
 
         module = "suite_cloud.mail.doctype.stalwart_node.stalwart_node"
         with (

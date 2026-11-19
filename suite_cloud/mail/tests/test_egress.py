@@ -134,7 +134,7 @@ class TestEgress(IntegrationTestCase):
             "reference_name": self.gateway.name,
             "comment_type": "Info",
         }
-        self.assertEqual(frappe.get_all("Comment", audit, pluck="comment_email"), [frappe.session.user])
+        self.assertEqual(frappe.get_all("Comment", audit, pluck="owner"), [frappe.session.user])
 
         module = "suite_cloud.mail.doctype.egress_gateway.egress_gateway"
         with (
