@@ -25,7 +25,7 @@ The code is in `suite_cloud/mail/cluster/outbound_scan.py` (the milter and the t
 
 | Failure | Reply |
 | --- | --- |
-| The scan takes longer than `task_timeout` (8 s), such as slow blocklist lookups under load | `soft_reject_on_timeout` makes Rspamd defer the message. `SUITE_CLOUD_REJECT_REPLY` sets the reply: `451 4.7.1 Message not sent: the outbound spam scan did not finish in time. Try again in a few minutes. Contact your administrator if this keeps happening.` A message that reached the reject score before the timeout is still refused |
+| The scan takes longer than `task_timeout` (8 s), such as slow blocklist lookups under load | `soft_reject_on_timeout` makes Rspamd defer the message. `SUITE_CLOUD_REJECT_REPLY` sets the reply: `451 4.7.1 Message not accepted: the spam check could not finish in time. Send it again in a few minutes. If this keeps happening, contact your administrator.` A message that reached the reject score before the timeout is still refused |
 | Rspamd is down, cannot be reached, or does not answer within `timeoutData` (12 s) | `tempFailOnError` makes Stalwart defer the message with its own fixed reply, `451 4.3.5 Unable to accept message at this time.` Stalwart has no setting for this text. `milter.io-error` or `milter.timeout` shows on the warnings stream |
 
 An SMTP client keeps the message and shows the send error. A JMAP `EmailSubmission/set` returns `notCreated` with `description: Server rejected DATA: 451 ...`. The deferral applies in Observe too: Observe refuses nothing, but it still scans every message.

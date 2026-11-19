@@ -10,8 +10,8 @@ local LINE_BUFFER = 65536 -- one write per line, so the proxy processes never in
 local REPLY_RULES = 3
 local DESCRIPTION_LENGTH = 80 -- keeps the reply under the 512 bytes an SMTP reply line allows
 local TIMEOUT_MODULE = 'task timeout'
-local TIMEOUT_REPLY = 'Message not sent: the outbound spam scan did not finish in time. '
-  .. 'Try again in a few minutes. Contact your administrator if this keeps happening.'
+local TIMEOUT_REPLY = 'Message not accepted: the spam check could not finish in time. '
+  .. 'Send it again in a few minutes. If this keeps happening, contact your administrator.'
 
 local function first_address(addresses)
   if addresses and addresses[1] and addresses[1].addr then
