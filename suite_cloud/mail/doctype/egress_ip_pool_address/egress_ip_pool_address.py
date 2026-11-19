@@ -14,10 +14,12 @@ class EgressIPPoolAddress(Document):
     if TYPE_CHECKING:
         from frappe.types import DF
 
+        allow_without_ptr: DF.Check
         bind_to_private_ip: DF.Check
         ehlo_hostname: DF.Data
         gateway: DF.Link
         ip_address: DF.Data
+        mx_host_suffixes: DF.SmallText | None
         parent: DF.Data
         parentfield: DF.Data
         parenttype: DF.Data
@@ -30,6 +32,18 @@ class EgressIPPoolAddress(Document):
         """The address the gateway binds to; the provider maps a private one to the public IP."""
 
         return self.private_ip_address if self.bind_to_private_ip else self.ip_address
+
+    @property
+    def mx_suffixes(self) -> tuple[str, ...]:
+        """The MX host suffixes this address is kept for; empty when it sends to any MX host."""
+
+        return tuple((self.mx_host_suffixes or "").split())
+
+    @property
+    def is_ready_to_send(self) -> bool:
+        """Receivers reject mail from an IP whose PTR does not match its EHLO name."""
+
+        return bool(self.ptr_verified or self.allow_without_ptr)
 
 
 def on_doctype_update() -> None:

@@ -279,9 +279,9 @@ def gateway_plan(gateway: Document) -> list[dict]:
     pools = gateway.pools()
     listeners, strategies, rules, sender_rules = {}, {}, [], []
     for pool in pools:
-        addresses = pool.addresses_on(gateway.name)
-        if not addresses:
-            continue
+        addresses = [a for a in pool.addresses_on(gateway.name) if a.is_ready_to_send]
+        if all(a.mx_suffixes for a in addresses):
+            continue  # no address here can take all other mail yet
         listener = f"relay-{pool.pool_name}"
         listeners[listener] = {
             "name": listener,
@@ -290,17 +290,9 @@ def gateway_plan(gateway: Document) -> list[dict]:
             "useTls": True,
             "tlsImplicit": False,
         }
-        strategies[pool.pool_name] = {
-            "name": pool.pool_name,
-            "description": f"Egress pool {pool.pool_name}",
-            "ehloHostname": gateway.hostname,
-            "sourceIps": plan.as_list(
-                [{"sourceIp": a.source_ip, "ehloHostname": a.ehlo_hostname} for a in addresses]
-            ),
-        }
-        # The connection strategy is chosen at delivery time, where the listener is no longer
-        # known but the port the message arrived on is.
-        rules.append({"if": f"received_via_port == {pool.relay_port}", "then": f"'{pool.pool_name}'"})
+        pool_strategies, pool_rules = pool_connection_plan(pool, addresses, gateway.hostname)
+        strategies.update(pool_strategies)
+        rules += pool_rules
         # The cluster logs in as the relay user of the egress zone but sends as its customers'
         # addresses, so Stalwart's default "sender must match the login" check is lifted here.
         sender_rules.append({"if": f"local_port == {pool.relay_port}", "then": "false"})
@@ -421,6 +413,43 @@ def gateway_plan(gateway: Document) -> list[dict]:
         }
     )
     return operations
+
+
+def pool_connection_plan(pool: Document, addresses: list[Document], ehlo_hostname: str) -> tuple[dict, list]:
+    """One pool's connection strategies on a gateway and the rules that pick them.
+
+    The strategy is chosen at delivery time, where the listener is no longer known but the port
+    the message arrived on and the MX host are. Addresses kept for some MX hosts get a strategy
+    for each list of suffixes, checked first; the rest take every other MX host. The pool's own
+    strategy is listed first, since the gateway's own mail falls back to the first strategy.
+    """
+
+    groups: dict[tuple[str, ...], list[Document]] = {}
+    for address in addresses:
+        groups.setdefault(address.mx_suffixes, []).append(address)
+    port = f"received_via_port == {pool.relay_port}"
+    description = f"Egress pool {pool.pool_name}"
+    strategies = {pool.pool_name: connection_strategy(pool.pool_name, description, groups[()], ehlo_hostname)}
+    rules = []
+    for number, suffixes in enumerate([s for s in groups if s], start=1):
+        name = f"{pool.pool_name}-mx{number}"
+        description = f"Egress pool {pool.pool_name} for {', '.join(suffixes)}"
+        strategies[name] = connection_strategy(name, description, groups[suffixes], ehlo_hostname)
+        hosts = " || ".join(f"ends_with(mx, '{suffix}')" for suffix in suffixes)
+        rules.append({"if": f"{port} && ({hosts})", "then": f"'{name}'"})
+    rules.append({"if": port, "then": f"'{pool.pool_name}'"})
+    return strategies, rules
+
+
+def connection_strategy(name: str, description: str, addresses: list[Document], ehlo_hostname: str) -> dict:
+    return {
+        "name": name,
+        "description": description,
+        "ehloHostname": ehlo_hostname,
+        "sourceIps": plan.as_list(
+            [{"sourceIp": a.source_ip, "ehloHostname": a.ehlo_hostname} for a in addresses]
+        ),
+    }
 
 
 def gateway_recovery_plan(gateway: Document) -> list[dict]:
