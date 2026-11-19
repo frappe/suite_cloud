@@ -36,8 +36,8 @@ def cluster_operations(cluster: Document) -> list[dict]:
 
 
 def milter_operation(cluster: Document) -> dict:
-    """Stalwart sends the message without the scan when Rspamd fails or is slow: the sending limits
-    still cap the account. Off until every running node has its scanner. MtaMilter has no
+    """Stalwart defers the message with a 451 when Rspamd fails or is slow, so no signed-in sender's
+    mail leaves without the scan. Off until every running node has its scanner. MtaMilter has no
     description, so the plan matches it on its address."""
 
     milter = {
@@ -45,10 +45,10 @@ def milter_operation(cluster: Document) -> dict:
         "hostname": rspamd.MILTER_HOST,
         "port": rspamd.MILTER_PORT,
         "stages": as_set(["data"]),
-        "tempFailOnError": False,
+        "tempFailOnError": True,
         "timeoutConnect": 1000,
         "timeoutCommand": 5000,
-        "timeoutData": 6000,  # longer than Rspamd's task_timeout, so it answers with what it has
+        "timeoutData": 12000,  # longer than Rspamd's task_timeout, so Rspamd sends its own reply
         "protocolVersion": "v6",
         "useTls": False,
         "maxResponseSize": 52428800,

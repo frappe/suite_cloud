@@ -12,14 +12,27 @@ The code is in `suite_cloud/mail/cluster/outbound_scan.py` (the milter and the t
 2. At RCPT, the [sending-limits hook](sending-limits.md) counts each recipient.
 3. At DATA, Stalwart evaluates the milter's `enable` expression. It is true for a signed-in session whose login is not a key of the `suite-cloud-outbound-scan-exempt` namespace.
 4. Stalwart connects to `127.0.0.1:11332` and sends the session and the message, with `{auth_authen}` set to the login.
-5. Rspamd scans the message with the outbound profile. It answers `accept`, or `554 5.7.1` when the score reaches the reject score.
+5. Rspamd scans the message with the outbound profile. It answers `accept`, or `554 5.7.1` when the score reaches the reject score. The refusal names the score, the reject score and the three rules that added the most, each with its description.
 6. On accept, Stalwart signs and queues the message. On a refusal, Stalwart sends the reply to the client and drops the message.
-7. If Rspamd does not answer in time or cannot be reached, Stalwart accepts the message without the scan.
+7. If the scan fails, Stalwart defers the message with a `451`, and the client tries again later. No signed-in sender's mail leaves without the scan, except a trusted account's (see [Scan failure](#scan-failure)).
 
 | Client | Refused message |
 | --- | --- |
-| SMTP | `554 5.7.1 Message refused: it looks like spam. Contact your administrator if this is wrong.` The client shows its send error and keeps the message |
+| SMTP | `554 5.7.1 Message refused as spam: score 21.50, limit 15. Top rules: URIBL_BLACK (+7.50): A domain in the message body is in the URIBL blacklist; ... Contact your administrator if this is wrong.` The client shows its send error and keeps the message |
 | JMAP | `EmailSubmission/set` returns `notCreated` with `type: forbiddenToSend` and `description: Server rejected DATA: 554 5.7.1 ...`. The draft stays in Drafts. A JMAP client must show `description` |
+
+## Scan failure
+
+| Failure | Reply |
+| --- | --- |
+| The scan takes longer than `task_timeout` (8 s), such as slow blocklist lookups under load | `soft_reject_on_timeout` makes Rspamd defer the message. `SUITE_CLOUD_REJECT_REPLY` sets the reply: `451 4.7.1 Message not accepted: the spam check could not finish in time. Send it again in a few minutes. If this keeps happening, contact your administrator.` A message that reached the reject score before the timeout is still refused |
+| Rspamd is down, cannot be reached, or does not answer within `timeoutData` (12 s) | `tempFailOnError` makes Stalwart defer the message with its own fixed reply, `451 4.3.5 Unable to accept message at this time.` Stalwart has no setting for this text. `milter.io-error` or `milter.timeout` shows on the warnings stream |
+
+An SMTP client keeps the message and shows the send error. A JMAP `EmailSubmission/set` returns `notCreated` with `description: Server rejected DATA: 451 ...`. The deferral applies in Observe too: Observe refuses nothing, but it still scans every message.
+
+## Refusal reply
+
+The idempotent symbol `SUITE_CLOUD_REJECT_REPLY` in `rspamd.local.lua` runs after the score. When the action is `reject`, it sets `smtp_message`, and the milter sends it instead of the proxy's `reject_message`. The reply holds the score, the reject score and the three rules with the highest positive score, highest first, each with its score and its Rspamd description. A description is cut at 80 characters and holds printable ASCII only, so the reply stays under the 512 bytes of an SMTP reply line. A rule without a description shows only its name and score. A refusal without a positive rule, such as GTUBE, shows only the score and the reject score. The proxy's `reject_message` is the reply when the symbol sets none.
 
 ## Settings
 
@@ -39,9 +52,9 @@ The cluster plan holds one operation, from `outbound_scan.cluster_operations()`:
 
 | Operation | Purpose |
 | --- | --- |
-| `upsert` MtaMilter `outbound-scan` | `127.0.0.1:11332`, `stages: data`, `tempFailOnError: false`, `timeoutConnect: 1000`, `timeoutCommand: 5000`, `timeoutData: 6000`, `protocolVersion: v6`. MtaMilter has no description, so the plan matches it on `hostname` and `port` |
+| `upsert` MtaMilter `outbound-scan` | `127.0.0.1:11332`, `stages: data`, `tempFailOnError: true`, `timeoutConnect: 1000`, `timeoutCommand: 5000`, `timeoutData: 12000`, `protocolVersion: v6`. MtaMilter has no description, so the plan matches it on `hostname` and `port` |
 
-`enable` stays off while the mode is Off, or while a Provisioned, Active or Draining node of the cluster lacks **Outbound Scanner Installed**. MtaMilter is not one of the objects Stalwart provisions itself, so the recovery plan carries it too, switched off. `timeoutData` is longer than Rspamd's `task_timeout` (4 s), so Rspamd answers with what it has before Stalwart gives up. Only the DATA stage is used: Stalwart opens a new milter connection for each stage and replays the session on it.
+`enable` stays off while the mode is Off, or while a Provisioned, Active or Draining node of the cluster lacks **Outbound Scanner Installed**. MtaMilter is not one of the objects Stalwart provisions itself, so the recovery plan carries it too, switched off. `timeoutData` is longer than Rspamd's `task_timeout` (8 s), so Rspamd sends its clear reply before Stalwart gives up. `timeoutData` is the wait for each read of Rspamd's answer. Only the DATA stage is used: Stalwart opens a new milter connection for each stage and replays the session on it.
 
 ## Trusted accounts
 
@@ -76,12 +89,12 @@ The files up to `arc.conf` are in `/etc/rspamd/local.d/`.
 | `worker-proxy.inc` | Milter on `127.0.0.1:11332`, `self_scan`, one process per vCPU, the reject message |
 | `worker-normal.inc` | `enabled = false` |
 | `worker-controller.inc` | `127.0.0.1:11334` |
-| `options.inc` | DNS at `127.0.0.1` with a 1 s timeout, `task_timeout = 4s` |
+| `options.inc` | DNS at `127.0.0.1` with a 1 s timeout, `task_timeout = 8s` (Rspamd's default) and `soft_reject_on_timeout = true` |
 | `actions.conf` | `reject` at the reject score (`null` in Observe and Off). `add_header` and `greylist` are off. The milter sends only signed-in senders' mail, so these are the outbound thresholds |
 | `settings.conf` | The `outbound` profile for `authenticated = yes`: the `neural`, `statistics`, `asn` and `mx_check` groups off, and `fuzzy` too without an Outbound Scan Store. The stock fuzzy rule sends hashes of the mail to rspamd.com |
 | `logging.inc` | Notice level to `/var/log/rspamd/rspamd.log`, one line with the user, score and symbols per message |
 | `dkim_signing.conf`, `arc.conf` | `enabled = false`: Stalwart signs the message after the scan |
-| `/etc/rspamd/rspamd.local.lua` | The scan recorder: one JSON line per scanned message to `/var/lib/rspamd/suite-cloud-scans.jsonl` |
+| `/etc/rspamd/rspamd.local.lua` | The scan recorder: one JSON line per scanned message to `/var/lib/rspamd/suite-cloud-scans.jsonl`. It also sets the reply of a refused message (see [Refusal reply](#refusal-reply)) |
 | `/usr/local/lib/suite-cloud/ship_outbound_scans.py` | The shipper: sends the recorded lines to Suite Cloud |
 | `/etc/systemd/system/suite-cloud-scans.service` and `.timer` | Run the shipper each minute, with the node's Suite Cloud token from `/etc/stalwart/stalwart.env` |
 
@@ -190,11 +203,12 @@ The filters are Date Range (the last 7 days by default), Host, Account and Messa
 
 | Case | Effect |
 | --- | --- |
-| Rspamd is down, slow (over 6 s) or not installed yet | Stalwart sends the message without the scan. The sending limits still cap the account. `milter.io-error` or `milter.timeout` shows on the warnings stream |
+| Rspamd is down or slow | Stalwart defers every signed-in sender's message on that node until Rspamd answers again (see [Scan failure](#scan-failure)) |
+| The mode is Off, or a running node has no scanner yet | The milter is off for the whole cluster, so Stalwart sends the message without the scan. The sending limits still cap the account |
 | A trusted account | Its mail is never scanned |
 | Mail that Stalwart makes itself (Sieve redirects, vacation replies, forwards, bounces) | Not scanned |
 | An Egress Gateway | It does not scan. The node scanned the message before it relayed it |
-| A sender who sends test messages | Can learn what the scanner refuses |
+| A sender who sends test messages | Can learn what the scanner refuses. The refusal names the top rules, so this takes fewer tries |
 | No Bayes, neural or reply learning | Scores come from rules, blocklists and, with an Outbound Scan Store, the learned fuzzy hashes |
 | A refused message | The sending-limits hook counted its recipients at RCPT, so they still count |
 | Records while telemetry is off, or Suite Cloud is down for a long time | The node keeps 100 MB of them, then deletes the oldest |
@@ -205,7 +219,7 @@ The filters are Date Range (the last 7 days by default), Host, Account and Messa
 2. Set **Outbound Spam Scan Mode** to Observe.
 3. On the test cluster, save the hand-installed Rspamd config of `n1` if it is still needed. The playbook deletes every Rspamd file it does not write (see [Rspamd on each node](#rspamd-on-each-node)). Then run **Install Outbound Scanners**.
 4. Check on the live server that the plan matches the MtaMilter again on `hostname` and `port`, that `protocolVersion` takes `"v6"`, and, with `rspamadm configdump`, the proxy's `reject_message`, `enabled = false` for the normal worker and the group names. With an Outbound Scan Store, check that `rspamadm configdump fuzzy_check` shows only the rule `local`.
-5. Send GTUBE over SMTP and JMAP, then clean mail, then stop Rspamd and send again, then mark the account as trusted and send GTUBE. Expect a refusal (in Enforce), `milter.action-accept` times under 150 ms, `250` with a `milter.io-error` warning, and `250`. Within six minutes each scanned message shows on the **Outbound Spam Scan** dashboard under its Message-ID. If it does not, check `journalctl -u suite-cloud-scans` on the node.
+5. Send GTUBE over SMTP and JMAP, then clean mail, then stop Rspamd and send again, then mark the account as trusted and send GTUBE. Expect a refusal (in Enforce), `milter.action-accept` times under 150 ms, `451 4.3.5` with a `milter.io-error` warning, and `250`. Within six minutes each scanned message shows on the **Outbound Spam Scan** dashboard under its Message-ID. If it does not, check `journalctl -u suite-cloud-scans` on the node.
 6. Run **Install Outbound Scanners** on each production cluster. Leave Observe on for a week and read the scores of signed-in senders on the **Outbound Spam Scan** dashboard. Mark the trusted accounts.
 7. Set the reject score from the Outbound Scores chart, set the mode to Enforce, and run **Install Outbound Scanners** on each cluster again.
 8. Watch the refusals and the scan time on the **Outbound Spam Scan** dashboard for the first days.
