@@ -206,8 +206,8 @@ def ensure_user(request) -> str:
 
     from suite_cloud.mail.tenancy.permissions import TENANT_ROLE
 
-    if frappe.db.exists("User", request.email):
-        user = frappe.get_doc("User", request.email)
+    if name := frappe.db.get_value("User", {"email": request.email}):
+        user = frappe.get_doc("User", name)
         if TENANT_ROLE not in {row.role for row in user.roles}:
             user.append_roles(TENANT_ROLE)
             user.save(ignore_permissions=True)
