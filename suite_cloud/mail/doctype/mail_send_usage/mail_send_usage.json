@@ -7,6 +7,7 @@
  "field_order": [
   "account",
   "tenant",
+  "cluster",
   "date",
   "reported_at",
   "column_break_main",
@@ -34,6 +35,15 @@
    "options": "Suite Tenant",
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "description": "The account's cluster when it sent. Kept after the account is deleted.",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1
   },
   {
    "description": "The UTC day.",
@@ -78,7 +88,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-21 10:00:00.000000",
+ "modified": "2026-11-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Send Usage",

@@ -310,6 +310,9 @@ EVENT_DATA_COLUMNS = (
     DerivedColumn("sender_domain", "VARCHAR", f"regexp_extract({data_text('from')}, {EMAIL_DOMAIN}, 1)"),
     DerivedColumn("recipient_domain", "VARCHAR", f"regexp_extract({data_text('to')}, {EMAIL_DOMAIN}, 1)"),
     DerivedColumn("elapsed", "DOUBLE", f"try_cast({data_text('elapsed')} AS DOUBLE)"),
+    # The rate of the throttle a smtp.rate-limit-exceeded refused under: a count per period in ms.
+    DerivedColumn("limit_count", "BIGINT", f"try_cast({data_text('limit[0]')} AS BIGINT)"),
+    DerivedColumn("limit_period", "BIGINT", f"try_cast({data_text('limit[1]')} AS BIGINT)"),
 )
 
 EVENTS = TelemetryTable(

@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 """What an account sent: one row per account and UTC day, unique on the two, for billing; a month
-is the sum of its days. A row keeps the account's tenant and outlives the account. ``suite_cloud.mail.send_usage`` adds the recipients of each message Stalwart
+is the sum of its days. A row keeps the account's tenant and cluster, and outlives the account. ``suite_cloud.mail.send_usage`` adds the recipients of each message Stalwart
 queued; rows are kept for the retention in Suite Cloud Settings."""
 
 import hashlib
@@ -31,6 +31,7 @@ class MailSendUsage(Document):
         from frappe.types import DF
 
         account: DF.Link
+        cluster: DF.Link | None
         date: DF.Date
         reported_at: DF.Datetime | None
         send_limit: DF.Int
@@ -144,6 +145,7 @@ def add_usage(totals: dict[tuple[str, date], int]) -> int:
         usage.name,
         usage.account,
         usage.tenant,
+        usage.cluster,
         usage.date,
         usage.sent,
         usage.send_limit,
@@ -154,9 +156,9 @@ def add_usage(totals: dict[tuple[str, date], int]) -> int:
         usage.modified_by,
     )
     for (account, day), sent in rows:
-        limit, tenant = accounts[account]
+        limit, tenant, cluster = accounts[account]
         query = query.insert(
-            usage_name(account, day), account, tenant, day, sent, limit, now, now, now, user, user
+            usage_name(account, day), account, tenant, cluster, day, sent, limit, now, now, now, user, user
         )
     query = (
         query.on_duplicate_key_update(usage.sent, usage.sent + Values(usage.sent))
@@ -168,13 +170,15 @@ def add_usage(totals: dict[tuple[str, date], int]) -> int:
     return len(rows)
 
 
-def get_accounts(accounts: list[str]) -> dict[str, tuple[int, str]]:
-    """``{account: (daily limit, tenant)}``."""
+def get_accounts(accounts: list[str]) -> dict[str, tuple[int, str, str]]:
+    """``{account: (daily limit, tenant, cluster)}``."""
 
     rows = frappe.get_all(
-        "Mail Account", filters={"name": ("in", accounts)}, fields=["name", "daily_send_limit", "tenant"]
+        "Mail Account",
+        filters={"name": ("in", accounts)},
+        fields=["name", "daily_send_limit", "tenant", "cluster"],
     )
-    return {row.name: (row.daily_send_limit, row.tenant) for row in rows}
+    return {row.name: (row.daily_send_limit, row.tenant, row.cluster) for row in rows}
 
 
 def prune_usage_job() -> None:

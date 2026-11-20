@@ -3,6 +3,7 @@
 from unittest.mock import patch
 
 import frappe
+from frappe.model.document import get_document_cache_key
 
 ROOT_DOMAIN = "example.test"
 
@@ -17,6 +18,11 @@ def configure_settings(**overrides) -> None:
         settings.set(key, value)
     settings.save()
     frappe.clear_document_cache("Suite Cloud Settings", "Suite Cloud Settings")
+    # The live bench shares Redis and can cache the committed settings again before this test reads
+    # them. This process's own cache comes first, so the test keeps the settings it saved; the live
+    # bench never sees them.
+    key = frappe.cache.make_key(get_document_cache_key("Suite Cloud Settings", "Suite Cloud Settings"))
+    frappe.local.cache[key] = settings
     clear_request_cache()
     make_zone()
 

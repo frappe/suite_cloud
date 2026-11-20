@@ -92,7 +92,7 @@ class TestShippedWorkbooks(unittest.TestCase):
         self.assertLessEqual({column.name for column in EVENT_DATA_COLUMNS}, set(selected["column_names"]))
 
     def test_the_sending_usage_query_reads_fields_the_doctypes_have(self) -> None:
-        """The query names Mail Send Usage and Mail Account columns; a renamed field fails here,
+        """The query names Mail Send Usage columns; a renamed field fails here,
         not on an operator's dashboard."""
 
         def fields(doctype: str) -> set[str]:
@@ -100,16 +100,13 @@ class TestShippedWorkbooks(unittest.TestCase):
             return {field["fieldname"] for field in json.loads(path.read_text())["fields"]} | FRAME_COLUMNS
 
         operations = shipped_workbook("stalwart")["queries"]["stalwart-sending-usage"]["operations"]
-        source, account_join = operations[0], operations[1]
+        source = operations[0]
         self.assertEqual(source["table"]["table_name"], "tabMail Send Usage")
-        self.assertEqual(account_join["table"]["table_name"], "tabMail Account")
-        usage_fields = {"account", "tenant", "date", "sent", "send_limit", "reported_at"}
+        usage_fields = {"account", "tenant", "cluster", "date", "sent", "send_limit", "reported_at"}
         self.assertLessEqual(usage_fields, fields("mail_send_usage"))
-        joined = {column["column_name"] for column in account_join["select_columns"]}
-        self.assertLessEqual(joined, fields("mail_account"))
-        # A row outlives its account, and keeps its own tenant.
-        self.assertEqual(account_join["join_type"], "left")
-        self.assertNotIn("tenant", joined)
+        # A row outlives its account and keeps its own tenant and cluster, so nothing joins the account.
+        tables = {op["table"]["table_name"] for op in operations if op["type"] == "join"}
+        self.assertNotIn("tabMail Account", tables)
 
     def test_sending_usage_marks_the_utc_day_as_current(self) -> None:
         """Rows are UTC days; the site's today, and the latest day with rows, are both wrong ones."""
@@ -126,7 +123,7 @@ class TestShippedWorkbooks(unittest.TestCase):
         dashboard = workbook["dashboards"]["stalwart-sending-usage"]
         charts = {item["chart"] for item in dashboard["items"] if item["type"] == "chart"}
         self.assertTrue(charts <= set(workbook["charts"]))
-        history = {"stalwart-sending-by-day", "stalwart-account-sending-history"}
+        history = {"stalwart-sending-by-day", "stalwart-account-sending-history", "stalwart-send-limit-refusals"}
         for item in dashboard["items"]:
             if item["type"] == "filter":
                 with self.subTest(filter=item["filter_name"]):

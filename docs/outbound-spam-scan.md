@@ -68,11 +68,11 @@ Stalwart holds a copy as Memory Lookup Keys:
 
 | Event | Call |
 | --- | --- |
-| Insert with the field set | `set_exempt(cluster, email, True)` |
-| Update that changes the field | `set_exempt(cluster, email, value)`, before the other changes go to the cluster |
-| Delete with the field set | `set_exempt(cluster, email, False)` |
+| Insert with the field set | `set_exempt(cluster, email, True, key_id)` |
+| Update that changes the field | `set_exempt(cluster, email, value, key_id)`, before the other changes go to the cluster |
+| Delete with the field set | `set_exempt(cluster, email, False, key_id)` |
 
-Each call runs in the request and runs `ReloadLookupStores` after a change. `ReloadSettings` does not rebuild the lookup stores, so a key without it has no effect. A failure raises, and the save rolls back. Each config push ends with `sync_exempt_accounts()`, which reads the namespace with a `namespace` query filter, creates the missing keys, deletes the extra ones, and reloads only when it changed a key. This repairs a key that a failed call or a hand edit left wrong.
+Stalwart cannot find a key by its name, so Mail Account keeps its key's id in **Outbound Scan Key**, and `set_exempt` returns it. Adding creates the key; a key already holding the address is found from Stalwart's `primaryKeyViolation`, which names it. Removing deletes by the id, and reads the namespace only for an account from before ids were kept. Each call runs in the request and runs `ReloadLookupStores` after a change. `ReloadSettings` does not rebuild the lookup stores, so a key without it has no effect. A failure raises, and the save rolls back. Each config push ends with `sync_exempt_accounts()`, which reads the namespace with a `namespace` query filter, creates the missing keys, deletes the extra ones, records each account's key id, and reloads only when it changed a key. This repairs a key that a failed call or a hand edit left wrong.
 
 ## Rspamd on each node
 

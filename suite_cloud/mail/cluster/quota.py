@@ -11,6 +11,7 @@ from frappe import _
 from frappe.utils import cint
 
 from suite_cloud.mail.cluster import server_token
+from suite_cloud.mail.cluster.lookup_keys import create_key, delete_key
 from suite_cloud.mail.cluster.plan import as_list, as_set
 from suite_cloud.mail.cluster.telemetry import public_url
 from suite_cloud.mail.send_usage import QUEUED_EVENT
@@ -221,8 +222,8 @@ def set_send_limit(cluster: Document, email: str, limit: int | None, key_id: str
 
 
 def write_key(service, email: str, value: str, key_id: str | None) -> str:
-    """Updates the key by its id. A key gone from Stalwart is created again; one already holding the
-    address, whose id the account lost, is found from Stalwart's refusal, which names it."""
+    """Updates the key by its id. A key gone from Stalwart is created again; one already holding
+    the address, whose id the account lost, is found from Stalwart's refusal and updated."""
 
     if key_id:
         try:
@@ -231,32 +232,10 @@ def write_key(service, email: str, value: str, key_id: str | None) -> str:
         except StalwartRejectedError as error:
             if error.error_type != "notFound":
                 raise
-    try:
-        return service.create(limit_key(email, value))["id"]
-    except StalwartRejectedError as error:
-        if not (taken := taken_key_id(error)):
-            raise
-    service.update(taken, {"value": value})
-    return taken
-
-
-def delete_key(service, key_id: str) -> None:
-    try:
-        service.delete([key_id])
-    except StalwartRejectedError as error:
-        if error.error_type != "notFound":  # gone already
-            raise
-
-
-def taken_key_id(error: StalwartRejectedError) -> str | None:
-    """The id of the key-value a ``primaryKeyViolation`` names; a plain key of the same name is
-    another feature's, and stays refused."""
-
-    for failure in (error.detail.get("notCreated") or {}).values():
-        taken = failure.get("objectId") or {}
-        if failure.get("type") == "primaryKeyViolation" and taken.get("object") == LOOKUP_KEY:
-            return taken.get("id")
-    return None
+    key_id, is_new = create_key(service, limit_key(email, value))
+    if not is_new:
+        service.update(key_id, {"value": value})
+    return key_id
 
 
 def get_limit_keys(client: StalwartClient) -> dict[str, dict]:

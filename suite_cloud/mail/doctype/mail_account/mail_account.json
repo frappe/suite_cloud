@@ -37,7 +37,8 @@
   "cluster",
   "column_break_cluster",
   "stalwart_id",
-  "send_limit_key"
+  "send_limit_key",
+  "outbound_scan_key"
  ],
  "fields": [
   {
@@ -267,6 +268,15 @@
    "fieldtype": "Data",
    "hidden": 1,
    "label": "Send Limit Key",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "The id of the account's outbound scan exemption key in Stalwart.",
+   "fieldname": "outbound_scan_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Outbound Scan Key",
    "no_copy": 1,
    "read_only": 1
   }

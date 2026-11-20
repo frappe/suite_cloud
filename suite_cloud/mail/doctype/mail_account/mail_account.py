@@ -56,6 +56,7 @@ class MailAccount(QuotaHolder, Document):
         groups: DF.TableMultiSelect[MailGroupMember]
         locale: DF.Data | None
         new_password: DF.Password | None
+        outbound_scan_key: DF.Data | None
         quotas: DF.Table[MailQuota]
         send_limit: DF.Link | None
         send_limit_key: DF.Data | None
@@ -208,7 +209,9 @@ class MailAccount(QuotaHolder, Document):
 
         is_exempt = bool(self.skip_outbound_scan) if is_exempt is None else is_exempt
         cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
-        outbound_scan.set_exempt(cluster, self.email, is_exempt)
+        key = outbound_scan.set_exempt(cluster, self.email, is_exempt, self.outbound_scan_key)
+        if key != self.outbound_scan_key:
+            self.db_set("outbound_scan_key", key, update_modified=False)
 
     def push_send_limit(self, is_created: bool = False, is_deleted: bool = False) -> None:
         """The cluster's copy of Send Limit, which picks the account's throttle: created first when
