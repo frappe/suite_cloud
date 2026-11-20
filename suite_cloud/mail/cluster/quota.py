@@ -32,9 +32,8 @@ USAGE_THROTTLE_MS = 30_000
 USAGE_TIMEOUT_MS = 30_000
 DAY_MS = 86_400_000
 MINUTE_MS = 60_000
-# Earlier releases asked Suite Cloud at RCPT and capped messages per day; a sync removes both.
+# Earlier releases asked Suite Cloud at RCPT; a sync removes the hook.
 OLD_HOOK_HEADERS = {HOOK_HEADER: "sending-limits"}
-OLD_BACKSTOP_DESCRIPTION = "suite-cloud-quota-backstop"
 NEVER = {"match": as_list([]), "else": "false"}
 
 
@@ -122,16 +121,19 @@ def usage_webhook_operation(cluster: Document) -> dict:
 
 
 def sync_send_limits(cluster: Document) -> None:
-    """Removes the throttles of limits the cluster no longer has and the old hook and backstop, then
-    makes the keys match the accounts. Runs after the plan is applied and before the reload."""
+    """Leaves only the plan's throttles, one per limit and the submission rate: Stalwart's own
+    defaults, the old backstop and those of deleted limits go. Stalwart adds its defaults again only
+    on a start that finds no throttle. Removes the old hook, then makes the keys match the accounts.
+    Runs after the plan is applied and before the reload."""
 
     client = cluster.get_client()
-    wanted = {limit_description(limit) for limit in get_cluster_limits(cluster.name)}
+    wanted = {limit_description(limit) for limit in get_cluster_limits(cluster.name)} | {
+        SUBMISSION_DESCRIPTION
+    }
     stale = [
         item["id"]
         for item in client.objects("MtaInboundThrottle").get_all()
-        if item.get("description") == OLD_BACKSTOP_DESCRIPTION
-        or (str(item.get("description") or "").startswith(LIMIT_PREFIX) and item["description"] not in wanted)
+        if item.get("description") not in wanted
     ]
     if stale:
         client.objects("MtaInboundThrottle").delete(stale)

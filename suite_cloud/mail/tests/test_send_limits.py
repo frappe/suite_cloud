@@ -445,17 +445,17 @@ class TestQuotaPlan(SendingLimitsTestCase):
         self.node.db_set("suite_cloud_token_installed", 1)
         self.assertTrue(quota.usage_webhook_operation(self.cluster)["value"]["sending-usage"]["enable"])
 
-    def test_a_push_removes_the_old_hook_backstop_and_dropped_limits(self) -> None:
-        self.fake._add("MtaInboundThrottle", {"description": "Sender IP throttle"})  # Stalwart's own
-        self.fake._add("MtaInboundThrottle", {"description": quota.OLD_BACKSTOP_DESCRIPTION})
-        self.fake._add("MtaInboundThrottle", {"description": "suite-cloud-send-limit-33333"})
+    def test_a_push_leaves_only_its_own_throttles(self) -> None:
+        for description in ("Sender IP throttle", "Sender address to recipient throttle"):  # Stalwart's
+            self.fake._add("MtaInboundThrottle", {"description": description})
+        self.fake._add("MtaInboundThrottle", {"description": "suite-cloud-quota-backstop"})  # the old one
+        self.fake._add("MtaInboundThrottle", {"description": "suite-cloud-send-limit-33333"})  # no such limit
         self.fake._add("MtaHook", {"httpHeaders": quota.OLD_HOOK_HEADERS})
 
         self.cluster.push_config()
         self.cluster.push_config()  # a second push finds every throttle by its description
-        self.assertEqual(
-            sorted(self.throttle_descriptions()), sorted(["Sender IP throttle", *self.throttles()])
-        )
+        self.assertEqual(sorted(self.throttle_descriptions()), sorted(self.throttles()))
+        self.assertEqual(len(self.throttles()), len(DEFAULT_LIMITS) + 1)  # one per limit, and the rate
         self.assertEqual(self.fake.all("MtaHook"), [])
         self.assertEqual(len(self.limit_keys()), 3)
 
