@@ -25,8 +25,8 @@ Confirms the credentials and returns the tenant profile, including where its mai
     "max_groups": 20,
     "max_mailing_lists": 20,
     "max_disk_gb": 500,
-    "default_daily_send_limit": 2000,
-    "default_monthly_send_limit": 10000,
+    "default_daily_send_limit": 50,
+    "send_limits": [50, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000],
     "custom_send_limits": false
   },
   "usage": {
@@ -40,7 +40,7 @@ Confirms the credentials and returns the tenant profile, including where its mai
 }
 ```
 
-`status` is `Active`, `Suspended` or `Archived`. `cluster`, `jmap_url` and `mail_hostname` are `null` until an operator sets the tenant up for Mail; until then every mail call answers a 422 `MailNotConfiguredError`, while the tenant calls on this page keep working. A limit of `null` means no limit. `max_disk_gb` is the disk the tenant's plan includes; it does not cap the quotas of the tenant's accounts and groups. `default_daily_send_limit` and `default_monthly_send_limit` are the [send limits](accounts.md#send-limits) a new account starts at, and `custom_send_limits` says whether the tenant may set an account's limits itself. `used_disk_bytes` is the figure [`get_disk_usage`](#get_disk_usage) answers, or `null` when the mail server cannot answer. `emails_sent` counts the emails the tenant's sites sent through Suite Cloud this calendar month, by when each was sent; see [Email](email.md).
+`status` is `Active`, `Suspended` or `Archived`. `cluster`, `jmap_url` and `mail_hostname` are `null` until an operator sets the tenant up for Mail; until then every mail call answers a 422 `MailNotConfiguredError`, while the tenant calls on this page keep working. A limit of `null` means no limit. `max_disk_gb` is the disk the tenant's plan includes; it does not cap the quotas of the tenant's accounts and groups. `default_daily_send_limit` is the [send limit](accounts.md#send-limits) a new account starts at (`null` until the tenant has a cluster), `send_limits` the values an account's limit may take (empty until then), and `custom_send_limits` says whether the tenant may set an account's limit itself. `used_disk_bytes` is the figure [`get_disk_usage`](#get_disk_usage) answers, or `null` when the mail server cannot answer. `emails_sent` counts the emails the tenant's sites sent through Suite Cloud this calendar month, by when each was sent; see [Email](email.md).
 
 ## `get_disk_usage`
 
@@ -60,6 +60,27 @@ Answers the disk the tenant's accounts and groups use together, as the mail serv
 ```
 
 Suite Cloud asks the mail server for every account and group of the tenant in as few calls as the server allows, then keeps the sum for 5 minutes. A call inside that time answers the kept figure and `fetched_at` says when it was read. `fresh` reads the mail server again and replaces the kept figure. When the mail server cannot answer, the call fails with a 503 and nothing is kept, so a partial sum is never served.
+
+## `get_send_usage`
+
+`GET tenant.get_send_usage`
+
+| Parameter | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `months` | integer | `12` | UTC months to answer, this one included, at most 24 |
+
+Answers the recipients the tenant's accounts sent per UTC month, newest first. A month with nothing sent is left out:
+
+```json
+{
+  "months": [
+    {"month": "2026-11", "sent": 18240},
+    {"month": "2026-10", "sent": 51003}
+  ]
+}
+```
+
+A month sums the days Suite Cloud keeps, so it reaches back only as far as the Sending Usage Retention, 90 days by default; an older month comes back partly or not at all. A deleted account's usage stays in its tenant's months. [`get_send_usage`](accounts.md#get_send_usage) on an account answers its days.
 
 ## `update_tenant_profile`
 

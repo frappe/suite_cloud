@@ -58,11 +58,8 @@
   "column_break_egress",
   "relay_username",
   "relay_password",
-  "sending_limits_section",
-  "max_daily_send_limit",
-  "column_break_sending_limits",
-  "max_monthly_send_limit",
-  "sending_limit_hook_timeout",
+  "sending_section",
+  "submission_rate",
   "config_tab",
   "bootstrap_node",
   "config_version",
@@ -413,40 +410,18 @@
    "label": "Relay Password"
   },
   {
-   "fieldname": "sending_limits_section",
+   "fieldname": "sending_section",
    "fieldtype": "Section Break",
-   "label": "Sending Limits"
+   "label": "Sending"
   },
   {
-   "default": "2000",
-   "description": "Upper limit, in recipients per UTC day, for each account's Daily Send Limit and each tenant default. Stalwart also applies it when Suite Cloud does not answer.",
-   "fieldname": "max_daily_send_limit",
+   "default": "90",
+   "description": "Messages per minute for each signed-in sender.",
+   "fieldname": "submission_rate",
    "fieldtype": "Int",
-   "label": "Max Daily Send Limit",
+   "label": "Submission Rate (Messages per Minute)",
    "non_negative": 1,
    "reqd": 1
-  },
-  {
-   "default": "10000",
-   "description": "Upper limit, in recipients per UTC month, for each account's Monthly Send Limit and each tenant default.",
-   "fieldname": "max_monthly_send_limit",
-   "fieldtype": "Int",
-   "label": "Max Monthly Send Limit",
-   "non_negative": 1,
-   "reqd": 1
-  },
-  {
-   "default": "1",
-   "description": "Seconds Stalwart waits for Suite Cloud's answer on each recipient, connect included, from 1 to 10. After it, Stalwart accepts the recipient uncounted. Reaches the cluster with the next Sync Config.",
-   "fieldname": "sending_limit_hook_timeout",
-   "fieldtype": "Int",
-   "label": "Sending Limit Hook Timeout (Seconds)",
-   "non_negative": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "column_break_sending_limits",
-   "fieldtype": "Column Break"
   },
   {
    "fieldname": "config_tab",
@@ -548,9 +523,29 @@
    "group": "Reports",
    "link_doctype": "TLS Report",
    "link_fieldname": "cluster"
+  },
+  {
+   "group": "Mail",
+   "link_doctype": "Mail Account",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Mail",
+   "link_doctype": "Mail Group",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Mail",
+   "link_doctype": "Mailing List",
+   "link_fieldname": "cluster"
+  },
+  {
+   "group": "Mail",
+   "link_doctype": "Mail Send Limit",
+   "link_fieldname": "cluster"
   }
  ],
- "modified": "2026-11-16 10:00:00.000000",
+ "modified": "2026-11-20 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Stalwart Cluster",

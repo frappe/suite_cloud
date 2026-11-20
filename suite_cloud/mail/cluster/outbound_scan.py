@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 import frappe
 
 from suite_cloud.mail.cluster import rspamd
+from suite_cloud.mail.cluster.lookup_keys import create_key, delete_key
 from suite_cloud.mail.cluster.plan import as_list, as_set
 from suite_cloud.mail.cluster.quota import NEVER
 from suite_cloud.utils import get_config
@@ -68,43 +69,54 @@ def is_scan_enabled(cluster: Document) -> bool:
 # --- trusted accounts ------------------------------------------------------------------------
 
 
-def set_exempt(cluster: Document, email: str, is_exempt: bool) -> None:
-    """Adds or removes one account's key. Stalwart reads keys only when it reloads its lookup
-    stores, which ``ReloadSettings`` does not do."""
+def set_exempt(cluster: Document, email: str, is_exempt: bool, key_id: str | None) -> str | None:
+    """Adds or removes one account's key, and returns its id. Adding finds a key already there from
+    Stalwart's refusal; removing goes by the id, and reads the namespace only for an account from
+    before ids were kept. Stalwart reads keys only when it reloads its lookup stores, which
+    ``ReloadSettings`` does not do."""
 
     client = cluster.get_client()
-    keys = get_exempt_keys(client)
     service = client.objects(LOOKUP_KEY)
-    if is_exempt and email not in keys:
-        service.create(lookup_key(email))
-    elif not is_exempt and email in keys:
-        service.delete(keys[email])
+    if is_exempt:
+        key_id, _is_new = create_key(service, lookup_key(email))
     else:
-        return
+        if not (key_id := key_id or get_exempt_keys(client).get(email)):
+            return None
+        delete_key(service, key_id)
+        key_id = None
     client.reload_lookup_stores()
+    return key_id
 
 
 def sync_exempt_accounts(cluster: Document) -> bool:
-    """Makes the cluster's keys match the cluster's trusted accounts; True when it changed any."""
+    """Makes the cluster's keys match the cluster's trusted accounts, and each account keep its
+    key's id; True when it changed any key."""
 
     client = cluster.get_client()
     keys = get_exempt_keys(client)
-    wanted = set(get_exempt_accounts(cluster))
+    accounts = frappe.get_all(
+        "Mail Account",
+        {"cluster": cluster.name},
+        ["name", "email", "skip_outbound_scan", "outbound_scan_key"],
+    )
+    wanted = {row.email for row in accounts if row.skip_outbound_scan}
     missing = sorted(wanted - set(keys))
     extra = [id for email, id in keys.items() if email not in wanted]
     service = client.objects(LOOKUP_KEY)
+    ids = {email: keys[email] for email in wanted if email in keys}
     for email in missing:
-        service.create(lookup_key(email))
+        ids[email] = service.create(lookup_key(email))["id"]
     if extra:
         service.delete(extra)
+    for row in accounts:
+        if (row.outbound_scan_key or None) != ids.get(row.email):
+            frappe.db.set_value(
+                "Mail Account", row.name, "outbound_scan_key", ids.get(row.email), update_modified=False
+            )
     if not (missing or extra):
         return False
     client.reload_lookup_stores()
     return True
-
-
-def get_exempt_accounts(cluster: Document) -> list[str]:
-    return frappe.get_all("Mail Account", {"cluster": cluster.name, "skip_outbound_scan": 1}, pluck="email")
 
 
 def get_exempt_keys(client: StalwartClient) -> dict[str, str]:

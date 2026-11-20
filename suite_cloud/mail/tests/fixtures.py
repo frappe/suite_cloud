@@ -71,6 +71,7 @@ def remove_cluster(name: str) -> None:
         frappe.db.delete("Server Job Task", {"parent": ["in", jobs]})
         frappe.db.delete("Server Job", {"name": ["in", jobs]})
     frappe.db.delete("DNS Record", {"managed_by": ["in", [*nodes, name]]})
+    frappe.db.delete("Mail Send Limit", {"cluster": name})
     for node in nodes:
         frappe.delete_doc("Stalwart Node", node, force=True, ignore_permissions=True, ignore_on_trash=True)
     frappe.delete_doc("Stalwart Cluster", name, force=True, ignore_permissions=True, ignore_on_trash=True)

@@ -9,6 +9,7 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, flt, get_first_day, now, now_datetime, today
 
+from suite_cloud.mail.doctype.mail_send_limit.mail_send_limit import get_daily_limits, get_default_limit
 from suite_cloud.mail.stalwart import get_client
 from suite_cloud.mail.stalwart.errors import StalwartError
 from suite_cloud.mail.tenancy.permissions import TENANT_ROLE, assert_can_own
@@ -40,8 +41,7 @@ class SuiteTenant(Document):
         allow_custom_send_limits: DF.Check
         archived_at: DF.Datetime | None
         contact_email: DF.Data | None
-        default_daily_send_limit: DF.Int
-        default_monthly_send_limit: DF.Int
+        default_send_limit: DF.Link | None
         egress_pool: DF.Link | None
         enabled: DF.Check
         max_accounts: DF.Int
@@ -236,20 +236,24 @@ class SuiteTenant(Document):
             frappe.throw(_("Total Disk Quota cannot be negative; 0 means unlimited."))
 
     def validate_send_limits(self) -> None:
-        """A new account starts at these, so each is at least 1 and within the cluster's max."""
+        """A tenant with a cluster always has a default, one of the cluster's limits: left blank,
+        the cluster's own default."""
 
-        cluster = self.get_cluster() if self.stalwart_cluster else None
-        for field, maximum in (
-            ("default_daily_send_limit", cluster and cluster.max_daily_send_limit),
-            ("default_monthly_send_limit", cluster and cluster.max_monthly_send_limit),
+        if not self.stalwart_cluster:
+            self.default_send_limit = None
+            return
+        if not self.default_send_limit:
+            self.default_send_limit = get_default_limit(self.stalwart_cluster)
+        if (
+            frappe.db.get_value("Mail Send Limit", self.default_send_limit, "cluster")
+            != self.stalwart_cluster
         ):
-            value = cint(self.get(field))
-            if value < 1 or (maximum and value > maximum):
-                frappe.throw(
-                    _("{0} must be between 1 and the cluster's max of {1}, not {2}.").format(
-                        _(self.meta.get_label(field)), maximum, value
-                    )
-                )
+            frappe.throw(
+                _("Default Send Limit {0} belongs to another cluster.").format(self.default_send_limit)
+            )
+
+    def get_default_daily_send_limit(self) -> int:
+        return cint(frappe.db.get_value("Mail Send Limit", self.default_send_limit, "daily_limit"))
 
     def domain_count(self) -> int:
         return frappe.db.count("Mail Domain", {"tenant": self.name})
@@ -405,8 +409,8 @@ class SuiteTenant(Document):
                 "max_groups": self.max_groups,
                 "max_mailing_lists": self.max_mailing_lists,
                 "max_disk_gb": self.max_disk_gb,
-                "default_daily_send_limit": self.default_daily_send_limit,
-                "default_monthly_send_limit": self.default_monthly_send_limit,
+                "default_daily_send_limit": self.get_default_daily_send_limit() if cluster else None,
+                "send_limits": get_daily_limits(cluster.name) if cluster else [],
                 "custom_send_limits": bool(self.allow_custom_send_limits),
             },
             "usage": {

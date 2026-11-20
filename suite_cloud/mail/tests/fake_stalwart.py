@@ -50,6 +50,7 @@ QUERY_FILTERS = {
     "Role": {"text"},
     "Tenant": {"text"},
     "MemoryLookupKey": {"namespace"},
+    "MemoryLookupKeyValue": {"namespace"},
     "DmarcExternalReport": {
         "domain",
         "totalFailedSessions",
@@ -74,10 +75,14 @@ SCHEMA = {
 }
 
 
+LOOKUP_TYPES = ("MemoryLookupKey", "MemoryLookupKeyValue")
+
+
 class FakeError(Exception):
-    def __init__(self, type: str, description: str = "") -> None:
+    def __init__(self, type: str, description: str = "", **extra) -> None:
         self.type = type
         self.description = description
+        self.extra = extra  # what Stalwart adds to the SetError, such as a taken key's objectId
 
 
 class FakeStalwart:
@@ -297,7 +302,11 @@ class FakeStalwart:
                 self._check_references(payload)
                 created = self._create(type, payload, collection, account_id)
             except FakeError as e:
-                result.setdefault("notCreated", {})[ref] = {"type": e.type, "description": e.description}
+                result.setdefault("notCreated", {})[ref] = {
+                    "type": e.type,
+                    "description": e.description,
+                    **e.extra,
+                }
                 continue
             refs[ref] = created["id"]
             result["created"][ref] = created
@@ -379,6 +388,14 @@ class FakeStalwart:
             self.objects["DkimSignature"][signature_id]["publicKey"] = f"MIIBIjANBg{signature_id}"
 
     def _check_unique(self, type: str, payload: dict) -> None:
+        if type in LOOKUP_TYPES:  # one namespace and key across both kinds, as Stalwart keeps them
+            for other in LOOKUP_TYPES:
+                if taken := self.find(other, namespace=payload.get("namespace"), key=payload.get("key")):
+                    raise FakeError(
+                        "primaryKeyViolation",
+                        properties=["namespace"],
+                        objectId={"object": other, "id": taken["id"]},
+                    )
         if type == "Domain" and self.find("Domain", name=payload.get("name")):
             raise FakeError("alreadyExists", f"Domain {payload.get('name')} already exists.")
         if type in ADDRESS_TYPES:

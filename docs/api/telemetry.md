@@ -7,7 +7,7 @@ Module `suite_cloud.api.telemetry`. Each Stalwart node and egress gateway pushes
 | `telemetry.webhook` | POST | Stalwart | Stages a batch of events |
 | `telemetry.otlp` | POST | Stalwart | Stages one OTLP metrics push |
 
-Stalwart's sending-limit hook, `suite_cloud.api.sending_limits.check`, goes through the same auth hook with the calling node's Suite Cloud token. See [Sending limits](../sending-limits.md).
+Stalwart's sending-usage WebHook, `suite_cloud.api.send_usage.record`, goes through the same auth hook with the calling node's Suite Cloud token, whether telemetry is on or not. See [Sending limits](../sending-limits.md).
 
 ## Authentication
 
@@ -17,13 +17,13 @@ Every Stalwart Node and Egress Gateway has its own **Suite Cloud Key** and **Sui
 SUITE_CLOUD_TOKEN=<key>.<secret>
 ```
 
-The WebHooks, the OTLP push and the sending-limit hook read the variable on the server that sends, so each request names its one server:
+The WebHooks, the OTLP push and the sending-usage WebHook read the variable on the server that sends, so each request names its one server:
 
 ```http
 Authorization: Bearer <key>.<secret>
 ```
 
-The token opens only `webhook`, `otlp` and, for a node, the sending-limit hook, and runs as a user without any role. The server record gives every row its `source` (`stalwart`), `host_ip` (the server's IPv4 address) and `hostname`. The request carries none of them. With **Enable Telemetry** off, every `webhook` and `otlp` request gets a 401. **Rotate Suite Cloud Token** on a node or gateway form replaces the secret at once and queues a job that writes it to the server and restarts Stalwart. Until the job ends, Stalwart sends the old token, gets a 401 and tries again.
+The token opens only `webhook`, `otlp` and, for a node, the sending-usage WebHook, and runs as a user without any role. The server record gives every row its `source` (`stalwart`), `host_ip` (the server's IPv4 address) and `hostname`. The request carries none of them. With **Enable Telemetry** off, every `webhook` and `otlp` request gets a 401. **Rotate Suite Cloud Token** on a node or gateway form replaces the secret at once and queues a job that writes it to the server and restarts Stalwart. Until the job ends, Stalwart sends the old token, gets a 401 and tries again.
 
 ## WebHook
 
@@ -79,7 +79,7 @@ After each load and each migrate, `current_metrics` holds the newest value of ev
 | 429 | `TooManyRequestsError` | The server sent more requests in the current minute than **Server Requests per Minute** allows |
 | 500 | | The batch could not be written, for example because the disk is full. Nothing was staged |
 
-**Server Requests per Minute** (300 by default) counts every request of one server in fixed one-minute windows: WebHooks and OTLP together. Three WebHooks and the metrics push make at most 7 requests a minute. The sending-limit hook is not throttled.
+**Server Requests per Minute** (300 by default) counts every request of one server in fixed one-minute windows: WebHooks and OTLP together. Three WebHooks and the metrics push make at most 7 requests a minute. The sending-usage WebHook is not throttled.
 
 ## Agent data
 

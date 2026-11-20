@@ -22,9 +22,9 @@
   "app_passwords",
   "api_keys",
   "sending_limits_section",
+  "send_limit",
   "daily_send_limit",
   "column_break_sending_limits",
-  "monthly_send_limit",
   "skip_outbound_scan",
   "quotas_section",
   "used_disk_bytes",
@@ -36,7 +36,9 @@
   "cluster_section",
   "cluster",
   "column_break_cluster",
-  "stalwart_id"
+  "stalwart_id",
+  "send_limit_key",
+  "outbound_scan_key"
  ],
  "fields": [
   {
@@ -152,30 +154,29 @@
    "options": "Mail Credential"
   },
   {
-   "description": "Limits and checks on outgoing mail. A limit applies about one minute after save.",
+   "description": "Limits and checks on outgoing mail.",
    "fieldname": "sending_limits_section",
    "fieldtype": "Section Break",
    "label": "Sending"
   },
   {
-   "description": "Recipients per UTC day. A message to 50 recipients counts as 50. Blank uses the tenant default. At most the cluster maximum.",
+   "description": "Recipients per UTC day. Blank uses the tenant default. A change starts a fresh count for the day.",
+   "fieldname": "send_limit",
+   "fieldtype": "Link",
+   "label": "Send Limit",
+   "options": "Mail Send Limit"
+  },
+  {
+   "fetch_from": "send_limit.daily_limit",
    "fieldname": "daily_send_limit",
    "fieldtype": "Int",
    "label": "Daily Send Limit",
    "non_negative": 1,
-   "reqd": 1
+   "read_only": 1
   },
   {
    "fieldname": "column_break_sending_limits",
    "fieldtype": "Column Break"
-  },
-  {
-   "description": "Recipients per UTC month. Blank uses the tenant default. At most the cluster maximum.",
-   "fieldname": "monthly_send_limit",
-   "fieldtype": "Int",
-   "label": "Monthly Send Limit",
-   "non_negative": 1,
-   "reqd": 1
   },
   {
    "default": "0",
@@ -260,12 +261,30 @@
    "label": "Stalwart ID",
    "no_copy": 1,
    "read_only": 1
+  },
+  {
+   "description": "The id of the account's send limit key in Stalwart.",
+   "fieldname": "send_limit_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Send Limit Key",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "The id of the account's outbound scan exemption key in Stalwart.",
+   "fieldname": "outbound_scan_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Outbound Scan Key",
+   "no_copy": 1,
+   "read_only": 1
   }
  ],
  "in_create": 0,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-11-05 23:00:00.000000",
+ "modified": "2026-11-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Account",

@@ -679,6 +679,27 @@ class TestEgress(IntegrationTestCase):
         self.assertEqual(self.strategy_names(gateway_fake), ["custom", "p1"])
         self.assertEqual(len(result["destroyed"]), 1)
 
+    def test_the_gateway_throttles_nothing(self) -> None:
+        """Its mail comes from the cluster's nodes, which apply the sending limits. One disabled
+        throttle stays, since Stalwart adds its defaults on any start that finds none."""
+
+        gateway_fake = FakeStalwart(
+            base_url=self.gateway.base_url, admin_password=self.gateway.get_password("admin_password")
+        )
+        for description in ("Sender IP throttle", "Sender address to recipient throttle"):  # Stalwart's
+            gateway_fake._add("MtaInboundThrottle", {"description": description})
+        with gateway_fake.install(), patch.object(egress, "apply_pool_changes"):
+            forget_sessions(self.gateway)
+            self.gateway.push_config()
+            self.gateway.push_config()
+        throttles = gateway_fake.all("MtaInboundThrottle")
+        self.assertEqual([t["description"] for t in throttles], [egress.GATEWAY_THROTTLE_DESCRIPTION])
+        self.assertFalse(throttles[0]["enable"])
+        recovery = [
+            op for op in egress.gateway_recovery_plan(self.gateway) if op["object"] == "MtaInboundThrottle"
+        ]
+        self.assertEqual(len(recovery), 1)  # a recovered gateway never gets the defaults either
+
     def reload_count(self, fake: FakeStalwart) -> int:
         return sum(action["@type"] == "ReloadSettings" for action in fake.all("Action"))
 

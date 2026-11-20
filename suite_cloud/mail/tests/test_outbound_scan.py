@@ -10,6 +10,7 @@ import frappe
 from suite_cloud.api.mail import accounts, domains
 from suite_cloud.mail.cluster import bootstrap, egress, outbound_scan, plan, push, quota, rspamd, telemetry
 from suite_cloud.mail.stalwart.errors import StalwartError
+from suite_cloud.mail.stalwart.service import ManagementService
 from suite_cloud.mail.tests import fake_stalwart
 from suite_cloud.mail.tests.fixtures import make_node, make_store
 from suite_cloud.mail.tests.test_tenant_api import TenantApiTestCase
@@ -151,15 +152,16 @@ class TestMilterPlan(OutboundScanTestCase):
 
 class TestTrustedAccounts(OutboundScanTestCase):
     def test_a_system_manager_marks_an_account_as_trusted(self) -> None:
+        reloads = self.lookup_reloads()  # creating the account wrote its send-limit key
         self.set_trusted(1)
         self.assertEqual(self.exempt_keys(), [TRUSTED])
         key = self.fake.find(outbound_scan.LOOKUP_KEY, key=TRUSTED)
         self.assertFalse(key["isGlobPattern"])
-        self.assertEqual(self.lookup_reloads(), 1)
+        self.assertEqual(self.lookup_reloads(), reloads + 1)
 
         self.set_trusted(0)
         self.assertEqual(self.exempt_keys(), [])
-        self.assertEqual(self.lookup_reloads(), 2)
+        self.assertEqual(self.lookup_reloads(), reloads + 2)
 
     def test_a_new_trusted_account_gets_its_key(self) -> None:
         frappe.get_doc({"doctype": "Mail Account", "email": "bob@acme.com", "skip_outbound_scan": 1}).insert()
@@ -181,11 +183,31 @@ class TestTrustedAccounts(OutboundScanTestCase):
 
     def test_a_refused_key_fails_the_save(self) -> None:
         frappe.db.savepoint("refused_key")
-        with patch.dict(fake_stalwart.QUERY_FILTERS, {"MemoryLookupKey": set()}):
+        with patch.object(ManagementService, "create", side_effect=StalwartError("refused")):
             self.assertRaises(StalwartError, self.set_trusted, 1)
         frappe.db.rollback(save_point="refused_key")
         self.assertEqual(frappe.db.get_value("Mail Account", TRUSTED, "skip_outbound_scan"), 0)
         self.assertEqual(self.exempt_keys(), [])
+
+    def test_a_key_is_written_by_the_id_the_account_keeps(self) -> None:
+        def key_id() -> str | None:
+            return frappe.db.get_value("Mail Account", TRUSTED, "outbound_scan_key")
+
+        # Stalwart cannot find a key by its name, so a save must not read the namespace.
+        with patch.object(outbound_scan, "get_exempt_keys", side_effect=AssertionError("read the namespace")):
+            self.set_trusted(1)
+            self.assertEqual(key_id(), self.fake.find(outbound_scan.LOOKUP_KEY, key=TRUSTED)["id"])
+            self.set_trusted(0)
+            self.assertIsNone(key_id())
+            # A key already there, whose id the account lost, is named by Stalwart's refusal.
+            kept = (
+                self.cluster.get_client()
+                .objects(outbound_scan.LOOKUP_KEY)
+                .create(outbound_scan.lookup_key(TRUSTED))
+            )
+            self.set_trusted(1)
+            self.assertEqual(key_id(), kept["id"])
+        self.assertEqual(self.exempt_keys(), [TRUSTED])
 
     def test_a_sync_repairs_the_keys(self) -> None:
         self.set_trusted(1)
@@ -202,6 +224,8 @@ class TestTrustedAccounts(OutboundScanTestCase):
 
         self.assertFalse(outbound_scan.sync_exempt_accounts(self.cluster))
         self.assertEqual(self.lookup_reloads(), reloads + 1)
+        stored = frappe.db.get_value("Mail Account", TRUSTED, "outbound_scan_key")
+        self.assertEqual(stored, self.fake.find(outbound_scan.LOOKUP_KEY, key=TRUSTED)["id"])  # recorded
 
     def test_a_config_push_syncs_the_keys(self) -> None:
         self.set_trusted(1)

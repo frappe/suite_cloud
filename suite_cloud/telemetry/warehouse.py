@@ -17,6 +17,7 @@ from frappe.utils import cint, now_datetime
 from suite_cloud.telemetry import (
     CURRENT_METRICS,
     DIMENSIONS,
+    EVENTS,
     MAIL_DOMAINS,
     METRICS,
     NODES,
@@ -51,6 +52,28 @@ def prune_expired_rows() -> None:
     """Scheduled daily."""
 
     Warehouse().prune_expired()
+
+
+# A refusal over a throttle names no account, but its session does: the login, else the sender of a
+# JMAP submission, which signs in over HTTP. A session's events come in order, so a refusal's sign-in
+# is loaded by the time it is; one whose session is still unknown is tried again on the next load.
+ATTRIBUTE_REFUSALS = """
+    UPDATE events SET account = session.account
+    FROM (
+        SELECT span_id, coalesce(
+            max(account) FILTER (WHERE event = 'auth.success'),
+            max(sender) FILTER (WHERE event = 'smtp.mail-from')
+        ) AS account
+        FROM events
+        WHERE span_id IN (
+            SELECT span_id FROM events
+            WHERE event = 'smtp.rate-limit-exceeded' AND account IS NULL AND span_id IS NOT NULL
+        )
+        GROUP BY span_id
+    ) AS session
+    WHERE events.event = 'smtp.rate-limit-exceeded' AND events.account IS NULL
+        AND events.span_id = session.span_id AND session.account IS NOT NULL
+"""
 
 
 class Warehouse:
@@ -239,6 +262,8 @@ class Warehouse:
             result = db.con.execute(
                 statement, {"files": [str(path) for path in files], "ids": [path.stem for path in files]}
             ).fetchone()
+            if table is EVENTS:
+                db.con.execute(ATTRIBUTE_REFUSALS)
         self.spool.delete(files)
         return result[0]
 

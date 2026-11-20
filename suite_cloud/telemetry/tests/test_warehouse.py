@@ -36,7 +36,7 @@ STALWART_DATA = (
     '"from": "ana@acme.test", "to": "bo@example.com", "elapsed": 412}'
 )
 # remote_ip, listener, domain, mx, reason, code, account, sender, recipient, sender_domain,
-# recipient_domain, elapsed
+# recipient_domain, elapsed, limit_count, limit_period
 STALWART_COLUMNS = (
     "198.51.100.7",
     "smtp",
@@ -50,8 +50,25 @@ STALWART_COLUMNS = (
     "acme.test",
     "example.com",
     412.0,
+    None,
+    None,
 )
-CODE_ONLY_COLUMNS = (None, None, None, None, "550 rejected", "421", None, None, None, None, None, None)
+CODE_ONLY_COLUMNS = (
+    None,
+    None,
+    None,
+    None,
+    "550 rejected",
+    "421",
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+    None,
+)
 NO_DATA_COLUMNS = (None,) * len(EVENT_DATA_COLUMNS)
 TABLE_NAMES = {
     "events",
@@ -200,6 +217,44 @@ class TestWarehouse(IntegrationTestCase):
         self.warehouse.load_pending()
 
         self.assertEqual(self.event_data_columns(), [STALWART_COLUMNS, CODE_ONLY_COLUMNS, NO_DATA_COLUMNS])
+
+    def test_a_refusal_over_a_limit_takes_its_session_s_account(self) -> None:
+        """Stalwart names only the throttle's rate; the sign-in, or a JMAP submission's sender, names
+        the account. A refusal whose session comes in a later load is named then."""
+
+        refused = '{"id": "MtaInboundThrottle with id t1", "limit": [500, 86400000]}'
+        self.stage(
+            EVENTS,
+            [
+                event(event="auth.success", span_id="s1", data='{"accountName": "ana@acme.test"}'),
+                event(event="smtp.mail-from", span_id="s1", data='{"from": "sales@acme.test"}'),
+                event(event="smtp.rate-limit-exceeded", span_id="s1", data=refused),
+                event(event="smtp.mail-from", span_id="s2", data='{"from": "bo@acme.test"}'),
+                event(
+                    event="smtp.rate-limit-exceeded", span_id="s2", data=refused.replace("86400000", "60000")
+                ),
+                event(event="smtp.rate-limit-exceeded", span_id="s3", data=refused),
+            ],
+        )
+        self.warehouse.load_pending()
+        self.stage(
+            EVENTS, [event(event="auth.success", span_id="s3", data='{"accountName": "cy@acme.test"}')]
+        )
+        self.warehouse.load_pending()  # s3's sign-in arrives late; nothing else is loaded
+
+        with self.warehouse.write_connection() as db:
+            rows = db.con.execute(
+                "SELECT span_id, account, limit_count, limit_period FROM events"
+                " WHERE event = 'smtp.rate-limit-exceeded' ORDER BY span_id"
+            ).fetchall()
+        self.assertEqual(
+            rows,
+            [
+                ("s1", "ana@acme.test", 500, 86_400_000),
+                ("s2", "bo@acme.test", 500, 60_000),
+                ("s3", "cy@acme.test", 500, 86_400_000),
+            ],
+        )
 
     def test_a_load_takes_the_outbound_scans_and_their_rules(self) -> None:
         record = {

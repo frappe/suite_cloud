@@ -5,7 +5,7 @@ from datetime import datetime
 import frappe
 from frappe.tests import UnitTestCase
 
-from suite_cloud.api import email, sending_limits, telemetry, tenant
+from suite_cloud.api import email, send_usage, telemetry, tenant
 from suite_cloud.api.mail import accounts, dmarc, domains, groups, mailing_lists, meta, tls
 from suite_cloud.api.tenant import InvalidInputError, api_errors, as_datetime, as_list
 from suite_cloud.mail.stalwart.errors import (
@@ -16,7 +16,7 @@ from suite_cloud.mail.stalwart.errors import (
 )
 
 MODULES = (tenant, email, domains, accounts, groups, mailing_lists, meta, dmarc, tls)
-SERVER_MODULES = (telemetry, sending_limits)  # called by Stalwart, not by tenants
+SERVER_MODULES = (telemetry, send_usage)  # called by Stalwart, not by tenants
 VERB_BY_PREFIX = {
     "list_": "GET",
     "get_": "GET",
@@ -71,7 +71,7 @@ class TestApiVerbs(UnitTestCase):
             names.add(name)
             with self.subTest(path):
                 self.assertTrue(getattr(function, "is_telemetry_api", False))
-        self.assertEqual(names, {"webhook", "otlp", "outbound_scans", "check"})
+        self.assertEqual(names, {"webhook", "otlp", "outbound_scans", "record"})
 
 
 class TestApiInput(UnitTestCase):

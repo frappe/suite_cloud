@@ -364,8 +364,8 @@ def recovery_plan(cluster: Document) -> list[dict]:
     """The cluster plan as the first node applies it in recovery mode.
 
     Stalwart provisions its built-in roles and inbound throttles only on a normal start that
-    finds none, so the plan must not create any: the disabled-accounts role and the quota
-    backstop are pushed once the cluster is active. The admin password is pinned here and only
+    finds none, so the plan must not create any: the disabled-accounts role and the sending-limit
+    throttles are pushed once the cluster is active. The admin password is pinned here and only
     here (see the helper), and so are the stores and the HTTPS port. A restored data store's
     certificates go here too, when the operator asks.
     """
@@ -490,7 +490,7 @@ def telemetry_operations(target: Document) -> list[dict]:
 
 
 def quota_operations(cluster: Document) -> list[dict]:
-    """The sending-limit hook and its backstop; filled in by suite_cloud.mail.cluster.quota."""
+    """The sending-limit throttles and the usage WebHook; filled in by suite_cloud.mail.cluster.quota."""
 
     from suite_cloud.mail.cluster.quota import cluster_operations  # it builds on this module
 

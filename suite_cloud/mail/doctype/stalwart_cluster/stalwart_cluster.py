@@ -19,9 +19,11 @@ from suite_cloud.mail.cluster import (
     outbound_scan,
     plan,
     push,
+    quota,
     reconcile,
     rspamd,
 )
+from suite_cloud.mail.doctype.mail_send_limit.mail_send_limit import create_default_limits
 from suite_cloud.mail.stalwart import forget_sessions, get_admin_client, get_client
 from suite_cloud.mail.stalwart.credentials import Credential
 from suite_cloud.provisioning.ssh import generate_keypair, validate_ssh_user_field
@@ -37,7 +39,6 @@ from suite_cloud.utils import (
 
 PUSH_TIMEOUT = 300  # seconds a config push may hold its cluster's lock, and wait for it by default
 SYNC_CONFIG_WAIT = 20  # seconds Sync Config waits for the lock, well inside a web worker's timeout
-MAX_HOOK_TIMEOUT = 10  # seconds
 HOSTNAME = re.compile(r"^(?!-)[a-z0-9-]{1,63}(?<!-)(\.(?!-)[a-z0-9-]{1,63}(?<!-))+$")
 STORE_KINDS = {
     "data_store": "Data",
@@ -80,17 +81,15 @@ class StalwartCluster(Document):
         label: DF.Data | None
         last_config_sync_at: DF.Datetime | None
         last_config_sync_error: DF.SmallText | None
-        max_daily_send_limit: DF.Int
-        max_monthly_send_limit: DF.Int
         outbound_scan_store: DF.Link | None
         region: DF.Link
         relay_password: DF.Password | None
         relay_username: DF.Data | None
         remove_existing_certificates: DF.Check
         search_store: DF.Link | None
-        sending_limit_hook_timeout: DF.Int
         single_node: DF.Check
         ssh_port: DF.Int
+        submission_rate: DF.Int
         ssh_private_key: DF.Password | None
         ssh_public_key: DF.Code | None
         ssh_user: DF.Data
@@ -122,7 +121,8 @@ class StalwartCluster(Document):
         self.validate_stores()
         self.validate_default()
         self.validate_egress_pool()
-        self.validate_send_limits()
+        if cint(self.submission_rate) < 1:
+            frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label("submission_rate"))))
 
     def validate_egress_pool(self) -> None:
         if (
@@ -131,20 +131,9 @@ class StalwartCluster(Document):
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.default_egress_pool))
 
-    def validate_send_limits(self) -> None:
-        """The max limits cap every account and tenant default, and the daily one is also the
-        server's own cap while Suite Cloud does not answer, so neither is ever off."""
-
-        for field in ("max_daily_send_limit", "max_monthly_send_limit"):
-            if cint(self.get(field)) < 1:
-                frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label(field))))
-        # Stalwart holds each recipient of a signed-in sender for up to this long.
-        if not 1 <= cint(self.sending_limit_hook_timeout) <= MAX_HOOK_TIMEOUT:
-            label = _(self.meta.get_label("sending_limit_hook_timeout"))
-            frappe.throw(_("{0} must be between 1 and {1}.").format(label, MAX_HOOK_TIMEOUT))
-
     def after_insert(self) -> None:
         dns.sync_spf_record(self)
+        create_default_limits(self)
 
     def onload(self) -> None:
         self.set_onload("outdated_scanner_nodes", rspamd.get_outdated_nodes(self))
@@ -159,9 +148,10 @@ class StalwartCluster(Document):
             self.db_set("status", "Disabled")
         elif not before.enabled and self.enabled and self.status == "Disabled":
             self.db_set("status", "Active")
-        if (before.default_egress_pool, before.additional_hostnames) != (
+        if (before.default_egress_pool, before.additional_hostnames, before.submission_rate) != (
             self.default_egress_pool,
             self.additional_hostnames,
+            self.submission_rate,
         ):
             push.resync_cluster_after_commit(self.name)
 
@@ -177,6 +167,10 @@ class StalwartCluster(Document):
         for doctype, field in dependants:
             if frappe.db.exists("DocType", doctype) and frappe.db.exists(doctype, {field: self.name}):
                 frappe.throw(_("Remove every {0} of this cluster first.").format(_(doctype)))
+        for name in frappe.get_all("Mail Send Limit", {"cluster": self.name}, pluck="name"):
+            limit = frappe.get_doc("Mail Send Limit", name)
+            limit.flags.deleting_cluster = True
+            limit.delete(ignore_permissions=True)
         dns.delete_cluster_records(self)
 
     # --- validation -----------------------------------------------------------
@@ -347,11 +341,12 @@ class StalwartCluster(Document):
             return self.apply_config()
 
     def apply_config(self) -> dict:
-        """Pushes the plan, then repairs the trusted accounts' keys a failed save or a hand edit
-        left wrong; the caller holds the push lock."""
+        """Pushes the plan, then repairs the sending-limit objects and the trusted accounts' keys a
+        failed save or a hand edit left wrong; the caller holds the push lock."""
 
         rendered = plan.cluster_plan(self)
         result = self.get_client().apply(rendered)
+        quota.sync_send_limits(self)
         self.get_client().reload_settings()
         outbound_scan.sync_exempt_accounts(self)
         self.bump_config_version(rendered)

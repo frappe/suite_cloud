@@ -1,11 +1,11 @@
-"""The telemetry API: Stalwart pushes its events and metrics, and asks about sending limits; each
-node's scan shipper pushes what its Rspamd scored.
+"""The telemetry API: Stalwart pushes its events and metrics, and the messages it queued for the
+sending usage; each node's scan shipper pushes what its Rspamd scored.
 
 Stalwart and the shipper send ``Authorization: Bearer <key>.<secret>``, the Suite Cloud token of the
 one node or gateway that sent the request (``server_token``). ``webhook``, ``otlp`` and
 ``outbound_scans`` take any server's token
-while telemetry is on; the sending-limit hook (``suite_cloud.api.sending_limits``) takes a Stalwart
-Node's whatever telemetry is set to. The ``authenticate`` auth hook checks the token and runs the
+while telemetry is on; the sending-usage WebHook (``suite_cloud.api.send_usage``) takes a
+Stalwart Node's whatever telemetry is set to. The ``authenticate`` auth hook checks the token and runs the
 request as the telemetry user, which holds no role, so a token opens nothing but these methods. A
 batch is staged as one parquet file and acknowledged; the warehouse loads it later. The cache notes
 when each host last sent each kind of telemetry, for the status on the node forms.
@@ -42,7 +42,7 @@ from suite_cloud.telemetry.spool import Spool
 from suite_cloud.utils import get_config, log_error
 
 API_PATHS = ("/api/v2/method/suite_cloud.api.telemetry.", "/api/method/suite_cloud.api.telemetry.")
-HOOK_PATHS = ("/api/v2/method/suite_cloud.api.sending_limits.", "/api/method/suite_cloud.api.sending_limits.")
+HOOK_PATHS = ("/api/v2/method/suite_cloud.api.send_usage.", "/api/method/suite_cloud.api.send_usage.")
 DEFAULT_REQUESTS_PER_MINUTE = 300  # the settings' defaults, used until the site has them
 WEBHOOK_EVENT_LIMIT = 65536  # what one request may stage; Stalwart sends every waiting event at once
 SCAN_LIMIT = 5000  # the shipper sends 2000 records per request
@@ -50,7 +50,7 @@ SOURCE = "stalwart"
 
 
 def authenticate() -> None:
-    """Frappe auth hook: a bearer token on the telemetry API or the sending-limit hook is a
+    """Frappe auth hook: a bearer token on the telemetry API or the sending-usage WebHook is a
     server's Suite Cloud token.
 
     Elsewhere a bearer token is Frappe's own OAuth business, so the hook leaves it alone.
@@ -74,7 +74,7 @@ def authenticate() -> None:
 
 
 def get_caller(token: str, is_hook: bool) -> frappe._dict | None:
-    """The hook takes a Stalwart Node's token: the sending limits hold whether telemetry is on or
+    """The usage WebHook takes a Stalwart Node's token: billing counts whether telemetry is on or
     not. The telemetry API takes any server's, while telemetry is on."""
 
     server = server_token.get_server(token)
@@ -87,7 +87,7 @@ def get_caller(token: str, is_hook: bool) -> frappe._dict | None:
 
 def hook_api(fn: Callable) -> Callable:
     """Only a Stalwart Node, signed in with its Suite Cloud token, may call the method. It is not
-    throttled: a refused check would be an accepted recipient."""
+    throttled: a refused batch would be counted late."""
 
     @wraps(fn)
     def wrapper(*args, **kwargs):

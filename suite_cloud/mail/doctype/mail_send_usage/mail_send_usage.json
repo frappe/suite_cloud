@@ -6,11 +6,12 @@
  "engine": "InnoDB",
  "field_order": [
   "account",
-  "period",
+  "tenant",
+  "cluster",
+  "date",
   "reported_at",
   "column_break_main",
   "sent",
-  "refused",
   "send_limit"
  ],
  "fields": [
@@ -22,14 +23,35 @@
    "label": "Account",
    "options": "Mail Account",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "description": "Kept after the account is deleted."
   },
   {
-   "description": "d:YYYYMMDD for a UTC day, m:YYYYMM for a UTC month.",
-   "fieldname": "period",
-   "fieldtype": "Data",
+   "description": "The account's tenant when it sent. Kept after the account is deleted.",
+   "fieldname": "tenant",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Tenant",
+   "options": "Suite Tenant",
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "description": "The account's cluster when it sent. Kept after the account is deleted.",
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "read_only": 1
+  },
+  {
+   "description": "The UTC day.",
+   "fieldname": "date",
+   "fieldtype": "Date",
    "in_list_view": 1,
-   "label": "Period",
+   "in_standard_filter": 1,
+   "label": "Date",
    "read_only": 1,
    "reqd": 1,
    "search_index": 1
@@ -45,7 +67,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Recipients in the period. A message to 50 recipients counts as 50.",
+   "description": "Recipients sent that day.",
    "fieldname": "sent",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -54,16 +76,7 @@
    "read_only": 1
   },
   {
-   "description": "Recipients refused for going over the limit.",
-   "fieldname": "refused",
-   "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Refused",
-   "non_negative": 1,
-   "read_only": 1
-  },
-  {
-   "description": "0 means no limit.",
+   "description": "The account's daily limit that day.",
    "fieldname": "send_limit",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -75,7 +88,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-03 12:00:00.000000",
+ "modified": "2026-11-21 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Send Usage",
@@ -90,7 +103,7 @@
   }
  ],
  "row_format": "Dynamic",
- "sort_field": "reported_at",
+ "sort_field": "date",
  "sort_order": "DESC",
  "states": [],
  "title_field": "account"
