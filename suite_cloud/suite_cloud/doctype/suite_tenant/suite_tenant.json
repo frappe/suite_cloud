@@ -29,8 +29,7 @@
   "max_groups",
   "max_mailing_lists",
   "send_limits_section",
-  "default_daily_send_limit",
-  "default_monthly_send_limit",
+  "default_send_limit",
   "column_break_send_limits",
   "allow_custom_send_limits",
   "usage_section",
@@ -225,26 +224,13 @@
    "label": "Sending Limits"
   },
   {
-   "default": "2000",
-   "description": "Daily Send Limit of a new account, in recipients per UTC day. At most the cluster maximum.",
-   "fieldname": "default_daily_send_limit",
-   "fieldtype": "Int",
-   "label": "Default Daily Send Limit",
-   "non_negative": 1,
+   "description": "Send Limit of a new account where the caller sets none: one of the cluster's Mail Send Limits. Blank uses the cluster's default.",
+   "fieldname": "default_send_limit",
+   "fieldtype": "Link",
+   "label": "Default Send Limit",
+   "options": "Mail Send Limit",
    "permlevel": 1,
-   "read_only_depends_on": "eval:!doc.stalwart_cluster",
-   "reqd": 1
-  },
-  {
-   "default": "10000",
-   "description": "Monthly Send Limit of a new account, in recipients per UTC month. At most the cluster maximum.",
-   "fieldname": "default_monthly_send_limit",
-   "fieldtype": "Int",
-   "label": "Default Monthly Send Limit",
-   "non_negative": 1,
-   "permlevel": 1,
-   "read_only_depends_on": "eval:!doc.stalwart_cluster",
-   "reqd": 1
+   "read_only_depends_on": "eval:!doc.stalwart_cluster"
   },
   {
    "fieldname": "column_break_send_limits",
@@ -252,7 +238,7 @@
   },
   {
    "default": "0",
-   "description": "Lets the tenant set each account's send limits through the API, up to the cluster maximum. When off, the API refuses a limit.",
+   "description": "Lets the tenant set each account's Daily Send Limit through the API, to one of the cluster's Mail Send Limits. When off, the API refuses a limit.",
    "fieldname": "allow_custom_send_limits",
    "fieldtype": "Check",
    "label": "Tenant May Set Send Limits",
@@ -313,7 +299,7 @@
    "link_fieldname": "tenant"
   }
  ],
- "modified": "2026-11-05 23:00:00.000000",
+ "modified": "2026-11-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Suite Cloud",
  "name": "Suite Tenant",

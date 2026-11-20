@@ -50,6 +50,7 @@ QUERY_FILTERS = {
     "Role": {"text"},
     "Tenant": {"text"},
     "MemoryLookupKey": {"namespace"},
+    "MemoryLookupKeyValue": {"namespace"},
     "DmarcExternalReport": {
         "domain",
         "totalFailedSessions",

@@ -10,7 +10,6 @@
   "reported_at",
   "column_break_main",
   "sent",
-  "refused",
   "send_limit"
  ],
  "fields": [
@@ -45,7 +44,7 @@
    "fieldtype": "Column Break"
   },
   {
-   "description": "Recipients in the period. A message to 50 recipients counts as 50.",
+   "description": "Recipients of the messages Stalwart accepted in the period. A message to 50 recipients counts as 50.",
    "fieldname": "sent",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -54,16 +53,7 @@
    "read_only": 1
   },
   {
-   "description": "Recipients refused for going over the limit.",
-   "fieldname": "refused",
-   "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Refused",
-   "non_negative": 1,
-   "read_only": 1
-  },
-  {
-   "description": "0 means no limit.",
+   "description": "The account's Daily Send Limit while the day was current. 0 for a month.",
    "fieldname": "send_limit",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -75,7 +65,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-03 12:00:00.000000",
+ "modified": "2026-11-20 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Send Usage",

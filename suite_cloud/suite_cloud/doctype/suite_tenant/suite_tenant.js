@@ -4,6 +4,7 @@
 frappe.ui.form.on('Suite Tenant', {
 	setup(frm) {
 		frm.set_query('egress_pool', () => ({ filters: { cluster: frm.doc.stalwart_cluster || '' } }))
+		frm.set_query('default_send_limit', () => ({ filters: { cluster: frm.doc.stalwart_cluster || '' } }))
 		frm.set_query('user', () => ({ query: 'suite_cloud.suite_cloud.doctype.suite_tenant.suite_tenant.owner_query' }))
 	},
 
@@ -18,8 +19,9 @@ frappe.ui.form.on('Suite Tenant', {
 	},
 
 	stalwart_cluster(frm) {
-		// A pool belongs to one cluster; a picked one is stale once the cluster changes.
+		// A pool and a send limit belong to one cluster; a picked one is stale once the cluster changes.
 		frm.set_value('egress_pool', null)
+		frm.set_value('default_send_limit', null)
 	},
 })
 

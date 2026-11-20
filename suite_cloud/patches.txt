@@ -43,3 +43,4 @@ suite_cloud.patches.v1_0.clear_redis_store_default_username
 suite_cloud.patches.v1_0.keep_pool_addresses_on_public_ip
 suite_cloud.patches.v1_0.clear_stalwart_release_defaults
 suite_cloud.patches.v1_0.shift_telemetry_to_system_time
+suite_cloud.patches.v1_0.create_mail_send_limits

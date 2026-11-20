@@ -76,20 +76,12 @@
        "type": "expression"
       },
       "measure_name": "Used (%)"
-     },
-     {
-      "data_type": "Integer",
-      "expression": {
-       "expression": "sum(refused)",
-       "type": "expression"
-      },
-      "measure_name": "Refused"
      }
     ]
    },
    "description": null,
    "folder": null,
-   "info": "Each account's sent and refused recipients per UTC day, newest first, with the daily limit the account had on that day. Filter by account to see one account's history.",
+   "info": "Each account's sent recipients per UTC day, newest first, with the daily limit the account had on that day. Filter by account to see one account's history.",
    "name": "stalwart-account-sending-history",
    "query": "stalwart-sending-usage",
    "sort_order": 94,
@@ -177,14 +169,6 @@
        "type": "expression"
       },
       "measure_name": "Used (%)"
-     },
-     {
-      "data_type": "Integer",
-      "expression": {
-       "expression": "sum(refused)",
-       "type": "expression"
-      },
-      "measure_name": "Refused"
      }
     ]
    },
@@ -4981,80 +4965,6 @@
    "title": "Received Spam and Ham",
    "workbook": "stalwart"
   },
-  "stalwart-refused-today": {
-   "chart_type": "Row",
-   "config": {
-    "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "is_current",
-        "type": "column"
-       },
-       "operator": "=",
-       "value": 1
-      },
-      {
-       "column": {
-        "column_name": "period_type",
-        "type": "column"
-       },
-       "operator": "=",
-       "value": "Day"
-      },
-      {
-       "column": {
-        "column_name": "refused",
-        "type": "column"
-       },
-       "operator": ">",
-       "value": 0
-      }
-     ],
-     "logical_operator": "And"
-    },
-    "limit": 10,
-    "order_by": [
-     {
-      "column": {
-       "column_name": "Refused",
-       "type": "column"
-      },
-      "direction": "desc"
-     }
-    ],
-    "x_axis": {
-     "dimension": {
-      "column_name": "account",
-      "data_type": "String",
-      "dimension_name": "account"
-     }
-    },
-    "y_axis": {
-     "series": [
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "sum(refused)",
-         "type": "expression"
-        },
-        "measure_name": "Refused"
-       }
-      }
-     ],
-     "show_data_labels": true
-    }
-   },
-   "description": null,
-   "folder": null,
-   "info": "Recipients refused for going over a limit in the latest UTC day.",
-   "name": "stalwart-refused-today",
-   "query": "stalwart-sending-usage",
-   "sort_order": 92,
-   "title": "Refused Today",
-   "workbook": "stalwart"
-  },
   "stalwart-rejections": {
    "chart_type": "Row",
    "config": {
@@ -5640,16 +5550,6 @@
         },
         "measure_name": "Recipients"
        }
-      },
-      {
-       "measure": {
-        "data_type": "Integer",
-        "expression": {
-         "expression": "sum(refused)",
-         "type": "expression"
-        },
-        "measure_name": "Refused"
-       }
       }
      ],
      "show_data_labels": false
@@ -5657,7 +5557,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Recipients sent and refused over a limit per UTC day, as far back as the Sending Usage Retention in Suite Cloud Settings.",
+   "info": "Recipients sent per UTC day, as far back as the Sending Usage Retention in Suite Cloud Settings.",
    "name": "stalwart-sending-by-day",
    "query": "stalwart-sending-usage",
    "sort_order": 93,
@@ -5691,15 +5591,6 @@
      {
       "data_type": "Integer",
       "expression": {
-       "expression": "sum_if((is_current == 1) & (period_type == 'Day'), refused)",
-       "type": "expression"
-      },
-      "id": "Refused Today",
-      "measure_name": "Refused Today"
-     },
-     {
-      "data_type": "Integer",
-      "expression": {
        "expression": "distinct_count_if((is_current == 1) & (limit_used >= 100), account)",
        "type": "expression"
       },
@@ -5721,7 +5612,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "The latest UTC day and month Suite Cloud counted. Recipients count once per address, sent or refused.",
+   "info": "The latest UTC day and month Suite Cloud counted. Recipients count once per address.",
    "name": "stalwart-sending-readings",
    "query": "stalwart-sending-usage",
    "sort_order": 89,
@@ -9482,7 +9373,6 @@
       "stalwart-account-sending-history": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-accounts-nearest-limits": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-most-recipients-today": "`stalwart-sending-usage`.`tenant_label`",
-      "stalwart-refused-today": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-sending-by-day": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-sending-readings": "`stalwart-sending-usage`.`tenant_label`"
      },
@@ -9504,7 +9394,6 @@
       "stalwart-account-sending-history": "`stalwart-sending-usage`.`cluster`",
       "stalwart-accounts-nearest-limits": "`stalwart-sending-usage`.`cluster`",
       "stalwart-most-recipients-today": "`stalwart-sending-usage`.`cluster`",
-      "stalwart-refused-today": "`stalwart-sending-usage`.`cluster`",
       "stalwart-sending-by-day": "`stalwart-sending-usage`.`cluster`",
       "stalwart-sending-readings": "`stalwart-sending-usage`.`cluster`"
      },
@@ -9526,7 +9415,6 @@
       "stalwart-account-sending-history": "`stalwart-sending-usage`.`account`",
       "stalwart-accounts-nearest-limits": "`stalwart-sending-usage`.`account`",
       "stalwart-most-recipients-today": "`stalwart-sending-usage`.`account`",
-      "stalwart-refused-today": "`stalwart-sending-usage`.`account`",
       "stalwart-sending-by-day": "`stalwart-sending-usage`.`account`",
       "stalwart-sending-readings": "`stalwart-sending-usage`.`account`"
      },
@@ -9537,7 +9425,7 @@
      "layout": {
       "h": 4,
       "i": "sending_readings-0",
-      "w": 5,
+      "w": 7,
       "x": 0,
       "y": 2
      },
@@ -9549,20 +9437,8 @@
      "layout": {
       "h": 4,
       "i": "sending_readings-1",
-      "w": 5,
-      "x": 5,
-      "y": 2
-     },
-     "reading": "Refused Today",
-     "type": "chart"
-    },
-    {
-     "chart": "stalwart-sending-readings",
-     "layout": {
-      "h": 4,
-      "i": "sending_readings-2",
-      "w": 5,
-      "x": 10,
+      "w": 7,
+      "x": 7,
       "y": 2
      },
      "reading": "At a Limit",
@@ -9572,9 +9448,9 @@
      "chart": "stalwart-sending-readings",
      "layout": {
       "h": 4,
-      "i": "sending_readings-3",
-      "w": 5,
-      "x": 15,
+      "i": "sending_readings-2",
+      "w": 6,
+      "x": 14,
       "y": 2
      },
      "reading": "Near a Limit",
@@ -9596,19 +9472,8 @@
      "layout": {
       "h": 20,
       "i": "most_recipients",
-      "w": 10,
+      "w": 20,
       "x": 0,
-      "y": 26
-     },
-     "type": "chart"
-    },
-    {
-     "chart": "stalwart-refused-today",
-     "layout": {
-      "h": 20,
-      "i": "refused_today",
-      "w": 10,
-      "x": 10,
       "y": 26
      },
      "type": "chart"
@@ -11147,7 +11012,6 @@
       "sent",
       "send_limit",
       "limit_used",
-      "refused",
       "reported_at"
      ],
      "type": "select"

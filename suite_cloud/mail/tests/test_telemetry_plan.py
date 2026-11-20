@@ -18,7 +18,13 @@ TOKEN = {
 
 
 def by_object(operations: list[dict]) -> dict:
-    return {operation["object"]: operation for operation in operations}
+    """The sending-usage WebHook is an operation of its own, which these tests leave out."""
+
+    return {
+        operation["object"]: operation
+        for operation in operations
+        if "sending-usage" not in (operation.get("value") or {})
+    }
 
 
 class TestTelemetryPlan(IntegrationTestCase):

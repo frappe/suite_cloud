@@ -8,9 +8,9 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import cint, flt
 
-from suite_cloud.mail import sending_limits
-from suite_cloud.mail.cluster import outbound_scan
+from suite_cloud.mail.cluster import outbound_scan, quota
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
+from suite_cloud.mail.doctype.mail_send_limit.mail_send_limit import get_default_limit
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import delete_usage, sent_by_account
 from suite_cloud.mail.stalwart import get_account_client
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB, Account
@@ -27,7 +27,6 @@ from suite_cloud.mail.tenancy.usage import used_disk_by_name
 from suite_cloud.utils import alias_payloads, child_rows, utc_iso
 
 MIN_PASSWORD_LENGTH = 8
-LIMIT_FIELDS = ("cluster", "daily_send_limit", "monthly_send_limit")  # what the limits cache holds
 
 
 class MailAccount(QuotaHolder, Document):
@@ -57,9 +56,9 @@ class MailAccount(QuotaHolder, Document):
         enabled: DF.Check
         groups: DF.TableMultiSelect[MailGroupMember]
         locale: DF.Data | None
-        monthly_send_limit: DF.Int
         new_password: DF.Password | None
         quotas: DF.Table[MailQuota]
+        send_limit: DF.Link | None
         skip_outbound_scan: DF.Check
         tenant: DF.Link | None
         stalwart_id: DF.Data | None
@@ -87,7 +86,7 @@ class MailAccount(QuotaHolder, Document):
         self.locale = (self.locale or "en-US").replace("_", "-")
 
         tenant = frappe.get_cached_doc("Suite Tenant", self.tenant)
-        self.validate_send_limits(tenant)
+        self.validate_send_limit(tenant)
         if self.is_new() and not self.flags.adopting:
             tenant.assert_can_add_account()
             account_credentials.apply_default_limits(self)
@@ -107,27 +106,20 @@ class MailAccount(QuotaHolder, Document):
             self.flags.password = self.new_password
         self.new_password = None
 
-    def validate_send_limits(self, tenant: Document) -> None:
-        """Every account has a limit: at least 1 recipient per UTC day and month, at most the
-        cluster's max. A new account starts at its tenant's defaults where the caller set none."""
+    def validate_send_limit(self, tenant: Document) -> None:
+        """Every account has one of its cluster's Mail Send Limits, since Stalwart has a throttle
+        only for those: where none is set, its tenant's default, else the cluster's."""
 
-        if self.is_new():
-            self.daily_send_limit = cint(self.daily_send_limit) or tenant.default_daily_send_limit
-            self.monthly_send_limit = cint(self.monthly_send_limit) or tenant.default_monthly_send_limit
-
-        cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
-        for field, maximum in (
-            ("daily_send_limit", cluster.max_daily_send_limit),
-            ("monthly_send_limit", cluster.max_monthly_send_limit),
-        ):
-            value = cint(self.get(field))
-            if value < 1 or value > maximum:
-                frappe.throw(
-                    _("{0} must be between 1 and the cluster's max of {1}, not {2}.").format(
-                        _(self.meta.get_label(field)), maximum, value
-                    ),
-                    frappe.ValidationError,
-                )
+        if not self.send_limit:
+            self.send_limit = tenant.default_send_limit or get_default_limit(self.cluster)
+        if not self.send_limit:
+            frappe.throw(_("Cluster {0} has no default Mail Send Limit.").format(self.cluster))
+        cluster, daily_limit = frappe.db.get_value(
+            "Mail Send Limit", self.send_limit, ["cluster", "daily_limit"]
+        ) or (None, 0)
+        if cluster != self.cluster:
+            frappe.throw(_("Send Limit {0} belongs to another cluster.").format(self.send_limit))
+        self.daily_send_limit = daily_limit
 
     def validate_groups(self) -> None:
         seen = set()
@@ -139,7 +131,6 @@ class MailAccount(QuotaHolder, Document):
                 frappe.throw(_("Group {0} belongs to another tenant.").format(row.group))
 
     def after_insert(self) -> None:
-        sending_limits.clear_limits_after_commit(self.name)  # it may hold the address as no account
         if self.flags.skip_push:  # adopted: the cluster has it, credentials and all
             return
         sync.push_create(self, "accounts", self.stalwart_payload(self.flags.password))
@@ -149,19 +140,22 @@ class MailAccount(QuotaHolder, Document):
                 self.push_enabled()
             if self.skip_outbound_scan:
                 self.push_scan_exemption()
+            self.push_send_limit()
         except Exception:
             sync.push_destroy(self, "accounts")  # the insert rolls back; the account must not survive
             raise
 
     def on_update(self) -> None:
-        self.clear_cached_limits()
         if self.is_new() or not self.stalwart_id or self.flags.skip_push:
             return
         before = self.get_doc_before_save()
         if not before:
             return
+        # First: a refusal leaves nothing else changed on the cluster.
         if bool(before.skip_outbound_scan) != bool(self.skip_outbound_scan):
-            self.push_scan_exemption()  # first: a refusal leaves nothing else changed on the cluster
+            self.push_scan_exemption()
+        if before.send_limit != self.send_limit:
+            self.push_send_limit()
 
         patch = {}
         if before.display_name != self.display_name:
@@ -188,19 +182,12 @@ class MailAccount(QuotaHolder, Document):
         if self.flags.password:
             self.set_password(self.flags.password)
 
-    def clear_cached_limits(self) -> None:
-        """A changed limit or cluster takes effect on the next recipient."""
-
-        before = self.get_doc_before_save()
-        if before and any(before.get(field) != self.get(field) for field in LIMIT_FIELDS):
-            sending_limits.clear_limits_after_commit(self.name)
-
     def on_trash(self) -> None:
         if self.skip_outbound_scan:
             self.push_scan_exemption(is_exempt=False)
+        self.push_send_limit(is_deleted=True)
         sync.push_destroy(self, "accounts")
         delete_usage(self.name)
-        sending_limits.clear_limits_after_commit(self.name)
 
     # --- Stalwart ------------------------------------------------------------------
 
@@ -224,6 +211,18 @@ class MailAccount(QuotaHolder, Document):
         is_exempt = bool(self.skip_outbound_scan) if is_exempt is None else is_exempt
         cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
         outbound_scan.set_exempt(cluster, self.email, is_exempt)
+
+    def push_send_limit(self, is_deleted: bool = False) -> None:
+        """The cluster's copy of Send Limit, which picks the account's throttle: created first
+        when the cluster lacks it."""
+
+        cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+        if is_deleted:
+            quota.set_send_limit(cluster, self.email, None)
+            return
+        limit = frappe.get_doc("Mail Send Limit", self.send_limit)
+        quota.ensure_throttle(cluster, limit)
+        quota.set_send_limit(cluster, self.email, None if limit.is_default else limit.daily_limit)
 
     def push_enabled(self) -> None:
         """Disabled accounts keep receiving mail but lose every other permission via a cluster role."""
@@ -365,8 +364,7 @@ def account_payload(
     send_usage: dict[str, int],
 ) -> dict:
     """The API shape of an account, from a document or a query row plus its related rows.
-    ``send_usage`` is what the last flush stored for the UTC day and month: recipients sent and
-    refused over a limit."""
+    ``send_usage`` is the recipients Stalwart accepted in the UTC day and month, as last counted."""
 
     return {
         "email": row.email,
@@ -379,7 +377,6 @@ def account_payload(
         "quotas": quotas,
         "used_disk_bytes": used_disk_bytes,
         "daily_send_limit": cint(row.daily_send_limit),
-        "monthly_send_limit": cint(row.monthly_send_limit),
         "send_usage": send_usage,
         "locale": row.locale,
         "time_zone": row.time_zone,
@@ -404,7 +401,6 @@ ACCOUNT_FIELDS = [
     "locale",
     "time_zone",
     "daily_send_limit",
-    "monthly_send_limit",
     "creation",
 ]
 

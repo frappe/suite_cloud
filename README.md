@@ -39,7 +39,7 @@ The app has three modules, so one CODEOWNERS line can cover each product:
 
 The tenant-facing API is split the same way: `suite_cloud.api.tenant` for what any product needs
 (authentication, `ping`, the tenant profile) and `suite_cloud.api.mail` for the mail directory.
-`suite_cloud.api.telemetry` and `suite_cloud.api.sending_limits` are for Stalwart, not for tenants.
+`suite_cloud.api.telemetry` and `suite_cloud.api.send_usage` are for Stalwart, not for tenants.
 
 ## The pieces
 
@@ -123,14 +123,14 @@ new Stalwart version out one node at a time (each node is drained first, except 
 cluster hostname's DNS, which the health check after the upgrade needs), **Sync Config** pushes the generated configuration
 again, **Check Drift** reports what differs from it without changing anything, and **Install Suite Cloud Tokens**
 installs each server's Suite Cloud token; the cluster, node and gateway forms show when each server last
-reported. Suite Cloud enforces the [sending limits](docs/sending-limits.md) of Mail Accounts through an
-MTA Hook in the cluster plan. Rspamd on each node runs the [outbound spam scan](docs/outbound-spam-scan.md) of signed-in senders through an MtaMilter in the cluster plan; **Install Outbound Scanners** installs it.
+reported. Stalwart enforces the [sending limits](docs/sending-limits.md) of Mail Accounts through
+inbound throttles in the cluster plan, and a WebHook sends Suite Cloud what it queued, for billing. Rspamd on each node runs the [outbound spam scan](docs/outbound-spam-scan.md) of signed-in senders through an MtaMilter in the cluster plan; **Install Outbound Scanners** installs it.
 
 ### Telemetry
 
 Stalwart pushes its own events and metrics to the [telemetry API](docs/api/telemetry.md). Three WebHooks send the events: one lists the events the dashboards read, one every other event Stalwart logs at error level, and one every other event it logs at warn level. OTLP sends the metrics every **Metrics Push Interval (Seconds)**. The cluster plan holds both, and the gateway plan holds its own.
 
-Each node and gateway has its own Suite Cloud token, `<key>.<secret>`, made with the record. Provisioning and upgrades write it to `/etc/stalwart/stalwart.env` as `SUITE_CLOUD_TOKEN`. Stalwart sends it on every request it makes to Suite Cloud: the WebHooks, OTLP and the [sending-limit hook](docs/sending-limits.md). A config reload that names a variable a running server lacks fails. So the plan switches them on only once every Provisioned, Active and Draining node of the cluster, or the gateway, has **Suite Cloud Token Installed**. Until then it writes them switched off and OTLP disabled. The WebHooks and OTLP also need **Enable Telemetry**; the sending-limit hook does not.
+Each node and gateway has its own Suite Cloud token, `<key>.<secret>`, made with the record. Provisioning and upgrades write it to `/etc/stalwart/stalwart.env` as `SUITE_CLOUD_TOKEN`. Stalwart sends it on every request it makes to Suite Cloud: the WebHooks, OTLP and the [sending-usage WebHook](docs/sending-limits.md). A config reload that names a variable a running server lacks fails. So the plan switches them on only once every Provisioned, Active and Draining node of the cluster, or the gateway, has **Suite Cloud Token Installed**. Until then it writes them switched off and OTLP disabled. The telemetry WebHooks and OTLP also need **Enable Telemetry**; the sending-usage WebHook does not.
 
 OTLP starts only when Stalwart starts. These jobs restart Stalwart:
 

@@ -21,6 +21,7 @@ from suite_cloud.mail.doctype.mail_account.mail_account import (
     account_payloads,
     validate_password,
 )
+from suite_cloud.mail.doctype.mail_send_limit.mail_send_limit import find_send_limit
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import usage_history
 from suite_cloud.mail.tenancy import account_credentials, sync
 from suite_cloud.mail.tenancy import quotas as quota_rows
@@ -55,9 +56,9 @@ HISTORY_DAYS_CAP = 400
 @frappe.whitelist(methods=["GET"])
 @mail_api
 def get_send_usage(email: str, days: int = 30) -> dict:
-    """The account's sent and refused recipients per UTC day for the last ``days`` (at most
-    400) and per month, newest first, each with the limit it had then; only as far back as the
-    Sending Usage Retention keeps."""
+    """The account's sent recipients per UTC day for the last ``days`` (at most 400), each with
+    the daily limit it had then, and per month, newest first; only as far back as the Sending
+    Usage Retention keeps."""
 
     return usage_history(owned("Mail Account", email).name, page_size(days, HISTORY_DAYS_CAP))
 
@@ -106,16 +107,15 @@ def create_account(
     time_zone: str | None = None,
     disable_receiving: bool = False,
     daily_send_limit: int | None = None,
-    monthly_send_limit: int | None = None,
 ) -> dict:
-    """``disable_receiving`` makes the account send-only: mail addressed to it bounces. The send
-    limits count recipients per UTC day and month, up to the cluster's max; left out, the
-    tenant's defaults apply."""
+    """``disable_receiving`` makes the account send-only: mail addressed to it bounces. The daily
+    send limit counts recipients per UTC day and is one of the tenant's ``send_limits``; left out,
+    the tenant's default applies."""
 
     validate_password(password)
 
     tenant = current_tenant()
-    assert_may_set_send_limits(tenant, daily_send_limit, monthly_send_limit)
+    send_limit = get_send_limit(tenant, tenant.stalwart_cluster, daily_send_limit)
     # Everything the account depends on is resolved first: a refusal after the insert would leave
     # the Stalwart account behind while the database change rolls back.
     lists = [owned("Mailing List", email_) for email_ in as_list(mailing_lists, MEMBERSHIP_CAP)]
@@ -129,8 +129,7 @@ def create_account(
             "locale": locale or "en-US",
             "time_zone": time_zone,
             "disable_receiving": int(sbool(disable_receiving)),
-            "daily_send_limit": daily_send_limit,
-            "monthly_send_limit": monthly_send_limit,
+            "send_limit": send_limit,
             "aliases": as_alias_rows(aliases),
             "groups": [{"group": owned("Mail Group", g).name} for g in as_list(groups, MEMBERSHIP_CAP)],
         }
@@ -172,22 +171,20 @@ def update_account(
     time_zone: str | None = None,
     disable_receiving: bool | None = None,
     daily_send_limit: int | None = None,
-    monthly_send_limit: int | None = None,
 ) -> dict:
     """``quotas`` replaces the other limits (``{}`` lifts them all); the disk quota stays unless
     ``disk_quota_gb`` or a ``maxDiskQuota`` entry changes it, and 0 lifts it. ``disable_receiving``
     makes the account send-only or lets it receive again; left out, it stays as it is. So do the
-    send limits."""
+    daily send limit."""
 
     doc = owned("Mail Account", email)
-    assert_may_set_send_limits(current_tenant(), daily_send_limit, monthly_send_limit)
+    send_limit = get_send_limit(current_tenant(), doc.cluster, daily_send_limit)
     for field, value in {
         "display_name": display_name,
         "description": description,
         "locale": locale,
         "time_zone": time_zone,
-        "daily_send_limit": daily_send_limit,
-        "monthly_send_limit": monthly_send_limit,
+        "send_limit": send_limit,
     }.items():
         if value is not None:
             doc.set(field, value)
@@ -391,8 +388,12 @@ def delete_account(email: str) -> None:
     frappe.local.response["http_status_code"] = 204
 
 
-def assert_may_set_send_limits(tenant, daily: int | None, monthly: int | None) -> None:
-    """Refused rather than ignored, so the tenant learns of the setting."""
+def get_send_limit(tenant, cluster: str, daily: int | None) -> str | None:
+    """The cluster's Mail Send Limit of ``daily`` recipients. A limit the tenant may not set is
+    refused rather than ignored, so the tenant learns of the setting."""
 
-    if (daily is not None or monthly is not None) and not tenant.allow_custom_send_limits:
+    if daily is None:
+        return None
+    if not tenant.allow_custom_send_limits:
         raise SendLimitsNotAllowedError(_("This tenant may not set send limits."))
+    return find_send_limit(cluster, daily, _("Daily Send Limit"))

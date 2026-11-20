@@ -9,7 +9,7 @@ The code is in `suite_cloud/mail/cluster/outbound_scan.py` (the milter and the t
 ## Request flow
 
 1. A Mail Account signs in over SMTP submission, or sends with JMAP. A JMAP `EmailSubmission/set` opens a local SMTP session, so it takes the same path.
-2. At RCPT, the [sending-limits hook](sending-limits.md) counts each recipient.
+2. At RCPT, the [sending-limit throttles](sending-limits.md) count each recipient.
 3. At DATA, Stalwart evaluates the milter's `enable` expression. It is true for a signed-in session whose login is not a key of the `suite-cloud-outbound-scan-exempt` namespace.
 4. Stalwart connects to `127.0.0.1:11332` and sends the session and the message, with `{auth_authen}` set to the login.
 5. Rspamd scans the message with the outbound profile. It answers `accept`, or `554 5.7.1` when the score reaches the reject score. The refusal names the score, the reject score and the three rules that added the most, each with its description.
@@ -210,7 +210,7 @@ The filters are Date Range (the last 7 days by default), Host, Account and Messa
 | An Egress Gateway | It does not scan. The node scanned the message before it relayed it |
 | A sender who sends test messages | Can learn what the scanner refuses. The refusal names the top rules, so this takes fewer tries |
 | No Bayes, neural or reply learning | Scores come from rules, blocklists and, with an Outbound Scan Store, the learned fuzzy hashes |
-| A refused message | The sending-limits hook counted its recipients at RCPT, so they still count |
+| A refused message | The sending-limit throttles counted its recipients at RCPT, so they count against the daily limit. Mail Send Usage does not count them: the message was never queued |
 | Records while telemetry is off, or Suite Cloud is down for a long time | The node keeps 100 MB of them, then deletes the oldest |
 
 ## Roll-out

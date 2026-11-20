@@ -76,8 +76,8 @@ def get_server(token: str) -> frappe._dict | None:
 
 
 def get_server_record(key: str) -> dict:
-    """The server of ``key`` with the SHA-256 of its secret, cached: the sending-limit hook asks
-    once per recipient. Empty for an unknown key, so a guessed one reads the database only once."""
+    """The server of ``key`` with the SHA-256 of its secret, cached: every WebHook and metrics push
+    asks. Empty for an unknown key, so a guessed one reads the database only once."""
 
     cache_key = get_cache_key(key)
     server = frappe.cache.get_value(cache_key)

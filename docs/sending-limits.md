@@ -1,60 +1,22 @@
 # Sending limits
 
-A Mail Account's **Daily Send Limit** and **Monthly Send Limit** count recipients per UTC day and month. Each is at least 1 and at most the cluster's **Max Daily Send Limit** and **Max Monthly Send Limit**. A new account starts at its tenant's **Default Daily Send Limit** and **Default Monthly Send Limit**, 2,000 and 10,000 unless an operator changes them. A tenant sets an account's limits through the API only while **Tenant May Set Send Limits** is on.
+A Mail Account's **Send Limit** counts recipients per UTC day. A message to 50 recipients counts as 50. Stalwart enforces it. Suite Cloud only counts what Stalwart accepted, in Mail Send Usage, for billing. A failure or outage of Suite Cloud does not change what an account may send.
 
-Suite Cloud enforces the limits. The code is in `suite_cloud/mail/sending_limits.py` (cache, check, flush), `suite_cloud/api/sending_limits.py` (the endpoint) and `suite_cloud/mail/cluster/quota.py` (the Stalwart config).
+The code is in `suite_cloud/mail/doctype/mail_send_limit/` (the limits), `suite_cloud/mail/cluster/quota.py` (the Stalwart config and the lookup keys), `suite_cloud/mail/send_usage.py` (the counting), `suite_cloud/api/send_usage.py` (the WebHook endpoint) and `suite_cloud/mail/doctype/mail_send_usage/mail_send_usage.py` (the stored totals).
 
-## Request flow
+## Mail Send Limit
 
-Stalwart calls an MTA Hook at the RCPT stage, once for each recipient of a signed-in sender. This covers SMTP submission and JMAP sends.
+A **Mail Send Limit** is one daily limit the accounts of one cluster may have, such as 1,000 recipients per day. Stalwart has one throttle per Mail Send Limit, so an operator keeps the list short. An account links to one of its cluster's limits; accounts with the same limit share its throttle, each with its own counter.
 
-```http
-POST /api/v2/method/suite_cloud.api.sending_limits.check
-Authorization: Bearer <key>.<secret>
-Content-Type: application/json
-
-{"context": {"stage": "rcpt", "sasl": {"login": "jane@acme.example"}, ...}, "envelope": {"from": {...}, "to": [{"address": "..."}]}}
-```
-
-1. The `authenticate` auth hook takes the bearer as the calling node's Suite Cloud token (`suite_cloud/mail/cluster/server_token.py`). It reads the server of the key from the cache, `suite_cloud:server_token:<key>` for 5 minutes, and compares the SHA-256 of the secret. The caller's cluster is the node's. A gateway's token, an unknown key or a wrong secret is a 401, and the address is throttled. **Enable Telemetry** does not matter. A saved or deleted node or gateway clears its cache key after commit.
-2. The endpoint reads the sender from `context.sasl.login`, stripped and in lowercase. The current recipient is the last entry of `envelope.to`.
-3. It reads the account's cluster and limits from the cache, or from Mail Account on a miss.
-4. One Lua script checks the day and month counters and counts the recipient as sent or refused.
-5. It answers in Stalwart's own JSON, without Frappe's `{"data": ...}` envelope.
-
-| Case | Answer |
+| Field | Rule |
 | --- | --- |
-| Under both limits, no login, no recipient, an address that is no Mail Account, or an account of another cluster | `{"action": "accept"}`. Only the first case is counted |
-| Over the daily limit | `{"action": "reject", "response": {"status": 550, "enhanced_status": "5.4.5", "message": "Daily sending limit of 2,000 recipients reached for jane@acme.example. It resets at 2026-11-04 00:00 UTC."}}` |
-| Over the monthly limit | The same, with the monthly limit and the 1st of the next month |
-| A fault, such as Redis being unreachable | 500, logged to the `sending_limits` log, not to an Error Log. Stalwart accepts the recipient |
+| Mail Send Limit **Daily Limit** | From 1 to the cluster's **Max Daily Send Limit**. Fixed once saved: to change a limit, add another and move the accounts to it. A limit an account or tenant links to cannot be deleted |
+| Mail Send Limit **Default** | One per cluster. A new account gets it when neither the caller nor its tenant sets a limit, and Stalwart applies it to every signed-in account that has no key. The default cannot be deleted. Marking another as the default clears the old one and pushes the cluster |
+| Mail Account **Send Limit** | A link to one of its cluster's limits. Blank on save takes the tenant's default, else the cluster's. **Daily Send Limit** shows its value |
+| Suite Tenant **Default Send Limit** | Blank, or one of its cluster's limits. The tenant object answers its value as `default_daily_send_limit` and lists the cluster's limits as `send_limits` |
+| Stalwart Cluster **Max Daily Send Limit** | At least 1. It caps every limit of the cluster, so a change that would leave a limit above it is refused, naming the limits. It also sets the submission rate, so a saved change pushes the cluster |
 
-A recipient over a limit is refused. The other recipients of the same message that fit are accepted, so a message can go to part of its recipients. An SMTP client gets `550 5.4.5 <message>` for each refused recipient. A JMAP `EmailSubmission/set` succeeds even when every recipient is refused: Stalwart writes the refusal only to `EmailSubmission.deliveryStatus.<address>` (`delivered: "no"`, `smtpReply: "550 5.4.5 ..."`) and sends no bounce. A JMAP client must read `deliveryStatus` to show the refusal.
-
-## Redis cache
-
-All keys are in the site's Redis cache, under `frappe.cache.make_key()`. The code uses raw Redis calls, because Frappe's `get_value` and `set_value` pickle values and keep a copy per request.
-
-| Key | Type | Content | TTL |
-| --- | --- | --- | --- |
-| `sending_limits:limit:<account>` | Hash | `cluster`, `daily`, `monthly`. An address that is no Mail Account has an empty `cluster` | 1 hour |
-| `sending_limits:count:<account>:<period>` | Hash | `sent` and `refused` recipients. `<period>` is `d:YYYYMMDD` or `m:YYYYMM` | Day: 3 days. Month: 35 days. Set again on each write |
-| `sending_limits:touched` | Set | `<account>\|<period>` of each counter written since the last flush | None |
-| `sending_limits:touched:flushing` | Set | The touched set that a flush took | None |
-
-The counter keys carry their day or month, so nothing resets them. Redis expires the old ones.
-
-Mail Account clears its limit hash after commit when it is inserted, when its cluster or a limit changes, and when it is deleted. A limit change takes effect on the next recipient. A clear before commit would let another worker read the old row and cache it again. The 1-hour TTL covers a missed clear.
-
-The cluster's max limits only cap the values a save accepts. They do not change enforcement.
-
-## Counting and Mail Send Usage
-
-When a counter is missing, the script asks for a seed. Suite Cloud reads the account's Mail Send Usage rows of the current day and month in one query and runs the script again with them, or with zeros. This happens once per account and period, and again after Redis loses a key.
-
-`flush_usage()` runs every minute. It renames `touched` to `touched:flushing`, reads each counter in one pipeline, drops periods other than today, yesterday and their months, and writes the rows to Mail Send Usage in batches of 5,000. Then it deletes `touched:flushing`. A failed run leaves the set in place, and the next run writes it again. Mail Send Usage keeps the higher count, so a second write changes nothing.
-
-The Mail Account form shows the stored totals: orange from 80% of a limit, red at 100%, with the refused recipients beside them. Suite Cloud keeps each account's day and month totals for **Sending Usage Retention (Days)** in Suite Cloud Settings (90 by default) and deletes older days, and months that ended before them, daily. Each day and month keeps the limit the account had while it was current. In Insights, the **Sending Usage** dashboard of the Stalwart Mail workbook shows sent and refused recipients for the latest UTC day, the accounts at or near a limit, the top senders and each account's daily history.
+A new cluster starts with 100 (the default), 500, 1,000 and 2,000 up to its max, plus the max. A tenant sets an account's limit through the API only while **Tenant May Set Send Limits** is on, by its value, which must be one of `send_limits`. There is no monthly limit. Mail Send Usage still keeps monthly totals.
 
 ## Stalwart config
 
@@ -62,41 +24,61 @@ The cluster plan holds two operations, from `quota.cluster_operations()`:
 
 | Operation | Purpose |
 | --- | --- |
-| `upsert` MtaHook `sending-limits` | `enable` for signed-in sessions only, `stages: rcpt`, `timeout` from the cluster's **Sending Limit Hook Timeout (Seconds)** (1 by default, 1 to 10), `tempFailOnError: false`, the calling node's `SUITE_CLOUD_TOKEN` as the bearer, and the header `X-Suite-Cloud-Hook: sending-limits`. It stays switched off until every Provisioned, Active and Draining node of the cluster has **Suite Cloud Token Installed**, since a reload that names a variable a running node lacks fails. The plan matches the hook on the header, so a **Public URL** change updates it in place |
-| `upsert` MtaInboundThrottle `suite-cloud-quota-backstop` | Caps every signed-in account at the cluster's **Max Daily Send Limit** messages per UTC day, checked at MAIL FROM. Always on |
+| `upsert` MtaInboundThrottle, matched on `description` | `suite-cloud-send-limit-<daily limit>` for each Mail Send Limit: key `authenticatedAs`, `rate` the limit per day. The default takes every signed-in account without a key: `!key_exists('suite-cloud-send-limit', authenticated_as)`. Each other limit takes the accounts whose key holds it: `key_get('suite-cloud-send-limit', authenticated_as) == '<daily limit>'`. Each `match` also reads `rcpt`, so Stalwart checks it once per recipient at RCPT. `suite-cloud-submission-rate` caps each signed-in account at the max divided by 1,440 messages per minute, rounded up, checked at MAIL FROM |
+| `upsert` WebHook `sending-usage`, matched on the header `X-Suite-Cloud-Hook: sending-usage` | Sends `queue.authenticated-message-queued` to `suite_cloud.api.send_usage.record` with the calling node's `SUITE_CLOUD_TOKEN`. It stays switched off until every Provisioned, Active and Draining node of the cluster has **Suite Cloud Token Installed**. **Enable Telemetry** does not matter. `discardAfter` is 24 hours |
 
-The hook URL uses **Public URL**, else the site's own URL, as the telemetry WebHooks do. A change reaches the cluster with the next Sync Config.
+Each account not on its cluster's default has a `MemoryLookupKeyValue` in the namespace `suite-cloud-send-limit`: the key is its address, the value its daily limit. Mail Account owns the limit and the key is a copy. A save that changes the limit, an insert and a delete write the key at once and run `ReloadLookupStores`. Stalwart reads keys only after that action; `ReloadSettings` does not reload them. A refused write fails the save.
+
+A key whose limit has no throttle would leave the account unlimited. So before it writes the key, a save creates the limit's throttle when the cluster lacks it, then runs `ReloadSettings`. A new Mail Send Limit is not pushed on its own: the first account that takes it, its **Sync Throttle** button or the next Sync Config creates the throttle. Deleting a limit pushes the cluster, which deletes its throttle.
+
+Sync Config applies the plan, then `quota.sync_send_limits()`: it deletes the throttles of limits the cluster no longer has, the old `suite-cloud-quota-backstop` throttle and the old RCPT MtaHook (header `X-Suite-Cloud-Hook: sending-limits`), and makes the keys match the accounts. Then it reloads the settings. Stalwart's own throttles stay.
+
+Recovery mode leaves the throttles out: Stalwart adds its default throttles only on a normal start that finds none. The first push after it adds them.
+
+An Egress Gateway has no throttle of Suite Cloud's. It takes mail only from the cluster's nodes, which have applied the accounts' limits already.
+
+## Over a limit
+
+A recipient over the account's limit, or a message over the submission rate, gets `452 4.4.5 Rate limit exceeded, try again later.` The text is fixed in Stalwart. 452 is temporary, so an SMTP client keeps the message and tries again later. The other recipients of the same message that fit are accepted. A JMAP `EmailSubmission/set` succeeds even when every recipient is refused: Stalwart writes the refusal only to `EmailSubmission.deliveryStatus.<address>`.
+
+A throttle window is fixed: it starts at the UTC day, since Stalwart divides the time by the period. A refused recipient still counts in the window, so an account stays refused until the day ends. Each throttle has its own counter, so a limit change starts the account at zero in its new limit for the rest of the day.
+
+## Counting
+
+1. Stalwart queues a message from a signed-in sender and logs `queue.authenticated-message-queued` with `queueId`, `from` and the `to` list. Only recipients the throttles accepted are in it.
+2. The WebHook sends the waiting events at most every 30 seconds:
+
+   ```http
+   POST /api/v2/method/suite_cloud.api.send_usage.record
+   Authorization: Bearer <key>.<secret>
+   Content-Type: application/json
+
+   {"events": [{"id": "...", "createdAt": "2026-11-20T09:59:00Z", "type": "queue.authenticated-message-queued", "data": {"queueId": 1234, "from": "jane@acme.example", "to": ["a@example.com", "b@example.com"]}}]}
+   ```
+
+3. The `authenticate` auth hook takes the bearer as the calling node's Suite Cloud token (`suite_cloud/mail/cluster/server_token.py`). A gateway's token, an unknown key or a wrong secret is a 401.
+4. The sender is lowercased and mapped to a Mail Account of the caller's cluster, directly or through an alias. Nodes make a signed-in sender use one of its own addresses. Another sender, a bounce and every other event type are skipped.
+5. `SET NX` on `send_usage:queued:<node>:<queueId>` in the Redis cache, for 3 days, marks each message counted. A batch Stalwart sends again counts only its new messages.
+6. The recipients are added to the account's day and month rows of the day the event was created, in one statement. If the write fails, the marks are deleted and the request fails, so the retried batch counts them.
+
+The answer is `{"data": {"counted": 2}}`.
+
+## Mail Send Usage
+
+One row per account and period: `d:YYYYMMDD` for a UTC day, `m:YYYYMM` for a UTC month. `sent` only grows. A day row keeps `send_limit`, the account's daily limit while the day was current; a month row has 0. Nothing counts refused recipients: Stalwart refuses them, and its events do not name the account.
+
+The Mail Account form shows today's and this month's totals: orange from 80% of the daily limit, red at 100%. Suite Cloud keeps each account's day and month totals for **Sending Usage Retention (Days)** in Suite Cloud Settings (90 by default) and deletes older days, and months that ended before them, daily. In Insights, the **Sending Usage** dashboard of the Stalwart Mail workbook shows the totals.
 
 ## Accepted losses
 
 | Case | Effect |
 | --- | --- |
-| Suite Cloud down, slow (over the cluster's **Sending Limit Hook Timeout**) or failing | Stalwart accepts the recipient uncounted. The backstop caps each account at **Max Daily Send Limit** messages per UTC day. It counts messages, not recipients, so it is never stricter than an account's own limit. A deploy that restarts Suite Cloud opens a short gap |
-| Redis evicts or loses counter keys | The counter is seeded again from Mail Send Usage. The counts since the last flush, up to 1 minute, are lost |
-| A transaction ends after RCPT (RSET, a refusal at DATA, a disconnect) | Its recipients stay counted |
-| Stalwart refuses a recipient after the hook accepted it, such as an unknown local address | The recipient stays counted. The hook runs before Stalwart's own recipient checks |
-| A JMAP send over the limit | The submission succeeds at the API level. The user sees the refusal only if the client reads `deliveryStatus` |
-| The same address appears twice in one message | It counts twice |
+| Suite Cloud down for less than 24 hours | Stalwart keeps the events and sends them later. They count on the day they were queued |
+| Suite Cloud down for more than 24 hours, or Stalwart restarts with events waiting | Those messages are sent but not counted |
+| A message refused at DATA, such as by the outbound spam scan | Not queued, so not counted |
+| A message queued and then bounced | Counted |
+| The same address twice in one message | Counted once: Stalwart keeps one recipient |
 
-## Hosting load
+## Moving from the RCPT hook
 
-Each recipient is one request to Suite Cloud. The check itself takes about 1 ms and reads no database row on a warm cache, but Frappe opens a database connection for each request. The cost per recipient is the network round trip from the node to Suite Cloud. Put Suite Cloud close to the clusters, serve the endpoint with keep-alive, and count the workers against the peak recipients per second of every cluster. Keep the RCPT reply p95 under 150 ms. Check `maxmemory` and `maxmemory-policy` of the production `redis_cache`: an evicted counter loses up to a minute of counts.
-
-## Moving to the Suite Cloud token
-
-The hook used to send the cluster's Quota Hook Token, and the WebHooks and OTLP sent `SUITE_CLOUD_TELEMETRY_TOKEN=<key>:<secret>`. Now every request sends the server's `SUITE_CLOUD_TOKEN=<key>.<secret>`. The patch `rename_suite_cloud_token` renames the fields to **Suite Cloud Key**, **Suite Cloud Secret** and **Suite Cloud Token Installed**, renames **Server Requests per Minute** to `server_requests_per_minute` and the Server Job callback to `after_install_token`, and deletes the clusters' Quota Hook Tokens. Each server is moved by hand, in this order, since a reload that names a variable a running server lacks fails:
-
-1. Before the deploy, print each server's new line in `bench console`, with the field names of the old version:
-
-   ```python
-   for doctype in ("Stalwart Node", "Egress Gateway"):
-       for name in frappe.get_all(doctype, pluck="name"):
-           doc = frappe.get_doc(doctype, name)
-           print(name, f"SUITE_CLOUD_TOKEN={doc.telemetry_key}.{doc.get_password('telemetry_secret')}")
-   ```
-
-2. On each server, add that line to `/etc/stalwart/stalwart.env`, keep the old line, and run `systemctl restart stalwart`, one server at a time.
-3. Deploy and migrate.
-4. Right away, **Sync Config** on each cluster and each Egress Gateway. Until then the old hook's token is refused, so Stalwart accepts recipients uncounted and only the backstop caps them, and the old telemetry token is refused: the WebHooks retry for up to **Webhook Discard After**, and the metrics of that window are lost.
-5. Restart Stalwart on each server again, one at a time. OTLP reads its config only at start.
-6. Later, delete the old `SUITE_CLOUD_TELEMETRY_TOKEN` line. It does no harm, and the next environment write from Suite Cloud drops it.
+The patch `create_mail_send_limits` gives each cluster the default limits plus one Mail Send Limit for each value its accounts and tenant defaults hold, and links them, so no account's limit changes. A value above the cluster's max takes the max, and 0 takes the default. It also drops the `refused` column of Mail Send Usage; the rows and their `sent` totals stay. It writes the rows directly, so no config push runs. After the deploy, run **Sync Config** on each cluster. Until then each cluster keeps the old hook, which calls an endpoint that no longer exists: Stalwart accepts every recipient, and only the old backstop caps the accounts.

@@ -1,0 +1,94 @@
+{
+ "actions": [],
+ "creation": "2026-11-20 12:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "cluster",
+  "daily_limit",
+  "column_break_main",
+  "is_default",
+  "title"
+ ],
+ "fields": [
+  {
+   "fieldname": "cluster",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cluster",
+   "options": "Stalwart Cluster",
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "description": "Recipients an account may send to per UTC day. A message to 50 recipients counts as 50. At most the cluster's Max Daily Send Limit. Cannot be changed: add another limit and move the accounts to it.",
+   "fieldname": "daily_limit",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Daily Limit",
+   "non_negative": 1,
+   "reqd": 1,
+   "set_only_once": 1
+  },
+  {
+   "fieldname": "column_break_main",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "description": "The cluster's default: a new account gets it when neither the caller nor its tenant sets a limit, and Stalwart applies it to any signed-in account it has no other limit for. One per cluster.",
+   "fieldname": "is_default",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Default"
+  },
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Title",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [
+  {
+   "group": "Mail",
+   "link_doctype": "Mail Account",
+   "link_fieldname": "send_limit"
+  },
+  {
+   "group": "Mail",
+   "link_doctype": "Suite Tenant",
+   "link_fieldname": "default_send_limit"
+  }
+ ],
+ "modified": "2026-11-20 12:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Mail",
+ "name": "Mail Send Limit",
+ "naming_rule": "By script",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "show_title_field_in_link": 1,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "title",
+ "track_changes": 1
+}

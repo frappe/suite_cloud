@@ -151,15 +151,16 @@ class TestMilterPlan(OutboundScanTestCase):
 
 class TestTrustedAccounts(OutboundScanTestCase):
     def test_a_system_manager_marks_an_account_as_trusted(self) -> None:
+        reloads = self.lookup_reloads()  # creating the account wrote its send-limit key
         self.set_trusted(1)
         self.assertEqual(self.exempt_keys(), [TRUSTED])
         key = self.fake.find(outbound_scan.LOOKUP_KEY, key=TRUSTED)
         self.assertFalse(key["isGlobPattern"])
-        self.assertEqual(self.lookup_reloads(), 1)
+        self.assertEqual(self.lookup_reloads(), reloads + 1)
 
         self.set_trusted(0)
         self.assertEqual(self.exempt_keys(), [])
-        self.assertEqual(self.lookup_reloads(), 2)
+        self.assertEqual(self.lookup_reloads(), reloads + 2)
 
     def test_a_new_trusted_account_gets_its_key(self) -> None:
         frappe.get_doc({"doctype": "Mail Account", "email": "bob@acme.com", "skip_outbound_scan": 1}).insert()
