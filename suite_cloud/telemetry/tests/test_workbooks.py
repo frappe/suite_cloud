@@ -123,7 +123,11 @@ class TestShippedWorkbooks(unittest.TestCase):
         dashboard = workbook["dashboards"]["stalwart-sending-usage"]
         charts = {item["chart"] for item in dashboard["items"] if item["type"] == "chart"}
         self.assertTrue(charts <= set(workbook["charts"]))
-        history = {"stalwart-sending-by-day", "stalwart-account-sending-history", "stalwart-send-limit-refusals"}
+        history = {
+            "stalwart-sending-by-day",
+            "stalwart-account-sending-history",
+            "stalwart-send-limit-refusals",
+        }
         for item in dashboard["items"]:
             if item["type"] == "filter":
                 with self.subTest(filter=item["filter_name"]):
