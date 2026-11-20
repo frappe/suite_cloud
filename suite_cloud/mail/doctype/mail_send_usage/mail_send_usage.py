@@ -1,12 +1,13 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
-"""What an account sent: one row per account and UTC period, unique on the two, for billing.
-``suite_cloud.mail.send_usage`` adds the recipients of each message Stalwart queued; rows are
-kept for the retention in Suite Cloud Settings."""
+"""What an account sent: one row per account and UTC day, unique on the two, for billing; a month
+is the sum of its days. ``suite_cloud.mail.send_usage`` adds the recipients of each message Stalwart
+queued; rows are kept for the retention in Suite Cloud Settings."""
 
 import hashlib
-from datetime import UTC, datetime, timedelta
+from collections import defaultdict
+from datetime import UTC, date, datetime, timedelta
 
 import frappe
 from frappe.model.document import Document
@@ -29,7 +30,7 @@ class MailSendUsage(Document):
         from frappe.types import DF
 
         account: DF.Link
-        period: DF.Data
+        date: DF.Date
         reported_at: DF.Datetime | None
         send_limit: DF.Int
         sent: DF.Int
@@ -39,82 +40,75 @@ class MailSendUsage(Document):
 
 
 def on_doctype_update() -> None:
-    """The upsert finds a period's row by this key."""
+    """The upsert finds a day's row by this key."""
 
-    frappe.db.add_unique("Mail Send Usage", ["account", "period"], constraint_name="account_period")
-
-
-def usage_name(account: str, period: str) -> str:
-    """A fixed-length name, since an account's name and a period together can pass the name column."""
-
-    return hashlib.sha1(f"{account}:{period}".encode()).hexdigest()
+    frappe.db.add_unique("Mail Send Usage", ["account", "date"], constraint_name="account_date")
 
 
-def periods_at(moment: datetime) -> tuple[str, str]:
-    """The day and month keys the counters use, in UTC."""
+def usage_name(account: str, day: date) -> str:
+    """A fixed-length name, since an account's name and a date together can pass the name column."""
 
-    moment = moment.astimezone(UTC)
-    return f"d:{moment:%Y%m%d}", f"m:{moment:%Y%m}"
+    return hashlib.sha1(f"{account}:{day.isoformat()}".encode()).hexdigest()
 
 
-def current_periods() -> tuple[str, str]:
-    return periods_at(datetime.now(UTC))
+def utc_date(moment: datetime) -> date:
+    return moment.astimezone(UTC).date()
+
+
+def utc_today() -> date:
+    return utc_date(datetime.now(UTC))
 
 
 def sent_by_account(accounts: list[str]) -> dict[str, dict[str, int]]:
-    """``{account: {day, month}}``: recipients sent in the current periods, in one query."""
+    """``{account: {day, month}}``: recipients sent today and this month, UTC, in one query."""
 
-    day, month = current_periods()
     usage = {account: {"day": 0, "month": 0} for account in accounts}
     if not accounts:
         return usage
+    today = utc_today()
     rows = frappe.get_all(
         "Mail Send Usage",
-        filters={"account": ("in", accounts), "period": ("in", (day, month))},
-        fields=["account", "period", "sent"],
+        filters={"account": ("in", accounts), "date": (">=", today.replace(day=1))},
+        fields=["account", "date", "sent"],
     )
     for row in rows:
-        usage[row.account]["day" if row.period == day else "month"] = row.sent
+        usage[row.account]["month"] += row.sent
+        if row.date == today:
+            usage[row.account]["day"] = row.sent
     return usage
 
 
 def usage_history(account: str, days: int) -> dict[str, list[dict]]:
-    """The account's totals of the last ``days`` UTC days, today included, and of their months,
-    newest first, each with the daily limit the account had while the day was current."""
+    """The account's totals of the last ``days`` UTC days, today included, each with the daily limit
+    it had that day, and of their months, newest first. A month sums every day stored for it."""
 
-    first_day, first_month = periods_at(datetime.now(UTC) - timedelta(days=days - 1))
-    today, this_month = current_periods()
-    usage = frappe.qb.DocType("Mail Send Usage")
-    rows = (
-        frappe.qb.from_(usage)
-        .select(usage.period, usage.sent, usage.send_limit)
-        .where(usage.account == account)
-        .where(
-            (usage.period.like("d:%") & usage.period[first_day:today])
-            | (usage.period.like("m:%") & usage.period[first_month:this_month])
-        )
-        .orderby(usage.period, order=frappe.qb.desc)
-        .run(as_dict=True)
+    today = utc_today()
+    first_day = today - timedelta(days=days - 1)
+    rows = frappe.get_all(
+        "Mail Send Usage",
+        filters={"account": account, "date": ("between", (first_day.replace(day=1), today))},
+        fields=["date", "sent", "send_limit"],
+        order_by="date desc",
     )
-    history = {"days": [], "months": []}
+    months = defaultdict(int)
     for row in rows:
-        stamp = row.period[2:]
-        if row.period.startswith("d:"):
-            entry, key = {"date": f"{stamp[:4]}-{stamp[4:6]}-{stamp[6:]}"}, "days"
-        else:
-            entry, key = {"month": f"{stamp[:4]}-{stamp[4:]}"}, "months"
-        if key == "days":
-            entry["limit"] = row.send_limit
-        history[key].append({**entry, "sent": row.sent})
-    return history
+        months[f"{row.date:%Y-%m}"] += row.sent
+    return {
+        "days": [
+            {"date": row.date.isoformat(), "sent": row.sent, "limit": row.send_limit}
+            for row in rows
+            if row.date >= first_day
+        ],
+        "months": [{"month": month, "sent": sent} for month, sent in months.items()],
+    }
 
 
-def add_usage(totals: dict[tuple[str, str], int]) -> int:
-    """Adds ``{(account, period): recipients}`` to the stored rows in one statement and returns how
-    many rows it wrote. A current period takes the account's daily limit as it is now; a past one
-    keeps the limit it was stored with. A month has no limit, so it stores 0."""
+def add_usage(totals: dict[tuple[str, date], int]) -> int:
+    """Adds ``{(account, day): recipients}`` to the stored rows in one statement and returns how
+    many rows it wrote. Today's row takes the account's daily limit as it is now; a past day keeps
+    the limit it was stored with."""
 
-    limits = daily_limits(list({account for account, _period in totals}))
+    limits = daily_limits(list({account for account, _day in totals}))
     rows = sorted((key, sent) for key, sent in totals.items() if key[0] in limits)  # deleted meanwhile
     if not rows:
         return 0
@@ -123,12 +117,12 @@ def add_usage(totals: dict[tuple[str, str], int]) -> int:
     user = frappe.session.user
     usage = frappe.qb.DocType("Mail Send Usage")
     limit_while_current = (
-        Case().when(usage.period.isin(current_periods()), Values(usage.send_limit)).else_(usage.send_limit)
+        Case().when(usage.date == utc_today(), Values(usage.send_limit)).else_(usage.send_limit)
     )
     query = frappe.qb.into(usage).columns(
         usage.name,
         usage.account,
-        usage.period,
+        usage.date,
         usage.sent,
         usage.send_limit,
         usage.reported_at,
@@ -137,10 +131,9 @@ def add_usage(totals: dict[tuple[str, str], int]) -> int:
         usage.owner,
         usage.modified_by,
     )
-    for (account, period), sent in rows:
-        limit = limits[account] if period.startswith("d:") else 0
+    for (account, day), sent in rows:
         query = query.insert(
-            usage_name(account, period), account, period, sent, limit, now, now, now, user, user
+            usage_name(account, day), account, day, sent, limits[account], now, now, now, user, user
         )
     query = (
         query.on_duplicate_key_update(usage.sent, usage.sent + Values(usage.sent))
@@ -168,25 +161,17 @@ def delete_usage(account: str) -> None:
 
 
 def prune_usage_job() -> None:
-    """Scheduled daily, and the only place that commits: one expired period per transaction, so a
+    """Scheduled daily, and the only place that commits: one expired day per transaction, so a
     shortened retention never deletes months of rows at once."""
 
-    for period in get_expired_periods():
-        frappe.db.delete("Mail Send Usage", {"period": period})
+    cutoff = utc_today() - timedelta(days=retention_days())
+    expired = frappe.get_all(
+        "Mail Send Usage", filters={"date": ("<", cutoff)}, pluck="date", distinct=True, order_by="date"
+    )
+    for day in expired:
+        frappe.db.delete("Mail Send Usage", {"date": day})
         if not frappe.in_test:
             frappe.db.commit()
-
-
-def get_expired_periods() -> list[str]:
-    """The days older than the retention and the months that ended before it, oldest first."""
-
-    day, month = periods_at(datetime.now(UTC) - timedelta(days=retention_days()))
-    usage = frappe.qb.DocType("Mail Send Usage")
-    old_days = usage.period.like("d:%") & (usage.period < day)
-    old_months = usage.period.like("m:%") & (usage.period < month)
-    return sorted(
-        frappe.qb.from_(usage).select(usage.period).distinct().where(old_days | old_months).run(pluck=True)
-    )
 
 
 def retention_days() -> int:

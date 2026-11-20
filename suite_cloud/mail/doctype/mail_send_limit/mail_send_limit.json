@@ -22,7 +22,7 @@
    "set_only_once": 1
   },
   {
-   "description": "Recipients an account may send to per UTC day. A message to 50 recipients counts as 50. At most the cluster's Max Daily Send Limit. Cannot be changed: add another limit and move the accounts to it.",
+   "description": "Recipients per UTC day. Cannot be changed after save.",
    "fieldname": "daily_limit",
    "fieldtype": "Int",
    "in_list_view": 1,
@@ -37,7 +37,7 @@
   },
   {
    "default": "0",
-   "description": "The cluster's default: a new account gets it when neither the caller nor its tenant sets a limit, and Stalwart applies it to any signed-in account it has no other limit for. One per cluster.",
+   "description": "Applies to accounts with no other limit. One per cluster.",
    "fieldname": "is_default",
    "fieldtype": "Check",
    "in_list_view": 1,

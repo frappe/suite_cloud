@@ -236,7 +236,15 @@ class SuiteTenant(Document):
             frappe.throw(_("Total Disk Quota cannot be negative; 0 means unlimited."))
 
     def validate_send_limits(self) -> None:
-        if self.default_send_limit and (
+        """A tenant with a cluster always has a default, one of the cluster's limits: left blank,
+        the cluster's own default."""
+
+        if not self.stalwart_cluster:
+            self.default_send_limit = None
+            return
+        if not self.default_send_limit:
+            self.default_send_limit = get_default_limit(self.stalwart_cluster)
+        if (
             frappe.db.get_value("Mail Send Limit", self.default_send_limit, "cluster")
             != self.stalwart_cluster
         ):
@@ -244,11 +252,8 @@ class SuiteTenant(Document):
                 _("Default Send Limit {0} belongs to another cluster.").format(self.default_send_limit)
             )
 
-    def get_default_daily_send_limit(self) -> int | None:
-        """What a new account gets: the tenant's default, else the cluster's."""
-
-        name = self.default_send_limit or get_default_limit(self.stalwart_cluster)
-        return cint(frappe.db.get_value("Mail Send Limit", name, "daily_limit")) if name else None
+    def get_default_daily_send_limit(self) -> int:
+        return cint(frappe.db.get_value("Mail Send Limit", self.default_send_limit, "daily_limit"))
 
     def domain_count(self) -> int:
         return frappe.db.count("Mail Domain", {"tenant": self.name})

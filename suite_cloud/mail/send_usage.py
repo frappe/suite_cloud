@@ -10,7 +10,7 @@ from typing import NamedTuple
 import frappe
 import redis
 
-from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import add_usage, periods_at
+from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import add_usage, utc_date
 
 QUEUED_EVENT = "queue.authenticated-message-queued"
 SEEN_TTL = 3 * 86400  # longer than a WebHook keeps a batch it could not send
@@ -34,8 +34,7 @@ def record_queued(cluster: str, server: str, events: list[dict]) -> int:
     fresh = mark_seen(server, messages)
     totals = Counter()
     for message in fresh:
-        for period in periods_at(message.queued_at):
-            totals[(accounts[message.sender], period)] += message.recipients
+        totals[(accounts[message.sender], utc_date(message.queued_at))] += message.recipients
     try:
         add_usage(totals)
     except Exception:

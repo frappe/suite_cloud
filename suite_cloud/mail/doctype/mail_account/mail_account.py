@@ -10,7 +10,6 @@ from frappe.utils import cint, flt
 
 from suite_cloud.mail.cluster import outbound_scan, quota
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
-from suite_cloud.mail.doctype.mail_send_limit.mail_send_limit import get_default_limit
 from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import delete_usage, sent_by_account
 from suite_cloud.mail.stalwart import get_account_client
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB, Account
@@ -108,12 +107,11 @@ class MailAccount(QuotaHolder, Document):
 
     def validate_send_limit(self, tenant: Document) -> None:
         """Every account has one of its cluster's Mail Send Limits, since Stalwart has a throttle
-        only for those: where none is set, its tenant's default, else the cluster's."""
+        only for those: where none is set, its tenant's default."""
 
+        self.send_limit = self.send_limit or tenant.default_send_limit
         if not self.send_limit:
-            self.send_limit = tenant.default_send_limit or get_default_limit(self.cluster)
-        if not self.send_limit:
-            frappe.throw(_("Cluster {0} has no default Mail Send Limit.").format(self.cluster))
+            frappe.throw(_("Tenant {0} has no Default Send Limit.").format(tenant.name))
         cluster, daily_limit = frappe.db.get_value(
             "Mail Send Limit", self.send_limit, ["cluster", "daily_limit"]
         ) or (None, 0)

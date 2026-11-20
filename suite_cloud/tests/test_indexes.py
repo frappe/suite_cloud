@@ -21,7 +21,7 @@ UNIQUE_INDEXES = {
     "TLS Report": [("cluster", "stalwart_id")],
     "Egress IP Pool Address": [("ip_address",)],
     "Mail Address Alias": [("alias_email",)],
-    "Mail Send Usage": [("account", "period")],
+    "Mail Send Usage": [("account", "date")],
     "Mailing List Recipient": [("mailing_list", "email")],
     "Stalwart Cluster": [("dns_zone", "label")],
 }

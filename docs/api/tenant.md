@@ -25,8 +25,8 @@ Confirms the credentials and returns the tenant profile, including where its mai
     "max_groups": 20,
     "max_mailing_lists": 20,
     "max_disk_gb": 500,
-    "default_daily_send_limit": 100,
-    "send_limits": [100, 500, 1000, 2000],
+    "default_daily_send_limit": 50,
+    "send_limits": [50, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000],
     "custom_send_limits": false
   },
   "usage": {

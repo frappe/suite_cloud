@@ -81,7 +81,6 @@ class StalwartCluster(Document):
         label: DF.Data | None
         last_config_sync_at: DF.Datetime | None
         last_config_sync_error: DF.SmallText | None
-        max_daily_send_limit: DF.Int
         outbound_scan_store: DF.Link | None
         region: DF.Link
         relay_password: DF.Password | None
@@ -90,6 +89,7 @@ class StalwartCluster(Document):
         search_store: DF.Link | None
         single_node: DF.Check
         ssh_port: DF.Int
+        submission_rate: DF.Int
         ssh_private_key: DF.Password | None
         ssh_public_key: DF.Code | None
         ssh_user: DF.Data
@@ -121,7 +121,8 @@ class StalwartCluster(Document):
         self.validate_stores()
         self.validate_default()
         self.validate_egress_pool()
-        self.validate_send_limits()
+        if cint(self.submission_rate) < 1:
+            frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label("submission_rate"))))
 
     def validate_egress_pool(self) -> None:
         if (
@@ -129,24 +130,6 @@ class StalwartCluster(Document):
             and frappe.db.get_value("Egress IP Pool", self.default_egress_pool, "cluster") != self.name
         ):
             frappe.throw(_("Egress pool {0} belongs to another cluster.").format(self.default_egress_pool))
-
-    def validate_send_limits(self) -> None:
-        """The max caps every Mail Send Limit of the cluster, so it cannot drop below one."""
-
-        maximum = cint(self.max_daily_send_limit)
-        if maximum < 1:
-            frappe.throw(_("{0} must be at least 1.").format(_(self.meta.get_label("max_daily_send_limit"))))
-        if self.is_new():
-            return
-        above = frappe.get_all(
-            "Mail Send Limit", {"cluster": self.name, "daily_limit": (">", maximum)}, pluck="daily_limit"
-        )
-        if above:
-            frappe.throw(
-                _(
-                    "Mail Send Limits {0} are above the new max. Move their accounts and delete them first."
-                ).format(", ".join(map(str, sorted(above))))
-            )
 
     def after_insert(self) -> None:
         dns.sync_spf_record(self)
@@ -165,10 +148,10 @@ class StalwartCluster(Document):
             self.db_set("status", "Disabled")
         elif not before.enabled and self.enabled and self.status == "Disabled":
             self.db_set("status", "Active")
-        if (before.default_egress_pool, before.additional_hostnames, before.max_daily_send_limit) != (
+        if (before.default_egress_pool, before.additional_hostnames, before.submission_rate) != (
             self.default_egress_pool,
             self.additional_hostnames,
-            self.max_daily_send_limit,
+            self.submission_rate,
         ):
             push.resync_cluster_after_commit(self.name)
 

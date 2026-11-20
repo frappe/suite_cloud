@@ -4,7 +4,6 @@ Lookup Key-Value names each account's limit. An account without a key gets the c
 WebHook sends each queued message to Suite Cloud, which counts it. Mail Account owns the limit; the
 keys are a copy."""
 
-import math
 from typing import TYPE_CHECKING
 
 import frappe
@@ -45,18 +44,22 @@ def cluster_operations(cluster: Document) -> list[dict]:
 
 def throttle_operation(cluster: Document) -> dict:
     """One throttle per Mail Send Limit, checked at RCPT since its ``match`` reads ``rcpt``, plus
-    the cap on messages per minute, checked at MAIL FROM, which spreads the cluster's max over the
-    day."""
+    the cap on messages per minute."""
 
     limits = get_cluster_limits(cluster.name)
     if not any(limit.is_default for limit in limits):
         frappe.throw(_("Cluster {0} has no default Mail Send Limit.").format(cluster.name))
     throttles = {limit_ref(limit): limit_throttle(limit) for limit in limits}
-    maximum = cint(cluster.max_daily_send_limit)
-    throttles["submission-rate"] = throttle(
-        SUBMISSION_DESCRIPTION, "!is_empty(authenticated_as)", math.ceil(maximum / 1440), MINUTE_MS
-    )
+    throttles["submission-rate"] = submission_throttle(cluster)
     return throttles_operation(throttles)
+
+
+def submission_throttle(cluster: Document) -> dict:
+    """Messages per signed-in sender and minute, checked at MAIL FROM, whatever its limit."""
+
+    return throttle(
+        SUBMISSION_DESCRIPTION, "!is_empty(authenticated_as)", cint(cluster.submission_rate), MINUTE_MS
+    )
 
 
 def limit_throttle(limit: Document | dict) -> dict:

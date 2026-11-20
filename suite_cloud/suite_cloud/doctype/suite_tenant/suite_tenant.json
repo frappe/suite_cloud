@@ -224,13 +224,14 @@
    "label": "Sending Limits"
   },
   {
-   "description": "Send Limit of a new account where the caller sets none: one of the cluster's Mail Send Limits. Blank uses the cluster's default.",
+   "description": "Send Limit for new accounts. Blank uses the cluster default.",
    "fieldname": "default_send_limit",
    "fieldtype": "Link",
    "label": "Default Send Limit",
    "options": "Mail Send Limit",
    "permlevel": 1,
-   "read_only_depends_on": "eval:!doc.stalwart_cluster"
+   "read_only_depends_on": "eval:!doc.stalwart_cluster",
+   "mandatory_depends_on": "eval:doc.stalwart_cluster"
   },
   {
    "fieldname": "column_break_send_limits",
@@ -238,7 +239,7 @@
   },
   {
    "default": "0",
-   "description": "Lets the tenant set each account's Daily Send Limit through the API, to one of the cluster's Mail Send Limits. When off, the API refuses a limit.",
+   "description": "Lets the tenant set an account's send limit through the API.",
    "fieldname": "allow_custom_send_limits",
    "fieldtype": "Check",
    "label": "Tenant May Set Send Limits",

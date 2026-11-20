@@ -5,16 +5,7 @@
    "config": {
     "columns": [],
     "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "period_type",
-        "type": "column"
-       },
-       "operator": "=",
-       "value": "Day"
-      }
-     ],
+     "filters": [],
      "logical_operator": "And"
     },
     "limit": 1000,
@@ -28,7 +19,7 @@
      },
      {
       "column": {
-       "column_name": "period_start",
+       "column_name": "date",
        "type": "column"
       },
       "direction": "desc"
@@ -36,9 +27,9 @@
     ],
     "rows": [
      {
-      "column_name": "period_start",
+      "column_name": "date",
       "data_type": "Date",
-      "dimension_name": "period_start",
+      "dimension_name": "date",
       "granularity": "day"
      },
      {
@@ -135,14 +126,10 @@
       "dimension_name": "tenant_label"
      },
      {
-      "column_name": "period_type",
-      "data_type": "String",
-      "dimension_name": "period_type"
-     },
-     {
-      "column_name": "period",
-      "data_type": "String",
-      "dimension_name": "period"
+      "column_name": "date",
+      "data_type": "Date",
+      "dimension_name": "date",
+      "granularity": "day"
      }
     ],
     "values": [
@@ -174,7 +161,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Accounts with a daily or monthly limit, by how much of it the latest day or month used.",
+   "info": "Accounts by how much of their daily limit the latest day used.",
    "name": "stalwart-accounts-nearest-limits",
    "query": "stalwart-sending-usage",
    "sort_order": 90,
@@ -3813,14 +3800,6 @@
        },
        "operator": "=",
        "value": 1
-      },
-      {
-       "column": {
-        "column_name": "period_type",
-        "type": "column"
-       },
-       "operator": "=",
-       "value": "Day"
       }
      ],
      "logical_operator": "And"
@@ -5509,23 +5488,14 @@
    "chart_type": "Bar",
    "config": {
     "filters": {
-     "filters": [
-      {
-       "column": {
-        "column_name": "period_type",
-        "type": "column"
-       },
-       "operator": "=",
-       "value": "Day"
-      }
-     ],
+     "filters": [],
      "logical_operator": "And"
     },
     "limit": 5000,
     "order_by": [
      {
       "column": {
-       "column_name": "period_start",
+       "column_name": "date",
        "type": "column"
       },
       "direction": "asc"
@@ -5533,9 +5503,9 @@
     ],
     "x_axis": {
      "dimension": {
-      "column_name": "period_start",
+      "column_name": "date",
       "data_type": "Date",
-      "dimension_name": "period_start",
+      "dimension_name": "date",
       "granularity": "day"
      }
     },
@@ -5582,7 +5552,7 @@
      {
       "data_type": "Integer",
       "expression": {
-       "expression": "sum_if((is_current == 1) & (period_type == 'Day'), sent)",
+       "expression": "sum_if(is_current == 1, sent)",
        "type": "expression"
       },
       "id": "Recipients Today",
@@ -5612,7 +5582,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "The latest UTC day and month Suite Cloud counted. Recipients count once per address.",
+   "info": "The latest UTC day Suite Cloud counted. Recipients count once per address.",
    "name": "stalwart-sending-readings",
    "query": "stalwart-sending-usage",
    "sort_order": 89,
@@ -10120,7 +10090,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-16 07:15:00.000000",
+ "modified": "2026-11-20 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -10964,24 +10934,6 @@
      "type": "mutate"
     },
     {
-     "data_type": "String",
-     "expression": {
-      "expression": "if_else(starts_with(period, 'd:'), 'Day', 'Month')",
-      "type": "expression"
-     },
-     "new_name": "period_type",
-     "type": "mutate"
-    },
-    {
-     "data_type": "Date",
-     "expression": {
-      "expression": "if_else(period_type == 'Day', substring(period, 2), concat(substring(period, 2), '01'))",
-      "type": "expression"
-     },
-     "new_name": "period_start",
-     "type": "mutate"
-    },
-    {
      "data_type": "Decimal",
      "expression": {
       "expression": "sent * 100.0 / null_if(send_limit, 0)",
@@ -10993,7 +10945,7 @@
     {
      "data_type": "Integer",
      "expression": {
-      "expression": "if_else((period == max(period, where=period_type == 'Day')) | (period == max(period, where=period_type == 'Month')), 1, 0)",
+      "expression": "if_else(date == max(date), 1, 0)",
       "type": "expression"
      },
      "new_name": "is_current",
@@ -11005,9 +10957,7 @@
       "tenant",
       "tenant_label",
       "cluster",
-      "period",
-      "period_type",
-      "period_start",
+      "date",
       "is_current",
       "sent",
       "send_limit",

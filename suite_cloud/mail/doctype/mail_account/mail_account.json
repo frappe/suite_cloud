@@ -152,13 +152,13 @@
    "options": "Mail Credential"
   },
   {
-   "description": "Limits and checks on outgoing mail. A limit applies on save.",
+   "description": "Limits and checks on outgoing mail.",
    "fieldname": "sending_limits_section",
    "fieldtype": "Section Break",
    "label": "Sending"
   },
   {
-   "description": "One of the cluster's Mail Send Limits, which Stalwart enforces in recipients per UTC day. A message to 50 recipients counts as 50. Blank uses the tenant default, else the cluster's.",
+   "description": "Recipients per UTC day. Blank uses the tenant default.",
    "fieldname": "send_limit",
    "fieldtype": "Link",
    "label": "Send Limit",

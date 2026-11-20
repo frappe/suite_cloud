@@ -8,8 +8,8 @@ from frappe.utils import cint
 
 from suite_cloud.mail.cluster import push, quota
 
-# What a new cluster starts with, besides its max; the lowest is the default.
-DEFAULT_DAILY_LIMITS = (100, 500, 1000, 2000)
+# What a new cluster starts with; the lowest is its default. An admin adds others as needed.
+DEFAULT_DAILY_LIMITS = (50, 250, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000)
 
 
 class MailSendLimit(Document):
@@ -35,9 +35,8 @@ class MailSendLimit(Document):
 
     def validate(self) -> None:
         self.title = _("{0} per day").format(f"{cint(self.daily_limit):,}")
-        maximum = cint(frappe.db.get_value("Stalwart Cluster", self.cluster, "max_daily_send_limit"))
-        if not 1 <= cint(self.daily_limit) <= maximum:
-            frappe.throw(_("Daily Limit must be between 1 and the cluster's max of {0}.").format(maximum))
+        if cint(self.daily_limit) < 1:
+            frappe.throw(_("Daily Limit must be at least 1."))
         default = get_default_limit(self.cluster)
         if not default:
             self.is_default = 1
@@ -102,11 +101,10 @@ def find_send_limit(cluster: str, daily_limit: int, label: str) -> str:
 
 
 def create_default_limits(cluster: Document, extra: set[int] = frozenset()) -> None:
-    """``DEFAULT_DAILY_LIMITS``, ``extra`` and the cluster's max, each up to the max, unless the
-    cluster has them."""
+    """``DEFAULT_DAILY_LIMITS`` and ``extra``, unless the cluster has them. The first a cluster
+    gets, the lowest, becomes its default."""
 
-    maximum = cint(cluster.max_daily_send_limit)
-    wanted = {value for value in (*DEFAULT_DAILY_LIMITS, *extra) if 1 <= value <= maximum} | {maximum}
+    wanted = {value for value in (*DEFAULT_DAILY_LIMITS, *extra) if value >= 1}
     existing = set(get_daily_limits(cluster.name))
     for value in sorted(wanted - existing):
         frappe.get_doc({"doctype": "Mail Send Limit", "cluster": cluster.name, "daily_limit": value}).insert(
