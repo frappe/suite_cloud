@@ -14,6 +14,7 @@ from suite_cloud.mail.cluster import server_token
 from suite_cloud.mail.cluster.plan import as_list, as_set
 from suite_cloud.mail.cluster.telemetry import public_url
 from suite_cloud.mail.send_usage import QUEUED_EVENT
+from suite_cloud.mail.stalwart.errors import StalwartRejectedError
 
 if TYPE_CHECKING:
     from frappe.model.document import Document
@@ -148,32 +149,35 @@ def sync_send_limits(cluster: Document) -> None:
 
 
 def sync_limit_keys(cluster: Document, client: StalwartClient) -> bool:
-    """Makes the cluster's keys match its accounts' limits; True when it changed any."""
+    """Makes the cluster's keys match its accounts' limits, and each account keep its key's id;
+    True when it changed any key."""
 
     keys = get_limit_keys(client)
     default = frappe.db.get_value("Mail Send Limit", {"cluster": cluster.name, "is_default": 1})
-    wanted = {
-        email: str(cint(daily_limit))
-        for email, send_limit, daily_limit in frappe.get_all(
-            "Mail Account",
-            {"cluster": cluster.name},
-            ["email", "send_limit", "daily_send_limit"],
-            as_list=True,
-        )
-        if send_limit != default
-    }
+    accounts = frappe.get_all(
+        "Mail Account",
+        {"cluster": cluster.name},
+        ["name", "email", "send_limit", "daily_send_limit", "send_limit_key"],
+    )
+    wanted = {row.email: str(cint(row.daily_send_limit)) for row in accounts if row.send_limit != default}
     missing = {email: value for email, value in wanted.items() if email not in keys}
     moved = {
         email: value for email, value in wanted.items() if email in keys and keys[email]["value"] != value
     }
     extra = [key["id"] for email, key in keys.items() if email not in wanted]
     service = client.objects(LOOKUP_KEY)
+    ids = {email: keys[email]["id"] for email in wanted if email in keys}
     for email, value in missing.items():
-        service.create(limit_key(email, value))
+        ids[email] = service.create(limit_key(email, value))["id"]
     for email, value in moved.items():
         service.update(keys[email]["id"], {"value": value})
     if extra:
         service.delete(extra)
+    for row in accounts:
+        if (row.send_limit_key or None) != ids.get(row.email):
+            frappe.db.set_value(
+                "Mail Account", row.name, "send_limit_key", ids.get(row.email), update_modified=False
+            )
     if not (missing or moved or extra):
         return False
     client.reload_lookup_stores()
@@ -196,23 +200,63 @@ def ensure_throttle(cluster: Document, limit: Document) -> bool:
     return True
 
 
-def set_send_limit(cluster: Document, email: str, limit: int | None) -> None:
-    """Writes one account's key; None, for the cluster's default or a deleted account, removes it.
+def set_send_limit(cluster: Document, email: str, limit: int | None, key_id: str | None) -> str | None:
+    """Writes one account's key by the id the account keeps, and returns the key's id; None, for
+    the cluster's default or a deleted account, removes it. Stalwart cannot find a key by its name,
+    so only a removal without an id, for an account from before ids were kept, reads the namespace.
     Stalwart reads keys only when it reloads its lookup stores, which ``ReloadSettings`` does not do."""
 
     client = cluster.get_client()
-    current = get_limit_keys(client).get(email)
-    value = str(limit) if limit else None
     service = client.objects(LOOKUP_KEY)
-    if current and value is None:
-        service.delete(current["id"])
-    elif current and current["value"] != value:
-        service.update(current["id"], {"value": value})
-    elif not current and value:
-        service.create(limit_key(email, value))
+    if limit:
+        key_id = write_key(service, email, str(limit), key_id)
     else:
-        return
+        key_id = key_id or (get_limit_keys(client).get(email) or {}).get("id")
+        if not key_id:
+            return None
+        delete_key(service, key_id)
+        key_id = None
     client.reload_lookup_stores()
+    return key_id
+
+
+def write_key(service, email: str, value: str, key_id: str | None) -> str:
+    """Updates the key by its id. A key gone from Stalwart is created again; one already holding the
+    address, whose id the account lost, is found from Stalwart's refusal, which names it."""
+
+    if key_id:
+        try:
+            service.update(key_id, {"value": value})
+            return key_id
+        except StalwartRejectedError as error:
+            if error.error_type != "notFound":
+                raise
+    try:
+        return service.create(limit_key(email, value))["id"]
+    except StalwartRejectedError as error:
+        if not (taken := taken_key_id(error)):
+            raise
+    service.update(taken, {"value": value})
+    return taken
+
+
+def delete_key(service, key_id: str) -> None:
+    try:
+        service.delete([key_id])
+    except StalwartRejectedError as error:
+        if error.error_type != "notFound":  # gone already
+            raise
+
+
+def taken_key_id(error: StalwartRejectedError) -> str | None:
+    """The id of the key-value a ``primaryKeyViolation`` names; a plain key of the same name is
+    another feature's, and stays refused."""
+
+    for failure in (error.detail.get("notCreated") or {}).values():
+        taken = failure.get("objectId") or {}
+        if failure.get("type") == "primaryKeyViolation" and taken.get("object") == LOOKUP_KEY:
+            return taken.get("id")
+    return None
 
 
 def get_limit_keys(client: StalwartClient) -> dict[str, dict]:

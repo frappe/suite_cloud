@@ -6,6 +6,7 @@
  "engine": "InnoDB",
  "field_order": [
   "account",
+  "tenant",
   "date",
   "reported_at",
   "column_break_main",
@@ -21,7 +22,18 @@
    "label": "Account",
    "options": "Mail Account",
    "read_only": 1,
-   "reqd": 1
+   "reqd": 1,
+   "description": "Kept after the account is deleted."
+  },
+  {
+   "description": "The account's tenant when it sent. Kept after the account is deleted.",
+   "fieldname": "tenant",
+   "fieldtype": "Link",
+   "in_standard_filter": 1,
+   "label": "Tenant",
+   "options": "Suite Tenant",
+   "read_only": 1,
+   "search_index": 1
   },
   {
    "description": "The UTC day.",
@@ -66,7 +78,7 @@
  "in_create": 1,
  "index_web_pages_for_search": 0,
  "links": [],
- "modified": "2026-11-20 16:00:00.000000",
+ "modified": "2026-11-21 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Mail",
  "name": "Mail Send Usage",

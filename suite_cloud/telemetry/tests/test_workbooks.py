@@ -103,10 +103,13 @@ class TestShippedWorkbooks(unittest.TestCase):
         source, account_join = operations[0], operations[1]
         self.assertEqual(source["table"]["table_name"], "tabMail Send Usage")
         self.assertEqual(account_join["table"]["table_name"], "tabMail Account")
-        usage_fields = {"account", "date", "sent", "send_limit", "reported_at"}
+        usage_fields = {"account", "tenant", "date", "sent", "send_limit", "reported_at"}
         self.assertLessEqual(usage_fields, fields("mail_send_usage"))
         joined = {column["column_name"] for column in account_join["select_columns"]}
         self.assertLessEqual(joined, fields("mail_account"))
+        # A row outlives its account, and keeps its own tenant.
+        self.assertEqual(account_join["join_type"], "left")
+        self.assertNotIn("tenant", joined)
 
     def test_sending_usage_marks_the_utc_day_as_current(self) -> None:
         """Rows are UTC days; the site's today, and the latest day with rows, are both wrong ones."""
@@ -130,7 +133,8 @@ class TestShippedWorkbooks(unittest.TestCase):
                     expected = history if item["filter_name"] == "Date Range" else charts
                     self.assertEqual(set(item["links"]), expected)
                     if item["filter_name"] == "Date Range":
-                        self.assertEqual(item["default_value"], "Last 1 Day (include current)")  # today
+                        # A week always holds the UTC day, which "today" in the site's zone may not.
+                        self.assertEqual(item["default_value"], "Last 7 Day (include current)")
 
     def test_the_outbound_scan_queries_read_columns_the_tables_have(self) -> None:
         queries = shipped_workbook("stalwart")["queries"]

@@ -80,7 +80,7 @@ Answers the recipients the tenant's accounts sent per UTC month, newest first. A
 }
 ```
 
-A month sums the days Suite Cloud keeps, so it reaches back only as far as the Sending Usage Retention, 90 days by default; an older month comes back partly or not at all. A deleted account's usage goes with it. [`get_send_usage`](accounts.md#get_send_usage) on an account answers its days.
+A month sums the days Suite Cloud keeps, so it reaches back only as far as the Sending Usage Retention, 90 days by default; an older month comes back partly or not at all. A deleted account's usage stays in its tenant's months. [`get_send_usage`](accounts.md#get_send_usage) on an account answers its days.
 
 ## `update_tenant_profile`
 

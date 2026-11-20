@@ -286,6 +286,49 @@ class TestLimitKeys(SendingLimitsTestCase):
         self.assertRaisesRegex(frappe.ValidationError, "belongs to another cluster", account.save)
         self.assertEqual(self.limit_keys()["bob@acme.com"], "500")
 
+    def key_id(self, email: str) -> str | None:
+        return frappe.db.get_value("Mail Account", email, "send_limit_key")
+
+    def test_an_account_writes_its_key_by_the_id_it_keeps(self) -> None:
+        self.assertEqual(
+            self.key_id("alice@acme.com"), self.fake.find(quota.LOOKUP_KEY, key="alice@acme.com")["id"]
+        )
+        # Stalwart cannot find a key by its name, so a save must not read the namespace.
+        with patch.object(quota, "get_limit_keys", side_effect=AssertionError("read the namespace")):
+            self.set_limit("alice@acme.com", 1000)
+            self.assertEqual(self.limit_keys()["alice@acme.com"], "1000")
+            self.set_limit("alice@acme.com", 50)  # the default: no key
+            self.assertNotIn("alice@acme.com", self.limit_keys())
+            self.assertIsNone(self.key_id("alice@acme.com"))
+            self.set_limit("alice@acme.com", 2500)
+            frappe.delete_doc("Mail Account", "bob@acme.com")
+        self.assertEqual(
+            self.key_id("alice@acme.com"), self.fake.find(quota.LOOKUP_KEY, key="alice@acme.com")["id"]
+        )
+        self.assertEqual(set(self.limit_keys()), {"alice@acme.com", "carol@acme.com"})
+
+    def test_a_stale_or_lost_key_id_is_found_again(self) -> None:
+        service = self.cluster.get_client().objects(quota.LOOKUP_KEY)
+        with patch.object(quota, "get_limit_keys", side_effect=AssertionError("read the namespace")):
+            service.delete([self.key_id("alice@acme.com")])  # gone from Stalwart: created again
+            self.set_limit("alice@acme.com", 1000)
+            # The account lost the id but the key is there: Stalwart's refusal names it.
+            kept = self.key_id("bob@acme.com")
+            frappe.db.set_value("Mail Account", "bob@acme.com", "send_limit_key", None)
+            self.set_limit("bob@acme.com", 2500)
+        self.assertEqual(
+            self.limit_keys(), {"alice@acme.com": "1000", "bob@acme.com": "2500", "carol@acme.com": "500"}
+        )
+        self.assertEqual(self.key_id("bob@acme.com"), kept)
+        self.assertEqual(
+            self.key_id("alice@acme.com"), self.fake.find(quota.LOOKUP_KEY, key="alice@acme.com")["id"]
+        )
+
+        # Removing a key the account has no id for reads the namespace once, as before ids were kept.
+        frappe.db.set_value("Mail Account", "carol@acme.com", "send_limit_key", None)
+        frappe.delete_doc("Mail Account", "carol@acme.com")
+        self.assertNotIn("carol@acme.com", self.limit_keys())
+
     def test_a_sync_repairs_the_keys(self) -> None:
         service = self.cluster.get_client().objects(quota.LOOKUP_KEY)
         service.delete(self.fake.find(quota.LOOKUP_KEY, key="alice@acme.com")["id"])
@@ -299,6 +342,8 @@ class TestLimitKeys(SendingLimitsTestCase):
             self.limit_keys(), dict.fromkeys(("alice@acme.com", "bob@acme.com", "carol@acme.com"), "500")
         )
         self.assertIsNotNone(self.fake.get(quota.LOOKUP_KEY, other["id"]))
+        for email in ("alice@acme.com", "bob@acme.com", "carol@acme.com"):  # each account keeps its id
+            self.assertEqual(self.key_id(email), self.fake.find(quota.LOOKUP_KEY, key=email)["id"])
         reloads = self.actions("ReloadLookupStores")
         self.assertFalse(quota.sync_limit_keys(self.cluster, client))
         self.assertEqual(self.actions("ReloadLookupStores"), reloads)
@@ -679,7 +724,12 @@ class TestUsage(SendingLimitsTestCase):
         self.assertEqual(listed["bob@acme.com"]["send_usage"], {"day": 0, "month": 0})
 
         accounts.delete_account("alice@acme.com")
-        self.assertFalse(frappe.db.exists("Mail Send Usage", {"account": "alice@acme.com"}))
+        # Billing outlives the account: its rows stay under its tenant, and still add up.
+        self.assertTrue(
+            frappe.db.exists("Mail Send Usage", {"account": "alice@acme.com", "tenant": self.tenant.name})
+        )
+        this_month = tenant_api.get_send_usage(months=1)["months"]
+        self.assertEqual(this_month, [{"month": f"{self.today:%Y-%m}", "sent": usage["month"]}])
 
     def test_prune_keeps_the_days_of_the_retention(self) -> None:
         days = [self.today - timedelta(days=days) for days in (0, 29, 30, 31, 70)]

@@ -187,7 +187,7 @@ Takes `email` and `groups`, an array of the tenant's group addresses (at most 50
 
 ## `delete_account`
 
-Takes `email`. Answers 204. The mailbox and its mail are removed from the cluster.
+Takes `email`. Answers 204. The mailbox and its mail are removed from the cluster. Its send usage stays, in the tenant's [`get_send_usage`](tenant.md#get_send_usage).
 
 ## `get_account_options`
 

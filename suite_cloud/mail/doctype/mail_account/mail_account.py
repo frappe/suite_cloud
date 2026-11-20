@@ -10,7 +10,7 @@ from frappe.utils import cint, flt
 
 from suite_cloud.mail.cluster import outbound_scan, quota
 from suite_cloud.mail.cluster.plan import DISABLED_ROLE_DESCRIPTION
-from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import delete_usage, sent_by_account
+from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import sent_by_account
 from suite_cloud.mail.stalwart import get_account_client
 from suite_cloud.mail.stalwart.directory import DISK_QUOTA, GB, Account
 from suite_cloud.mail.tenancy import account_credentials, quotas, sync
@@ -58,6 +58,7 @@ class MailAccount(QuotaHolder, Document):
         new_password: DF.Password | None
         quotas: DF.Table[MailQuota]
         send_limit: DF.Link | None
+        send_limit_key: DF.Data | None
         skip_outbound_scan: DF.Check
         tenant: DF.Link | None
         stalwart_id: DF.Data | None
@@ -185,7 +186,6 @@ class MailAccount(QuotaHolder, Document):
             self.push_scan_exemption(is_exempt=False)
         self.push_send_limit(is_deleted=True)
         sync.push_destroy(self, "accounts")
-        delete_usage(self.name)
 
     # --- Stalwart ------------------------------------------------------------------
 
@@ -211,20 +211,20 @@ class MailAccount(QuotaHolder, Document):
         outbound_scan.set_exempt(cluster, self.email, is_exempt)
 
     def push_send_limit(self, is_created: bool = False, is_deleted: bool = False) -> None:
-        """The cluster's copy of Send Limit, which picks the account's throttle: created first
-        when the cluster lacks it. An account on the cluster's default has no key, so creating or
-        deleting one needs no call: a key lookup reads the whole namespace, since Stalwart cannot
-        filter on the key, and Sync Config repairs any key left over."""
+        """The cluster's copy of Send Limit, which picks the account's throttle: created first when
+        the cluster lacks it. The key is written by the id the account keeps. An account on the
+        cluster's default has no key, so creating or deleting one needs no call."""
 
         cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
         limit = frappe.get_doc("Mail Send Limit", self.send_limit)
         if limit.is_default and (is_created or is_deleted):
             return
-        if is_deleted:
-            quota.set_send_limit(cluster, self.email, None)
-            return
-        quota.ensure_throttle(cluster, limit)
-        quota.set_send_limit(cluster, self.email, None if limit.is_default else limit.daily_limit)
+        if not is_deleted:
+            quota.ensure_throttle(cluster, limit)
+        value = None if is_deleted or limit.is_default else limit.daily_limit
+        key = quota.set_send_limit(cluster, self.email, value, self.send_limit_key)
+        if not is_deleted and key != self.send_limit_key:
+            self.db_set("send_limit_key", key, update_modified=False)
 
     def push_enabled(self) -> None:
         """Disabled accounts keep receiving mail but lose every other permission via a cluster role."""

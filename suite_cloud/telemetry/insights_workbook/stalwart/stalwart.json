@@ -9329,7 +9329,7 @@
    "items": [
     {
      "default_operator": "within",
-     "default_value": "Last 1 Day (include current)",
+     "default_value": "Last 7 Day (include current)",
      "filter_name": "Date Range",
      "filter_type": "Date",
      "icon": "calendar",
@@ -10109,7 +10109,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-20 18:00:00.000000",
+ "modified": "2026-11-21 10:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -10900,12 +10900,8 @@
        "type": "column"
       }
      },
-     "join_type": "inner",
+     "join_type": "left",
      "select_columns": [
-      {
-       "column_name": "tenant",
-       "type": "column"
-      },
       {
        "column_name": "cluster",
        "type": "column"

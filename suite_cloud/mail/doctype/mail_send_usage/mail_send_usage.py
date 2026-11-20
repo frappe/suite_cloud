@@ -2,7 +2,7 @@
 # For license information, please see license.txt
 
 """What an account sent: one row per account and UTC day, unique on the two, for billing; a month
-is the sum of its days. ``suite_cloud.mail.send_usage`` adds the recipients of each message Stalwart
+is the sum of its days. A row keeps the account's tenant and outlives the account. ``suite_cloud.mail.send_usage`` adds the recipients of each message Stalwart
 queued; rows are kept for the retention in Suite Cloud Settings."""
 
 import hashlib
@@ -35,6 +35,7 @@ class MailSendUsage(Document):
         reported_at: DF.Datetime | None
         send_limit: DF.Int
         sent: DF.Int
+        tenant: DF.Link | None
     # end: auto-generated types
 
     pass
@@ -106,16 +107,14 @@ def usage_history(account: str, days: int) -> dict[str, list[dict]]:
 
 def tenant_usage_by_month(tenant: str, months: int) -> list[dict]:
     """The tenant's recipients per UTC month for the last ``months``, this one included, newest
-    first: each month sums every day kept for the tenant's accounts."""
+    first: each month sums every day kept for the tenant's accounts, deleted ones included."""
 
     first = add_months(utc_today().replace(day=1), -(months - 1))
-    usage, account = frappe.qb.DocType("Mail Send Usage"), frappe.qb.DocType("Mail Account")
+    usage = frappe.qb.DocType("Mail Send Usage")
     rows = (
         frappe.qb.from_(usage)
-        .join(account)
-        .on(account.name == usage.account)
         .select(usage.date, Sum(usage.sent).as_("sent"))
-        .where((account.tenant == tenant) & (usage.date >= first))
+        .where((usage.tenant == tenant) & (usage.date >= first))
         .groupby(usage.date)
         .run(as_dict=True)
     )
@@ -130,8 +129,8 @@ def add_usage(totals: dict[tuple[str, date], int]) -> int:
     many rows it wrote. Today's row takes the account's daily limit as it is now; a past day keeps
     the limit it was stored with."""
 
-    limits = daily_limits(list({account for account, _day in totals}))
-    rows = sorted((key, sent) for key, sent in totals.items() if key[0] in limits)  # deleted meanwhile
+    accounts = get_accounts(list({account for account, _day in totals}))
+    rows = sorted((key, sent) for key, sent in totals.items() if key[0] in accounts)  # deleted meanwhile
     if not rows:
         return 0
     # One lock order for every writer, so two batches of the same accounts do not deadlock.
@@ -144,6 +143,7 @@ def add_usage(totals: dict[tuple[str, date], int]) -> int:
     query = frappe.qb.into(usage).columns(
         usage.name,
         usage.account,
+        usage.tenant,
         usage.date,
         usage.sent,
         usage.send_limit,
@@ -154,8 +154,9 @@ def add_usage(totals: dict[tuple[str, date], int]) -> int:
         usage.modified_by,
     )
     for (account, day), sent in rows:
+        limit, tenant = accounts[account]
         query = query.insert(
-            usage_name(account, day), account, day, sent, limits[account], now, now, now, user, user
+            usage_name(account, day), account, tenant, day, sent, limit, now, now, now, user, user
         )
     query = (
         query.on_duplicate_key_update(usage.sent, usage.sent + Values(usage.sent))
@@ -167,19 +168,13 @@ def add_usage(totals: dict[tuple[str, date], int]) -> int:
     return len(rows)
 
 
-def daily_limits(accounts: list[str]) -> dict[str, int]:
-    return dict(
-        frappe.get_all(
-            "Mail Account",
-            filters={"name": ("in", accounts)},
-            fields=["name", "daily_send_limit"],
-            as_list=True,
-        )
+def get_accounts(accounts: list[str]) -> dict[str, tuple[int, str]]:
+    """``{account: (daily limit, tenant)}``."""
+
+    rows = frappe.get_all(
+        "Mail Account", filters={"name": ("in", accounts)}, fields=["name", "daily_send_limit", "tenant"]
     )
-
-
-def delete_usage(account: str) -> None:
-    frappe.db.delete("Mail Send Usage", {"account": account})
+    return {row.name: (row.daily_send_limit, row.tenant) for row in rows}
 
 
 def prune_usage_job() -> None:

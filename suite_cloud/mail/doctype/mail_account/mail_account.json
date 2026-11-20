@@ -36,7 +36,8 @@
   "cluster_section",
   "cluster",
   "column_break_cluster",
-  "stalwart_id"
+  "stalwart_id",
+  "send_limit_key"
  ],
  "fields": [
   {
@@ -257,6 +258,15 @@
    "fieldname": "stalwart_id",
    "fieldtype": "Data",
    "label": "Stalwart ID",
+   "no_copy": 1,
+   "read_only": 1
+  },
+  {
+   "description": "The id of the account's send limit key in Stalwart.",
+   "fieldname": "send_limit_key",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "Send Limit Key",
    "no_copy": 1,
    "read_only": 1
   }
