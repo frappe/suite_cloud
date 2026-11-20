@@ -108,15 +108,29 @@ class TestShippedWorkbooks(unittest.TestCase):
         joined = {column["column_name"] for column in account_join["select_columns"]}
         self.assertLessEqual(joined, fields("mail_account"))
 
+    def test_sending_usage_marks_the_utc_day_as_current(self) -> None:
+        """Rows are UTC days; the site's today, and the latest day with rows, are both wrong ones."""
+
+        operations = shipped_workbook("stalwart")["queries"]["stalwart-sending-usage"]["operations"]
+        current = next(op for op in operations if op.get("new_name") == "is_current")
+        self.assertEqual(current["type"], "sql_column")
+        self.assertIn("utc_timestamp()", current["raw_sql"])
+
     def test_the_sending_usage_filters_reach_every_chart(self) -> None:
+        """The date range picks the days of the history charts; the others show today."""
+
         workbook = shipped_workbook("stalwart")
         dashboard = workbook["dashboards"]["stalwart-sending-usage"]
         charts = {item["chart"] for item in dashboard["items"] if item["type"] == "chart"}
         self.assertTrue(charts <= set(workbook["charts"]))
+        history = {"stalwart-sending-by-day", "stalwart-account-sending-history"}
         for item in dashboard["items"]:
             if item["type"] == "filter":
                 with self.subTest(filter=item["filter_name"]):
-                    self.assertEqual(set(item["links"]), charts)
+                    expected = history if item["filter_name"] == "Date Range" else charts
+                    self.assertEqual(set(item["links"]), expected)
+                    if item["filter_name"] == "Date Range":
+                        self.assertEqual(item["default_value"], "Last 1 Day (include current)")  # today
 
     def test_the_outbound_scan_queries_read_columns_the_tables_have(self) -> None:
         queries = shipped_workbook("stalwart")["queries"]

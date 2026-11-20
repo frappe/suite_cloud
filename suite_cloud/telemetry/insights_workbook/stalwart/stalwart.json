@@ -72,7 +72,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Each account's sent recipients per UTC day, newest first, with the daily limit the account had on that day. Filter by account to see one account's history.",
+   "info": "Each account's sent recipients per UTC day in the Date Range, newest first, with the daily limit the account had on that day. Filter by account to see one account's history.",
    "name": "stalwart-account-sending-history",
    "query": "stalwart-sending-usage",
    "sort_order": 94,
@@ -161,7 +161,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Accounts by how much of their daily limit the latest day used.",
+   "info": "Accounts by how much of their daily limit they used today (UTC).",
    "name": "stalwart-accounts-nearest-limits",
    "query": "stalwart-sending-usage",
    "sort_order": 90,
@@ -5527,7 +5527,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Recipients sent per UTC day, as far back as the Sending Usage Retention in Suite Cloud Settings.",
+   "info": "Recipients sent per UTC day in the Date Range, as far back as the Sending Usage Retention in Suite Cloud Settings.",
    "name": "stalwart-sending-by-day",
    "query": "stalwart-sending-usage",
    "sort_order": 93,
@@ -5582,7 +5582,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "The latest UTC day Suite Cloud counted. Recipients count once per address.",
+   "info": "Today, the UTC day, as Suite Cloud counted it so far. Recipients count once per address.",
    "name": "stalwart-sending-readings",
    "query": "stalwart-sending-usage",
    "sort_order": 89,
@@ -9328,6 +9328,25 @@
   "stalwart-sending-usage": {
    "items": [
     {
+     "default_operator": "within",
+     "default_value": "Last 1 Day (include current)",
+     "filter_name": "Date Range",
+     "filter_type": "Date",
+     "icon": "calendar",
+     "layout": {
+      "h": 2,
+      "i": "filter-date",
+      "w": 4,
+      "x": 0,
+      "y": 0
+     },
+     "links": {
+      "stalwart-sending-by-day": "`stalwart-sending-usage`.`date`",
+      "stalwart-account-sending-history": "`stalwart-sending-usage`.`date`"
+     },
+     "type": "filter"
+    },
+    {
      "default_operator": "in",
      "filter_name": "Tenant",
      "filter_type": "String",
@@ -9336,7 +9355,7 @@
       "h": 2,
       "i": "filter-tenant_label",
       "w": 4,
-      "x": 0,
+      "x": 4,
       "y": 0
      },
      "links": {
@@ -9357,7 +9376,7 @@
       "h": 2,
       "i": "filter-cluster",
       "w": 4,
-      "x": 4,
+      "x": 8,
       "y": 0
      },
      "links": {
@@ -9378,7 +9397,7 @@
       "h": 2,
       "i": "filter-account",
       "w": 4,
-      "x": 8,
+      "x": 12,
       "y": 0
      },
      "links": {
@@ -10090,7 +10109,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-20 16:00:00.000000",
+ "modified": "2026-11-20 18:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -10943,13 +10962,11 @@
      "type": "mutate"
     },
     {
+     "data_source": "Site DB",
      "data_type": "Integer",
-     "expression": {
-      "expression": "if_else(date == max(date), 1, 0)",
-      "type": "expression"
-     },
      "new_name": "is_current",
-     "type": "mutate"
+     "raw_sql": "if(`date` = date(utc_timestamp()), 1, 0)",
+     "type": "sql_column"
     },
     {
      "column_names": [

@@ -67,7 +67,7 @@ The answer is `{"data": {"counted": 2}}`.
 
 One row per account and UTC day, unique on `account` and `date`. `sent` only grows. `send_limit` is the account's daily limit while the day was current. A month's usage, for an account or a tenant, is the sum of its days: Suite Cloud stores no month rows. Nothing counts refused recipients: Stalwart refuses them, and its events do not name the account.
 
-The Mail Account form shows today's and this month's totals: orange from 80% of the daily limit, red at 100%. Suite Cloud keeps each account's days for **Sending Usage Retention (Days)** in Suite Cloud Settings (90 by default) and deletes older days daily, one day per transaction. A month the retention has partly passed sums only the days kept. In Insights, the **Sending Usage** dashboard of the Stalwart Mail workbook shows the totals.
+The Mail Account form shows today's and this month's totals: orange from 80% of the daily limit, red at 100%. Suite Cloud keeps each account's days for **Sending Usage Retention (Days)** in Suite Cloud Settings (90 by default) and deletes older days daily, one day per transaction. A month the retention has partly passed sums only the days kept. In Insights, the **Sending Usage** dashboard of the Stalwart Mail workbook shows the totals. Its readings and limit tables show today, the UTC day; its **Date Range** filter, today by default, picks the days of the Sending by Day and Account Sending History charts.
 
 ## Accepted losses
 
