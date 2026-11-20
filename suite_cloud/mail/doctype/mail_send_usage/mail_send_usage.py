@@ -12,7 +12,8 @@ from datetime import UTC, date, datetime, timedelta
 import frappe
 from frappe.model.document import Document
 from frappe.query_builder import Case
-from frappe.utils import cint
+from frappe.query_builder.functions import Sum
+from frappe.utils import add_months, cint
 from pypika.terms import Values
 
 from suite_cloud.utils import get_config
@@ -101,6 +102,27 @@ def usage_history(account: str, days: int) -> dict[str, list[dict]]:
         ],
         "months": [{"month": month, "sent": sent} for month, sent in months.items()],
     }
+
+
+def tenant_usage_by_month(tenant: str, months: int) -> list[dict]:
+    """The tenant's recipients per UTC month for the last ``months``, this one included, newest
+    first: each month sums every day kept for the tenant's accounts."""
+
+    first = add_months(utc_today().replace(day=1), -(months - 1))
+    usage, account = frappe.qb.DocType("Mail Send Usage"), frappe.qb.DocType("Mail Account")
+    rows = (
+        frappe.qb.from_(usage)
+        .join(account)
+        .on(account.name == usage.account)
+        .select(usage.date, Sum(usage.sent).as_("sent"))
+        .where((account.tenant == tenant) & (usage.date >= first))
+        .groupby(usage.date)
+        .run(as_dict=True)
+    )
+    totals = defaultdict(int)
+    for row in rows:
+        totals[f"{row.date:%Y-%m}"] += int(row.sent)
+    return [{"month": month, "sent": totals[month]} for month in sorted(totals, reverse=True)]
 
 
 def add_usage(totals: dict[tuple[str, date], int]) -> int:

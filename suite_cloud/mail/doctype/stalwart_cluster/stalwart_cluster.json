@@ -415,7 +415,7 @@
    "label": "Sending"
   },
   {
-   "default": "60",
+   "default": "90",
    "description": "Messages per minute for each signed-in sender.",
    "fieldname": "submission_rate",
    "fieldtype": "Int",

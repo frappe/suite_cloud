@@ -138,7 +138,7 @@ class MailAccount(QuotaHolder, Document):
                 self.push_enabled()
             if self.skip_outbound_scan:
                 self.push_scan_exemption()
-            self.push_send_limit()
+            self.push_send_limit(is_created=True)
         except Exception:
             sync.push_destroy(self, "accounts")  # the insert rolls back; the account must not survive
             raise
@@ -210,15 +210,19 @@ class MailAccount(QuotaHolder, Document):
         cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
         outbound_scan.set_exempt(cluster, self.email, is_exempt)
 
-    def push_send_limit(self, is_deleted: bool = False) -> None:
+    def push_send_limit(self, is_created: bool = False, is_deleted: bool = False) -> None:
         """The cluster's copy of Send Limit, which picks the account's throttle: created first
-        when the cluster lacks it."""
+        when the cluster lacks it. An account on the cluster's default has no key, so creating or
+        deleting one needs no call: a key lookup reads the whole namespace, since Stalwart cannot
+        filter on the key, and Sync Config repairs any key left over."""
 
         cluster = frappe.get_cached_doc("Stalwart Cluster", self.cluster)
+        limit = frappe.get_doc("Mail Send Limit", self.send_limit)
+        if limit.is_default and (is_created or is_deleted):
+            return
         if is_deleted:
             quota.set_send_limit(cluster, self.email, None)
             return
-        limit = frappe.get_doc("Mail Send Limit", self.send_limit)
         quota.ensure_throttle(cluster, limit)
         quota.set_send_limit(cluster, self.email, None if limit.is_default else limit.daily_limit)
 

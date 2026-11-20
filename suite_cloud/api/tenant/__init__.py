@@ -21,6 +21,7 @@ from frappe.query_builder.functions import Count
 from frappe.utils import cint, get_datetime, sbool
 from frappe.utils.password import get_decrypted_password
 
+from suite_cloud.mail.doctype.mail_send_usage.mail_send_usage import tenant_usage_by_month
 from suite_cloud.mail.stalwart.errors import (
     StalwartError,
     StalwartRejectedError,
@@ -38,6 +39,7 @@ RATE_LIMIT = 300  # requests per tenant per minute
 ALIAS_CAP = 100  # aliases on one object; more than that is a list, not an account
 MEMBERSHIP_CAP = 500  # groups or members named in one request
 RECIPIENT_BATCH = 5000  # recipients added or removed in one request
+SEND_USAGE_MONTHS_CAP = 24
 
 
 class TenantAuthError(frappe.AuthenticationError):
@@ -455,6 +457,16 @@ def get_disk_usage(fresh: bool = False) -> dict:
     ``fresh`` asks the mail server now."""
 
     return current_tenant().get_disk_usage(sbool(fresh))
+
+
+@frappe.whitelist(methods=["GET"])
+@mail_api
+def get_send_usage(months: int = 12) -> dict:
+    """The recipients the tenant's accounts sent per UTC month, newest first, for the last
+    ``months`` (at most 24), this month included; only as far back as the Sending Usage Retention
+    keeps."""
+
+    return {"months": tenant_usage_by_month(current_tenant().name, page_size(months, SEND_USAGE_MONTHS_CAP))}
 
 
 @frappe.whitelist(methods=["PATCH"])

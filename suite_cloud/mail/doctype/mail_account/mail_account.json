@@ -158,7 +158,7 @@
    "label": "Sending"
   },
   {
-   "description": "Recipients per UTC day. Blank uses the tenant default.",
+   "description": "Recipients per UTC day. Blank uses the tenant default. A change starts a fresh count for the day.",
    "fieldname": "send_limit",
    "fieldtype": "Link",
    "label": "Send Limit",

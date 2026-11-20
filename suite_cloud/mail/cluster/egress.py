@@ -13,7 +13,7 @@ import frappe
 from frappe import _
 from frappe.utils import add_to_date, get_datetime, now
 
-from suite_cloud.mail.cluster import dns, plan, server_token
+from suite_cloud.mail.cluster import dns, plan, quota, server_token
 from suite_cloud.mail.cluster.push import recorded_failure, resync_cluster
 from suite_cloud.mail.stalwart import has_credentials
 from suite_cloud.mail.stalwart.directory import dkim_management_payload
@@ -29,6 +29,7 @@ GATEWAY_VARIABLES_BUILDER = "suite_cloud.mail.cluster.egress.build_gateway_varia
 SUITE_RULE_PREFIX = "'egress-"
 # Marks the gateway connection strategies Suite Cloud owns, so the ones a plan drops can be removed.
 POOL_STRATEGY_DESCRIPTION = "Egress pool"
+GATEWAY_THROTTLE_DESCRIPTION = "suite-cloud-gateway-no-throttle"
 # Mail between domains of the cluster never leaves it: without this rule first, a relay fallback
 # would send it out through a gateway only to come back through the cluster's own MX.
 LOCAL_RULE = {"if": "is_local_domain(rcpt_domain)", "then": "'local'"}
@@ -394,6 +395,7 @@ def gateway_plan(gateway: Document) -> list[dict]:
             {"@type": "upsert", "object": "MtaConnectionStrategy", "matchOn": ["name"], "value": strategies}
         )
     operations.extend(gateway_defaults_plan())
+    operations.append(gateway_throttle_operation())
     operations.append(plan.tracer_operation())
     operations.extend(plan.telemetry_operations(gateway))
     operations.append(
@@ -469,6 +471,29 @@ def connection_strategy(name: str, description: str, addresses: list[Document], 
             [{"sourceIp": a.source_ip, "ehloHostname": a.ehlo_hostname} for a in addresses]
         ),
     }
+
+
+def gateway_throttle_operation() -> dict:
+    """The gateway takes mail only from its cluster's nodes, which apply the sending limits, so it
+    throttles nothing. Stalwart adds its default throttles on any start that finds no throttle,
+    disabled ones included, so this disabled one keeps them out; ``remove_other_throttles`` drops
+    the rest."""
+
+    placeholder = quota.throttle(GATEWAY_THROTTLE_DESCRIPTION, "false", 1, quota.MINUTE_MS)
+    placeholder["enable"] = False
+    return quota.throttles_operation({"no-throttle": placeholder})
+
+
+def remove_other_throttles(client) -> list[str]:
+    """Stalwart's defaults and any other throttle; runs before the reload."""
+
+    service = client.objects("MtaInboundThrottle")
+    stale = [
+        item["id"] for item in service.get_all() if item.get("description") != GATEWAY_THROTTLE_DESCRIPTION
+    ]
+    if stale:
+        service.delete(stale)
+    return stale
 
 
 def gateway_recovery_plan(gateway: Document) -> list[dict]:

@@ -61,6 +61,27 @@ Answers the disk the tenant's accounts and groups use together, as the mail serv
 
 Suite Cloud asks the mail server for every account and group of the tenant in as few calls as the server allows, then keeps the sum for 5 minutes. A call inside that time answers the kept figure and `fetched_at` says when it was read. `fresh` reads the mail server again and replaces the kept figure. When the mail server cannot answer, the call fails with a 503 and nothing is kept, so a partial sum is never served.
 
+## `get_send_usage`
+
+`GET tenant.get_send_usage`
+
+| Parameter | Type | Default | Meaning |
+| --- | --- | --- | --- |
+| `months` | integer | `12` | UTC months to answer, this one included, at most 24 |
+
+Answers the recipients the tenant's accounts sent per UTC month, newest first. A month with nothing sent is left out:
+
+```json
+{
+  "months": [
+    {"month": "2026-11", "sent": 18240},
+    {"month": "2026-10", "sent": 51003}
+  ]
+}
+```
+
+A month sums the days Suite Cloud keeps, so it reaches back only as far as the Sending Usage Retention, 90 days by default; an older month comes back partly or not at all. A deleted account's usage goes with it. [`get_send_usage`](accounts.md#get_send_usage) on an account answers its days.
+
 ## `update_tenant_profile`
 
 `PATCH tenant.update_tenant_profile`

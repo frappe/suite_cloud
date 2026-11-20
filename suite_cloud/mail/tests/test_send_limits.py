@@ -10,6 +10,7 @@ import frappe
 from frappe.utils import get_test_client
 
 from suite_cloud.api import send_usage as send_usage_api
+from suite_cloud.api import tenant as tenant_api
 from suite_cloud.api.mail import accounts, domains
 from suite_cloud.api.telemetry import authenticate
 from suite_cloud.api.tenant import SendLimitsNotAllowedError
@@ -395,7 +396,7 @@ class TestQuotaPlan(SendingLimitsTestCase):
         )
         submission = throttles["suite-cloud-submission-rate"]
         self.assertEqual(submission["match"]["match"]["0"]["if"], "!is_empty(authenticated_as)")
-        self.assertEqual(submission["rate"], {"count": 60, "period": 60_000})  # the cluster's default
+        self.assertEqual(submission["rate"], {"count": 90, "period": 60_000})  # the cluster's default
 
         # Stalwart adds its default throttles only when none exist, so recovery leaves ours out.
         self.assertNotIn("MtaInboundThrottle", {op["object"] for op in plan.recovery_plan(self.cluster)})
@@ -515,6 +516,22 @@ class TestTenantSendLimits(SendingLimitsTestCase):
         self.tenant.db_set("default_send_limit", self.limit(1000))
         limits = frappe.get_doc("Suite Tenant", self.tenant.name).to_api()["limits"]
         self.assertEqual(limits["default_daily_send_limit"], 1000)
+
+    def test_a_tenant_reads_its_usage_per_month(self) -> None:
+        last_month = self.today.replace(day=1) - timedelta(days=1)
+        add_usage({("alice@acme.com", self.today): 3, ("bob@acme.com", self.today): 4})
+        add_usage(
+            {("alice@acme.com", last_month): 10, ("alice@acme.com", last_month - timedelta(days=40)): 99}
+        )
+        this, previous = f"{self.today:%Y-%m}", f"{last_month:%Y-%m}"
+
+        self.assertEqual(
+            tenant_api.get_send_usage(months=2),
+            {"months": [{"month": this, "sent": 7}, {"month": previous, "sent": 10}]},
+        )
+        self.assertEqual(tenant_api.get_send_usage(months=1), {"months": [{"month": this, "sent": 7}]})
+        self.act_as(self.other)
+        self.assertEqual(tenant_api.get_send_usage(), {"months": []})
 
     def test_tenants_read_an_account_s_daily_history(self) -> None:
         now = self.now
