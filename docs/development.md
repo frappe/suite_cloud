@@ -13,13 +13,13 @@ The tests need none of the outside services. They use fakes of Stalwart, Central
 
 ## 1. A bench and a site
 
-Suite Cloud runs on Frappe `develop` with Python 3.14, MariaDB and Redis. It requires [Frappe Insights](https://github.com/frappe/insights) `develop`, which holds the telemetry the nodes push.
+Suite Cloud runs on Frappe `develop` with Python 3.14, MariaDB and Redis. [Frappe Insights](https://github.com/frappe/insights) `develop` is optional: it holds the telemetry the nodes push. Without it, the telemetry warehouse, its dashboards and the alerts are off, and pushed telemetry is not kept.
 
 1. Create a bench: `bench init --python python3.14 suite-bench`.
-2. Get the apps: `bench get-app insights` and `bench get-app https://github.com/frappe/suite_cloud`.
+2. Get the apps: `bench get-app insights` (for telemetry) and `bench get-app https://github.com/frappe/suite_cloud`.
 3. Install the development tools: `bench setup requirements --dev`.
 4. Create a site: `bench new-site suite-cloud.localhost`.
-5. Install the app: `bench --site suite-cloud.localhost install-app suite_cloud`. This installs Insights first.
+5. Install the apps: `bench --site suite-cloud.localhost install-app insights suite_cloud`. Leave out `insights` if you do not work on telemetry.
 6. Turn on developer mode: `bench --site suite-cloud.localhost set-config developer_mode 1`.
 7. Start the bench: `bench start`.
 

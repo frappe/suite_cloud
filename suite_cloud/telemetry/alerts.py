@@ -24,7 +24,7 @@ from frappe.utils import (
 
 from suite_cloud.mail.cluster import rspamd
 from suite_cloud.suite_cloud.doctype.tenant_email.email_types import get_inline_images
-from suite_cloud.telemetry import status
+from suite_cloud.telemetry import insights_installed, status
 from suite_cloud.telemetry.warehouse import Warehouse
 from suite_cloud.utils import get_config, log_exception
 
@@ -41,6 +41,8 @@ DEFAULT_ERRORS_PER_HOUR = 100  # the settings' default, used until the site has 
 def check_server_alerts() -> None:
     """Scheduled every five minutes."""
 
+    if not insights_installed():
+        return
     Alerts().check()
 
 

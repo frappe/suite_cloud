@@ -23,6 +23,7 @@ from suite_cloud.telemetry import (
     NODES,
     TABLES,
     TelemetryTable,
+    insights_installed,
 )
 from suite_cloud.telemetry.spool import Spool
 from suite_cloud.utils import get_config, log_exception
@@ -45,12 +46,16 @@ PREVIOUS_PUSH = "lag(timestamp) OVER (PARTITION BY host_ip ORDER BY timestamp) A
 def load_staged_batches() -> None:
     """Scheduled every five minutes."""
 
+    if not insights_installed():
+        return
     Warehouse().load_pending()
 
 
 def prune_expired_rows() -> None:
     """Scheduled daily."""
 
+    if not insights_installed():
+        return
     Warehouse().prune_expired()
 
 

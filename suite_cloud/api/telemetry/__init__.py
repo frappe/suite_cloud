@@ -28,6 +28,8 @@ from suite_cloud.telemetry import (
     OUTBOUND_SCAN_SYMBOLS,
     OUTBOUND_SCANS,
     TELEMETRY_USER,
+    TelemetryTable,
+    insights_installed,
     status,
 )
 from suite_cloud.telemetry import outbound_scans as scans_module
@@ -143,7 +145,7 @@ def webhook(events: list) -> dict:
         )
     if rows:
         envelope = get_server_envelope(server, get_batch_id(server.name, events))
-        Spool().write(EVENTS, EVENTS.get_batch(envelope, rows), envelope["batch_id"])
+        stage(Spool(), EVENTS, envelope, rows)
     status.record_contact(server.ipv4_address, status.EVENTS)
     return {"accepted": len(rows), "skipped": len(problems)}
 
@@ -164,7 +166,7 @@ def otlp() -> Response:
         log_error(f"Telemetry metrics from {server.hostname}: {skipped} data points skipped", "")
     if rows:
         envelope = get_server_envelope(server, get_metrics_batch_id(server.name, body))
-        Spool().write(METRICS, METRICS.get_batch(envelope, rows), envelope["batch_id"])
+        stage(Spool(), METRICS, envelope, rows)
     status.record_contact(server.ipv4_address, status.METRICS)
     return Response(status=200)  # an empty ExportMetricsServiceResponse
 
@@ -188,11 +190,19 @@ def outbound_scans(scans: list) -> dict:
     spool = Spool()
     for table, table_rows in ((OUTBOUND_SCANS, rows), (OUTBOUND_SCAN_SYMBOLS, symbol_rows)):
         if table_rows:
-            spool.write(table, table.get_batch(envelope, table_rows), envelope["batch_id"])
+            stage(spool, table, envelope, table_rows)
     status.record_contact(server.ipv4_address, status.SCAN_CHECK_IN)
     if rows:
         status.record_contact(server.ipv4_address, status.SCAN_RECORDS)
     return {"accepted": len(rows), "skipped": len(problems)}
+
+
+def stage(spool: Spool, table: TelemetryTable, envelope: dict, rows: list[dict]) -> None:
+    """Stages a batch for the warehouse. Without Insights there is no warehouse to load and prune
+    the spool, so nothing is kept: the request is still answered and the contact still noted."""
+
+    if insights_installed():
+        spool.write(table, table.get_batch(envelope, rows), envelope["batch_id"])
 
 
 def get_server_envelope(server: frappe._dict, batch_id: str) -> dict:

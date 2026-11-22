@@ -4,7 +4,9 @@ app_publisher = "Frappe"
 app_description = "Deploys and manages Stalwart mail clusters for Frappe Suite sites"
 app_email = "developers@frappe.io"
 app_license = "agpl-3.0"
-required_apps = ["insights"]  # holds the telemetry the nodes push (suite_cloud.telemetry)
+# Insights holds the telemetry the nodes push (suite_cloud.telemetry). It is optional: without it
+# the telemetry warehouse, its dashboards and alerts are off, and everything else works.
+required_apps = []
 
 # Send non-GET requests for this app's endpoints as native `application/json`
 # bodies instead of form-encoded, per-key JSON-stringified values.
