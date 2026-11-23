@@ -436,7 +436,11 @@ def owner_query(
     return frappe.get_all(
         "User",
         filters=[["Has Role", "role", "=", TENANT_ROLE], ["User", "enabled", "=", 1]],
-        or_filters=[["User", "name", "like", f"%{txt}%"], ["User", "full_name", "like", f"%{txt}%"]],
+        or_filters=[
+            ["User", "name", "like", f"%{txt}%"],
+            ["User", "email", "like", f"%{txt}%"],
+            ["User", "full_name", "like", f"%{txt}%"],
+        ],
         fields=["name", "full_name"],
         order_by="name",
         start=start,
