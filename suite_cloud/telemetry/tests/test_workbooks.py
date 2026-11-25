@@ -29,6 +29,12 @@ class TestShippedWorkbooks(unittest.TestCase):
                     self.assertGreaterEqual(chart["config"].get("limit", 0), 1000)
                     self.assertNotIn("per day", chart.get("info") or "")
 
+    def test_no_chart_shares_a_name_with_a_query(self) -> None:
+        """A chart runs as a query named after itself, so a source query of the same name reads as circular."""
+
+        workbook = shipped_workbook("stalwart")
+        self.assertFalse(set(workbook["charts"]) & set(workbook["queries"]))
+
     def test_filters_sit_side_by_side_from_the_left(self) -> None:
         for name, dashboard in shipped_workbook("stalwart")["dashboards"].items():
             layouts = [item["layout"] for item in dashboard["items"] if item["type"] == "filter"]

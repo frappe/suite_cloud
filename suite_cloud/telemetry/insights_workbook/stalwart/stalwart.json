@@ -7211,7 +7211,7 @@
    "folder": null,
    "info": "Recipients Stalwart refused over an account's daily limit, and messages refused over the submission rate, in the Date Range. Stalwart answers 452, so the sender tries again later.",
    "name": "stalwart-send-limit-refusals",
-   "query": "stalwart-send-limit-refusals",
+   "query": "stalwart-limit-refusals",
    "sort_order": 117,
    "title": "Refused Over a Limit",
    "workbook": "stalwart"
@@ -9414,7 +9414,7 @@
      "links": {
       "stalwart-sending-by-day": "`stalwart-sending-usage`.`date`",
       "stalwart-account-sending-history": "`stalwart-sending-usage`.`date`",
-      "stalwart-send-limit-refusals": "`stalwart-send-limit-refusals`.`timestamp`"
+      "stalwart-send-limit-refusals": "`stalwart-limit-refusals`.`timestamp`"
      },
      "type": "filter"
     },
@@ -9436,7 +9436,7 @@
       "stalwart-most-recipients-today": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-sending-by-day": "`stalwart-sending-usage`.`tenant_label`",
       "stalwart-sending-readings": "`stalwart-sending-usage`.`tenant_label`",
-      "stalwart-send-limit-refusals": "`stalwart-send-limit-refusals`.`tenant_label`"
+      "stalwart-send-limit-refusals": "`stalwart-limit-refusals`.`tenant_label`"
      },
      "type": "filter"
     },
@@ -9458,7 +9458,7 @@
       "stalwart-most-recipients-today": "`stalwart-sending-usage`.`cluster`",
       "stalwart-sending-by-day": "`stalwart-sending-usage`.`cluster`",
       "stalwart-sending-readings": "`stalwart-sending-usage`.`cluster`",
-      "stalwart-send-limit-refusals": "`stalwart-send-limit-refusals`.`cluster`"
+      "stalwart-send-limit-refusals": "`stalwart-limit-refusals`.`cluster`"
      },
      "type": "filter"
     },
@@ -9480,7 +9480,7 @@
       "stalwart-most-recipients-today": "`stalwart-sending-usage`.`account`",
       "stalwart-sending-by-day": "`stalwart-sending-usage`.`account`",
       "stalwart-sending-readings": "`stalwart-sending-usage`.`account`",
-      "stalwart-send-limit-refusals": "`stalwart-send-limit-refusals`.`account`"
+      "stalwart-send-limit-refusals": "`stalwart-limit-refusals`.`account`"
      },
      "type": "filter"
     },
@@ -10195,7 +10195,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-21 14:00:00.000000",
+ "modified": "2026-11-25 12:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -11327,12 +11327,12 @@
    "use_live_connection": 1,
    "workbook": "stalwart"
   },
-  "stalwart-send-limit-refusals": {
+  "stalwart-limit-refusals": {
    "folder": null,
    "is_builder_query": 1,
    "is_native_query": 0,
    "is_script_query": 0,
-   "name": "stalwart-send-limit-refusals",
+   "name": "stalwart-limit-refusals",
    "sort_order": 15,
    "title": "Send Limit Refusals",
    "use_live_connection": 1,
