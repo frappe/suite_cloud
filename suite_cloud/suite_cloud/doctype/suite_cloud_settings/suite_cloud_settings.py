@@ -119,7 +119,7 @@ class SuiteCloudSettings(Document):
             self.apply_outbound_scan_change(before)
 
     def validate_outbound_scan(self) -> None:
-        if self.outbound_scan_mode == "Enforce" and flt(self.outbound_scan_reject_score) <= 0:
+        if self.outbound_scan_mode != "Off" and flt(self.outbound_scan_reject_score) <= 0:
             frappe.throw(_("The Outbound Spam Scan Reject Score must be above 0."))
 
     def apply_outbound_scan_change(self, before: Document) -> None:

@@ -41,7 +41,7 @@ The **Outbound Spam Scan** section is on the Stalwart tab of Suite Cloud Setting
 | Field | Default | Purpose |
 | --- | --- | --- |
 | **Outbound Spam Scan Mode** | Enforce | Off: no scan. Observe: scan and log the score, refuse nothing. Enforce: refuse at the reject score |
-| **Outbound Spam Scan Reject Score** | 15 | The Rspamd score at which Enforce refuses a message |
+| **Outbound Spam Scan Reject Score** | 15 | The Rspamd score at which Enforce refuses a message. Observe refuses nothing and counts the messages at or over it on the dashboard. It must be above 0 in Observe and Enforce |
 | **Rspamd Version** | blank | The package version to install. Blank installs the current stable release |
 
 A change from Off to another mode, or back, changes only the cluster plan. Suite Cloud queues a push to each Active cluster. A change between Observe and Enforce, or of the reject score in Enforce, changes the Rspamd files. Run **Install Outbound Scanners** on each cluster to apply it. The cluster form lists each running node whose files do not match the current settings.
@@ -193,7 +193,7 @@ The subject, the body and the recipient addresses are not recorded.
 | Outbound Scores | Messages per score band of one point. Use it to set the reject score |
 | Rules That Raised Scores | The rules that added to a score most often |
 | Outbound Scan Time (ms) | The median and slowest scan per hour |
-| Outbound Scores by Account | Each sender's message count, average, median and highest score, and refusals |
+| Outbound Scores by Account | Each sender's message count, average, median and highest score, messages over the reject score and refusals, each also as a percentage of the messages |
 | Scanned Messages | One row per message, newest first |
 | Rules per Message | Each rule that matched each message and what it added |
 

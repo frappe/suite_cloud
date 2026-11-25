@@ -141,13 +141,16 @@ class TestMilterPlan(OutboundScanTestCase):
         fill_outbound_scan_defaults.execute()
         self.assertEqual(frappe.db.get_single_value(settings, "outbound_scan_mode"), "Observe")
 
-    def test_enforce_needs_a_reject_score(self) -> None:
-        self.assertRaises(
-            frappe.ValidationError,
-            configure_settings,
-            outbound_scan_mode="Enforce",
-            outbound_scan_reject_score=0,
-        )
+    def test_a_scanning_mode_needs_a_reject_score(self) -> None:
+        for mode in ("Observe", "Enforce"):
+            with self.subTest(mode):
+                self.assertRaises(
+                    frappe.ValidationError,
+                    configure_settings,
+                    outbound_scan_mode=mode,
+                    outbound_scan_reject_score=0,
+                )
+        configure_settings(outbound_scan_mode="Off", outbound_scan_reject_score=0)
 
 
 class TestTrustedAccounts(OutboundScanTestCase):

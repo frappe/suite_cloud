@@ -3979,18 +3979,36 @@
       "measure_name": "Over Reject Score"
      },
      {
+      "data_type": "Decimal",
+      "expression": {
+       "expression": "count_if(score >= reject_score) / count()",
+       "type": "expression"
+      },
+      "format": "percent",
+      "measure_name": "Over Reject Score (%)"
+     },
+     {
       "data_type": "Integer",
       "expression": {
        "expression": "count_if(action == 'reject')",
        "type": "expression"
       },
       "measure_name": "Refused"
+     },
+     {
+      "data_type": "Decimal",
+      "expression": {
+       "expression": "count_if(action == 'reject') / count()",
+       "type": "expression"
+      },
+      "format": "percent",
+      "measure_name": "Refused (%)"
      }
     ]
    },
    "description": null,
    "folder": null,
-   "info": "Each signed-in sender's scores, highest first. A taken-over account shows as a jump in its highest and median score.",
+   "info": "Each signed-in sender's scores, highest first. A taken-over account shows as a jump in its highest and median score. Over Reject Score counts the messages at or over the reject score the settings had when the records arrived, in Observe too, and each (%) column is that count over Messages.",
    "name": "stalwart-outbound-accounts",
    "query": "stalwart-outbound-scans",
    "sort_order": 114,
@@ -10195,7 +10213,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-25 12:00:00.000000",
+ "modified": "2026-11-25 13:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
