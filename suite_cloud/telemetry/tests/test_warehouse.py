@@ -1,5 +1,6 @@
 """The loader: whole batches into Insights' DuckDB once, bad files aside, old rows out."""
 
+import json
 import shutil
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -24,7 +25,8 @@ from suite_cloud.telemetry import (
 )
 from suite_cloud.telemetry.outbound_scans import get_scan_rows
 from suite_cloud.telemetry.spool import Spool
-from suite_cloud.telemetry.warehouse import Warehouse
+from suite_cloud.telemetry.tests.test_workbooks import shipped_workbook
+from suite_cloud.telemetry.warehouse import DATA_SOURCE, Warehouse
 from suite_cloud.tests.fixtures import configure_settings
 from suite_cloud.utils import get_system_zone
 
@@ -77,6 +79,7 @@ TABLE_NAMES = {
     "outbound_scan_symbols",
     "nodes",
     "mail_domains",
+    "outbound_scan_settings",
     "current_metrics",
 }
 
@@ -278,6 +281,59 @@ class TestWarehouse(IntegrationTestCase):
             ),
             [("acme.test", "reject", 16.2, 15.0)],
         )
+
+    def test_a_refresh_copies_the_outbound_scan_settings_now(self) -> None:
+        configure_settings(outbound_scan_mode="Off", outbound_scan_reject_score=6)
+        self.warehouse.refresh_tables()
+        settings = "SELECT mode, reject_score FROM outbound_scan_settings"
+        self.assertEqual(self.warehouse.query(settings, {}), [("Off", 6.0)])
+
+        configure_settings(outbound_scan_mode="Observe", outbound_scan_reject_score=5)
+        self.warehouse.refresh_tables()
+        self.assertEqual(self.warehouse.query(settings, {}), [("Observe", 5.0)])
+
+    def test_the_outbound_scans_query_compares_every_scan_with_the_reject_score_now(self) -> None:
+        configure_settings(outbound_scan_mode="Enforce", outbound_scan_reject_score=15)
+        records = [
+            {
+                "time": NOW.replace(tzinfo=get_system_zone()).timestamp(),
+                "user": "ana@acme.test",
+                "action": "no action",
+                "score": score,
+            }
+            for score in (2.0, 6.0)
+        ]
+        self.stage(OUTBOUND_SCANS, get_scan_rows(records)[0])
+        configure_settings(outbound_scan_mode="Observe", outbound_scan_reject_score=5)
+        self.warehouse.load_pending()
+
+        rows = self.run_shipped_query("stalwart-outbound-scans")
+
+        self.assertEqual(
+            sorted(
+                (row["score"], row["reject_score"], row["outbound_scan_settings_reject_score"])
+                for row in rows
+            ),
+            [(2.0, 15.0, 5.0), (6.0, 15.0, 5.0)],
+        )
+
+    def run_shipped_query(self, name: str) -> list[dict]:
+        from insights.insights.doctype.insights_data_source_v3.insights_data_source_v3 import db_connections
+
+        operations = json.dumps(shipped_workbook("stalwart")["queries"][name]["operations"])
+        workbook = frappe.get_doc({"doctype": "Insights Workbook", "title": self.name}).insert()
+        query = frappe.get_doc(
+            {
+                "doctype": "Insights Query v3",
+                "title": name,
+                "workbook": workbook.name,
+                "is_builder_query": 1,
+                "use_live_connection": 1,
+                "operations": operations.replace(f'"{DATA_SOURCE}"', f'"{self.name}"'),
+            }
+        ).insert()
+        with db_connections():
+            return query.execute()["rows"]
 
     def test_a_table_from_before_the_extracted_columns_gets_them_filled_on_the_next_load(self) -> None:
         legacy = TelemetryTable(EVENTS.name, EVENTS.schema)

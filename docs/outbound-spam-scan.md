@@ -182,14 +182,16 @@ Nothing in the scan waits for Suite Cloud: the recorder only writes a local file
 | `score` | `score` | Rspamd's score |
 | `scan_time` | `scan_time` | Milliseconds from the start of the scan to the record |
 | `symbols` | `symbols`, and the `outbound_scan_symbols` rows | `{rule: score}` of each matched rule |
-| | `mode`, `reject_score` | The settings when the batch arrived, so Observe shows what Enforce would refuse |
+| | `mode`, `reject_score` | The settings when the batch arrived |
 
 The subject, the body and the recipient addresses are not recorded.
+
+The `outbound_scan_settings` table holds one row: the mode and reject score in Suite Cloud Settings now. The loader rewrites it every five minutes, and the Outbound Scans query joins it as `outbound_scan_settings_reject_score`. The charts count a message as over the reject score against this current score, not the stored one, so a new reject score applies to every day shown within five minutes. This lets you try a score in Observe on the mail already scanned.
 
 | Dashboard chart | Shows |
 | --- | --- |
 | Outbound Scan Readings | Scanned, refused and over-the-score messages, and the median scan time |
-| Outbound Scan Results | Passed, over the reject score but not refused (Observe), and refused messages per day |
+| Outbound Scan Results | Passed, over the current reject score but not refused, and refused messages per day |
 | Outbound Scores | Messages per score band of one point. Use it to set the reject score |
 | Rules That Raised Scores | The rules that added to a score most often |
 | Outbound Scan Time (ms) | The median and slowest scan per hour |
