@@ -12,8 +12,9 @@ from pathlib import Path
 import frappe
 import pyarrow.parquet as parquet
 from frappe import _
-from frappe.utils import cint, now_datetime
+from frappe.utils import cint, flt, now_datetime
 
+from suite_cloud.mail.cluster.rspamd import SCAN_FIELDS
 from suite_cloud.telemetry import (
     CURRENT_METRICS,
     DIMENSIONS,
@@ -21,6 +22,7 @@ from suite_cloud.telemetry import (
     MAIL_DOMAINS,
     METRICS,
     NODES,
+    OUTBOUND_SCAN_SETTINGS,
     TABLES,
     TelemetryTable,
 )
@@ -198,15 +200,16 @@ class Warehouse:
 
     def refresh_tables(self) -> None:
         """Creates the telemetry tables, adds the derived columns an older one lacks, and rewrites
-        the node and mail domain tables from Suite Cloud's records.
+        the node, mail domain and outbound scan settings tables from Suite Cloud's records.
 
         The records are read before the lock is taken. Past a one-time backfill, the file is held
-        only for the table checks and two small table swaps.
+        only for the table checks and three small table swaps.
         """
 
         batches = {
             NODES: NODES.get_batch({}, get_node_rows()),
             MAIL_DOMAINS: MAIL_DOMAINS.get_batch({}, get_mail_domain_rows()),
+            OUTBOUND_SCAN_SETTINGS: OUTBOUND_SCAN_SETTINGS.get_batch({}, [get_scan_settings_row()]),
         }
         with self.write_connection() as db:
             for table in (*TABLES, CURRENT_METRICS):
@@ -388,6 +391,13 @@ def get_host_rows(
         for address in addresses
         if address
     ]
+
+
+def get_scan_settings_row() -> dict:
+    """The reject score in every mode, so Observe and Off still count against it; 0 counts as unset."""
+
+    mode, score = get_config(SCAN_FIELDS)
+    return {"mode": mode, "reject_score": flt(score) or None}
 
 
 def get_mail_domain_rows() -> list[dict]:

@@ -472,4 +472,15 @@ MAIL_DOMAINS = TelemetryTable(
     ),
 )
 
-DIMENSIONS = (NODES, MAIL_DOMAINS)
+# One row: the outbound scan settings now, so a chart compares every message with today's reject score.
+OUTBOUND_SCAN_SETTINGS = TelemetryTable(
+    "outbound_scan_settings",
+    pyarrow.schema(
+        [
+            pyarrow.field("mode", pyarrow.string(), nullable=False),
+            pyarrow.field("reject_score", pyarrow.float64()),
+        ]
+    ),
+)
+
+DIMENSIONS = (NODES, MAIL_DOMAINS, OUTBOUND_SCAN_SETTINGS)

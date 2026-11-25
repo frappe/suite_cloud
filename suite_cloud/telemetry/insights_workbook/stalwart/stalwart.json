@@ -3973,7 +3973,7 @@
      {
       "data_type": "Integer",
       "expression": {
-       "expression": "count_if(score >= reject_score)",
+       "expression": "count_if(score >= outbound_scan_settings_reject_score)",
        "type": "expression"
       },
       "measure_name": "Over Reject Score"
@@ -3981,7 +3981,7 @@
      {
       "data_type": "Decimal",
       "expression": {
-       "expression": "count_if(score >= reject_score) / count()",
+       "expression": "count_if(score >= outbound_scan_settings_reject_score) / count()",
        "type": "expression"
       },
       "format": "percent",
@@ -4008,7 +4008,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Each signed-in sender's scores, highest first. A taken-over account shows as a jump in its highest and median score. Over Reject Score counts the messages at or over the reject score the settings had when the records arrived, in Observe too, and each (%) column is that count over Messages.",
+   "info": "Each signed-in sender's scores, highest first. A taken-over account shows as a jump in its highest and median score. Over Reject Score counts the messages at or over the reject score in Suite Cloud Settings now, in Observe too, and each (%) column is that count over Messages.",
    "name": "stalwart-outbound-accounts",
    "query": "stalwart-outbound-scans",
    "sort_order": 114,
@@ -4229,7 +4229,7 @@
      {
       "data_type": "Integer",
       "expression": {
-       "expression": "count_if((action != 'reject') & (score >= reject_score))",
+       "expression": "count_if((action != 'reject') & (score >= outbound_scan_settings_reject_score))",
        "type": "expression"
       },
       "measure_name": "Over Reject Score, Not Refused",
@@ -4291,7 +4291,7 @@
        "measure": {
         "data_type": "Integer",
         "expression": {
-         "expression": "count_if((action != 'reject') & (score < reject_score))",
+         "expression": "count_if((action != 'reject') & (score < outbound_scan_settings_reject_score))",
          "type": "expression"
         },
         "measure_name": "Passed"
@@ -4301,7 +4301,7 @@
        "measure": {
         "data_type": "Integer",
         "expression": {
-         "expression": "count_if((action != 'reject') & (score >= reject_score))",
+         "expression": "count_if((action != 'reject') & (score >= outbound_scan_settings_reject_score))",
          "type": "expression"
         },
         "measure_name": "Over Reject Score, Not Refused"
@@ -4324,7 +4324,7 @@
    },
    "description": null,
    "folder": null,
-   "info": "Messages signed-in senders sent, per day, as each node's Rspamd scored them. Over Reject Score, Not Refused is what Observe let through that Enforce would refuse, at the reject score the settings had when the records arrived.",
+   "info": "Messages signed-in senders sent, per day, as each node's Rspamd scored them. Over Reject Score, Not Refused is what was let through at or over the reject score in Suite Cloud Settings now, so a new reject score applies to every day shown.",
    "name": "stalwart-outbound-scan-results",
    "query": "stalwart-outbound-scans",
    "sort_order": 110,
@@ -10213,7 +10213,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-25 13:00:00.000000",
+ "modified": "2026-11-25 14:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
@@ -10932,6 +10932,27 @@
      "type": "source"
     },
     {
+     "join_condition": {
+      "join_expression": {
+       "expression": "is_set(t2.reject_score)",
+       "type": "expression"
+      }
+     },
+     "join_type": "left",
+     "select_columns": [
+      {
+       "column_name": "reject_score",
+       "type": "column"
+      }
+     ],
+     "table": {
+      "data_source": "suite_cloud_telemetry",
+      "table_name": "outbound_scan_settings",
+      "type": "table"
+     },
+     "type": "join"
+    },
+    {
      "data_type": "String",
      "expression": {
       "expression": "coalesce(hostname, host_ip)",
@@ -10970,6 +10991,7 @@
       "scan_time",
       "mode",
       "reject_score",
+      "outbound_scan_settings_reject_score",
       "symbols"
      ],
      "type": "select"

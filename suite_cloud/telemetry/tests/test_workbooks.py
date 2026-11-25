@@ -14,6 +14,17 @@ def shipped_workbook(name: str) -> dict:
     return json.loads((WORKBOOKS / name / f"{name}.json").read_text())
 
 
+def joined_columns(operations: list[dict]) -> set[str]:
+    """Insights prefixes a joined column the source also has with the joined table's name."""
+
+    return {
+        f"{join['table']['table_name']}_{name}" if name in OUTBOUND_SCANS.columns else name
+        for join in operations
+        if join["type"] == "join"
+        for name in (column["column_name"] for column in join["select_columns"])
+    }
+
+
 class TestShippedWorkbooks(unittest.TestCase):
     def test_metric_charts_are_plotted_per_hour(self) -> None:
         """A gauge sampled every minute shows one point per day when bucketed by day; the host
@@ -156,8 +167,24 @@ class TestShippedWorkbooks(unittest.TestCase):
                 self.assertEqual(operations[0]["table"]["table_name"], table.name)
                 self.assertLessEqual(
                     set(selected["column_names"]),
-                    {*table.columns, *(column.name for column in table.derived), *mutated},
+                    {
+                        *table.columns,
+                        *(column.name for column in table.derived),
+                        *mutated,
+                        *joined_columns(operations),
+                    },
                 )
+
+    def test_the_outbound_scan_charts_count_against_the_reject_score_now(self) -> None:
+        """The reject score a scan stored is the one it arrived under; a new score must count every day shown."""
+
+        workbook = shipped_workbook("stalwart")
+        operations = workbook["queries"]["stalwart-outbound-scans"]["operations"]
+        self.assertIn("outbound_scan_settings_reject_score", joined_columns(operations))
+        for name, chart in workbook["charts"].items():
+            if chart["query"] == "stalwart-outbound-scans":
+                with self.subTest(chart=name):
+                    self.assertNotRegex(json.dumps(chart["config"]), r"[^_]reject_score")
 
     def test_the_account_scores_show_each_count_as_a_share_of_the_messages(self) -> None:
         values = shipped_workbook("stalwart")["charts"]["stalwart-outbound-accounts"]["config"]["values"]
