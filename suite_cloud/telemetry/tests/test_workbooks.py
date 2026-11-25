@@ -159,6 +159,20 @@ class TestShippedWorkbooks(unittest.TestCase):
                     {*table.columns, *(column.name for column in table.derived), *mutated},
                 )
 
+    def test_the_account_scores_show_each_count_as_a_share_of_the_messages(self) -> None:
+        values = shipped_workbook("stalwart")["charts"]["stalwart-outbound-accounts"]["config"]["values"]
+        measures = {value["measure_name"]: value for value in values}
+        names = list(measures)
+        for count in ("Over Reject Score", "Refused"):
+            with self.subTest(count):
+                share = measures[f"{count} (%)"]
+                self.assertEqual(names.index(f"{count} (%)"), names.index(count) + 1)
+                self.assertEqual(share["format"], "percent")
+                self.assertEqual(
+                    share["expression"]["expression"],
+                    f"{measures[count]['expression']['expression']} / count()",
+                )
+
     def test_the_outbound_scan_filters_reach_every_chart(self) -> None:
         workbook = shipped_workbook("stalwart")
         dashboard = workbook["dashboards"]["stalwart-outbound-scan"]
