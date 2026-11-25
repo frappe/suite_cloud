@@ -190,7 +190,7 @@ The `outbound_scan_settings` table holds one row: the mode and reject score in S
 
 | Dashboard chart | Shows |
 | --- | --- |
-| Outbound Scan Readings | Scanned, refused and over-the-score messages, and the median scan time |
+| Outbound Scan Readings | Scanned, refused and over-the-score messages, refused and over-the-score as a percentage of scanned, and the median scan time |
 | Outbound Scan Results | Passed, over the current reject score but not refused, and refused messages per day |
 | Outbound Scores | Messages per score band of one point. Use it to set the reject score |
 | Rules That Raised Scores | The rules that added to a score most often |

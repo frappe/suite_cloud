@@ -4194,7 +4194,21 @@
      },
      {
       "comparison": {
+       "show": "delta",
+       "source": "previous"
+      },
+      "negative_is_better": true
+     },
+     {
+      "comparison": {
        "show": "change",
+       "source": "previous"
+      },
+      "negative_is_better": true
+     },
+     {
+      "comparison": {
+       "show": "delta",
        "source": "previous"
       },
       "negative_is_better": true
@@ -4227,6 +4241,16 @@
       "id": "Refused"
      },
      {
+      "data_type": "Decimal",
+      "expression": {
+       "expression": "count_if(action == 'reject') / count()",
+       "type": "expression"
+      },
+      "format": "percent",
+      "measure_name": "Refused (%)",
+      "id": "Refused (%)"
+     },
+     {
       "data_type": "Integer",
       "expression": {
        "expression": "count_if((action != 'reject') & (score >= outbound_scan_settings_reject_score))",
@@ -4234,6 +4258,16 @@
       },
       "measure_name": "Over Reject Score, Not Refused",
       "id": "Over Reject Score, Not Refused"
+     },
+     {
+      "data_type": "Decimal",
+      "expression": {
+       "expression": "count_if((action != 'reject') & (score >= outbound_scan_settings_reject_score)) / count()",
+       "type": "expression"
+      },
+      "format": "percent",
+      "measure_name": "Over Reject Score, Not Refused (%)",
+      "id": "Over Reject Score, Not Refused (%)"
      },
      {
       "data_type": "Decimal",
@@ -8787,8 +8821,8 @@
      "chart": "stalwart-outbound-scan-readings",
      "layout": {
       "h": 7,
-      "i": "scan_readings-0",
-      "w": 5,
+      "i": "scan_readings-scanned",
+      "w": 3,
       "x": 0,
       "y": 2
      },
@@ -8799,9 +8833,9 @@
      "chart": "stalwart-outbound-scan-readings",
      "layout": {
       "h": 7,
-      "i": "scan_readings-1",
-      "w": 5,
-      "x": 5,
+      "i": "scan_readings-refused",
+      "w": 3,
+      "x": 3,
       "y": 2
      },
      "type": "chart",
@@ -8811,9 +8845,21 @@
      "chart": "stalwart-outbound-scan-readings",
      "layout": {
       "h": 7,
-      "i": "scan_readings-2",
-      "w": 5,
-      "x": 10,
+      "i": "scan_readings-refused-share",
+      "w": 3,
+      "x": 6,
+      "y": 2
+     },
+     "type": "chart",
+     "reading": "Refused (%)"
+    },
+    {
+     "chart": "stalwart-outbound-scan-readings",
+     "layout": {
+      "h": 7,
+      "i": "scan_readings-over-reject-score-not-refused",
+      "w": 4,
+      "x": 9,
       "y": 2
      },
      "type": "chart",
@@ -8823,9 +8869,21 @@
      "chart": "stalwart-outbound-scan-readings",
      "layout": {
       "h": 7,
-      "i": "scan_readings-3",
-      "w": 5,
-      "x": 15,
+      "i": "scan_readings-over-reject-score-not-refused-share",
+      "w": 4,
+      "x": 13,
+      "y": 2
+     },
+     "type": "chart",
+     "reading": "Over Reject Score, Not Refused (%)"
+    },
+    {
+     "chart": "stalwart-outbound-scan-readings",
+     "layout": {
+      "h": 7,
+      "i": "scan_readings-median-scan-time",
+      "w": 3,
+      "x": 17,
       "y": 2
      },
      "type": "chart",
@@ -10213,7 +10271,7 @@
  "folders": [],
  "idx": 0,
  "is_standard": 1,
- "modified": "2026-11-25 14:00:00.000000",
+ "modified": "2026-11-25 16:00:00.000000",
  "modified_by": "Administrator",
  "module": "Telemetry",
  "name": "stalwart",
