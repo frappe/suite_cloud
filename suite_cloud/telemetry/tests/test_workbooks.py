@@ -188,16 +188,38 @@ class TestShippedWorkbooks(unittest.TestCase):
 
     def test_the_account_scores_show_each_count_as_a_share_of_the_messages(self) -> None:
         values = shipped_workbook("stalwart")["charts"]["stalwart-outbound-accounts"]["config"]["values"]
-        measures = {value["measure_name"]: value for value in values}
-        names = list(measures)
-        for count in ("Over Reject Score", "Refused"):
+        self.assert_shares_follow_counts(values, ("Over Reject Score", "Refused"))
+
+    def test_the_scan_readings_show_each_count_as_a_share_of_the_scanned_messages(self) -> None:
+        workbook = shipped_workbook("stalwart")
+        config = workbook["charts"]["stalwart-outbound-scan-readings"]["config"]
+        self.assert_shares_follow_counts(
+            config["number_columns"], ("Refused", "Over Reject Score, Not Refused")
+        )
+        self.assertEqual(len(config["number_column_options"]), len(config["number_columns"]))
+
+        cards = [
+            item
+            for item in workbook["dashboards"]["stalwart-outbound-scan"]["items"]
+            if item.get("chart") == "stalwart-outbound-scan-readings"
+        ]
+        self.assertEqual(
+            [card["reading"] for card in cards], [column["id"] for column in config["number_columns"]]
+        )
+        self.assertEqual({card["layout"]["y"] for card in cards}, {2})
+        self.assertEqual(sum(card["layout"]["w"] for card in cards), 20)
+
+    def assert_shares_follow_counts(self, measures: list[dict], counts: tuple[str, ...]) -> None:
+        by_name = {measure["measure_name"]: measure for measure in measures}
+        names = list(by_name)
+        for count in counts:
             with self.subTest(count):
-                share = measures[f"{count} (%)"]
+                share = by_name[f"{count} (%)"]
                 self.assertEqual(names.index(f"{count} (%)"), names.index(count) + 1)
                 self.assertEqual(share["format"], "percent")
                 self.assertEqual(
                     share["expression"]["expression"],
-                    f"{measures[count]['expression']['expression']} / count()",
+                    f"{by_name[count]['expression']['expression']} / count()",
                 )
 
     def test_the_outbound_scan_filters_reach_every_chart(self) -> None:
